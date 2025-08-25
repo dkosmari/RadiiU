@@ -5,7 +5,7 @@ EXTRA_DIST = \
 	COPYING.GPLv3 \
 	radio-browser-info-api.md \
 	README.md \
-	todo.org
+	TODO.org
 
 
 SUBDIRS = external

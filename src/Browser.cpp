@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <iostream>
 #include <random>
+#include <set>
 #include <span>
 #include <thread>
 #include <utility>
@@ -50,11 +51,7 @@ namespace Browser {
     thread_safe<std::string> safe_server;
     std::atomic_bool pending_connect{false};
 
-    struct Mirror {
-        net::address address;
-        std::string name;
-    };
-    thread_safe<std::vector<Mirror>> safe_mirrors;
+    thread_safe<std::vector<std::string>> safe_mirrors;
     std::jthread fetch_mirrors_thread;
 
 
@@ -142,13 +139,10 @@ namespace Browser {
                     addresses.push_back(entry.addr);
             }
             cout << "Found " << addresses.size() << " mirrors" << endl;
-            std::vector<Mirror> new_mirrors;
+            std::set<std::string> new_mirrors;
             {
                 net::resolver::name_resolver nr;
                 for (const auto& addr : addresses) {
-                    Mirror m;
-                    m.address = addr;
-                    m.name = to_string(addr);
                     try {
                         nr.process(addr);
 
@@ -159,19 +153,21 @@ namespace Browser {
                             throw std::runtime_error{"failed to look up name for "
                                                      + to_string(addr)};
                         if (nr.result.name)
-                            m.name = *nr.result.name;
+                            new_mirrors.insert(std::move(*nr.result.name));
                     }
                     catch (std::exception& e) {
                         cout << "Failed to look up name for " << addr << endl;
                     }
-                    new_mirrors.push_back(std::move(m));
                 }
             }
 
             if (stopper.stop_requested())
                 return false;
 
-            safe_mirrors.store(std::move(new_mirrors));
+            auto mirrors = safe_mirrors.lock();
+            mirrors->clear();
+            for (const auto& name : new_mirrors)
+                mirrors->push_back(name);
 
             return true;
         }
@@ -187,7 +183,7 @@ namespace Browser {
     {
         if (!fetch_mirrors(stopper))
             return;
-        std::vector<Mirror> local_mirrors = safe_mirrors.load();
+        std::vector<std::string> local_mirrors = safe_mirrors.load();
 
 #ifdef __WIIU__
         std::uint64_t now = OSGetTime();
@@ -206,7 +202,7 @@ namespace Browser {
         std::ranges::shuffle(local_mirrors, rnd_engine);
         // try each mirror until one that works
         const std::string user_agent = utils::get_user_agent();
-        for (auto [address, name] : local_mirrors) {
+        for (auto name : local_mirrors) {
             if (stopper.stop_requested())
                 return;
             bool success = false;
@@ -235,14 +231,7 @@ namespace Browser {
     void
     initialize()
     {
-        busy = true;
-        std::string server = safe_server.load();
-        server = cfg::radio_info_server;
-        if (server.empty())
-            fetch_mirrors_thread = std::jthread{fetch_mirrors_and_select_random};
-        else
-            busy = false;
-
+        connect();
         load();
     }
 
@@ -346,12 +335,7 @@ namespace Browser {
     std::vector<std::string>
     get_mirrors()
     {
-        auto list = safe_mirrors.c_lock();
-        std::vector<std::string> result;
-        result.reserve(list->size());
-        for (auto& entry : *list)
-            result.push_back(entry.name);
-        return result;
+        return safe_mirrors.load();
     }
 
 
@@ -408,11 +392,21 @@ namespace Browser {
 
 
     void
-    connect(const std::string& url)
+    connect()
     {
+        busy = true;
         auto server = safe_server.lock();
-        *server = url;
-        need_refresh = true;
+        if (*server != cfg::server) {
+            *server = cfg::server;
+            need_refresh = true;
+        }
+        if (server->empty())
+            need_refresh = true;
+
+        if (server->empty())
+            fetch_mirrors_thread = std::jthread{fetch_mirrors_and_select_random};
+        else
+            busy = false;
     }
 
 

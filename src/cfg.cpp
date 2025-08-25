@@ -32,6 +32,14 @@ using std::endl;
 
 namespace cfg {
 
+    std::filesystem::path base_dir;
+
+    std::string server;
+    unsigned    player_buffer_size      = 8192;
+    bool        disable_auto_power_down = true;
+    unsigned    browser_page_size       = 20;
+
+
     namespace {
         std::filesystem::path
         get_user_config_path()
@@ -52,16 +60,6 @@ namespace cfg {
 #endif
         }
     } // namespace
-
-    std::filesystem::path base_dir;
-
-    std::string radio_info_server;
-
-    unsigned player_buffer_size = 8192;
-
-    bool disable_auto_power_down = true;
-
-    unsigned browser_page_size = 20;
 
 
     void
@@ -110,8 +108,8 @@ namespace cfg {
         try {
             auto root = json::load(base_dir / "settings.json").as<json::object>();
 
-            if (root.contains("radio_info_server"))
-                radio_info_server = root.at("radio_info_server").as<json::string>();
+            if (root.contains("server"))
+                server = root.at("server").as<json::string>();
 
             if (root.contains("player_buffer_size"))
                 player_buffer_size = root.at("player_buffer_size").as<json::integer>();
@@ -133,8 +131,8 @@ namespace cfg {
     {
         try {
             json::object root;
-            if (!radio_info_server.empty())
-                root["radio_info_server"] = radio_info_server;
+            if (!server.empty())
+                root["server"] = server;
             root["player_buffer_size"]      = player_buffer_size;
             root["disable_auto_power_down"] = disable_auto_power_down;
             root["browser_page_size"]       = browser_page_size;

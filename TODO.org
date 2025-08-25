@@ -1,4 +1,4 @@
-* Pending features for v0.1 [29%]
+* Pending features for v0.1 [32%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
@@ -23,6 +23,7 @@
     - [ ] Show stream details (bitrate, codec)
     - [ ] Add/remove to favorites
     - [ ] Show track change history.
-  - [X] Settings [1/1]
+  - [X] Settings [2/2]
     - [X] Load/save (store as save game on Wii U)
+    - [X] Select server
   - [ ] Add "About" tab, for credits and version number for all components

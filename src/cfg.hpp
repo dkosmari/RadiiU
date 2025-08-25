@@ -17,7 +17,7 @@ namespace cfg {
 
     extern std::filesystem::path base_dir;
 
-    extern std::string radio_info_server;
+    extern std::string server;
     extern unsigned    player_buffer_size;
     extern bool        disable_auto_power_down;
     extern unsigned    browser_page_size;

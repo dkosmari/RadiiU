@@ -5,10 +5,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <iostream>
+#include <memory>
 #include <utility>
 #include <vector>
-#include <memory>
-#include <iostream>
 
 #include <curlxx/curl.hpp>
 
@@ -75,7 +75,7 @@ namespace rest {
     {
         cout << "Running rest::initialize()" << endl;
         user_agent = ua;
-        multi.set_max_total_connections(4);
+        multi.set_max_total_connections(5);
         multi.set_max_connections(10);
     }
 

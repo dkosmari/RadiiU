@@ -29,6 +29,10 @@ namespace Browser {
 
 
     void
+    connect();
+
+
+    void
     update_list();
 
 
