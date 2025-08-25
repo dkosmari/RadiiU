@@ -1,4 +1,4 @@
-* Pending features for v0.1 [30%]
+* Pending features for v0.1 [29%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
@@ -25,3 +25,4 @@
     - [ ] Show track change history.
   - [X] Settings [1/1]
     - [X] Load/save (store as save game on Wii U)
+  - [ ] Add "About" tab, for credits and version number for all components
