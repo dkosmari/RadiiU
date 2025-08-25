@@ -1,0 +1,7 @@
+#pragma once
+
+#define IMGUI_ENABLE_FREETYPE
+
+#define IMGUI_USE_WCHAR32
+
+#define IMGUI_DEFINE_MATH_OPERATORS

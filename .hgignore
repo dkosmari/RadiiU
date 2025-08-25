@@ -1,0 +1,26 @@
+syntax: glob
+
+*.elf
+*.json
+*.o
+*.rpx
+*.wuhb
+*~
+.deps
+aclocal.m4
+aminclude.am
+autom4te.cache
+build-aux
+build-native
+build-wiiu
+CafeStd.ttf
+compile_flags.txt
+config.h
+config.h.in
+config.log
+config.status
+config.sub
+configure
+Makefile
+Makefile.in
+stamp-h1

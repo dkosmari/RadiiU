@@ -1,0 +1,12 @@
+[submodule "external/curlxx"]
+	path = external/curlxx
+	url = https://github.com/dkosmari/curlxx.git
+[submodule "external/imgui"]
+	path = external/imgui
+	url = https://github.com/dkosmari/imgui.git
+[submodule "external/mpg123xx"]
+	path = external/mpg123xx
+	url = https://github.com/dkosmari/mpg123xx.git
+[submodule "external/sdl2xx"]
+	path = external/sdl2xx
+	url = https://github.com/dkosmari/sdl2xx.git

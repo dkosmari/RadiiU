@@ -1,0 +1,5 @@
+#!/bin/sh -x
+(cd external/curlxx && ./bootstrap) || exit 1
+(cd external/mpg123xx && ./bootstrap) || exit 2
+(cd external/sdl2xx && ./bootstrap) || exit 3
+exec autoreconf --install "$@"
