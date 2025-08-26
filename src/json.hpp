@@ -11,12 +11,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <iosfwd>
 #include <map>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <variant>
 #include <vector>
-#include <stdexcept>
 
 
 namespace json {
@@ -109,7 +110,7 @@ namespace json {
 
 
     void
-    dump(const value& val);
+    dump(const value& va, std::ostream& outl);
 
 
     value

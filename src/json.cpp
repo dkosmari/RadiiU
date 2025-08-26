@@ -5,8 +5,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <iostream>
 #include <fstream>
+#include <iostream>
+#include <ostream>
 #include <utility>
 
 #include <jansson.h>
@@ -364,11 +365,12 @@ namespace json {
 
 
     void
-    dump(const value& val)
+    dump(const value& val,
+         std::ostream& out)
     {
-        printer p{std::cout};
+        printer p{out};
         visit([&p](const auto& v) { p(v); }, val);
-        std::cout << std::flush;
+        out << std::flush;
     }
 
 

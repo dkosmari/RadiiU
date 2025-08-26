@@ -8,8 +8,8 @@
 #ifndef REST_HPP
 #define REST_HPP
 
-#include <map>
 #include <functional>
+#include <map>
 #include <string>
 
 #include <curlxx/easy.hpp>
@@ -62,6 +62,14 @@ namespace rest {
         error_function_t on_error = {});
 
 
+    std::string
+    get_sync(const std::string& url);
+
+    std::string
+    get_sync(const std::string& url,
+             const request_params_t& params);
+
+
     void
     get_json(const std::string& url,
              json_success_function_t on_success,
@@ -73,6 +81,13 @@ namespace rest {
              json_success_function_t on_success,
              error_function_t on_error = {});
 
+
+    json::value
+    get_json_sync(const std::string& url);
+
+    json::value
+    get_json_sync(const std::string& url,
+                  const request_params_t& params);
 
 
     void

@@ -204,24 +204,16 @@ namespace Browser {
         for (auto name : local_mirrors) {
             if (stopper.stop_requested())
                 return;
-            bool success = false;
-            curl::easy ez;
-            ez.set_user_agent(utils::get_user_agent());
-            ez.set_verbose(false);
-            ez.set_follow(true);
-            ez.set_ssl_verify_peer(false);
-            ez.set_write_function([&success](std::span<const char> buf)
-            {
-                success = true;
-                return buf.size();
-            });
-            ez.set_url("https://" + name + "/json/stats");
-            auto result = ez.try_perform();
-            if (result) {
-                // success
+            try {
+                auto result = rest::get_json_sync("https://" + name + "/json/stats");
+                cout << "Mirror " << name << " returned:\n";
+                dump(result, cout);
                 safe_server.store(name);
                 pending_connect = true;
                 break;
+            }
+            catch (std::exception& e) {
+                cout << "Mirror " << name << " failed to respond: " << e.what() << endl;
             }
         }
     }
