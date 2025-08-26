@@ -16,17 +16,35 @@
 
 namespace utils {
 
-    std::string
+    const std::string&
     get_user_agent()
     {
-        std::string user_agent = PACKAGE_NAME "/" PACKAGE_VERSION " (";
-        user_agent += SDL_GetPlatform();
+        static const std::string user_agent = []
+        {
+            std::string result = PACKAGE_NAME "/" PACKAGE_VERSION " (";
+            result += SDL_GetPlatform();
 #ifdef __WUT__
-        user_agent += "; WUT";
+            result += "; WUT";
 #endif
-        user_agent += ")";
+            result += ")";
+            return result;
+        }();
+
         return user_agent;
     }
 
+
+    const std::filesystem::path&
+    get_content_path()
+    {
+        static const std::filesystem::path content_path =
+#ifdef __WIIU__
+            "/vol/content"
+#else
+            "assets/content"
+#endif
+            ;
+        return content_path;
+    }
 
 } // namespace utils

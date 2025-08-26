@@ -42,16 +42,6 @@ libimgui_a_CPPFLAGS = \
 	$(FT_CFLAGS)
 
 
-if ENABLE_WIIU
-
-libimgui_a_CPPFLAGS += \
-	-DIMGUI_DISABLE_DEFAULT_SHELL_FUNCTIONS \
-	-DIMGUI_RGBA_BE
-
-endif ENABLE_WIIU
-
-
-
 .PHONY: company
 company: compile_flags.txt
 

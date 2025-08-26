@@ -201,13 +201,12 @@ namespace Browser {
         std::minstd_rand rnd_engine{rnd_seq};
         std::ranges::shuffle(local_mirrors, rnd_engine);
         // try each mirror until one that works
-        const std::string user_agent = utils::get_user_agent();
         for (auto name : local_mirrors) {
             if (stopper.stop_requested())
                 return;
             bool success = false;
             curl::easy ez;
-            ez.set_user_agent(user_agent);
+            ez.set_user_agent(utils::get_user_agent());
             ez.set_verbose(false);
             ez.set_follow(true);
             ez.set_ssl_verify_peer(false);

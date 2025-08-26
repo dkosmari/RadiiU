@@ -15,7 +15,7 @@
 namespace IconManager {
 
     void
-    initialize(const std::string& user_agent);
+    initialize();
 
     void
     finalize();

@@ -26,6 +26,7 @@
 #include "icy_meta.hpp"
 #include "imgui_extras.hpp"
 #include "Station.hpp"
+#include "utils.hpp"
 
 
 using std::cout;
@@ -44,7 +45,6 @@ namespace Player {
 
     State state = State::stopped;
 
-    std::string user_agent;
     std::string url;
     curl::multi multi;
     curl::easy easy;
@@ -176,10 +176,8 @@ namespace Player {
 
 
     void
-    initialize(const std::string& ua)
-    {
-        user_agent = ua;
-    }
+    initialize()
+    {}
 
 
     void
@@ -217,8 +215,7 @@ namespace Player {
         mpg.open_feed();
 
         easy.set_verbose(false);
-        if (!user_agent.empty())
-            easy.set_user_agent(user_agent);
+        easy.set_user_agent(utils::get_user_agent());
         easy.set_url(url);
         easy.set_forbid_reuse(true);
         easy.set_follow(true);

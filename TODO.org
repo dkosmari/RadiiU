@@ -1,4 +1,4 @@
-* Pending features for v0.1 [32%]
+* Pending features for v0.1 [34%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
@@ -26,4 +26,5 @@
   - [X] Settings [2/2]
     - [X] Load/save (store as save game on Wii U)
     - [X] Select server
-  - [ ] Add "About" tab, for credits and version number for all components
+  - [X] Add "About" tab, for credits and version number for all components
+  - [ ] Handle loss of internet connection.

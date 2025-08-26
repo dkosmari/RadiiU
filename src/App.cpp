@@ -22,6 +22,7 @@
 
 #include "App.hpp"
 
+#include "About.hpp"
 #include "Browser.hpp"
 #include "cfg.hpp"
 #include "Favorites.hpp"
@@ -59,7 +60,7 @@ namespace {
 
 
     void
-    load_fonts(const std::filesystem::path& content_path)
+    load_fonts()
     {
         auto& io = ImGui::GetIO();
 
@@ -97,7 +98,7 @@ namespace {
         font_config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
         font_config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
 
-        if (!io.Fonts->AddFontFromFileTTF((content_path / "Symbola.ttf").c_str(),
+        if (!io.Fonts->AddFontFromFileTTF((utils::get_content_path() / "Symbola.ttf").c_str(),
                                           symbola_size,
                                           &font_config))
             throw std::runtime_error{"Could not load font!"};
@@ -111,6 +112,7 @@ namespace {
         recent,
         player,
         settings,
+        about,
     };
 
     std::optional<TabIndex> next_tab = TabIndex::browser;
@@ -155,11 +157,6 @@ namespace {
 
 
 App::App() :
-#ifdef __WIIU__
-    content_path{"/vol/content"},
-#else
-    content_path{"assets/content"},
-#endif
     sdl_init{sdl::init::flag::video,
              sdl::init::flag::audio,
              sdl::init::flag::game_controller},
@@ -206,40 +203,48 @@ App::App() :
     io.LogFilename = nullptr;
     io.IniFilename = nullptr;
 
-    load_fonts(content_path);
+    load_fonts();
 
     ImGui::StyleColorsDark();
 
     // Custom styling
     auto& style = ImGui::GetStyle();
-    float roundness = 8;
-    style.WindowRounding = 0;
-    style.WindowPadding = {12, 12};
+    const float radius = 8;
+
     style.WindowBorderSize = 0;
-    style.FrameRounding = roundness;
-    style.GrabRounding = roundness;
-    style.ScrollbarRounding = roundness;
-    style.ScrollbarSize = 48;
-    style.GrabMinSize = 48;
+    style.WindowRounding = 0;
+    style.WindowPadding = {8, 8};
+
+    style.ScrollbarSize = 32;
+    style.ScrollbarRounding = radius;
+
+    style.GrabMinSize = 32;
+    style.GrabRounding = radius;
+
+    style.FrameRounding = radius;
     style.FramePadding = {12, 12};
+
     style.ImageBorderSize = 0;
+
     style.ItemSpacing = {12, 12};
     style.ItemInnerSpacing = {12, 12};
-    style.TabRounding = 16;
+
+    style.ChildBorderSize = 0;
+    style.ChildRounding = 0;
+
+    style.TabRounding = 12;
     // style.TabBorderSize = 16;
     // style.TabBarBorderSize = 16;
     // style.TabBarOverlineSize = 16;
-
 
     ImGui_ImplSDL2_InitForSDLRenderer(window.data(), renderer.data());
     ImGui_ImplSDLRenderer2_Init(renderer.data());
 
     title_texture = make_logo_texture(renderer);
 
-    std::string user_agent = utils::get_user_agent();
-    IconManager::initialize(user_agent);
-    rest::initialize(user_agent);
-    Player::initialize(user_agent);
+    IconManager::initialize();
+    rest::initialize(utils::get_user_agent());
+    Player::initialize();
     Favorites::initialize();
     Browser::initialize();
 
@@ -404,6 +409,15 @@ App::process_ui()
                 Settings::process_ui();
                 ImGui::EndTabItem();
             }
+
+            if (ImGui::BeginTabItem("About", nullptr,
+                                    should_switch(TabIndex::about)
+                                    ? ImGuiTabItemFlags_SetSelected
+                                    : ImGuiTabItemFlags_None)) {
+                About::process_ui();
+                ImGui::EndTabItem();
+            }
+
             next_tab.reset();
 
             ImGui::EndTabBar();

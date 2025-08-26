@@ -63,8 +63,7 @@ namespace rest {
             return stream.write(buf.data(), buf.size());
         }
 
-
-    };
+    }; // struct request
 
 
     std::vector<std::unique_ptr<request>> requests;

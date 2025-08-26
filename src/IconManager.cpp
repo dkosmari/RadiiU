@@ -24,10 +24,11 @@
 
 #include "IconManager.hpp"
 
-#include "async_queue.hpp"
 #include "App.hpp"
+#include "async_queue.hpp"
 #include "crc32.hpp"
 #include "thread_safe.hpp"
+#include "utils.hpp"
 
 
 using std::cout;
@@ -87,13 +88,12 @@ namespace IconManager {
 
 
     void
-    initialize(const std::string& ua)
+    initialize()
     {
-        user_agent = ua;
+        user_agent = utils::get_user_agent();
+        content_prefix = utils::get_content_path();
 
         App* app = App::get_instance();
-        content_prefix = app->content_path;
-
         renderer = &app->renderer;
 
         error_icon   = sdl::img::load_texture(*renderer,

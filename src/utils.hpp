@@ -8,13 +8,18 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
+#include <filesystem>
 #include <string>
 
 
 namespace utils {
 
-    std::string
+    const std::string&
     get_user_agent();
+
+
+    const std::filesystem::path&
+    get_content_path();
 
 } // namespace utils
 

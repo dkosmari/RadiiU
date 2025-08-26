@@ -5,3 +5,12 @@
 #define IMGUI_USE_WCHAR32
 
 #define IMGUI_DEFINE_MATH_OPERATORS
+
+
+#ifdef __WIIU__
+
+#  define IMGUI_DISABLE_DEFAULT_SHELL_FUNCTIONS
+
+#  define IMGUI_RGBA_BE
+
+#endif

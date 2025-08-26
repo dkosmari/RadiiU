@@ -8,7 +8,6 @@
 #ifndef APP_HPP
 #define APP_HPP
 
-#include <filesystem>
 #include <memory>
 #include <vector>
 
@@ -22,8 +21,6 @@
 
 
 struct App {
-
-    std::filesystem::path content_path;
 
     sdl::init sdl_init;
     sdl::img::init img_init;

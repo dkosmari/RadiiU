@@ -8,9 +8,6 @@
 #include <exception>
 #include <iostream>
 
-// #include <mpg123.h>
-#include <curl/curl.h>
-
 #include "App.hpp"
 
 #ifdef HAVE_CONFIG_H
@@ -26,8 +23,6 @@ int
 main(int, char* [])
 {
     cout << "Started " << PACKAGE_STRING << endl;
-
-    cout << "curl: " << curl_version() << endl;
 
     // cout << "mpg123 decoders:" << endl;
     // const char** decoders = mpg123_decoders();

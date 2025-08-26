@@ -35,6 +35,8 @@ noinst_PROGRAMS = radiiu.elf
 
 
 radiiu_elf_SOURCES = \
+	src/About.cpp \
+	src/About.hpp \
 	src/App.cpp \
 	src/App.hpp \
 	src/async_queue.hpp \
@@ -105,8 +107,6 @@ radiiu_elf_LDADD =  \
 
 
 if ENABLE_WIIU
-
-radiiu_elf_CPPFLAGS += -DIMGUI_RGBA_BE
 
 RPX_TARGET = radiiu.rpx
 
