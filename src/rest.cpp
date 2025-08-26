@@ -32,7 +32,7 @@ namespace rest {
 
         byte_stream stream;
         curl::easy easy;
-        response_function_t on_response;
+        success_function_t on_success;
         error_function_t on_error;
 
 
@@ -40,13 +40,12 @@ namespace rest {
         request(request&& other) = delete;
 
         request(const std::string& url,
-                response_function_t on_response_arg,
+                success_function_t on_success_arg,
                 error_function_t on_error_arg) :
-            on_response{std::move(on_response_arg)},
+            on_success{std::move(on_success_arg)},
             on_error{std::move(on_error_arg)}
         {
-            std::cout << "preparing request for '" << url << "'" << endl;
-
+            cout << "preparing request for '" << url << "'" << endl;
             easy.set_url(url);
             easy.set_verbose(false);
             if (!user_agent.empty())
@@ -91,13 +90,26 @@ namespace rest {
     }
 
 
+    std::string
+    concat(const request_params_t& params)
+    {
+        std::string result;
+        const char* separator = "?";
+        for (auto& [key, val] : params) {
+            result += separator + curl::escape(key) + "=" + curl::escape(val);
+            separator = "&";
+        }
+        return result;
+    }
+
+
     void
     get(const std::string& url,
-        response_function_t on_response,
+        success_function_t on_success,
         error_function_t on_error)
     {
         auto req = std::make_unique<request>(url,
-                                             std::move(on_response),
+                                             std::move(on_success),
                                              std::move(on_error));
         multi.add(req->easy);
         requests.push_back(std::move(req));
@@ -106,41 +118,37 @@ namespace rest {
 
     void
     get(const std::string& base_url,
-        const std::map<std::string, std::string>& args,
-        response_function_t on_response,
+        const request_params_t& params,
+        success_function_t on_success,
         error_function_t on_error)
     {
-        std::string full_url = base_url;
-        const char* separator = "?";
-        for (auto& [key, val] : args) {
-            full_url += separator + curl::escape(key) + "=" + curl::escape(val);
-            separator = "&";
-        }
-        get(full_url, std::move(on_response), std::move(on_error));
+        std::string full_url = base_url + concat(params);
+        get(full_url, std::move(on_success), std::move(on_error));
     }
 
 
     void
     get_json(const std::string& url,
-             json_response_function_t on_response,
+             json_success_function_t on_success,
              error_function_t on_error)
     {
         get(url,
-            [on_response=std::move(on_response)](curl::easy& ez,
-                                                 const std::string& response,
-                                                 const std::string& content_type)
+            [on_success=std::move(on_success)](curl::easy& ez,
+                                               const std::string& response,
+                                               const std::string& content_type)
             {
                 if (content_type != "application/json") {
-                    cout << "ERROR: response wasn't JSON!" << endl;
+                    cout << "ERROR: response was not JSON!" << endl;
                     return;
                 }
                 try {
                     json::value response_value = json::parse(response);
-                    if (on_response)
-                        on_response(ez, response_value);
+                    if (on_success)
+                        on_success(ez, response_value);
                 }
                 catch (std::exception& e) {
                     cout << "ERROR parsing JSON: " << e.what() << endl;
+                    throw;
                 }
             },
             on_error);
@@ -149,17 +157,12 @@ namespace rest {
 
     void
     get_json(const std::string& base_url,
-             const std::map<std::string, std::string>& args,
-             json_response_function_t on_response,
+             const request_params_t& params,
+             json_success_function_t on_success,
              error_function_t on_error)
     {
-        std::string full_url = base_url;
-        const char* separator = "?";
-        for (auto& [key, val] : args) {
-            full_url += separator + curl::escape(key) + "=" + curl::escape(val);
-            separator = "&";
-        }
-        get_json(full_url, std::move(on_response), std::move(on_error));
+        std::string full_url = base_url + concat(params);
+        get_json(full_url, std::move(on_success), std::move(on_error));
     }
 
 
@@ -180,11 +183,11 @@ namespace rest {
     {
         multi.perform();
 
-        // For each DONE transfer, dispatch to the on_response() or on_error() callbacks.
+        // For each DONE transfer, dispatch to the on_success() or on_error() callbacks.
         for (auto [ez, error_code] : multi.get_done()) {
             auto it = find(ez);
             if (it == requests.end()) {
-                cout << "BUG: could find request!" << endl;
+                cout << "BUG: could not find request!" << endl;
                 continue;
             }
 
@@ -193,15 +196,21 @@ namespace rest {
             multi.remove(*ez);
 
             if (!error_code) {
-                if (req->on_response) {
+                if (req->on_success) {
                     std::string response = req->stream.read_str();
                     std::string content_type;
                     auto content_type_header = req->easy.try_get_header("Content-Type");
                     if (content_type_header)
                         content_type = content_type_header->value;
 
-                    if (req->on_response)
-                        req->on_response(req->easy, response, content_type);
+                    try {
+                        if (req->on_success)
+                            req->on_success(req->easy, response, content_type);
+                    }
+                    catch (std::exception& e) {
+                        if (req->on_error)
+                            req->on_error(req->easy, e);
+                    }
                 }
             } else {
                 curl::error e{error_code};

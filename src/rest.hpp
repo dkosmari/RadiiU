@@ -19,20 +19,23 @@
 
 namespace rest {
 
-    using response_callback_t = void (curl::easy& ez,
-                                      const std::string& response,
-                                      const std::string& content_type);
-    using response_function_t = std::function<response_callback_t>;
+    using success_callback_t = void (curl::easy& ez,
+                                     const std::string& response,
+                                     const std::string& content_type);
+    using success_function_t = std::function<success_callback_t>;
 
 
     using error_callback_t = void (curl::easy& ez,
-                                   const curl::error& error);
+                                   const std::exception& error);
     using error_function_t = std::function<error_callback_t>;
 
 
-    using json_response_callback_t = void(curl::easy& ez,
-                                          const json::value& response);
-    using json_response_function_t = std::function<json_response_callback_t>;
+    using json_success_callback_t = void(curl::easy& ez,
+                                         const json::value& response);
+    using json_success_function_t = std::function<json_success_callback_t>;
+
+
+    using request_params_t = std::map<std::string, std::string>;
 
 
     void
@@ -43,28 +46,31 @@ namespace rest {
     finalize();
 
 
+    // TODO: expose the curl::easy object for each request.
+
+
     void
     get(const std::string& url,
-        response_function_t on_response = {},
+        success_function_t on_success,
         error_function_t on_error = {});
 
 
     void
     get(const std::string& base_url,
-        const std::map<std::string, std::string>& args,
-        response_function_t on_response = {},
+        const request_params_t& params,
+        success_function_t on_success,
         error_function_t on_error = {});
 
 
     void
     get_json(const std::string& url,
-             json_response_function_t on_response = {},
+             json_success_function_t on_success,
              error_function_t on_error = {});
 
     void
     get_json(const std::string& base_url,
-             const std::map<std::string, std::string>& args,
-             json_response_function_t on_response = {},
+             const request_params_t& params,
+             json_success_function_t on_success,
              error_function_t on_error = {});
 
 

@@ -379,10 +379,18 @@ namespace Browser {
                            stations.clear();
                            auto& list = response.as<json::array>();
                            cout << "Received " << list.size() << " stations" << endl;
-                           for (auto& entry : list)
+                           for (auto& entry : list) {
+                               // ensure the page size limit is respected
+                               if (stations.size() >= cfg::browser_page_size)
+                                   break;
                                stations.push_back(Station::from_json(entry.as<json::object>()));
-                           if (stations.size() > cfg::browser_page_size)
-                               stations.resize(cfg::browser_page_size);
+                           }
+                           busy = false;
+                       },
+                       [](curl::easy&,
+                          const std::exception& error)
+                       {
+                           cout << "JSON request failed: " << error.what() << endl;
                            busy = false;
                        });
 
