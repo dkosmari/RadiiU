@@ -31,7 +31,9 @@ struct Station {
     std::string uuid;
 
     std::uint64_t votes = 0;
-    std::uint64_t bitrate = 0;
+    std::uint64_t click_count = 0;
+    std::int64_t click_trend = 0;
+    unsigned bitrate = 0;
 
 
     static

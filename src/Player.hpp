@@ -35,9 +35,6 @@ namespace Player {
     play();
 
     void
-    play(const std::string& new_url);
-
-    void
     play(const Station& station);
 
 

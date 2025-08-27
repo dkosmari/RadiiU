@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include <map>
+#include <optional>
 #include <vector>
 
 #ifdef __WUT__
@@ -20,6 +21,7 @@
 
 #include "Player.hpp"
 
+#include "Browser.hpp"
 #include "byte_stream.hpp"
 #include "cfg.hpp"
 #include "IconManager.hpp"
@@ -45,7 +47,7 @@ namespace Player {
 
     State state = State::stopped;
 
-    std::string url;
+    std::optional<Station> station;
     curl::multi multi;
     curl::easy easy;
     mpg123::handle mpg;
@@ -169,7 +171,7 @@ namespace Player {
             }
 
             // since CURL requires us to handle all bytes, we stash them in raw_stream
-            return raw_stream.write(buf.data(), buf.size());
+            return raw_stream.write(buf);
         }
 
     } // namespace
@@ -188,21 +190,29 @@ namespace Player {
     void
     play()
     {
-        play(url);
-    }
-
-
-    void
-    play(const std::string& new_url)
-    {
         if (state == State::playing)
             stop();
 
-        url = new_url;
-        if (url.empty())
+        if (!station)
             return;
 
-        cout << "starting to play " << new_url << endl;
+        std::string url;
+        if (!station->url_resolved.empty())
+            url = station->url_resolved;
+
+        if (url.empty())
+            if (!station->url.empty())
+                url = station->url; // TODO: might need resolving
+
+        if (url.empty()) {
+            cout << "No usable URL found" << endl;
+            return;
+        }
+
+        if (!station->uuid.empty())
+            Browser::send_click(station->uuid);
+
+        cout << "starting to play " << url << endl;
 
         state = State::playing;
 
@@ -240,15 +250,11 @@ namespace Player {
 
 
     void
-    play(const Station& station)
+    play(const Station& st)
     {
-        if (!station.url_resolved.empty()) {
-            play(station.url_resolved);
-            return;
-        }
-
-        if (!station.url.empty())
-            play(station.url);
+        cout << "Starting playback of station \"" << st.name << "\"" << endl;
+        station = st;
+        play();
     }
 
 
@@ -424,7 +430,7 @@ namespace Player {
     {
         if (ImGui::BeginChild("player", {0, 0})) {
 
-            ImGui::BeginDisabled(url.empty());
+            ImGui::BeginDisabled(!station);
 
             const vec2 button_size = {64, 64};
             if (state == State::playing) {

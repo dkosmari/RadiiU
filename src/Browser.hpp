@@ -42,6 +42,13 @@ namespace Browser {
     void
     process_ui();
 
+
+    void
+    send_click(const std::string& uuid);
+
+    void
+    send_vote(const std::string& uuid);
+
 } // namespace Browser
 
 #endif

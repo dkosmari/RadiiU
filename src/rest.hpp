@@ -51,14 +51,14 @@ namespace rest {
 
     void
     get(const std::string& url,
-        success_function_t on_success,
+        success_function_t on_success = {},
         error_function_t on_error = {});
 
 
     void
     get(const std::string& base_url,
         const request_params_t& params,
-        success_function_t on_success,
+        success_function_t on_success = {},
         error_function_t on_error = {});
 
 
@@ -72,13 +72,13 @@ namespace rest {
 
     void
     get_json(const std::string& url,
-             json_success_function_t on_success,
+             json_success_function_t on_success = {},
              error_function_t on_error = {});
 
     void
     get_json(const std::string& base_url,
              const request_params_t& params,
-             json_success_function_t on_success,
+             json_success_function_t on_success = {},
              error_function_t on_error = {});
 
 

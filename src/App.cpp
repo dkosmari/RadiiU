@@ -222,17 +222,17 @@ App::App() :
     style.GrabRounding = radius;
 
     style.FrameRounding = radius;
-    style.FramePadding = {12, 12};
+    style.FramePadding = {8, 8};
 
     style.ImageBorderSize = 0;
 
-    style.ItemSpacing = {12, 12};
-    style.ItemInnerSpacing = {12, 12};
+    style.ItemSpacing = {8, 8};
+    style.ItemInnerSpacing = {8, 8};
 
     style.ChildBorderSize = 0;
     style.ChildRounding = 0;
 
-    style.TabRounding = 12;
+    style.TabRounding = 8;
     // style.TabBorderSize = 16;
     // style.TabBarBorderSize = 16;
     // style.TabBarOverlineSize = 16;

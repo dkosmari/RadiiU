@@ -41,6 +41,11 @@ namespace ImGui {
                ImGuiComboFlags flags = 0);
 
 
+    bool
+    Button(const std::string& label,
+           const ImVec2& size = ImVec2(0, 0));
+
+
     template<concepts::arithmetic T>
     bool
     Drag(const char* label,

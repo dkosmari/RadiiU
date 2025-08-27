@@ -57,6 +57,8 @@ Station::from_json(const json::object& obj)
     h.load("language",     result.language);
     h.load("stationuuid",  result.uuid);
     h.load("votes",        result.votes);
+    h.load("clickcount",   result.click_count);
+    h.load("clicktrend",   result.click_trend);
     h.load("bitrate",      result.bitrate);
     return result;
 }
@@ -112,6 +114,8 @@ Station::to_json()
     h.store("language", language);
     h.store("stationuuid", uuid);
     h.store("votes", votes);
+    h.store("clickcount", click_count);
+    h.store("clicktrend", click_trend);
     h.store("bitrate", bitrate);
     return obj;
 }

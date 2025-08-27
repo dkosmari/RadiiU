@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cinttypes>
 #include <exception>
 #include <filesystem>
 #include <iostream>
@@ -438,7 +439,7 @@ namespace Browser {
     void
     show_navigation()
     {
-        ImGui::AlignTextToFramePadding();
+        // ImGui::AlignTextToFramePadding();
         if (ImGui::Button("100⏪") && !busy) {
             if (page_index >= 100)
                 page_index -= 100;
@@ -448,7 +449,7 @@ namespace Browser {
         }
         ImGui::SameLine();
 
-        ImGui::AlignTextToFramePadding();
+        // ImGui::AlignTextToFramePadding();
         if (ImGui::Button("10⏪") && !busy) {
             if (page_index >= 10)
                 page_index -= 10;
@@ -458,7 +459,7 @@ namespace Browser {
         }
         ImGui::SameLine();
 
-        ImGui::AlignTextToFramePadding();
+        // ImGui::AlignTextToFramePadding();
         if (ImGui::Button("⏴") && !busy) {
             if (page_index > 0)
                 --page_index;
@@ -466,24 +467,25 @@ namespace Browser {
         }
         ImGui::SameLine();
 
+        ImGui::AlignTextToFramePadding();
         ImGui::Value("Page", page_index + 1);
         ImGui::SameLine();
 
-        ImGui::AlignTextToFramePadding();
+        // ImGui::AlignTextToFramePadding();
         if (ImGui::Button("⏵") && !busy) {
             ++page_index;
             update_list();
         }
         ImGui::SameLine();
 
-        ImGui::AlignTextToFramePadding();
+        // ImGui::AlignTextToFramePadding();
         if (ImGui::Button("⏩10") && !busy) {
             page_index += 10;
             update_list();
         }
         ImGui::SameLine();
 
-        ImGui::AlignTextToFramePadding();
+        // ImGui::AlignTextToFramePadding();
         if (ImGui::Button("⏩100") && !busy) {
             page_index += 100;
             update_list();
@@ -493,30 +495,97 @@ namespace Browser {
 
     void
     show(const Station& station,
-         ImGuiID target_id)
+         ImGuiID drag_target)
     {
-        if (ImGui::BeginChild(station.uuid.data(), {0, 0}, ImGuiChildFlags_AutoResizeY)) {
+        if (ImGui::BeginChild(station.uuid.data(), {0, 0},
+                              ImGuiChildFlags_AutoResizeY |
+                              ImGuiChildFlags_FrameStyle |
+                              ImGuiChildFlags_NavFlattened)) {
 
-            if (ImGui::ImageButton("play_button",
-                                   *IconManager::get("ui/play-button.png"),
-                                   vec2{64, 64})) {
-                Player::play(station);
+            if (ImGui::BeginChild("actions", {0, 0},
+                                  ImGuiChildFlags_AutoResizeX |
+                                  ImGuiChildFlags_AutoResizeY |
+                                  ImGuiChildFlags_NavFlattened)) {
+                if (ImGui::ImageButton("play_button",
+                                       *IconManager::get("ui/play-button.png"),
+                                       vec2{64, 64})) {
+                    Player::play(station);
+                }
+                if (ImGui::Button("♡♥")) {
+                    cout << "TODO: add/remove favorites" << endl;
+                }
             }
+            ImGui::HandleDragScroll(drag_target);
+            ImGui::EndChild();
+
             ImGui::SameLine();
 
-            if (!station.favicon.empty()) {
-                auto icon = IconManager::get(station.favicon);
-                auto icon_size = icon->get_size();
-                vec2 size = {64, 64};
-                size.x = icon_size.x * size.y / icon_size.y;
-                ImGui::Image(*IconManager::get(station.favicon), size);
-                ImGui::SameLine();
+            if (ImGui::BeginChild("details", {0, 0},
+                                  ImGuiChildFlags_AutoResizeY |
+                                  ImGuiChildFlags_NavFlattened)) {
+
+                if (ImGui::BeginChild("first_line", {0, 0},
+                                      ImGuiChildFlags_AutoResizeY |
+                                      ImGuiChildFlags_NavFlattened)) {
+
+                    if (!station.favicon.empty()) {
+                        auto icon = IconManager::get(station.favicon);
+                        auto icon_size = icon->get_size();
+                        vec2 size = {64, 64};
+                        size.x = icon_size.x * size.y / icon_size.y;
+                        ImGui::Image(*IconManager::get(station.favicon), size);
+                        ImGui::SameLine();
+                    }
+
+                    ImGui::TextWrapped("%s", station.name.data());
+                    // WORKAROUND: ImGui cuts off the text.
+                    ImGui::Spacing();
+                }
+                ImGui::HandleDragScroll(drag_target);
+                ImGui::EndChild();
+
+                if (ImGui::BeginChild("second_line", {0, 0},
+                                      ImGuiChildFlags_AutoResizeY |
+                                      ImGuiChildFlags_NavFlattened)) {
+                    std::string vote_label = "👍 " + std::to_string(station.votes);
+                    if (ImGui::Button(vote_label)) {
+                        send_vote(station.uuid);
+                    }
+                    ImGui::SameLine();
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::BulletText("Clicks: %" PRIu64 " (%+" PRId64 ")",
+                                      station.click_count,
+                                      station.click_trend);
+                    if (station.bitrate) {
+                        ImGui::SameLine();
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::BulletText("%u kbps", station.bitrate);
+                    }
+                    if (!station.country_code.empty()) {
+                        ImGui::SameLine();
+                        ImGui::AlignTextToFramePadding();
+#if 0
+                        std::string region_glyph;
+                        for (char c : station.country_code) {
+                            if ('A' <= c && c <= 'Z') {
+                                region_glyph += "🇦";
+                                region_glyph.back() += c - 'A';
+                            }
+                        }
+                        ImGui::BulletText("%s", region_glyph.data());
+#else
+                        ImGui::BulletText("%s", station.country_code.data());
+                    }
+#endif
+                    ImGui::Spacing();
+                }
+                ImGui::HandleDragScroll(drag_target);
+                ImGui::EndChild();
             }
-
-            ImGui::TextUnformatted(station.name);
+            ImGui::HandleDragScroll(drag_target);
+            ImGui::EndChild();
         }
-
-        ImGui::HandleDragScroll(target_id);
+        ImGui::HandleDragScroll(drag_target);
         ImGui::EndChild();
     }
 
@@ -592,15 +661,59 @@ namespace Browser {
 
         show_navigation();
 
-        ImGui::EndDisabled();
-
         if (ImGui::BeginChild("stations")) {
-            auto target_id = ImGui::GetCurrentWindow()->ID;
+            auto drag_target = ImGui::GetCurrentWindow()->ID;
             for (const auto& station : stations)
-                show(station, target_id);
+                show(station, drag_target);
         }
+
         ImGui::HandleDragScroll();
         ImGui::EndChild();
+
+        ImGui::EndDisabled();
     }
+
+
+    void
+    send_click(const std::string& uuid)
+    {
+        if (uuid.empty())
+            return;
+        auto server = safe_server.load();
+        if (server.empty())
+            return;
+        rest::get_json("https://" + server + "/json/url/" + uuid,
+                       [](curl::easy&,
+                          const json::value& response)
+                       {
+                           auto obj = response.as<json::object>();
+                           if (obj.contains("name"))
+                               cout << "Clicked on "
+                                    << obj.at("name").as<json::string>()
+                                    << endl;
+                       });
+    }
+
+
+    void
+    send_vote(const std::string& uuid)
+    {
+        if (uuid.empty())
+            return;
+        auto server = safe_server.load();
+        if (server.empty())
+            return;
+        rest::get_json("https://" + server + "/json/vote/" + uuid,
+                       [](curl::easy&,
+                          const json::value& response)
+                       {
+                           auto obj = response.as<json::object>();
+                           if (obj.contains("message"))
+                                            cout << obj.at("message").as<json::string>()
+                                                 << endl;
+                       });
+    }
+
+
 
 } // namespace Browser

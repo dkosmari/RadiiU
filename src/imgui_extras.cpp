@@ -134,6 +134,14 @@ namespace ImGui {
     }
 
 
+    bool
+    Button(const std::string& label,
+           const ImVec2& size)
+    {
+        return Button(label.data(), size);
+    }
+
+
     template<concepts::arithmetic T>
     bool
     Drag(const char* label,
