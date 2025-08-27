@@ -213,7 +213,7 @@ App::App() :
 
     style.WindowBorderSize = 0;
     style.WindowRounding = 0;
-    style.WindowPadding = {8, 8};
+    style.WindowPadding = {12, 12};
 
     style.ScrollbarSize = 32;
     style.ScrollbarRounding = radius;
@@ -222,17 +222,17 @@ App::App() :
     style.GrabRounding = radius;
 
     style.FrameRounding = radius;
-    style.FramePadding = {8, 8};
+    style.FramePadding = {12, 12};
 
     style.ImageBorderSize = 0;
 
-    style.ItemSpacing = {8, 8};
-    style.ItemInnerSpacing = {8, 8};
+    style.ItemSpacing = {12, 12};
+    style.ItemInnerSpacing = {12, 12};
 
     style.ChildBorderSize = 0;
     style.ChildRounding = 0;
 
-    style.TabRounding = 8;
+    style.TabRounding = radius;
     // style.TabBorderSize = 16;
     // style.TabBarBorderSize = 16;
     // style.TabBarOverlineSize = 16;

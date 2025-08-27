@@ -57,15 +57,20 @@ namespace Favorites {
             json::array list;
             for (const Station& st : stations)
                 list.push_back(st.to_json());
-            const std::filesystem::path old_name = cfg::base_dir / "favorites.json";
-            const std::filesystem::path new_name = cfg::base_dir / "favorites.json.new";
+            const std::filesystem::path old_favorites = cfg::base_dir / "favorites.json";
+            const std::filesystem::path new_favorites = cfg::base_dir / "favorites.json.new";
 
             json::value root = std::move(list);
-            save(root, new_name);
 #ifdef __WIIU__
-            remove(old_name);
+            if (exists(new_favorites))
+                remove(new_favorites);
 #endif
-            rename(new_name, old_name);
+            save(root, new_favorites);
+#ifdef __WIIU__
+            if (exists(old_favorites))
+                remove(old_favorites);
+#endif
+            rename(new_favorites, old_favorites);
         }
         catch (std::exception& e) {
             cout << "Error saving favorites: " << e.what() << endl;

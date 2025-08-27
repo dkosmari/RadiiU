@@ -289,13 +289,18 @@ namespace Browser {
 
             obj["page"] = 1 + page_index;
 
-            const std::filesystem::path old_name = cfg::base_dir / "browser.json";
-            const std::filesystem::path new_name = cfg::base_dir / "browser.json.new";
-            json::save(std::move(obj), new_name);
+            const std::filesystem::path old_browser = cfg::base_dir / "browser.json";
+            const std::filesystem::path new_browser = cfg::base_dir / "browser.json.new";
 #ifdef __WIIU__
-            remove(old_name);
+            if (exists(new_browser))
+                remove(new_browser);
 #endif
-            rename(new_name, old_name);
+            json::save(std::move(obj), new_browser);
+#ifdef __WIIU__
+            if (exists(old_browser))
+                remove(old_browser);
+#endif
+            rename(new_browser, old_browser);
         }
         catch (std::exception& e) {
             cout << "Error saving browser state: " << e.what() << endl;

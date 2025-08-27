@@ -139,9 +139,14 @@ namespace cfg {
 
             std::filesystem::path old_settings = base_dir / "settings.json";
             std::filesystem::path new_settings = base_dir / "settings.json.new";
+#ifdef __WIIU__
+            if (exists(new_settings))
+                remove(new_settings);
+#endif
             json::save(root, new_settings);
 #ifdef __WIIU__
-            remove(old_settings);
+            if (exists(old_settings))
+                remove(old_settings);
 #endif
             rename(new_settings, old_settings);
         }
