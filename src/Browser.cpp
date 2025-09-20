@@ -16,6 +16,7 @@
 #include <set>
 #include <span>
 #include <thread>
+#include <unordered_set>
 #include <utility>
 
 #ifdef __WIIU__
@@ -85,6 +86,10 @@ namespace Browser {
     std::vector<Station> stations;
 
     bool need_refresh = false;
+
+
+    // TODO: allow votes to expire after 24 hours.
+    std::unordered_set<std::string> votes_cast;
 
 
     void
@@ -499,8 +504,8 @@ namespace Browser {
 
 
     void
-    show(const Station& station,
-         ImGuiID drag_target)
+    show_station(const Station& station,
+                 ImGuiID drag_target)
     {
         if (ImGui::BeginChild(station.uuid.data(), {0, 0},
                               ImGuiChildFlags_AutoResizeY |
@@ -552,10 +557,14 @@ namespace Browser {
                 if (ImGui::BeginChild("second_line", {0, 0},
                                       ImGuiChildFlags_AutoResizeY |
                                       ImGuiChildFlags_NavFlattened)) {
-                    std::string vote_label = "👍 " + std::to_string(station.votes);
-                    if (ImGui::Button(vote_label)) {
+
+                    bool voted = votes_cast.contains(station.uuid);
+                    ImGui::BeginDisabled(voted);
+                    std::string vote_label = "👍" + std::to_string(station.votes);
+                    if (ImGui::Button(vote_label))
                         send_vote(station.uuid);
-                    }
+                    ImGui::EndDisabled();
+
                     ImGui::SameLine();
                     ImGui::AlignTextToFramePadding();
                     ImGui::BulletText("Clicks: %" PRIu64 " (%+" PRId64 ")",
@@ -669,7 +678,7 @@ namespace Browser {
         if (ImGui::BeginChild("stations")) {
             auto drag_target = ImGui::GetCurrentWindow()->ID;
             for (const auto& station : stations)
-                show(station, drag_target);
+                show_station(station, drag_target);
         }
 
         ImGui::HandleDragScroll();
@@ -709,13 +718,22 @@ namespace Browser {
         if (server.empty())
             return;
         rest::get_json("https://" + server + "/json/vote/" + uuid,
-                       [](curl::easy&,
+                       [uuid](curl::easy&,
                           const json::value& response)
                        {
                            auto obj = response.as<json::object>();
                            if (obj.contains("message"))
                                             cout << obj.at("message").as<json::string>()
                                                  << endl;
+                           try {
+                               if (obj.at("ok").as<bool>())
+                                   votes_cast.insert(uuid);
+                           }
+                           catch (std::exception& e) {
+                               cout << "Unexpected error reading status of vote: "
+                                    << e.what()
+                                    << endl;
+                           }
                        });
     }
 

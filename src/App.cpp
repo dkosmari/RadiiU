@@ -233,9 +233,6 @@ App::App() :
     style.ChildRounding = 0;
 
     style.TabRounding = radius;
-    // style.TabBorderSize = 16;
-    // style.TabBarBorderSize = 16;
-    // style.TabBarOverlineSize = 16;
 
     ImGui_ImplSDL2_InitForSDLRenderer(window.data(), renderer.data());
     ImGui_ImplSDLRenderer2_Init(renderer.data());
@@ -284,6 +281,7 @@ App::run()
         draw();
 
     }
+    cout << "Stopped running" << endl;
 }
 
 

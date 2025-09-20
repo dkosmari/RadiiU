@@ -108,6 +108,10 @@ radiiu_elf_LDADD =  \
 
 if ENABLE_WIIU
 
+radiiu_elf_LDFLAGS = \
+	$(AM_LDFLAGS) \
+	-Wl,-Map,radiiu.map
+
 RPX_TARGET = radiiu.rpx
 
 WUHB_FILE = radiiu.wuhb
@@ -135,7 +139,7 @@ uninstall-wiiu:
 	curl "ftp://wiiu" --quote "DELE /fs/vol/external01/wiiu/apps/$(WUHB_FILE)"
 
 
-CLEANFILES = $(WUHB_FILE)
+CLEANFILES = $(WUHB_FILE) radiiu.map
 
 else !ENABLE_WIIU
 

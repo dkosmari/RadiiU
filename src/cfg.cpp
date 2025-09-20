@@ -50,13 +50,13 @@ namespace cfg {
             return buf;
 #else
             wordexp_t expanded{};
-            if (wordexp("~", &expanded, WRDE_NOCMD)) {
+            if (wordexp("${XDG_CONFIG_HOME:-~/.config}", &expanded, WRDE_NOCMD)) {
                 wordfree(&expanded);
                 return ".";
             }
-            std::filesystem::path home_dir = expanded.we_wordv[0];
+            std::filesystem::path config_dir = expanded.we_wordv[0];
             wordfree(&expanded);
-            return home_dir / ".config" / PACKAGE_NAME;
+            return config_dir / PACKAGE_NAME;
 #endif
         }
     } // namespace
