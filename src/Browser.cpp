@@ -13,7 +13,6 @@
 #include <filesystem>
 #include <iostream>
 #include <random>
-#include <set>
 #include <span>
 #include <thread>
 #include <unordered_set>
@@ -146,7 +145,7 @@ namespace Browser {
                     addresses.push_back(entry.addr);
             }
             cout << "Found " << addresses.size() << " mirrors" << endl;
-            std::set<std::string> new_mirrors;
+            std::unordered_set<std::string> new_mirrors;
             {
                 net::resolver::name_resolver nr;
                 for (const auto& addr : addresses) {
