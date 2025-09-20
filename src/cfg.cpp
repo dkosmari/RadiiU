@@ -38,6 +38,7 @@ namespace cfg {
     unsigned    player_buffer_size      = 8192;
     bool        disable_auto_power_down = true;
     unsigned    browser_page_size       = 20;
+    bool        start_on_favorites      = false;
 
 
     namespace {
@@ -119,6 +120,9 @@ namespace cfg {
 
             if (root.contains("browser_page_size"))
                 browser_page_size = root.at("browser_page_size").as<json::integer>();
+
+            if (root.contains("start_on_favorites"))
+                start_on_favorites = root.at("start_on_favorites").as<bool>();
         }
         catch (std::exception& e) {
             cout << "Could not load settings: " << e.what() << endl;
@@ -136,6 +140,7 @@ namespace cfg {
             root["player_buffer_size"]      = player_buffer_size;
             root["disable_auto_power_down"] = disable_auto_power_down;
             root["browser_page_size"]       = browser_page_size;
+            root["start_on_favorites"]      = start_on_favorites;
 
             std::filesystem::path old_settings = base_dir / "settings.json";
             std::filesystem::path new_settings = base_dir / "settings.json.new";

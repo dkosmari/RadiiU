@@ -115,18 +115,18 @@ namespace {
         about,
     };
 
-    std::optional<TabIndex> next_tab = TabIndex::browser;
+    std::optional<TabIndex> next_tab;
 
     bool
     should_switch(TabIndex idx)
     {
         if (!next_tab)
             return false;
-        cout << "Next tab requested: "
-             << static_cast<int>(idx)
-             << " -> "
-             << static_cast<int>(*next_tab)
-             << endl;
+        // cout << "Next tab requested: "
+        //      << static_cast<int>(idx)
+        //      << " -> "
+        //      << static_cast<int>(*next_tab)
+        //      << endl;
         return idx == *next_tab;
     }
 
@@ -165,6 +165,11 @@ App::App() :
     instance = this;
 
     cfg::initialize();
+
+    if (cfg::start_on_favorites)
+        next_tab = TabIndex::favorites;
+    else
+        next_tab = TabIndex::browser;
 
     // Create an audio device to stop the boot sound.
     sdl::audio::spec aspec;
