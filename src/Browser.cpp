@@ -31,6 +31,7 @@
 #include "Browser.hpp"
 
 #include "cfg.hpp"
+#include "Favorites.hpp"
 #include "IconManager.hpp"
 #include "imgui_extras.hpp"
 #include "Player.hpp"
@@ -521,8 +522,13 @@ namespace Browser {
                                        vec2{64, 64})) {
                     Player::play(station);
                 }
-                if (ImGui::Button("♡♥")) {
-                    cout << "TODO: add/remove favorites" << endl;
+                bool is_favorited = Favorites::contains(station.uuid);
+                if (is_favorited) {
+                    if (ImGui::Button("♥"))
+                        Favorites::remove(station.uuid);
+                } else {
+                    if (ImGui::Button("♡"))
+                        Favorites::add(station);
                 }
             }
             ImGui::HandleDragScroll(drag_target);
@@ -541,7 +547,7 @@ namespace Browser {
                     if (!station.favicon.empty()) {
                         auto icon = IconManager::get(station.favicon);
                         auto icon_size = icon->get_size();
-                        vec2 size = {64, 64};
+                        vec2 size = {128, 128};
                         size.x = icon_size.x * size.y / icon_size.y;
                         ImGui::Image(*IconManager::get(station.favicon), size);
                         ImGui::SameLine();
@@ -559,8 +565,8 @@ namespace Browser {
                                       ImGuiChildFlags_NavFlattened)) {
 
                     bool voted = votes_cast.contains(station.uuid);
-                    ImGui::BeginDisabled(voted);
                     std::string vote_label = "👍" + std::to_string(station.votes);
+                    ImGui::BeginDisabled(voted);
                     if (ImGui::Button(vote_label))
                         send_vote(station.uuid);
                     ImGui::EndDisabled();

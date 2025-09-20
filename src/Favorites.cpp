@@ -5,10 +5,12 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
+#include <unordered_set>
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -31,6 +33,7 @@ using std::endl;
 namespace Favorites {
 
     std::vector<Station> stations;
+    std::unordered_set<std::string> uuids;
 
 
     void
@@ -40,8 +43,13 @@ namespace Favorites {
             auto root = json::load(cfg::base_dir / "favorites.json");
             const auto& list = root.as<json::array>();
             stations.clear();
-            for (auto& elem : list)
+            uuids.clear();
+            for (auto& elem : list) {
                 stations.push_back(Station::from_json(elem.as<json::object>()));
+                const auto& st = stations.back();
+                if (!st.uuid.empty())
+                    uuids.insert(st.uuid);
+            }
             cout << "Loaded " << stations.size() << " favorites" << endl;
         }
         catch (std::exception& e) {
@@ -168,6 +176,50 @@ namespace Favorites {
         ImGui::HandleDragScroll();
 
         ImGui::EndChild();
+    }
+
+
+    bool
+    contains(const std::string& uuid)
+    {
+        if (uuid.empty())
+            return false;
+        return uuids.contains(uuid);
+    }
+
+
+    void
+    add(const Station& st)
+    {
+        stations.push_back(st);
+        if (!st.uuid.empty())
+            uuids.insert(st.uuid);
+    }
+
+
+
+    namespace {
+
+        const std::string&
+        by_id(const Station& st)
+        {
+            return st.uuid;
+        }
+
+    } // namespace
+
+
+    void
+    remove(const std::string& uuid)
+    {
+        if (uuid.empty())
+            return;
+        if (!uuids.contains(uuid))
+            return;
+        uuids.erase(uuid);
+        auto it = std::ranges::find(stations, uuid, by_id);
+        if (it != stations.end())
+            stations.erase(it);
     }
 
 } // namespace Favorites

@@ -1,13 +1,13 @@
-* Pending features for v0.1 [44%]
+* Pending features for v0.1 [48%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
-  - [-] Browser [7/9]
+  - [-] Browser [8/9]
     - [X] Send click
     - [X] Send upvote
     - [X] Clear filters
     - [X] Sort order
-    - [ ] Add/remove favorites
+    - [X] Add/remove favorites
     - [ ] Button to show more info
     - [X] Select random server from DNS query
     - [X] Show a few more fields like vote count and country.

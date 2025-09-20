@@ -8,6 +8,11 @@
 #ifndef FAVORITES_HPP
 #define FAVORITES_HPP
 
+#include <string>
+
+
+struct Station;
+
 namespace Favorites {
 
     void
@@ -20,6 +25,18 @@ namespace Favorites {
 
     void
     process_ui();
+
+
+    bool
+    contains(const std::string& uuid);
+
+
+    void
+    add(const Station& st);
+
+
+    void
+    remove(const std::string& uuid);
 
 } // namespace Favorites
 
