@@ -101,80 +101,79 @@ namespace Favorites {
 
 
     void
-    process_ui()
+    show_station(const Station& station,
+                 ImGuiID scroll_target)
     {
-        if (ImGui::BeginChild("favorites")) {
+        if (ImGui::BeginChild(ImGui::GetID(reinterpret_cast<const void*>(&station)), {0, 0},
+                              ImGuiChildFlags_Borders
+                              | ImGuiChildFlags_AutoResizeY
+                              )) {
 
-            auto target_id = ImGui::GetCurrentWindow()->ID;
+            const vec2 play_size = {64, 64};
 
-            for (const auto& station : stations) {
+            if (ImGui::ImageButton("play_button",
+                                   *IconManager::get("ui/play-button.png"),
+                                   play_size)) {
+                Player::play(station);
+            }
 
-                if (ImGui::BeginChild(ImGui::GetID(reinterpret_cast<const void*>(&station)), {0, 0},
-                                      ImGuiChildFlags_Borders
-                                      | ImGuiChildFlags_AutoResizeY
-                                      )) {
-
-                    const vec2 play_size = {64, 64};
-
-                    if (ImGui::ImageButton("play_button",
-                                           *IconManager::get("ui/play-button.png"),
-                                           play_size)) {
-                        Player::play(station);
-                    }
-
-                    // TODO: add edit/remove button
+            // TODO: add edit/remove button
 
 
-                    ImGui::SameLine();
+            ImGui::SameLine();
 
-                    if (!station.favicon.empty()) {
-                        const vec2 icon_size = {128, 128};
-                        ImGui::Image(*IconManager::get(station.favicon), icon_size);
+            if (!station.favicon.empty()) {
+                const vec2 icon_size = {128, 128};
+                ImGui::Image(*IconManager::get(station.favicon), icon_size);
 
-                        ImGui::SameLine();
-                    }
+                ImGui::SameLine();
+            }
 
-                    // ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.5f, 0.0f, 0.0f, 1.0f));
+            // ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.5f, 0.0f, 0.0f, 1.0f));
 
-                    if (ImGui::BeginChild("station_info",
-                                          {0, 0},
-                                          ImGuiChildFlags_AutoResizeY)) {
-                        ImGui::TextUnformatted(station.name);
-                        if (!station.homepage.empty()) {
-                            ImVec4 link_color = ImGui::GetStyle().Colors[ImGuiCol_TextLink];
-                            ImGui::PushStyleColor(ImGuiCol_Text, link_color);
-                            ImGui::TextUnformatted(station.homepage);
-                            ImGui::PopStyleColor();
-                        }
-                        if (!station.country_code.empty())
-                            ImGui::TextUnformatted(station.country_code);
-                        if (!station.tags.empty())
-                            ImGui::Text("Tags: %s", station.tags.data());
-
-                    }
-
-                    // WORKAROUND to bad layout from ImGui
-                    ImGui::Spacing();
-
-                    // ImGui::PopStyleColor();
-
-                    ImGui::HandleDragScroll(target_id);
-
-                    ImGui::EndChild();
-
-
+            if (ImGui::BeginChild("station_info",
+                                  {0, 0},
+                                  ImGuiChildFlags_AutoResizeY)) {
+                ImGui::TextUnformatted(station.name);
+                if (!station.homepage.empty()) {
+                    ImVec4 link_color = ImGui::GetStyle().Colors[ImGuiCol_TextLink];
+                    ImGui::PushStyleColor(ImGuiCol_Text, link_color);
+                    ImGui::TextUnformatted(station.homepage);
+                    ImGui::PopStyleColor();
                 }
-
-                ImGui::HandleDragScroll(target_id);
-
-                ImGui::EndChild();
+                if (!station.country_code.empty())
+                    ImGui::TextUnformatted(station.country_code);
+                if (!station.tags.empty())
+                    ImGui::Text("Tags: %s", station.tags.data());
 
             }
 
+            // WORKAROUND to bad layout from ImGui
+            ImGui::Spacing();
+
+            // ImGui::PopStyleColor();
+
+            ImGui::HandleDragScroll(scroll_target);
+
+            ImGui::EndChild();
+
+
         }
+    }
 
+
+    void
+    process_ui()
+    {
+        if (ImGui::BeginChild("favorites")) {
+            auto scroll_target = ImGui::GetCurrentWindow()->ID;
+            for (const auto& station : stations) {
+                show_station(station, scroll_target);
+                ImGui::HandleDragScroll(scroll_target);
+                ImGui::EndChild();
+            }
+        }
         ImGui::HandleDragScroll();
-
         ImGui::EndChild();
     }
 
@@ -195,7 +194,6 @@ namespace Favorites {
         if (!st.uuid.empty())
             uuids.insert(st.uuid);
     }
-
 
 
     namespace {
