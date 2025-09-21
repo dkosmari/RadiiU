@@ -430,7 +430,7 @@ namespace ImGui {
             if (lock_scroll)
                 state.velocity = {};
             else
-                state.velocity *= 0.96875f;
+                state.velocity *= std::pow(1.0f/16.0f, io.DeltaTime);
 
             const float min_speed = 1.0f/60.0f;
 #if 1

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <vector>
 #include <unordered_set>
@@ -34,6 +35,21 @@ namespace Favorites {
 
     std::vector<Station> stations;
     std::unordered_set<std::string> uuids;
+
+
+    namespace {
+
+        struct MoveOp {
+            std::size_t src;
+            std::size_t dst;
+        };
+
+        std::optional<MoveOp> move_operation;
+
+        std::optional<std::size_t> scroll_to_station;
+
+    } // namespace
+
 
 
     void
@@ -102,6 +118,7 @@ namespace Favorites {
 
     void
     show_station(const Station& station,
+                 std::size_t index,
                  ImGuiID scroll_target)
     {
         if (ImGui::BeginChild(ImGui::GetID(reinterpret_cast<const void*>(&station)),
@@ -110,16 +127,49 @@ namespace Favorites {
                               ImGuiChildFlags_FrameStyle |
                               ImGuiChildFlags_NavFlattened)) {
 
-            const vec2 play_size = {64, 64};
+            if (ImGui::BeginChild("actions",
+                                  {0, 0},
+                                  ImGuiChildFlags_AutoResizeX |
+                                  ImGuiChildFlags_AutoResizeY |
+                                  ImGuiChildFlags_NavFlattened)) {
+                const vec2 play_size = {96, 96};
+                if (ImGui::ImageButton("play_button",
+                                       *IconManager::get("ui/play-button.png"),
+                                       play_size)) {
+                    Player::play(station);
+                }
 
-            if (ImGui::ImageButton("play_button",
-                                   *IconManager::get("ui/play-button.png"),
-                                   play_size)) {
-                Player::play(station);
+                ImGui::BeginDisabled(index == 0);
+                if (ImGui::Button("▲")) {
+                    move_operation.emplace();
+                    move_operation->src = index;
+                    move_operation->dst = index - 1;
+                }
+                ImGui::EndDisabled();
+
+                ImGui::SameLine();
+
+                ImGui::BeginDisabled(index + 1 >= stations.size());
+                if (ImGui::Button("▼")) {
+                    move_operation.emplace();
+                    move_operation->src = index;
+                    move_operation->dst = index + 1;
+                }
+                ImGui::EndDisabled();
+
+                if (ImGui::Button("🖊")) {
+                    cout << "TODO: edit favorite" << endl;
+                }
+
+                ImGui::SameLine();
+
+                if (ImGui::Button("🗑")) {
+                    cout << "TODO: confirm delete favorites" << endl;
+                }
+
             }
-
-            // TODO: add edit/remove button
-
+            ImGui::HandleDragScroll(scroll_target);
+            ImGui::EndChild(); // actions
 
             ImGui::SameLine();
 
@@ -150,19 +200,17 @@ namespace Favorites {
                 if (!station.tags.empty())
                     ImGui::Text("Tags: %s", station.tags.data());
 
+                // WORKAROUND to bad layout from ImGui
+                ImGui::Spacing();
             }
-
-            // WORKAROUND to bad layout from ImGui
-            ImGui::Spacing();
+            ImGui::HandleDragScroll(scroll_target);
+            ImGui::EndChild(); // station_info
 
             // ImGui::PopStyleColor();
 
-            ImGui::HandleDragScroll(scroll_target);
-
-            ImGui::EndChild();
-
-
         }
+        ImGui::HandleDragScroll(scroll_target);
+        ImGui::EndChild(); // station
     }
 
 
@@ -172,14 +220,28 @@ namespace Favorites {
         // Note: flat navigation doesn't work well on child windows that scroll.
         if (ImGui::BeginChild("favorites")) {
             auto scroll_target = ImGui::GetCurrentWindow()->ID;
-            for (const auto& station : stations) {
-                show_station(station, scroll_target);
-                ImGui::HandleDragScroll(scroll_target);
-                ImGui::EndChild();
+            for (std::size_t index = 0; index < stations.size(); ++index) {
+                show_station(stations[index], index, scroll_target);
+                if (scroll_to_station && *scroll_to_station == index) {
+                    ImGui::SetScrollHereY();
+                    scroll_to_station.reset();
+                }
             }
         }
         ImGui::HandleDragScroll();
         ImGui::EndChild();
+
+        // Handle any pending move
+        if (move_operation) {
+            auto [src, dst] = *move_operation;
+            assert(src < stations.size());
+            assert(dst < stations.size());
+            Station tmp = std::move(stations[src]);
+            stations.erase(stations.begin() + src);
+            stations.insert(stations.begin() + dst, std::move(tmp));
+            scroll_to_station = dst;
+            move_operation.reset();
+        }
     }
 
 
