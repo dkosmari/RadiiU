@@ -434,6 +434,8 @@ App::process_ui()
 
     ImGui::EndFrame();
     ImGui::Render();
+
+    ImGui::KineticScrollFrameEnd();
 }
 
 

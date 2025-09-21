@@ -116,6 +116,10 @@ namespace ImGui {
           ImGuiInputTextFlags flags = 0);
 
 
+    void
+    KineticScrollFrameEnd();
+
+
     bool
     Selectable(const std::string& label,
                bool selected = false,

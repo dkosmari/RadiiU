@@ -6,16 +6,21 @@
  */
 
 #include <cinttypes>
-#include <cstdio>
 #include <cstdarg>
 #include <cstdint>
+#include <cstdio>
+#include <iostream>
 #include <limits>
 #include <stdexcept>
+#include <unordered_map>
 
 #include <imgui_internal.h>
 
 #include "imgui_extras.hpp"
 
+
+using std::cout;
+using std::endl;
 
 
 namespace ImGui {
@@ -26,7 +31,7 @@ namespace ImGui {
                              ImGuiMouseButton mouse_button);
 
     void
-    ScrollWhenDraggingOnVoid(ImGuiID target_id,
+    ScrollWhenDraggingOnVoid(ImGuiID scroll_target,
                              const ImVec2& delta,
                              ImGuiMouseButton mouse_button);
 
@@ -121,6 +126,19 @@ namespace ImGui {
         constexpr ImGuiDataType imgui_data_type_v<float> = ImGuiDataType_Float;
         template<>
         constexpr ImGuiDataType imgui_data_type_v<double> = ImGuiDataType_Double;
+
+
+        struct ScrollState {
+            ImVec2 vel;
+            bool dragging = false;
+        };
+        std::unordered_map<ImGuiID, ScrollState> scroll_states;
+
+        float
+        length(const ImVec2& v)
+        {
+            return std::hypot(v.x, v.y);
+        }
 
     } // namespace
 
@@ -221,7 +239,9 @@ namespace ImGui {
     void
     HandleDragScroll(ImGuiID target_id)
     {
-        ImGui::ScrollWhenDraggingOnVoid(target_id, -GetIO().MouseDelta, ImGuiMouseButton_Left);
+        ScrollWhenDraggingOnVoid(target_id,
+                                 -GetIO().MouseDelta,
+                                 ImGuiMouseButton_Left);
     }
 
 
@@ -374,31 +394,57 @@ namespace ImGui {
                   const char*, ImGuiInputTextFlags);
 
 
-    // From https://github.com/ocornut/imgui/issues/3379#issuecomment-1678718752
+    void
+    KineticScrollFrameEnd()
+    {
+        // check if user wants to stop scrolling
+        bool pinning_down = false;
+        ImGuiIO& io = GetIO();
+        if (io.MouseDown[0] &&
+            //length(io.MouseDelta) < io.MouseDragThreshold
+            io.MouseDelta.x == 0 && io.MouseDelta.y == 0
+            ) {
+            pinning_down = true;
+            // cout << "pinning down" << endl;
+        }
+
+        for (auto& [id, state] : scroll_states) {
+            if (!state.dragging && !pinning_down) {
+                ImGuiWindow* window = FindWindowByID(id);
+                auto& scroll = window->Scroll;
+                if (state.vel.x != 0.0f)
+                    SetScrollX(window, scroll.x + state.vel.x);
+                if (state.vel.y != 0.0f)
+                    SetScrollY(window, scroll.y + state.vel.y);
+            }
+
+            if (pinning_down)
+                state.vel = {};
+            else
+                state.vel *= 0.96875f;
+            if (length(state.vel) < 1.0f)
+                state.vel = {};
+
+            state.dragging = false;
+        }
+        std::erase_if(scroll_states,
+                      [](const auto& elem)
+                      {
+                          return elem.second.vel == ImVec2{};
+                      });
+    }
+
+
     void
     ScrollWhenDraggingOnVoid(const ImVec2& delta,
                              ImGuiMouseButton mouse_button)
     {
-        ImGuiContext& g = *GetCurrentContext();
-        ImGuiWindow* window = g.CurrentWindow;
-        bool hovered = false;
-        bool held = false;
-        ImGuiID id = window->GetID("##scrolldraggingoverlay");
-        KeepAliveID(id);
-        ImGuiButtonFlags button_flags = (mouse_button == 0)
-            ? ImGuiButtonFlags_MouseButtonLeft
-            : (mouse_button == 1)
-                ? ImGuiButtonFlags_MouseButtonRight
-                : ImGuiButtonFlags_MouseButtonMiddle;
-        if (g.HoveredId == 0) // If nothing hovered so far in the frame (not same as IsAnyItemHovered()!)
-            ButtonBehavior(window->Rect(), id, &hovered, &held, button_flags);
-        if (held && delta.x != 0.0f)
-            SetScrollX(window, window->Scroll.x + delta.x);
-        if (held && delta.y != 0.0f)
-            SetScrollY(window, window->Scroll.y + delta.y);
+        ImGuiWindow* current_window = GetCurrentContext()->CurrentWindow;
+        ScrollWhenDraggingOnVoid(current_window->ID, delta, mouse_button);
     }
 
 
+    // Based on https://github.com/ocornut/imgui/issues/3379#issuecomment-1678718752
     void
     ScrollWhenDraggingOnVoid(ImGuiID target_id,
                              const ImVec2& delta,
@@ -419,18 +465,25 @@ namespace ImGui {
                 ? ImGuiButtonFlags_MouseButtonRight
                 : ImGuiButtonFlags_MouseButtonMiddle;
 
+        // If nothing hovered so far in the frame (not same as IsAnyItemHovered()!)
         if (g.HoveredId == 0)
-            // If nothing hovered so far in the frame (not same as IsAnyItemHovered()!)
             ButtonBehavior(current_window->Rect(),
                            overlay_id,
                            &hovered,
                            &held,
                            button_flags);
 
-        if (held && delta.x != 0.0f)
-            SetScrollX(target_window, target_window->Scroll.x + delta.x);
-        if (held && delta.y != 0.0f)
-            SetScrollY(target_window, target_window->Scroll.y + delta.y);
+        auto& target_scroll = target_window->Scroll;
+        auto& state = scroll_states[target_id];
+        state.dragging = held;
+
+        if (held) {
+            state.vel = delta;
+            if (delta.x != 0.0f)
+                SetScrollX(target_window, target_scroll.x + delta.x);
+            if (delta.y != 0.0f)
+                SetScrollY(target_window, target_scroll.y + delta.y);
+        }
     }
 
 

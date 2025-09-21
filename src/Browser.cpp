@@ -85,6 +85,7 @@ namespace Browser {
     unsigned page_index = 0;
     std::vector<Station> stations;
 
+    bool scroll_to_top = false;
     bool need_refresh = false;
 
 
@@ -424,6 +425,7 @@ namespace Browser {
     update_list()
     {
         need_refresh = true;
+        scroll_to_top = true;
     }
 
 
@@ -682,6 +684,10 @@ namespace Browser {
 
         if (ImGui::BeginChild("stations")) {
             auto drag_target = ImGui::GetCurrentWindow()->ID;
+            if (scroll_to_top) {
+                ImGui::SetScrollY(0);
+                scroll_to_top = false;
+            }
             for (const auto& station : stations)
                 show_station(station, drag_target);
         }
