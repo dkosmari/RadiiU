@@ -454,6 +454,13 @@ namespace ImGui {
 
 
     void
+    PushID(const std::string& str)
+    {
+        PushID(str.data(), str.data() + str.size());
+    }
+
+
+    void
     ScrollWhenDraggingOnVoid(const ImVec2& delta,
                              ImGuiMouseButton mouse_button)
     {

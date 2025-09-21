@@ -120,6 +120,10 @@ namespace ImGui {
     KineticScrollFrameEnd();
 
 
+    void
+    PushID(const std::string& str);
+
+
     bool
     Selectable(const std::string& label,
                bool selected = false,

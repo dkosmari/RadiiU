@@ -579,13 +579,13 @@ namespace Browser {
 
                     ImGui::SameLine();
                     ImGui::AlignTextToFramePadding();
-                    ImGui::BulletText("Clicks: %" PRIu64 " (%+" PRId64 ")",
+                    ImGui::BulletText("🎧 %" PRIu64 " (%+" PRId64 ")",
                                       station.click_count,
                                       station.click_trend);
                     if (station.bitrate) {
                         ImGui::SameLine();
                         ImGui::AlignTextToFramePadding();
-                        ImGui::BulletText("%u kbps", station.bitrate);
+                        ImGui::BulletText("👂 %u kbps", station.bitrate);
                     }
                     if (!station.country_code.empty()) {
                         ImGui::SameLine();
@@ -600,7 +600,7 @@ namespace Browser {
                         }
                         ImGui::BulletText("%s", region_glyph.data());
 #else
-                        ImGui::BulletText("%s", station.country_code.data());
+                        ImGui::BulletText("🏳 %s", station.country_code.data());
                     }
 #endif
                     ImGui::Spacing();

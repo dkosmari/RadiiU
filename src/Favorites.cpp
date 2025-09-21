@@ -121,7 +121,9 @@ namespace Favorites {
                  std::size_t index,
                  ImGuiID scroll_target)
     {
-        if (ImGui::BeginChild(ImGui::GetID(reinterpret_cast<const void*>(&station)),
+        ImGui::PushID(std::to_string(index) + ":" + station.uuid);
+
+        if (ImGui::BeginChild("station",
                               {0, 0},
                               ImGuiChildFlags_AutoResizeY |
                               ImGuiChildFlags_FrameStyle |
@@ -196,9 +198,9 @@ namespace Favorites {
                     ImGui::PopStyleColor();
                 }
                 if (!station.country_code.empty())
-                    ImGui::TextUnformatted(station.country_code);
+                    ImGui::Text("🏳 %s", station.country_code.data());
                 if (!station.tags.empty())
-                    ImGui::Text("Tags: %s", station.tags.data());
+                    ImGui::TextWrapped("🏷 %s", station.tags.data());
 
                 // WORKAROUND to bad layout from ImGui
                 ImGui::Spacing();
@@ -211,6 +213,8 @@ namespace Favorites {
         }
         ImGui::HandleDragScroll(scroll_target);
         ImGui::EndChild(); // station
+
+        ImGui::PopID();
     }
 
 
