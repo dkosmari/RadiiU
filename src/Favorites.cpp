@@ -104,10 +104,11 @@ namespace Favorites {
     show_station(const Station& station,
                  ImGuiID scroll_target)
     {
-        if (ImGui::BeginChild(ImGui::GetID(reinterpret_cast<const void*>(&station)), {0, 0},
-                              ImGuiChildFlags_Borders
-                              | ImGuiChildFlags_AutoResizeY
-                              )) {
+        if (ImGui::BeginChild(ImGui::GetID(reinterpret_cast<const void*>(&station)),
+                              {0, 0},
+                              ImGuiChildFlags_AutoResizeY |
+                              ImGuiChildFlags_FrameStyle |
+                              ImGuiChildFlags_NavFlattened)) {
 
             const vec2 play_size = {64, 64};
 
@@ -123,9 +124,11 @@ namespace Favorites {
             ImGui::SameLine();
 
             if (!station.favicon.empty()) {
-                const vec2 icon_size = {128, 128};
-                ImGui::Image(*IconManager::get(station.favicon), icon_size);
-
+                auto icon = IconManager::get(station.favicon);
+                auto icon_size = icon->get_size();
+                vec2 size = {128, 128};
+                size.x = icon_size.x * size.y / icon_size.y;
+                ImGui::Image(*IconManager::get(station.favicon), size);
                 ImGui::SameLine();
             }
 
@@ -133,7 +136,8 @@ namespace Favorites {
 
             if (ImGui::BeginChild("station_info",
                                   {0, 0},
-                                  ImGuiChildFlags_AutoResizeY)) {
+                                  ImGuiChildFlags_AutoResizeY |
+                                  ImGuiChildFlags_NavFlattened)) {
                 ImGui::TextUnformatted(station.name);
                 if (!station.homepage.empty()) {
                     ImVec4 link_color = ImGui::GetStyle().Colors[ImGuiCol_TextLink];
@@ -165,6 +169,7 @@ namespace Favorites {
     void
     process_ui()
     {
+        // Note: flat navigation doesn't work well on child windows that scroll.
         if (ImGui::BeginChild("favorites")) {
             auto scroll_target = ImGui::GetCurrentWindow()->ID;
             for (const auto& station : stations) {

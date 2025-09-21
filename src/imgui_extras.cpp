@@ -6,6 +6,7 @@
  */
 
 #include <cinttypes>
+#include <cmath>
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
@@ -129,11 +130,16 @@ namespace ImGui {
 
 
         struct ScrollState {
-            ImVec2 vel;
+            ImVec2 velocity;
             bool dragging = false;
         };
         std::unordered_map<ImGuiID, ScrollState> scroll_states;
 
+
+        unsigned pinning_down_frames = 0;
+
+
+        [[maybe_unused]]
         float
         length(const ImVec2& v)
         {
@@ -397,40 +403,52 @@ namespace ImGui {
     void
     KineticScrollFrameEnd()
     {
+        // Try to detect the user touched and is holding in place.
         // check if user wants to stop scrolling
-        bool pinning_down = false;
         ImGuiIO& io = GetIO();
         if (io.MouseDown[0] &&
             //length(io.MouseDelta) < io.MouseDragThreshold
             io.MouseDelta.x == 0 && io.MouseDelta.y == 0
             ) {
-            pinning_down = true;
-            // cout << "pinning down" << endl;
-        }
+            ++pinning_down_frames;
+            // cout << "pinning down frames: " << pinning_down_frames << endl;
+        } else
+            pinning_down_frames = 0;
+
+        const bool lock_scroll = pinning_down_frames >= 2;
 
         for (auto& [id, state] : scroll_states) {
-            if (!state.dragging && !pinning_down) {
+            if (!state.dragging && !lock_scroll) {
                 ImGuiWindow* window = FindWindowByID(id);
                 auto& scroll = window->Scroll;
-                if (state.vel.x != 0.0f)
-                    SetScrollX(window, scroll.x + state.vel.x);
-                if (state.vel.y != 0.0f)
-                    SetScrollY(window, scroll.y + state.vel.y);
+                if (state.velocity.x != 0.0f)
+                    SetScrollX(window, scroll.x + state.velocity.x * io.DeltaTime);
+                if (state.velocity.y != 0.0f)
+                    SetScrollY(window, scroll.y + state.velocity.y * io.DeltaTime);
             }
 
-            if (pinning_down)
-                state.vel = {};
+            if (lock_scroll)
+                state.velocity = {};
             else
-                state.vel *= 0.96875f;
-            if (length(state.vel) < 1.0f)
-                state.vel = {};
+                state.velocity *= 0.96875f;
+
+            const float min_speed = 1.0f/60.0f;
+#if 1
+            if (length(state.velocity) < min_speed)
+                state.velocity = {};
+#else
+            if (std::abs(state.velocity.x) < min_speed)
+                state.velocity.x = 0;
+            if (std::abs(state.velocity.y) < min_speed)
+                state.velocity.y = 0;
+#endif
 
             state.dragging = false;
         }
         std::erase_if(scroll_states,
                       [](const auto& elem)
                       {
-                          return elem.second.vel == ImVec2{};
+                          return elem.second.velocity == ImVec2{};
                       });
     }
 
@@ -478,7 +496,11 @@ namespace ImGui {
         state.dragging = held;
 
         if (held) {
-            state.vel = delta;
+            state.velocity = delta / GetIO().DeltaTime;
+            if (target_window->ScrollMax.x == 0)
+                state.velocity.x = 0;
+            if (target_window->ScrollMax.y == 0)
+                state.velocity.y = 0;
             if (delta.x != 0.0f)
                 SetScrollX(target_window, target_scroll.x + delta.x);
             if (delta.y != 0.0f)

@@ -428,7 +428,9 @@ namespace Player {
     void
     process_ui()
     {
-        if (ImGui::BeginChild("player", {0, 0})) {
+        if (ImGui::BeginChild("player",
+                              {0, 0},
+                              ImGuiChildFlags_NavFlattened)) {
 
             ImGui::BeginDisabled(!station);
 

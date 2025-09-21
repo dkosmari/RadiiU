@@ -24,6 +24,7 @@ namespace Settings {
     void
     process_ui()
     {
+        // Note: flat navigation doesn't work well on child windows that scroll.
         if (ImGui::BeginChild("settings")) {
 
             if (ImGui::BeginCombo("Preferred server",

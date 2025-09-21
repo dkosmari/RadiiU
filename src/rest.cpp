@@ -166,6 +166,12 @@ namespace rest {
                                                const std::string& response,
                                                const std::string& content_type)
             {
+                if (content_type != "application/json")
+                    throw std::runtime_error{"Content-Type should be application/json, but got "
+                                             + content_type
+                                             + "\nContent:\n"
+                                             + response.substr(0, 256)
+                                             + (response.size() > 256 ? "\n..." : "\n<<EOF>>")};
                 if (content_type != "application/json") {
                     cout << "ERROR: response was not JSON!" << endl;
                     return;
@@ -215,7 +221,10 @@ namespace rest {
         if (content_type_header)
             if (content_type_header->value != "application/json")
                 throw std::runtime_error{"Content-Type should be application/json, but got "
-                                         + content_type_header->value};
+                                         + content_type_header->value
+                                         + "\nContent:\n"
+                                         + stream.read_str(256)
+                                         + (!stream.empty() ? "\n..." : "\n<<EOF>>")};
         return json::parse(stream.read_str());
     }
 

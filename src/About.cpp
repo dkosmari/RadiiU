@@ -70,6 +70,7 @@ namespace About {
     {
         static const ImVec4 label_color = {1.0, 1.0, 0.25, 1.0};
 
+        // Note: flat navigation doesn't work well on child windows that scroll.
         if (ImGui::BeginChild("about")) {
 
             auto radiiu_icon_tex = IconManager::get("ui/radiiu-icon.png");

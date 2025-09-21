@@ -509,12 +509,14 @@ namespace Browser {
     show_station(const Station& station,
                  ImGuiID drag_target)
     {
-        if (ImGui::BeginChild(station.uuid.data(), {0, 0},
+        if (ImGui::BeginChild(station.uuid.data(),
+                              {0, 0},
                               ImGuiChildFlags_AutoResizeY |
                               ImGuiChildFlags_FrameStyle |
                               ImGuiChildFlags_NavFlattened)) {
 
-            if (ImGui::BeginChild("actions", {0, 0},
+            if (ImGui::BeginChild("actions",
+                                  {0, 0},
                                   ImGuiChildFlags_AutoResizeX |
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
@@ -537,11 +539,13 @@ namespace Browser {
 
             ImGui::SameLine();
 
-            if (ImGui::BeginChild("details", {0, 0},
+            if (ImGui::BeginChild("details",
+                                  {0, 0},
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                if (ImGui::BeginChild("first_line", {0, 0},
+                if (ImGui::BeginChild("first_line",
+                                      {0, 0},
                                       ImGuiChildFlags_AutoResizeY |
                                       ImGuiChildFlags_NavFlattened)) {
 
@@ -561,7 +565,8 @@ namespace Browser {
                 ImGui::HandleDragScroll(drag_target);
                 ImGui::EndChild();
 
-                if (ImGui::BeginChild("second_line", {0, 0},
+                if (ImGui::BeginChild("second_line",
+                                      {0, 0},
                                       ImGuiChildFlags_AutoResizeY |
                                       ImGuiChildFlags_NavFlattened)) {
 
@@ -619,9 +624,12 @@ namespace Browser {
         ImGui::SetNextItemOpen(filters_visible);
         if (ImGui::CollapsingHeader("Options")) {
             filters_visible = true;
-            if (ImGui::BeginChild("filters", {0, 0},
+            if (ImGui::BeginChild("filters",
+                                  {0, 0},
                                   ImGuiChildFlags_FrameStyle |
-                                  ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY)) {
+                                  ImGuiChildFlags_AutoResizeX |
+                                  ImGuiChildFlags_AutoResizeY |
+                                  ImGuiChildFlags_NavFlattened)) {
 
                 ImGui::TextUnformatted("Filters");
 
@@ -642,9 +650,12 @@ namespace Browser {
 
             ImGui::SameLine();
 
-            if (ImGui::BeginChild("sorting", {0, 0},
+            if (ImGui::BeginChild("sorting",
+                                  {0, 0},
                                   ImGuiChildFlags_FrameStyle |
-                                  ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY)) {
+                                  ImGuiChildFlags_AutoResizeX |
+                                  ImGuiChildFlags_AutoResizeY |
+                                  ImGuiChildFlags_NavFlattened)) {
                 ImGui::TextUnformatted("Order");
                 ImGui::SetNextItemWidth(250);
                 if (ImGui::BeginCombo("##Order", to_string(order))) {
@@ -663,9 +674,12 @@ namespace Browser {
 
             ImGui::SameLine();
 
-            if (ImGui::BeginChild("buttons", {0, 0},
+            if (ImGui::BeginChild("buttons",
+                                  {0, 0},
                                   ImGuiChildFlags_FrameStyle |
-                                  ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY)) {
+                                  ImGuiChildFlags_AutoResizeX |
+                                  ImGuiChildFlags_AutoResizeY |
+                                  ImGuiChildFlags_NavFlattened)) {
                 if (ImGui::Button("Reset"))
                     reset_options();
                 if (ImGui::Button("Apply")) {
@@ -682,6 +696,7 @@ namespace Browser {
 
         show_navigation();
 
+        // Note: flat navigation doesn't work well on child windows that scroll.
         if (ImGui::BeginChild("stations")) {
             auto drag_target = ImGui::GetCurrentWindow()->ID;
             if (scroll_to_top) {
