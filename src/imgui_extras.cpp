@@ -7,7 +7,6 @@
 
 #include <cinttypes>
 #include <cmath>
-#include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <iostream>
@@ -15,9 +14,12 @@
 #include <stdexcept>
 #include <unordered_map>
 
+#include <imgui.h>
+#include <imgui_stdlib.h>
 #include <imgui_internal.h>
 
 #include "imgui_extras.hpp"
+#include "utils.hpp"
 
 
 using std::cout;
@@ -25,7 +27,6 @@ using std::endl;
 
 
 namespace ImGui {
-
 
     void
     ScrollWhenDraggingOnVoid(const ImVec2& delta,
@@ -40,7 +41,13 @@ namespace ImGui {
     namespace {
 
         std::string
-        cpp_sprintf(const char* fmt, va_list args)
+        cpp_vsprintf(const char* fmt,
+                     va_list args)
+            IM_FMTLIST(1);
+
+        std::string
+        cpp_vsprintf(const char* fmt,
+                     va_list args)
         {
             std::va_list args2;
             va_copy(args2, args);
@@ -57,12 +64,18 @@ namespace ImGui {
 
 #if 0
         std::string
-        cpp_sprintf(const char* fmt, ...)
+        cpp_sprintf(const char* fmt,
+                    ...)
+            IM_FMTARGS(1);
+
+        std::string
+        cpp_sprintf(const char* fmt,
+                    ...)
         {
             std::va_list args;
             va_start(args, fmt);
             try {
-                auto result = cpp_sprintf(fmt, args);
+                auto result = cpp_vsprintf(fmt, args);
                 va_end(args);
                 return result;
             }
@@ -72,6 +85,7 @@ namespace ImGui {
             }
         }
 #endif
+
 
         ImVec2
         to_imgui(sdl::vec2 p)
@@ -150,11 +164,21 @@ namespace ImGui {
 
 
     bool
-    BeginCombo(const char* label,
+    BeginCombo(const std::string& label,
                const std::string& preview,
                ImGuiComboFlags flags)
     {
-        return BeginCombo(label, preview.data(), flags);
+        return BeginCombo(label.data(),
+                          preview.data(),
+                          flags);
+    }
+
+
+    bool
+    BeginPopup(const std::string& id,
+               ImGuiWindowFlags flags)
+    {
+        return BeginPopup(id.data(), flags);
     }
 
 
@@ -189,7 +213,7 @@ namespace ImGui {
 
     template<concepts::arithmetic T>
     bool
-    Drag(const char* label,
+    Drag(const std::string& label,
          T& v,
          T v_min,
          T v_max,
@@ -197,61 +221,72 @@ namespace ImGui {
          const char* format,
          ImGuiSliderFlags flags)
     {
-        return DragScalar(label, imgui_data_type_v<T>, &v, speed, &v_min, &v_max, format, flags);
+        return DragScalar(label.data(),
+                          imgui_data_type_v<T>,
+                          &v,
+                          speed,
+                          &v_min,
+                          &v_max,
+                          format,
+                          flags);
     }
+
+    /* ------------------------------------- */
+    /* Explicit instantiations for Drag<T>() */
+    /* ------------------------------------- */
 
     template
     bool
-    Drag<std::int8_t>(const char*,
+    Drag<std::int8_t>(const std::string&,
                       std::int8_t&, std::int8_t, std::int8_t,
                       float, const char*, ImGuiSliderFlags);
     template
     bool
-    Drag<std::uint8_t>(const char*,
+    Drag<std::uint8_t>(const std::string&,
                        std::uint8_t&, std::uint8_t, std::uint8_t,
                        float, const char*, ImGuiSliderFlags);
 
     template
     bool
-    Drag<std::int16_t>(const char*,
+    Drag<std::int16_t>(const std::string&,
                        std::int16_t&, std::int16_t, std::int16_t,
                        float, const char*, ImGuiSliderFlags);
     template
     bool
-    Drag<std::uint16_t>(const char*,
+    Drag<std::uint16_t>(const std::string&,
                         std::uint16_t&, std::uint16_t, std::uint16_t,
                         float, const char*, ImGuiSliderFlags);
 
     template
     bool
-    Drag<std::int32_t>(const char*,
+    Drag<std::int32_t>(const std::string&,
                        std::int32_t&, std::int32_t, std::int32_t,
                        float, const char*, ImGuiSliderFlags);
     template
     bool
-    Drag<std::uint32_t>(const char*,
+    Drag<std::uint32_t>(const std::string&,
                         std::uint32_t&, std::uint32_t, std::uint32_t,
                         float, const char*, ImGuiSliderFlags);
 
     template
     bool
-    Drag<std::int64_t>(const char*,
+    Drag<std::int64_t>(const std::string&,
                        std::int64_t&, std::int64_t, std::int64_t,
                        float, const char*, ImGuiSliderFlags);
     template
     bool
-    Drag<std::uint64_t>(const char*,
+    Drag<std::uint64_t>(const std::string&,
                         std::uint64_t&, std::uint64_t, std::uint64_t,
                         float, const char*, ImGuiSliderFlags);
 
     template
     bool
-    Drag<float>(const char*,
+    Drag<float>(const std::string&,
                 float&, float, float,
                 float, const char*, ImGuiSliderFlags);
     template
     bool
-    Drag<double>(const char*,
+    Drag<double>(const std::string&,
                  double&, double, double,
                  float, const char*, ImGuiSliderFlags);
 
@@ -337,9 +372,9 @@ namespace ImGui {
                   const sdl::vec2f& uv0,
                   const sdl::vec2f& uv1)
     {
-        auto window_width = ImGui::GetWindowSize().x;
-        ImGui::SetCursorPosX(0.5f * (window_width - size.x));
-        ImGui::Image(texture, size, uv0, uv1);
+        auto window_width = GetContentRegionAvail().x;
+        SetCursorPosX(0.5f * (window_width - size.x));
+        Image(texture, size, uv0, uv1);
     }
 
     void
@@ -353,72 +388,92 @@ namespace ImGui {
 
     template<concepts::arithmetic T>
     bool
-    Input(const char* label,
+    Input(const std::string& label,
           T& v,
           T step,
           T step_fast,
           const char* format,
           ImGuiInputTextFlags flags)
     {
-        return InputScalar(label, imgui_data_type_v<T>, &v, &step, &step_fast, format, flags);
+        return InputScalar(label.data(),
+                           imgui_data_type_v<T>,
+                           &v,
+                           &step,
+                           &step_fast,
+                           format,
+                           flags);
     }
 
+    /* -------------------------------------- */
+    /* Explicit instantiations for Input<T>() */
+    /* -------------------------------------- */
 
     template
     bool
-    Input<std::int8_t>(const char*,
+    Input<std::int8_t>(const std::string&,
                        std::int8_t&, std::int8_t, std::int8_t,
                        const char*, ImGuiInputTextFlags);
     template
     bool
-    Input<std::uint8_t>(const char*,
+    Input<std::uint8_t>(const std::string&,
                         std::uint8_t&, std::uint8_t, std::uint8_t,
                         const char*, ImGuiInputTextFlags);
 
     template
     bool
-    Input<std::int16_t>(const char*,
+    Input<std::int16_t>(const std::string&,
                         std::int16_t&, std::int16_t, std::int16_t,
                         const char*, ImGuiInputTextFlags);
     template
     bool
-    Input<std::uint16_t>(const char*,
+    Input<std::uint16_t>(const std::string&,
                          std::uint16_t&, std::uint16_t, std::uint16_t,
                          const char*, ImGuiInputTextFlags);
 
     template
     bool
-    Input<std::int32_t>(const char*,
+    Input<std::int32_t>(const std::string&,
                         std::int32_t&, std::int32_t, std::int32_t,
                         const char*, ImGuiInputTextFlags);
     template
     bool
-    Input<std::uint32_t>(const char*,
+    Input<std::uint32_t>(const std::string&,
                          std::uint32_t&, std::uint32_t, std::uint32_t,
                          const char*, ImGuiInputTextFlags);
 
     template
     bool
-    Input<std::int64_t>(const char*,
+    Input<std::int64_t>(const std::string&,
                         std::int64_t&, std::int64_t, std::int64_t,
                         const char*, ImGuiInputTextFlags);
     template
     bool
-    Input<std::uint64_t>(const char*,
+    Input<std::uint64_t>(const std::string&,
                          std::uint64_t&, std::uint64_t, std::uint64_t,
                          const char*, ImGuiInputTextFlags);
 
     template
     bool
-    Input<float>(const char*,
+    Input<float>(const std::string&,
                  float&, float, float,
                  const char*, ImGuiInputTextFlags);
 
     template
     bool
-    Input<double>(const char*,
+    Input<double>(const std::string&,
                   double&, double, double,
                   const char*, ImGuiInputTextFlags);
+
+
+    bool
+    InputText(const std::string& label,
+              std::string& value,
+              ImGuiInputTextFlags flags,
+              ImGuiInputTextCallback callback,
+              void* ctx)
+    {
+        return InputText(label.data(), &value, flags, callback, ctx);
+    }
 
 
     void
@@ -557,69 +612,75 @@ namespace ImGui {
 
     template<concepts::arithmetic T>
     bool
-    Slider(const char* label,
+    Slider(const std::string& label,
            T& v,
            T v_min,
            T v_max,
            const char* format,
            ImGuiSliderFlags flags)
     {
-        return SliderScalar(label, imgui_data_type_v<T>, &v, &v_min, &v_max, format, flags);
+        return SliderScalar(label.data(),
+                            imgui_data_type_v<T>,
+                            &v, &v_min, &v_max,
+                            format, flags);
     }
 
+    /* --------------------------------------- */
+    /* Explicit instantiations for Slider<T>() */
+    /* --------------------------------------- */
 
     template
     bool
-    Slider<std::int8_t>(const char*,
+    Slider<std::int8_t>(const std::string&,
                         std::int8_t&, std::int8_t, std::int8_t,
                         const char*, ImGuiSliderFlags);
     template
     bool
-    Slider<std::uint8_t>(const char*,
+    Slider<std::uint8_t>(const std::string&,
                          std::uint8_t&, std::uint8_t, std::uint8_t,
                          const char*, ImGuiSliderFlags);
 
     template
     bool
-    Slider<std::int16_t>(const char*,
+    Slider<std::int16_t>(const std::string&,
                          std::int16_t&, std::int16_t, std::int16_t,
                          const char*, ImGuiSliderFlags);
     template
     bool
-    Slider<std::uint16_t>(const char*,
+    Slider<std::uint16_t>(const std::string&,
                           std::uint16_t&, std::uint16_t, std::uint16_t,
                           const char*, ImGuiSliderFlags);
 
     template
     bool
-    Slider<std::int32_t>(const char*,
+    Slider<std::int32_t>(const std::string&,
                          std::int32_t&, std::int32_t, std::int32_t,
                          const char*, ImGuiSliderFlags);
     template
     bool
-    Slider<std::uint32_t>(const char*,
+    Slider<std::uint32_t>(const std::string&,
                           std::uint32_t&, std::uint32_t, std::uint32_t,
                           const char*, ImGuiSliderFlags);
 
     template
     bool
-    Slider<std::int64_t>(const char*,
+    Slider<std::int64_t>(const std::string&,
                          std::int64_t&, std::int64_t, std::int64_t,
                          const char*, ImGuiSliderFlags);
     template
     bool
-    Slider<std::uint64_t>(const char*,
+    Slider<std::uint64_t>(const std::string&,
                           std::uint64_t&, std::uint64_t, std::uint64_t,
                           const char*, ImGuiSliderFlags);
 
     template
     bool
-    Slider<float>(const char*,
+    Slider<float>(const std::string&,
                   float&, float, float,
                   const char*, ImGuiSliderFlags);
     template
     bool
-    Slider<double>(const char*,
+    Slider<double>(const std::string&,
                    double&, double, double,
                    const char*, ImGuiSliderFlags);
 
@@ -631,23 +692,35 @@ namespace ImGui {
                        const char* fmt,
                        ...)
     {
-        ImGui::PushStyleColor(ImGuiCol_Text, color);
         std::va_list args;
         va_start(args, fmt);
-        ImGui::TextAlignedV(align_x, size_x, fmt, args);
+        TextAlignedColoredV(align_x, size_x, color, fmt, args);
         va_end(args);
-        ImGui::PopStyleColor();
     }
 
 
     void
-    TextCentered(const char* fmt, ...)
+    TextAlignedColoredV(float align_x,
+                        float size_x,
+                        const ImVec4& color,
+                        const char* fmt,
+                        std::va_list args)
+    {
+        PushStyleColor(ImGuiCol_Text, color);
+        TextAlignedV(align_x, size_x, fmt, args);
+        PopStyleColor();
+    }
+
+
+    void
+    TextCentered(const char* fmt,
+                 ...)
     {
         std::string text;
         std::va_list args;
         va_start(args, fmt);
         try {
-            text = cpp_sprintf(fmt, args);
+            text = cpp_vsprintf(fmt, args);
             va_end(args);
         }
         catch (...) {
@@ -655,11 +728,34 @@ namespace ImGui {
             throw;
         }
 
-        auto window_width = ImGui::GetWindowSize().x;
-        auto text_width   = ImGui::CalcTextSize(text.data(), nullptr, true).x;
+        float window_width = GetContentRegionAvail().x;
+        float text_width   = CalcTextSize(text, true).x;
 
-        ImGui::SetCursorPosX(0.5f * (window_width - text_width));
-        ImGui::Text("%s", text.data());
+        SetCursorPosX(0.5f * (window_width - text_width));
+        Text("%s", text.data());
+    }
+
+
+    void
+    TextRight(const char* fmt,
+              ...)
+    {
+        std::va_list args;
+        va_start(args, fmt);
+        TextAlignedV(1.0f, -FLT_MIN, fmt, args);
+        va_end(args);
+    }
+
+
+    void
+    TextRightColored(const ImVec4& color,
+                     const char* fmt,
+                     ...)
+    {
+        std::va_list args;
+        va_start(args, fmt);
+        TextAlignedColoredV(1.0f, -FLT_MIN, color, fmt, args);
+        va_end(args);
     }
 
 
@@ -670,51 +766,147 @@ namespace ImGui {
     }
 
 
+    template<typename T>
     void
-    Value(const char* prefix,
-          std::int64_t val)
+    Value(const std::string& prefix,
+          const T& value)
     {
-        Text("%s: %" PRId64, prefix, val);
+        const std::string fmt = "%s: %" + utils::format(value);
+        Text(fmt.data(),
+             prefix.data(),
+             value);
+    }
+
+    /* -------------------------------------- */
+    /* Explicit instantiations for Value<T>() */
+    /* -------------------------------------- */
+
+    template
+    void
+    Value<char>(const std::string& prefix,
+                const char&);
+
+    template
+    void
+    Value<std::int8_t>(const std::string& prefix,
+                       const std::int8_t&);
+    template
+    void
+    Value<std::uint8_t>(const std::string& prefix,
+                        const std::uint8_t&);
+
+    template
+    void
+    Value<std::int16_t>(const std::string& prefix,
+                        const std::int16_t&);
+    template
+    void
+    Value<std::uint16_t>(const std::string& prefix,
+                         const std::uint16_t&);
+
+    template
+    void
+    Value<std::int32_t>(const std::string& prefix,
+                        const std::int32_t&);
+    template
+    void
+    Value<std::uint32_t>(const std::string& prefix,
+                         const std::uint32_t&);
+
+    template
+    void
+    Value<std::int64_t>(const std::string& prefix,
+                        const std::int64_t&);
+    template
+    void
+    Value<std::uint64_t>(const std::string& prefix,
+                         const std::uint64_t&);
+
+    template
+    void
+    Value<char*>(const std::string& prefix,
+                 char* const &);
+    template
+    void
+    Value<const char*>(const std::string& prefix,
+                       const char* const &);
+
+    // Specialization for std::string
+    template<>
+    void
+    Value<std::string>(const std::string& prefix,
+                       const std::string& value)
+    {
+        Value<const char*>(prefix, value.data());
     }
 
 
+    template<typename T>
     void
-    Value(const char* prefix,
-          std::uint64_t val)
+    ValueWrapped(const std::string& prefix,
+                 const T& value)
     {
-        Text("%s: %" PRIu64, prefix, val);
+        const std::string fmt = "%s: %" + utils::format(value);
+        TextWrapped(fmt.data(), prefix.data(), value);
     }
 
+    /* --------------------------------------------- */
+    /* Explicit instantiations for ValueWrapped<T>() */
+    /* --------------------------------------------- */
 
+    template
     void
-    Value(const char* prefix,
-          const std::string& str)
-    {
-        Text("%s: %s", prefix, str.data());
-    }
-
-
+    ValueWrapped<int8_t>(const std::string&,
+                         const std::int8_t&);
+    template
     void
-    ValueWrapped(const char* prefix,
-                 std::int64_t val)
-    {
-        TextWrapped("%s: %" PRId64, prefix, val);
-    }
+    ValueWrapped<uint8_t>(const std::string&,
+                          const std::uint8_t&);
 
-
+    template
     void
-    ValueWrapped(const char* prefix,
-                 std::uint64_t val)
-    {
-        TextWrapped("%s: %" PRIu64, prefix, val);
-    }
-
-
+    ValueWrapped<int16_t>(const std::string&,
+                          const std::int16_t&);
+    template
     void
-    ValueWrapped(const char* prefix,
-                 const std::string& str)
+    ValueWrapped<uint16_t>(const std::string&,
+                           const std::uint16_t&);
+
+    template
+    void
+    ValueWrapped<int32_t>(const std::string&,
+                          const std::int32_t&);
+    template
+    void
+    ValueWrapped<uint32_t>(const std::string&,
+                           const std::uint32_t&);
+
+
+    template
+    void
+    ValueWrapped<int64_t>(const std::string&,
+                          const std::int64_t&);
+    template
+    void
+    ValueWrapped<uint64_t>(const std::string&,
+                           const std::uint64_t&);
+
+    template
+    void
+    ValueWrapped<char*>(const std::string&,
+                        char* const&);
+    template
+    void
+    ValueWrapped<const char*>(const std::string&,
+                              const char* const&);
+
+    // Specialization for std::string
+    template<>
+    void
+    ValueWrapped<std::string>(const std::string& prefix,
+                              const std::string& value)
     {
-        TextWrapped("%s: %s", prefix, str.data());
+        ValueWrapped<const char*>(prefix, value.data());
     }
 
 } // namespace ImGui

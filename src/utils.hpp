@@ -10,6 +10,7 @@
 
 #include <filesystem>
 #include <string>
+#include <type_traits>
 
 
 namespace utils {
@@ -20,6 +21,22 @@ namespace utils {
 
     const std::filesystem::path&
     get_content_path();
+
+
+    namespace detail {
+
+        template<typename T>
+        extern const char* format_helper;
+
+    } // detail
+
+
+    template<typename T>
+    std::string
+    format(T&)
+    {
+        return detail::format_helper<std::remove_cv_t<T>>;
+    }
 
 } // namespace utils
 

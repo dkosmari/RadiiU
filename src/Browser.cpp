@@ -9,6 +9,7 @@
 #include <array>
 #include <atomic>
 #include <cinttypes>
+#include <concepts>
 #include <exception>
 #include <filesystem>
 #include <iostream>
@@ -24,12 +25,13 @@
 
 #include <imgui.h>
 #include <imgui_internal.h>
-#include <misc/cpp/imgui_stdlib.h>
+#include <imgui_stdlib.h>
 #include <curlxx/easy.hpp>
 
 #include "Browser.hpp"
 
 #include "cfg.hpp"
+#include "constants.hpp"
 #include "Favorites.hpp"
 #include "IconManager.hpp"
 #include "imgui_extras.hpp"
@@ -48,49 +50,59 @@ using std::endl;
 using sdl::vec2;
 
 
+using constants::label_color;
+
+
 namespace Browser {
 
-    thread_safe<std::string> safe_server;
-    std::atomic_bool pending_connect{false};
+    namespace {
 
-    thread_safe<std::vector<std::string>> safe_mirrors;
-    std::jthread fetch_mirrors_thread;
+        thread_safe<std::string> safe_server;
+        std::atomic_bool pending_connect{false};
 
-
-    bool busy = false;
-    bool filters_visible = false;
-    std::string filter_name;
-    std::string filter_tag;
-    std::string filter_country;
-
-    enum class Order : unsigned {
-        name,
-        country,
-        language,
-        votes,
-        random,
-    };
-
-    const std::array order_strings = {
-        "name",
-        "country",
-        "language",
-        "votes",
-        "random",
-    };
-
-    Order order = Order::name;
-    bool reverse = false;
-
-    unsigned page_index = 0;
-    std::vector<Station> stations;
-
-    bool scroll_to_top = false;
-    bool need_refresh = false;
+        thread_safe<std::vector<std::string>> safe_mirrors;
+        std::jthread fetch_mirrors_thread;
 
 
-    // TODO: allow votes to expire after 24 hours.
-    std::unordered_set<std::string> votes_cast;
+        bool busy = false;
+        bool filters_visible = false;
+        std::string filter_name;
+        std::string filter_tag;
+        std::string filter_country;
+
+        enum class Order : unsigned {
+            name,
+            country,
+            language,
+            votes,
+            random,
+        };
+
+        const std::array order_strings = {
+            "name",
+            "country",
+            "language",
+            "votes",
+            "random",
+        };
+
+        Order order = Order::name;
+        bool reverse = false;
+
+        unsigned page_index = 0;
+        std::vector<Station> stations;
+
+        bool scroll_to_top = false;
+        bool need_refresh = false;
+
+
+        // TODO: allow votes to expire after 24 hours.
+        std::unordered_set<std::string> votes_cast;
+
+
+        const std::string popup_info_id = "info";
+
+    } // namespace
 
 
     void
@@ -451,7 +463,6 @@ namespace Browser {
     void
     show_navigation()
     {
-        // ImGui::AlignTextToFramePadding();
         if (ImGui::Button("100⏪") && !busy) {
             if (page_index >= 100)
                 page_index -= 100;
@@ -461,7 +472,6 @@ namespace Browser {
         }
         ImGui::SameLine();
 
-        // ImGui::AlignTextToFramePadding();
         if (ImGui::Button("10⏪") && !busy) {
             if (page_index >= 10)
                 page_index -= 10;
@@ -471,7 +481,6 @@ namespace Browser {
         }
         ImGui::SameLine();
 
-        // ImGui::AlignTextToFramePadding();
         if (ImGui::Button("⏴") && !busy) {
             if (page_index > 0)
                 --page_index;
@@ -483,21 +492,18 @@ namespace Browser {
         ImGui::Value("Page", page_index + 1);
         ImGui::SameLine();
 
-        // ImGui::AlignTextToFramePadding();
         if (ImGui::Button("⏵") && !busy) {
             ++page_index;
             update_list();
         }
         ImGui::SameLine();
 
-        // ImGui::AlignTextToFramePadding();
         if (ImGui::Button("⏩10") && !busy) {
             page_index += 10;
             update_list();
         }
         ImGui::SameLine();
 
-        // ImGui::AlignTextToFramePadding();
         if (ImGui::Button("⏩100") && !busy) {
             page_index += 100;
             update_list();
@@ -506,8 +512,72 @@ namespace Browser {
 
 
     void
+    show_info_row(const std::string& label,
+                  const std::string& value)
+    {
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextRightColored(label_color,  "%s", label.data());
+        ImGui::TableNextColumn();
+        ImGui::TextWrapped("%s", value.data());
+    }
+
+
+    template<std::integral T>
+    void
+    show_info_row(const std::string& label,
+                  T value)
+    {
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextRightColored(label_color, "%s", label.data());
+        ImGui::TableNextColumn();
+        const std::string fmt = "%" + utils::format(value);
+        ImGui::TextWrapped(fmt.data(), value);
+    }
+
+
+    void
+    process_info_popup(const Station& station)
+    {
+        ImGui::SetNextWindowSize({900, 600}, ImGuiCond_Appearing);
+        if (ImGui::BeginPopup(popup_info_id,
+                              ImGuiWindowFlags_NoSavedSettings)) {
+
+            if (ImGui::BeginTable("fields", 2,
+                                  ImGuiTableFlags_None)) {
+
+                ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
+                ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+
+                show_info_row("name", station.name);
+                show_info_row("url", station.url);
+                show_info_row("url_resolved", station.url_resolved);
+                show_info_row("homepage", station.homepage);
+                show_info_row("favicon", station.favicon);
+                show_info_row("tags", station.tags);
+                show_info_row("country_code", station.country_code);
+                show_info_row("language", station.language);
+                show_info_row("uuid", station.uuid);
+
+                show_info_row("votes", station.votes);
+                show_info_row("click_count", station.click_count);
+                show_info_row("click_trend", station.click_trend);
+                show_info_row("bitrate", station.bitrate);
+
+                ImGui::EndTable();
+            }
+            ImGui::HandleDragScroll();
+            ImGui::EndPopup();
+        }
+    }
+
+
+    void
     show_station(const Station& station,
-                 ImGuiID drag_target)
+                 ImGuiID scroll_target)
     {
         if (ImGui::BeginChild(station.uuid.data(),
                               {0, 0},
@@ -525,6 +595,7 @@ namespace Browser {
                                        vec2{64, 64})) {
                     Player::play(station);
                 }
+
                 bool is_favorited = Favorites::contains(station.uuid);
                 if (is_favorited) {
                     if (ImGui::Button("♥"))
@@ -533,8 +604,14 @@ namespace Browser {
                     if (ImGui::Button("♡"))
                         Favorites::add(station);
                 }
+
+                ImGui::SameLine();
+
+                if (ImGui::Button("🛈"))
+                    ImGui::OpenPopup(popup_info_id);
+                process_info_popup(station);
             }
-            ImGui::HandleDragScroll(drag_target);
+            ImGui::HandleDragScroll(scroll_target);
             ImGui::EndChild();
 
             ImGui::SameLine();
@@ -562,7 +639,7 @@ namespace Browser {
                     // WORKAROUND: ImGui cuts off the text.
                     ImGui::Spacing();
                 }
-                ImGui::HandleDragScroll(drag_target);
+                ImGui::HandleDragScroll(scroll_target);
                 ImGui::EndChild();
 
                 if (ImGui::BeginChild("second_line",
@@ -605,13 +682,13 @@ namespace Browser {
 #endif
                     ImGui::Spacing();
                 }
-                ImGui::HandleDragScroll(drag_target);
+                ImGui::HandleDragScroll(scroll_target);
                 ImGui::EndChild();
             }
-            ImGui::HandleDragScroll(drag_target);
+            ImGui::HandleDragScroll(scroll_target);
             ImGui::EndChild();
         }
-        ImGui::HandleDragScroll(drag_target);
+        ImGui::HandleDragScroll(scroll_target);
         ImGui::EndChild();
     }
 
@@ -698,13 +775,13 @@ namespace Browser {
 
         // Note: flat navigation doesn't work well on child windows that scroll.
         if (ImGui::BeginChild("stations")) {
-            auto drag_target = ImGui::GetCurrentWindow()->ID;
+            auto scroll_target = ImGui::GetCurrentWindow()->ID;
             if (scroll_to_top) {
                 ImGui::SetScrollY(0);
                 scroll_to_top = false;
             }
             for (const auto& station : stations)
-                show_station(station, drag_target);
+                show_station(station, scroll_target);
         }
 
         ImGui::HandleDragScroll();

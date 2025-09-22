@@ -5,6 +5,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <cinttypes>
+
 #include <SDL2/SDL_platform.h>
 
 #include "utils.hpp"
@@ -46,5 +48,27 @@ namespace utils {
             ;
         return content_path;
     }
+
+
+    namespace detail {
+
+        template<> const char* format_helper<char> = "c";
+
+        template<> const char* format_helper<std::int8_t>  = PRIi8;
+        template<> const char* format_helper<std::uint8_t> = PRIu8;
+
+        template<> const char* format_helper<std::int16_t>  = PRIi16;
+        template<> const char* format_helper<std::uint16_t> = PRIu16;
+
+        template<> const char* format_helper<std::int32_t>  = PRIi32;
+        template<> const char* format_helper<std::uint32_t> = PRIu32;
+
+        template<> const char* format_helper<std::int64_t>  = PRIi64;
+        template<> const char* format_helper<std::uint64_t> = PRIu64;
+
+        template<> const char* format_helper<char *>       = "s";
+        template<> const char* format_helper<const char *> = "s";
+
+    } // namespace detail
 
 } // namespace utils

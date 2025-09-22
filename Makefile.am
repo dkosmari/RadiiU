@@ -46,6 +46,8 @@ radiiu_elf_SOURCES = \
 	src/byte_stream.hpp \
 	src/cfg.cpp \
 	src/cfg.hpp \
+	src/constants.cpp \
+	src/constants.hpp \
 	src/crc32.cpp \
 	src/crc32.hpp \
 	src/Favorites.cpp \
@@ -75,14 +77,15 @@ radiiu_elf_SOURCES = \
 
 radiiu_elf_CPPFLAGS = \
 	$(AM_CPPFLAGS) \
-	-DIMGUI_USER_CONFIG='"$(srcdir)/external/custom_imconfig.h"' \
 	$(CURL_CFLAGS) \
 	$(JANSSON_CFLAGS) \
 	$(MPG123_CFLAGS) \
 	$(SDL_CFLAGS) \
 	$(FT_CFLAGS) \
 	-I$(srcdir)/external/curlxx/include \
+	-DIMGUI_USER_CONFIG='"$(srcdir)/external/custom_imconfig.h"' \
 	-I$(srcdir)/external/imgui \
+	-I$(srcdir)/external/imgui/misc/cpp \
 	-I$(srcdir)/external/mpg123xx/include \
 	-I$(srcdir)/external/sdl2xx/include
 

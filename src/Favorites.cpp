@@ -15,11 +15,12 @@
 
 #include <imgui.h>
 #include <imgui_internal.h>
-#include <misc/cpp/imgui_stdlib.h>
+#include <imgui_stdlib.h>
 
 #include "Favorites.hpp"
 
 #include "cfg.hpp"
+#include "constants.hpp"
 #include "IconManager.hpp"
 #include "imgui_extras.hpp"
 #include "Player.hpp"
@@ -32,11 +33,12 @@ using std::cout;
 using std::endl;
 
 
+using constants::label_color;
+
+
 namespace Favorites {
 
     namespace {
-
-        const ImVec4 label_color = {1.0, 1.0, 0.25, 1.0};
 
         std::vector<Station> stations;
         std::unordered_multiset<std::string> uuids;
@@ -52,15 +54,15 @@ namespace Favorites {
         std::optional<std::size_t> scroll_to_station;
 
 
-        const std::string delete_popup_title = "Delete station?";
+        const std::string popup_delete_title = "Delete station?";
         std::optional<std::size_t> station_to_remove;
 
 
-        const std::string edit_popup_title = "Edit station";
+        const std::string popup_edit_title = "Edit station";
         std::optional<Station> edited_station;
 
 
-        const std::string create_popup_title = "Create station";
+        const std::string popup_create_title = "Create station";
         std::optional<Station> created_station;
 
     } // namespace
@@ -138,7 +140,7 @@ namespace Favorites {
         ImGui::SetNextWindowSize({800, 300}, ImGuiCond_Appearing);
         ImGui::SetNextWindowSizeConstraints({ 400, 250 },
                                             { FLT_MAX, FLT_MAX });
-        if (ImGui::BeginPopupModal(delete_popup_title,
+        if (ImGui::BeginPopupModal(popup_delete_title,
                                    nullptr,
                                    ImGuiWindowFlags_NoSavedSettings)) {
             auto window_size = ImGui::GetContentRegionAvail();
@@ -162,7 +164,7 @@ namespace Favorites {
                 // Line it up to the right of the window
                 auto& style = ImGui::GetStyle();
                 const std::string label = "Delete";
-                ImVec2 btn_size = ImGui::CalcTextSize(label) + style.FramePadding * 2;
+                ImVec2 btn_size = ImGui::CalcTextSize(label, true) + style.FramePadding * 2;
                 float new_x = window_size.x - btn_size.x;
                 float cur_x = ImGui::GetCursorPosX();
                 if (new_x > cur_x) // avoid overlapping with Cancel button
@@ -179,6 +181,20 @@ namespace Favorites {
 
 
     void
+    show_row_for(const std::string& label,
+                 std::string& value)
+    {
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextRightColored(label_color, "%s", label.data());
+        ImGui::TableNextColumn();
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+        ImGui::InputText("##" + label, value);
+    }
+
+
+    void
     show_station_fields(Station& station)
     {
         if (ImGui::BeginTable("fields", 2,
@@ -187,77 +203,15 @@ namespace Favorites {
             ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
             ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "name");
-            ImGui::TableNextColumn();
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-            ImGui::InputText("##name", &station.name);
-
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "url");
-            ImGui::TableNextColumn();
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-            ImGui::InputText("##url", &station.url);
-
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "url_resolved");
-            ImGui::TableNextColumn();
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-            ImGui::InputText("##url_resolved", &station.url_resolved);
-
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "homepage");
-            ImGui::TableNextColumn();
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-            ImGui::InputText("##homepage", &station.homepage);
-
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "favicon");
-            ImGui::TableNextColumn();
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-            ImGui::InputText("##favicon", &station.favicon);
-
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "tags");
-            ImGui::TableNextColumn();
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-            ImGui::InputText("##tags", &station.tags);
-
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "country_code");
-            ImGui::TableNextColumn();
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-            ImGui::InputText("##country_code", &station.country_code);
-
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "language");
-            ImGui::TableNextColumn();
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-            ImGui::InputText("##language", &station.language);
-
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "uuid");
-            ImGui::TableNextColumn();
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-            ImGui::InputText("##uuid", &station.uuid);
+            show_row_for("name", station.name);
+            show_row_for("url", station.url);
+            show_row_for("url_resolved", station.url_resolved);
+            show_row_for("homepage", station.homepage);
+            show_row_for("favicon", station.favicon);
+            show_row_for("tags", station.tags);
+            show_row_for("country_code", station.country_code);
+            show_row_for("language", station.language);
+            show_row_for("uuid", station.uuid);
 
             ImGui::EndTable();
         }
@@ -273,7 +227,7 @@ namespace Favorites {
         ImGui::SetNextWindowSize({1100, 700}, ImGuiCond_Appearing);
         ImGui::SetNextWindowSizeConstraints({ 400, 400 },
                                             { FLT_MAX, FLT_MAX });
-        if (ImGui::BeginPopupModal(edit_popup_title,
+        if (ImGui::BeginPopupModal(popup_edit_title,
                                    nullptr,
                                    ImGuiWindowFlags_NoSavedSettings)) {
 
@@ -302,7 +256,7 @@ namespace Favorites {
                 // Line it up to the right of the window
                 auto& style = ImGui::GetStyle();
                 const std::string label = "Apply";
-                ImVec2 btn_size = ImGui::CalcTextSize(label) + style.FramePadding * 2;
+                ImVec2 btn_size = ImGui::CalcTextSize(label, true) + style.FramePadding * 2;
                 float new_x = window_size.x - btn_size.x;
                 float cur_x = ImGui::GetCursorPosX();
                 if (new_x > cur_x) // avoid overlapping with Cancel button
@@ -335,7 +289,7 @@ namespace Favorites {
         ImGui::SetNextWindowSize({1100, 700}, ImGuiCond_Appearing);
         ImGui::SetNextWindowSizeConstraints({ 400, 400 },
                                             { FLT_MAX, FLT_MAX });
-        if (ImGui::BeginPopupModal(create_popup_title,
+        if (ImGui::BeginPopupModal(popup_create_title,
                                    nullptr,
                                    ImGuiWindowFlags_NoSavedSettings)) {
 
@@ -364,7 +318,7 @@ namespace Favorites {
                 // Line it up to the right of the window
                 auto& style = ImGui::GetStyle();
                 const std::string label = "Create";
-                ImVec2 btn_size = ImGui::CalcTextSize(label) + style.FramePadding * 2;
+                ImVec2 btn_size = ImGui::CalcTextSize(label, true) + style.FramePadding * 2;
                 float new_x = window_size.x - btn_size.x;
                 float cur_x = ImGui::GetCursorPosX();
                 if (new_x > cur_x) // avoid overlapping with Cancel button
@@ -427,14 +381,14 @@ namespace Favorites {
 
                 if (ImGui::Button("🖊")) {
                     edited_station = station;
-                    ImGui::OpenPopup(edit_popup_title);
+                    ImGui::OpenPopup(popup_edit_title);
                 }
                 process_popup_edit(station);
 
                 ImGui::SameLine();
 
                 if (ImGui::Button("🗑"))
-                    ImGui::OpenPopup(delete_popup_title);
+                    ImGui::OpenPopup(popup_delete_title);
                 process_popup_delete(station, index);
             }
             ImGui::HandleDragScroll(scroll_target);
@@ -494,7 +448,7 @@ namespace Favorites {
                               ImGuiChildFlags_AutoResizeY)) {
 
             if (ImGui::Button("Create")) {
-                ImGui::OpenPopup(create_popup_title);
+                ImGui::OpenPopup(popup_create_title);
                 created_station.emplace();
             }
             process_popup_create();
@@ -508,7 +462,7 @@ namespace Favorites {
 
             ImGui::AlignTextToFramePadding();
             //ImGui::Value("Size", stations.size());
-            ImGui::TextAligned(1.0f, -FLT_MIN, "%zu stations", stations.size());
+            ImGui::TextRight("%zu stations", stations.size());
 
         }
         ImGui::EndChild();

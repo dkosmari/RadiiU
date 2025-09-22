@@ -8,6 +8,7 @@
 #ifndef IMGUI_EXTRAS_HPP
 #define IMGUI_EXTRAS_HPP
 
+#include <cstdarg>
 #include <cstdint>
 #include <string>
 #include <type_traits>
@@ -36,9 +37,14 @@ namespace ImGui {
 
 
     bool
-    BeginCombo(const char* label,
+    BeginCombo(const std::string& label,
                const std::string& preview,
                ImGuiComboFlags flags = 0);
+
+
+    bool
+    BeginPopup(const std::string& id,
+               ImGuiWindowFlags flags = 0);
 
 
     bool
@@ -60,7 +66,7 @@ namespace ImGui {
 
     template<concepts::arithmetic T>
     bool
-    Drag(const char* label,
+    Drag(const std::string& label,
          T& v,
          T v_min,
          T v_max,
@@ -120,12 +126,20 @@ namespace ImGui {
 
     template<concepts::arithmetic T>
     bool
-    Input(const char* label,
+    Input(const std::string& label,
           T& v,
           T step = T{1},
           T step_fast = T{100},
           const char* format = nullptr,
           ImGuiInputTextFlags flags = 0);
+
+
+    bool
+    InputText(const std::string& label,
+              std::string& value,
+              ImGuiInputTextFlags flags = 0,
+              ImGuiInputTextCallback callback = nullptr,
+              void* ctx = nullptr);
 
 
     void
@@ -150,7 +164,7 @@ namespace ImGui {
 
     template<concepts::arithmetic T>
     bool
-    Slider(const char* label,
+    Slider(const std::string& label,
            T& v,
            T v_min,
            T v_max,
@@ -168,38 +182,47 @@ namespace ImGui {
 
 
     void
-    TextCentered(const char* fmt, ...)
+    TextAlignedColoredV(float align_x,
+                        float size_x,
+                        const ImVec4& color,
+                        const char* fmt,
+                        std::va_list args)
+        IM_FMTLIST(4);
+
+
+    void
+    TextCentered(const char* fmt,
+                 ...)
         IM_FMTARGS(1);
+
+
+    void
+    TextRight(const char* fmt,
+              ...)
+        IM_FMTARGS(1);
+
+
+    void
+    TextRightColored(const ImVec4& color,
+                     const char* fmt,
+                     ...)
+        IM_FMTARGS(2);
 
 
     void
     TextUnformatted(const std::string& text);
 
 
+    template<typename T>
     void
-    Value(const char* prefix,
-          std::int64_t val);
-
-    void
-    Value(const char* prefix,
-          std::uint64_t val);
-
-    void
-    Value(const char* prefix,
-          const std::string& str);
+    Value(const std::string& prefix,
+          const T& value);
 
 
+    template<typename T>
     void
-    ValueWrapped(const char* prefix,
-                 std::int64_t val);
-
-    void
-    ValueWrapped(const char* prefix,
-                 std::uint64_t val);
-
-    void
-    ValueWrapped(const char* prefix,
-                 const std::string& str);
+    ValueWrapped(const std::string& prefix,
+                 const T& value);
 
 } // namespace ImGui
 

@@ -1,14 +1,14 @@
-* Pending features for v0.1 [62%]
+* Pending features for v0.1 [63%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
-  - [-] Browser [8/9]
+  - [X] Browser [9/9]
     - [X] Send click
     - [X] Send upvote
     - [X] Clear filters
     - [X] Sort order
     - [X] Add/remove favorites
-    - [ ] Button to show more info
+    - [X] Button to show more info
     - [X] Select random server from DNS query
     - [X] Show a few more fields like vote count and country.
     - [X] Save browser state
@@ -26,8 +26,9 @@
     - [ ] Show stream details (bitrate, codec)
     - [ ] Add/remove to favorites
     - [ ] Show track change history.
-  - [X] Settings [2/2]
+  - [-] Settings [2/3]
     - [X] Load/save (store as save game on Wii U)
     - [X] Select server
+    - [ ] Cosmetic: use a table to line up all fields.
   - [X] Add "About" tab, for credits and version number for all components
   - [ ] Handle loss of internet connection.

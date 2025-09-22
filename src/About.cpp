@@ -14,6 +14,7 @@
 
 #include "About.hpp"
 
+#include "constants.hpp"
 #include "IconManager.hpp"
 #include "imgui_extras.hpp"
 #include "utils.hpp"
@@ -25,6 +26,9 @@
 
 using std::cout;
 using std::endl;
+
+
+using constants::label_color;
 
 
 namespace About {
@@ -68,8 +72,6 @@ namespace About {
     void
     process_ui()
     {
-        static const ImVec4 label_color = {1.0, 1.0, 0.25, 1.0};
-
         // Note: flat navigation doesn't work well on child windows that scroll.
         if (ImGui::BeginChild("about")) {
 
@@ -84,13 +86,13 @@ namespace About {
 
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "Homepage");
+                ImGui::TextRightColored(label_color, "Homepage");
                 ImGui::TableNextColumn();
                 ImGui::TextLink(PACKAGE_URL);
 
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "Bugs");
+                ImGui::TextRightColored(label_color, "Bugs");
                 ImGui::TableNextColumn();
                 ImGui::TextLink(PACKAGE_BUGREPORT);
 
