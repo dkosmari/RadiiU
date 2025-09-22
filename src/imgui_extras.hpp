@@ -163,11 +163,13 @@ namespace ImGui {
                        float size_x,
                        const ImVec4& color,
                        const char* fmt,
-                       ...);
+                       ...)
+        IM_FMTARGS(4);
 
 
     void
-    TextCentered(const char* fmt, ...);
+    TextCentered(const char* fmt, ...)
+        IM_FMTARGS(1);
 
 
     void

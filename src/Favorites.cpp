@@ -39,7 +39,7 @@ namespace Favorites {
         const ImVec4 label_color = {1.0, 1.0, 0.25, 1.0};
 
         std::vector<Station> stations;
-        std::unordered_set<std::string> uuids;
+        std::unordered_multiset<std::string> uuids;
 
 
         struct MoveOp {
@@ -57,7 +57,11 @@ namespace Favorites {
 
 
         const std::string edit_popup_title = "Edit station";
-        std::optional<Station> editing_station;
+        std::optional<Station> edited_station;
+
+
+        const std::string create_popup_title = "Create station";
+        std::optional<Station> created_station;
 
     } // namespace
 
@@ -128,7 +132,7 @@ namespace Favorites {
 
 
     void
-    process_delete_popup(const Station& station,
+    process_popup_delete(const Station& station,
                          std::size_t index)
     {
         ImGui::SetNextWindowSize({800, 300}, ImGuiCond_Appearing);
@@ -175,9 +179,95 @@ namespace Favorites {
 
 
     void
-    process_edit_popup(Station& station)
+    show_station_fields(Station& station)
     {
-        if (!editing_station)
+        if (ImGui::BeginTable("fields", 2,
+                              ImGuiTableFlags_None)) {
+
+            ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "name");
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+            ImGui::InputText("##name", &station.name);
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "url");
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+            ImGui::InputText("##url", &station.url);
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "url_resolved");
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+            ImGui::InputText("##url_resolved", &station.url_resolved);
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "homepage");
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+            ImGui::InputText("##homepage", &station.homepage);
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "favicon");
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+            ImGui::InputText("##favicon", &station.favicon);
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "tags");
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+            ImGui::InputText("##tags", &station.tags);
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "country_code");
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+            ImGui::InputText("##country_code", &station.country_code);
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "language");
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+            ImGui::InputText("##language", &station.language);
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "uuid");
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+            ImGui::InputText("##uuid", &station.uuid);
+
+            ImGui::EndTable();
+        }
+    }
+
+
+    void
+    process_popup_edit(Station& station)
+    {
+        if (!edited_station)
             return;
 
         ImGui::SetNextWindowSize({1100, 700}, ImGuiCond_Appearing);
@@ -188,92 +278,9 @@ namespace Favorites {
                                    ImGuiWindowFlags_NoSavedSettings)) {
 
             if (ImGui::BeginChild("content",
-                                  {0, -ImGui::GetFrameHeightWithSpacing()})) {
+                                  {0, -ImGui::GetFrameHeightWithSpacing()}))
+                show_station_fields(*edited_station);
 
-                // auto scroll_target = ImGui::GetCurrentWindow()->ID;
-
-                if (ImGui::BeginTable("fields", 2,
-                                      ImGuiTableFlags_None)) {
-
-                    ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
-                    ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
-
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "name");
-                    ImGui::TableNextColumn();
-                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                    ImGui::InputText("##name", &editing_station->name);
-
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "url");
-                    ImGui::TableNextColumn();
-                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                    ImGui::InputText("##url", &editing_station->url);
-
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "url_resolved");
-                    ImGui::TableNextColumn();
-                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                    ImGui::InputText("##url_resolved", &editing_station->url_resolved);
-
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "homepage");
-                    ImGui::TableNextColumn();
-                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                    ImGui::InputText("##homepage", &editing_station->homepage);
-
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "favicon");
-                    ImGui::TableNextColumn();
-                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                    ImGui::InputText("##favicon", &editing_station->favicon);
-
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "tags");
-                    ImGui::TableNextColumn();
-                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                    ImGui::InputText("##tags", &editing_station->tags);
-
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "country_code");
-                    ImGui::TableNextColumn();
-                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                    ImGui::InputText("##country_code", &editing_station->country_code);
-
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "language");
-                    ImGui::TableNextColumn();
-                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                    ImGui::InputText("##language", &editing_station->language);
-
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "uuid");
-                    ImGui::TableNextColumn();
-                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                    ImGui::InputText("##uuid", &editing_station->uuid);
-
-                    ImGui::EndTable();
-                }
-
-            }
             ImGui::HandleDragScroll();
             ImGui::EndChild();
 
@@ -283,7 +290,7 @@ namespace Favorites {
             {
                 if (ImGui::Button("Cancel")) {
                     ImGui::CloseCurrentPopup();
-                    editing_station.reset();
+                    edited_station.reset();
                 }
                 ImGui::SetItemDefaultFocus();
             }
@@ -302,9 +309,71 @@ namespace Favorites {
                     ImGui::SetCursorPosX(new_x);
                 if (ImGui::Button(label)) {
                     ImGui::CloseCurrentPopup();
-                    if (editing_station)
-                        station = *editing_station;
-                    editing_station.reset();
+                    if (edited_station) {
+                        auto it = uuids.find(station.uuid);
+                        if (it != uuids.end())
+                            uuids.erase(it);
+                        station = std::move(*edited_station);
+                        if (!station.uuid.empty())
+                            uuids.insert(station.uuid);
+                    }
+                    edited_station.reset();
+                }
+            }
+
+            ImGui::EndPopup();
+        }
+    }
+
+
+    void
+    process_popup_create()
+    {
+        if (!created_station)
+            return;
+
+        ImGui::SetNextWindowSize({1100, 700}, ImGuiCond_Appearing);
+        ImGui::SetNextWindowSizeConstraints({ 400, 400 },
+                                            { FLT_MAX, FLT_MAX });
+        if (ImGui::BeginPopupModal(create_popup_title,
+                                   nullptr,
+                                   ImGuiWindowFlags_NoSavedSettings)) {
+
+            if (ImGui::BeginChild("content",
+                                  {0, -ImGui::GetFrameHeightWithSpacing()})) {
+                show_station_fields(*created_station);
+            }
+            ImGui::HandleDragScroll();
+            ImGui::EndChild();
+
+            auto window_size = ImGui::GetContentRegionAvail();
+
+            // Cancel button
+            {
+                if (ImGui::Button("Cancel")) {
+                    ImGui::CloseCurrentPopup();
+                    created_station.reset();
+                }
+                ImGui::SetItemDefaultFocus();
+            }
+
+            ImGui::SameLine();
+
+            // Create button
+            {
+                // Line it up to the right of the window
+                auto& style = ImGui::GetStyle();
+                const std::string label = "Create";
+                ImVec2 btn_size = ImGui::CalcTextSize(label) + style.FramePadding * 2;
+                float new_x = window_size.x - btn_size.x;
+                float cur_x = ImGui::GetCursorPosX();
+                if (new_x > cur_x) // avoid overlapping with Cancel button
+                    ImGui::SetCursorPosX(new_x);
+                if (ImGui::Button(label)) {
+                    ImGui::CloseCurrentPopup();
+                    if (created_station)
+                        add(*created_station);
+                    created_station.reset();
                 }
             }
 
@@ -357,16 +426,16 @@ namespace Favorites {
                 ImGui::EndDisabled();
 
                 if (ImGui::Button("🖊")) {
-                    editing_station = station;
+                    edited_station = station;
                     ImGui::OpenPopup(edit_popup_title);
                 }
-                process_edit_popup(station);
+                process_popup_edit(station);
 
                 ImGui::SameLine();
 
                 if (ImGui::Button("🗑"))
                     ImGui::OpenPopup(delete_popup_title);
-                process_delete_popup(station, index);
+                process_popup_delete(station, index);
             }
             ImGui::HandleDragScroll(scroll_target);
             ImGui::EndChild(); // actions
@@ -419,6 +488,32 @@ namespace Favorites {
     void
     process_ui()
     {
+        if (ImGui::BeginChild("status_bar",
+                              {0, 0},
+                              ImGuiChildFlags_NavFlattened |
+                              ImGuiChildFlags_AutoResizeY)) {
+
+            if (ImGui::Button("Create")) {
+                ImGui::OpenPopup(create_popup_title);
+                created_station.emplace();
+            }
+            process_popup_create();
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("Save"))
+                save();
+
+            ImGui::SameLine();
+
+            ImGui::AlignTextToFramePadding();
+            //ImGui::Value("Size", stations.size());
+            ImGui::TextAligned(1.0f, -FLT_MIN, "%zu stations", stations.size());
+
+        }
+        ImGui::EndChild();
+
+
         // Note: flat navigation doesn't work well on child windows that scroll.
         if (ImGui::BeginChild("favorites")) {
             auto scroll_target = ImGui::GetCurrentWindow()->ID;
@@ -490,10 +585,16 @@ namespace Favorites {
             return;
         if (!uuids.contains(uuid))
             return;
-        uuids.erase(uuid);
-        auto it = std::ranges::find(stations, uuid, by_id);
-        if (it != stations.end())
-            stations.erase(it);
+        {
+            auto it = uuids.find(uuid);
+            if (it != uuids.end())
+                uuids.erase(it);
+        }
+        {
+            auto it = std::ranges::find(stations, uuid, by_id);
+            if (it != stations.end())
+                stations.erase(it);
+        }
     }
 
 
@@ -502,7 +603,12 @@ namespace Favorites {
     {
         if (index >= stations.size())
             return;
-        uuids.erase(stations[index].uuid);
+        {
+            auto it = uuids.find(stations[index].uuid);
+            if (it != uuids.end())
+                uuids.erase(it);
+        }
+
         stations.erase(stations.begin() + index);
     }
 

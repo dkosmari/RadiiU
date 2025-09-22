@@ -113,9 +113,10 @@ Station::to_json()
     h.store("countrycode", country_code);
     h.store("language", language);
     h.store("stationuuid", uuid);
-    h.store("votes", votes);
-    h.store("clickcount", click_count);
-    h.store("clicktrend", click_trend);
-    h.store("bitrate", bitrate);
+    // Note: these fields are volatile, no point in serializing them.
+    // h.store("votes", votes);
+    // h.store("clickcount", click_count);
+    // h.store("clicktrend", click_trend);
+    // h.store("bitrate", bitrate);
     return obj;
 }
