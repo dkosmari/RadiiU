@@ -15,6 +15,7 @@
 
 #include <imgui.h>
 #include <imgui_internal.h>
+#include <misc/cpp/imgui_stdlib.h>
 
 #include "Favorites.hpp"
 
@@ -35,6 +36,8 @@ namespace Favorites {
 
     namespace {
 
+        const ImVec4 label_color = {1.0, 1.0, 0.25, 1.0};
+
         std::vector<Station> stations;
         std::unordered_set<std::string> uuids;
 
@@ -49,8 +52,12 @@ namespace Favorites {
         std::optional<std::size_t> scroll_to_station;
 
 
-        std::optional<std::size_t> station_to_remove;
         const std::string delete_popup_title = "Delete station?";
+        std::optional<std::size_t> station_to_remove;
+
+
+        const std::string edit_popup_title = "Edit station";
+        std::optional<Station> editing_station;
 
     } // namespace
 
@@ -150,14 +157,154 @@ namespace Favorites {
             {
                 // Line it up to the right of the window
                 auto& style = ImGui::GetStyle();
-                ImVec2 btn_size = ImGui::CalcTextSize("Delete") + style.FramePadding * 2;
+                const std::string label = "Delete";
+                ImVec2 btn_size = ImGui::CalcTextSize(label) + style.FramePadding * 2;
                 float new_x = window_size.x - btn_size.x;
                 float cur_x = ImGui::GetCursorPosX();
                 if (new_x > cur_x) // avoid overlapping with Cancel button
                     ImGui::SetCursorPosX(new_x);
-                if (ImGui::Button("Delete")) {
+                if (ImGui::Button(label)) {
                     ImGui::CloseCurrentPopup();
                     station_to_remove = index;
+                }
+            }
+            ImGui::HandleDragScroll();
+            ImGui::EndPopup();
+        }
+    }
+
+
+    void
+    process_edit_popup(Station& station)
+    {
+        if (!editing_station)
+            return;
+
+        ImGui::SetNextWindowSize({1100, 700}, ImGuiCond_Appearing);
+        ImGui::SetNextWindowSizeConstraints({ 400, 400 },
+                                            { FLT_MAX, FLT_MAX });
+        if (ImGui::BeginPopupModal(edit_popup_title,
+                                   nullptr,
+                                   ImGuiWindowFlags_NoSavedSettings)) {
+
+            if (ImGui::BeginChild("content",
+                                  {0, -ImGui::GetFrameHeightWithSpacing()})) {
+
+                // auto scroll_target = ImGui::GetCurrentWindow()->ID;
+
+                if (ImGui::BeginTable("fields", 2,
+                                      ImGuiTableFlags_None)) {
+
+                    ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
+                    ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "name");
+                    ImGui::TableNextColumn();
+                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                    ImGui::InputText("##name", &editing_station->name);
+
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "url");
+                    ImGui::TableNextColumn();
+                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                    ImGui::InputText("##url", &editing_station->url);
+
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "url_resolved");
+                    ImGui::TableNextColumn();
+                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                    ImGui::InputText("##url_resolved", &editing_station->url_resolved);
+
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "homepage");
+                    ImGui::TableNextColumn();
+                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                    ImGui::InputText("##homepage", &editing_station->homepage);
+
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "favicon");
+                    ImGui::TableNextColumn();
+                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                    ImGui::InputText("##favicon", &editing_station->favicon);
+
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "tags");
+                    ImGui::TableNextColumn();
+                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                    ImGui::InputText("##tags", &editing_station->tags);
+
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "country_code");
+                    ImGui::TableNextColumn();
+                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                    ImGui::InputText("##country_code", &editing_station->country_code);
+
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "language");
+                    ImGui::TableNextColumn();
+                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                    ImGui::InputText("##language", &editing_station->language);
+
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "uuid");
+                    ImGui::TableNextColumn();
+                    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                    ImGui::InputText("##uuid", &editing_station->uuid);
+
+                    ImGui::EndTable();
+                }
+
+            }
+            ImGui::HandleDragScroll();
+            ImGui::EndChild();
+
+            auto window_size = ImGui::GetContentRegionAvail();
+
+            // Cancel button
+            {
+                if (ImGui::Button("Cancel")) {
+                    ImGui::CloseCurrentPopup();
+                    editing_station.reset();
+                }
+                ImGui::SetItemDefaultFocus();
+            }
+
+            ImGui::SameLine();
+
+            // Apply button
+            {
+                // Line it up to the right of the window
+                auto& style = ImGui::GetStyle();
+                const std::string label = "Apply";
+                ImVec2 btn_size = ImGui::CalcTextSize(label) + style.FramePadding * 2;
+                float new_x = window_size.x - btn_size.x;
+                float cur_x = ImGui::GetCursorPosX();
+                if (new_x > cur_x) // avoid overlapping with Cancel button
+                    ImGui::SetCursorPosX(new_x);
+                if (ImGui::Button(label)) {
+                    ImGui::CloseCurrentPopup();
+                    if (editing_station)
+                        station = *editing_station;
+                    editing_station.reset();
                 }
             }
 
@@ -167,7 +314,7 @@ namespace Favorites {
 
 
     void
-    show_station(const Station& station,
+    show_station(Station& station,
                  std::size_t index,
                  ImGuiID scroll_target)
     {
@@ -210,8 +357,10 @@ namespace Favorites {
                 ImGui::EndDisabled();
 
                 if (ImGui::Button("🖊")) {
-                    cout << "TODO: edit favorite" << endl;
+                    editing_station = station;
+                    ImGui::OpenPopup(edit_popup_title);
                 }
+                process_edit_popup(station);
 
                 ImGui::SameLine();
 

@@ -1,4 +1,4 @@
-* Pending features for v0.1 [53%]
+* Pending features for v0.1 [55%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
@@ -12,8 +12,9 @@
     - [X] Select random server from DNS query
     - [X] Show a few more fields like vote count and country.
     - [X] Save browser state
-  - [-] Favorites [3/4]
-    - [ ] Edit entry
+  - [-] Favorites [4/5]
+    - [ ] Add entry
+    - [X] Edit entry
     - [X] Remove entry
     - [X] Reorder entry
     - [X] Load/save

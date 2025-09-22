@@ -84,17 +84,13 @@ namespace About {
 
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                ImGui::PushStyleColor(ImGuiCol_Text, label_color);
-                ImGui::TextAligned(1.0, -FLT_MIN, "Homepage");
-                ImGui::PopStyleColor();
+                ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "Homepage");
                 ImGui::TableNextColumn();
                 ImGui::TextLink(PACKAGE_URL);
 
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                ImGui::PushStyleColor(ImGuiCol_Text, label_color);
-                ImGui::TextAligned(1.0, -FLT_MIN, "Bugs");
-                ImGui::PopStyleColor();
+                ImGui::TextAlignedColored(1.0, -FLT_MIN, label_color, "Bugs");
                 ImGui::TableNextColumn();
                 ImGui::TextLink(PACKAGE_BUGREPORT);
 

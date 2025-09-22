@@ -159,6 +159,14 @@ namespace ImGui {
 
 
     void
+    TextAlignedColored(float align_x,
+                       float size_x,
+                       const ImVec4& color,
+                       const char* fmt,
+                       ...);
+
+
+    void
     TextCentered(const char* fmt, ...);
 
 

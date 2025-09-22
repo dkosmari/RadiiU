@@ -625,6 +625,22 @@ namespace ImGui {
 
 
     void
+    TextAlignedColored(float align_x,
+                       float size_x,
+                       const ImVec4& color,
+                       const char* fmt,
+                       ...)
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, color);
+        std::va_list args;
+        va_start(args, fmt);
+        ImGui::TextAlignedV(align_x, size_x, fmt, args);
+        va_end(args);
+        ImGui::PopStyleColor();
+    }
+
+
+    void
     TextCentered(const char* fmt, ...)
     {
         std::string text;
