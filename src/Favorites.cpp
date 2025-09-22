@@ -33,20 +33,24 @@ using std::endl;
 
 namespace Favorites {
 
-    std::vector<Station> stations;
-    std::unordered_set<std::string> uuids;
-
-
     namespace {
+
+        std::vector<Station> stations;
+        std::unordered_set<std::string> uuids;
+
 
         struct MoveOp {
             std::size_t src;
             std::size_t dst;
         };
-
         std::optional<MoveOp> move_operation;
 
+
         std::optional<std::size_t> scroll_to_station;
+
+
+        std::optional<std::size_t> station_to_remove;
+        const std::string delete_popup_title = "Delete station?";
 
     } // namespace
 
@@ -117,6 +121,52 @@ namespace Favorites {
 
 
     void
+    process_delete_popup(const Station& station,
+                         std::size_t index)
+    {
+        ImGui::SetNextWindowSize({800, 300}, ImGuiCond_Appearing);
+        ImGui::SetNextWindowSizeConstraints({ 400, 250 },
+                                            { FLT_MAX, FLT_MAX });
+        if (ImGui::BeginPopupModal(delete_popup_title,
+                                   nullptr,
+                                   ImGuiWindowFlags_NoSavedSettings)) {
+            auto window_size = ImGui::GetContentRegionAvail();
+
+            if (ImGui::BeginChild("content", {0, -ImGui::GetFrameHeightWithSpacing()})) {
+                ImGui::TextWrapped("%s", station.name.data());
+            }
+            ImGui::EndChild();
+
+            // Cancel button
+            {
+                if (ImGui::Button("Cancel"))
+                    ImGui::CloseCurrentPopup();
+                ImGui::SetItemDefaultFocus();
+            }
+
+            ImGui::SameLine();
+
+            // Delete button
+            {
+                // Line it up to the right of the window
+                auto& style = ImGui::GetStyle();
+                ImVec2 btn_size = ImGui::CalcTextSize("Delete") + style.FramePadding * 2;
+                float new_x = window_size.x - btn_size.x;
+                float cur_x = ImGui::GetCursorPosX();
+                if (new_x > cur_x) // avoid overlapping with Cancel button
+                    ImGui::SetCursorPosX(new_x);
+                if (ImGui::Button("Delete")) {
+                    ImGui::CloseCurrentPopup();
+                    station_to_remove = index;
+                }
+            }
+
+            ImGui::EndPopup();
+        }
+    }
+
+
+    void
     show_station(const Station& station,
                  std::size_t index,
                  ImGuiID scroll_target)
@@ -165,10 +215,9 @@ namespace Favorites {
 
                 ImGui::SameLine();
 
-                if (ImGui::Button("🗑")) {
-                    cout << "TODO: confirm delete favorites" << endl;
-                }
-
+                if (ImGui::Button("🗑"))
+                    ImGui::OpenPopup(delete_popup_title);
+                process_delete_popup(station, index);
             }
             ImGui::HandleDragScroll(scroll_target);
             ImGui::EndChild(); // actions
@@ -246,6 +295,13 @@ namespace Favorites {
             scroll_to_station = dst;
             move_operation.reset();
         }
+
+        // Handle pending delete
+        if (station_to_remove) {
+            remove(*station_to_remove);
+            station_to_remove.reset();
+        }
+
     }
 
 
@@ -289,6 +345,16 @@ namespace Favorites {
         auto it = std::ranges::find(stations, uuid, by_id);
         if (it != stations.end())
             stations.erase(it);
+    }
+
+
+    void
+    remove(std::size_t index)
+    {
+        if (index >= stations.size())
+            return;
+        uuids.erase(stations[index].uuid);
+        stations.erase(stations.begin() + index);
     }
 
 } // namespace Favorites

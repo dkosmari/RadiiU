@@ -350,12 +350,12 @@ App::process_ui()
                             ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(window_size.x, window_size.y),
                              ImGuiCond_Always);
-    ImGuiWindowFlags win_flags = 0;
-    win_flags |= ImGuiWindowFlags_NoTitleBar;
-    win_flags |= ImGuiWindowFlags_NoMove;
-    win_flags |= ImGuiWindowFlags_NoSavedSettings;
-    win_flags |= ImGuiWindowFlags_NoResize;
-    if (ImGui::Begin("##MainWindow", nullptr, win_flags)) {
+    if (ImGui::Begin("##MainWindow",
+                     nullptr,
+                     ImGuiWindowFlags_NoTitleBar |
+                     ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoSavedSettings |
+                     ImGuiWindowFlags_NoResize)) {
 
         // Draw logo on top, centered
         auto window_width = ImGui::GetWindowSize().x;

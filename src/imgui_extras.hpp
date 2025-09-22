@@ -42,8 +42,20 @@ namespace ImGui {
 
 
     bool
+    BeginPopupModal(const std::string& name,
+                    bool* p_open = nullptr,
+                    ImGuiWindowFlags flags = 0);
+
+
+    bool
     Button(const std::string& label,
            const ImVec2& size = ImVec2(0, 0));
+
+
+    ImVec2
+    CalcTextSize(const std::string& text,
+                 bool hide_text_after_double_hash = false,
+                 float wrap_width = -1.0f);
 
 
     template<concepts::arithmetic T>
@@ -121,6 +133,11 @@ namespace ImGui {
 
 
     void
+    OpenPopup(const std::string& str_id,
+              ImGuiPopupFlags popup_flags = 0);
+
+
+    void
     PushID(const std::string& str);
 
 
@@ -174,6 +191,6 @@ namespace ImGui {
     ValueWrapped(const char* prefix,
                  const std::string& str);
 
-}
+} // namespace ImGui
 
 #endif

@@ -159,10 +159,31 @@ namespace ImGui {
 
 
     bool
+    BeginPopupModal(const std::string& name,
+                    bool* p_open,
+                    ImGuiWindowFlags flags)
+    {
+        return BeginPopupModal(name.data(), p_open, flags);
+    }
+
+
+    bool
     Button(const std::string& label,
            const ImVec2& size)
     {
         return Button(label.data(), size);
+    }
+
+
+    ImVec2
+    CalcTextSize(const std::string& text,
+                 bool hide_text_after_double_hash,
+                 float wrap_width)
+    {
+        return CalcTextSize(text.data(),
+                            text.data() + text.size(),
+                            hide_text_after_double_hash,
+                            wrap_width);
     }
 
 
@@ -450,6 +471,14 @@ namespace ImGui {
                       {
                           return elem.second.velocity == ImVec2{};
                       });
+    }
+
+
+    void
+    OpenPopup(const std::string& str_id,
+              ImGuiPopupFlags popup_flags)
+    {
+        OpenPopup(str_id.data(), popup_flags);
     }
 
 

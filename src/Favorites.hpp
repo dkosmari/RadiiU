@@ -38,6 +38,9 @@ namespace Favorites {
     void
     remove(const std::string& uuid);
 
+    void
+    remove(std::size_t index);
+
 } // namespace Favorites
 
 #endif
