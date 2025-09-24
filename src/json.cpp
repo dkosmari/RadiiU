@@ -24,6 +24,11 @@ namespace json {
     {}
 
 
+    error::error(const std::string& msg) :
+        std::runtime_error{msg}
+    {}
+
+
     value::value(const value& other) :
         base_type{other}
     {}
@@ -387,13 +392,26 @@ namespace json {
 
     void
     save(const value& val,
-         const std::filesystem::path& filename)
+         const std::filesystem::path& filename,
+         bool replace)
     {
-        std::ofstream out{filename};
+        std::filesystem::path new_filename = filename;
+        if (replace)
+            new_filename += ".new";
+        std::ofstream out{new_filename};
         if (!out)
-            throw error{"could not open output file"};
+            throw error{"could not open output file: " + new_filename.string()};
         printer p{out};
         visit([&p](const auto& v) { p(v); }, val);
+        out.close();
+        if (replace) {
+#ifdef __WIIU__
+            // WORKAROUND: Wii U doesn't replace files with rename()
+            if (exists(filename))
+                remove(filename);
+#endif
+            rename(new_filename, filename);
+        }
     }
 
 } // namespace json

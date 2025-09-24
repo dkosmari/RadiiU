@@ -5,20 +5,17 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#ifndef FAVORITES_HPP
-#define FAVORITES_HPP
-
-#include <string>
+#ifndef RECENT_HPP
+#define RECENT_HPP
 
 
 struct Station;
 
 
-namespace Favorites {
+namespace Recent {
 
     void
     initialize();
-
 
     void
     finalize();
@@ -28,20 +25,9 @@ namespace Favorites {
     process_ui();
 
 
-    bool
-    contains(const std::string& uuid);
-
-
     void
-    add(const Station& st);
+    add(const Station& station);
 
-
-    void
-    remove(const std::string& uuid);
-
-    void
-    remove(std::size_t index);
-
-} // namespace Favorites
+} // namespace Recent
 
 #endif

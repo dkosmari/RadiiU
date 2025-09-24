@@ -45,6 +45,12 @@ struct Station {
     to_json()
         const;
 
-};
+}; // struct Station
+
+
+bool
+operator ==(const Station& a,
+            const Station& b)
+    noexcept;
 
 #endif

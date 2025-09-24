@@ -27,6 +27,7 @@
 #include "IconManager.hpp"
 #include "icy_meta.hpp"
 #include "imgui_extras.hpp"
+#include "Recent.hpp"
 #include "Station.hpp"
 #include "utils.hpp"
 
@@ -254,6 +255,7 @@ namespace Player {
     {
         cout << "Starting playback of station \"" << st.name << "\"" << endl;
         station = st;
+        Recent::add(st);
         play();
     }
 

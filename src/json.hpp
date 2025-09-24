@@ -31,6 +31,7 @@ namespace json {
     struct error : std::runtime_error {
 
         error(const char* msg);
+        error(const std::string& msg);
 
     };
 
@@ -119,7 +120,8 @@ namespace json {
 
     void
     save(const value& val,
-         const std::filesystem::path& filename);
+         const std::filesystem::path& filename,
+         bool replace = true);
 
 } // namespace json
 

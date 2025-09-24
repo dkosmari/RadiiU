@@ -42,6 +42,36 @@ namespace {
 
 } // namespace
 
+
+bool
+operator ==(const Station& a,
+            const Station& b)
+    noexcept
+{
+    // If both have uuid, skip all other comparisons.
+    if (!a.uuid.empty() && !b.uuid.empty())
+        return a.uuid == b.uuid;
+
+    if (a.name != b.name)
+        return false;
+    if (a.url != b.url)
+        return false;
+    if (a.url_resolved != b.url_resolved)
+        return false;
+    if (a.homepage != b.homepage)
+        return false;
+    if (a.favicon != b.favicon)
+        return false;
+    if (a.tags != b.tags)
+        return false;
+    if (a.country_code != b.country_code)
+        return false;
+    if (a.language != b.language)
+        return false;
+    return true;
+}
+
+
 Station
 Station::from_json(const json::object& obj)
 {

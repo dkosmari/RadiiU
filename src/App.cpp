@@ -28,8 +28,8 @@
 #include "Favorites.hpp"
 #include "IconManager.hpp"
 #include "imgui_extras.hpp"
-#include "json.hpp"
 #include "Player.hpp"
+#include "Recent.hpp"
 #include "rest.hpp"
 #include "Settings.hpp"
 #include "utils.hpp"
@@ -117,17 +117,14 @@ namespace {
 
     std::optional<TabIndex> next_tab;
 
-    bool
-    should_switch(TabIndex idx)
+    ImGuiTabItemFlags
+    get_tab_item_flags_for(TabIndex idx)
     {
-        if (!next_tab)
-            return false;
-        // cout << "Next tab requested: "
-        //      << static_cast<int>(idx)
-        //      << " -> "
-        //      << static_cast<int>(*next_tab)
-        //      << endl;
-        return idx == *next_tab;
+        ImGuiTabItemFlags result = ImGuiTabItemFlags_None;
+        // If switching tabs, set the SetSelected flag
+        if (next_tab && idx == *next_tab)
+            result |= ImGuiTabItemFlags_SetSelected;
+        return result;
     }
 
 
@@ -246,9 +243,11 @@ App::App() :
 
     IconManager::initialize();
     rest::initialize(utils::get_user_agent());
-    Player::initialize();
+
     Favorites::initialize();
     Browser::initialize();
+    Recent::initialize();
+    Player::initialize();
 
     cout << "Finished App constructor" << endl;
 }
@@ -256,9 +255,10 @@ App::App() :
 
 App::~App()
 {
+    Player::finalize();
+    Recent::finalize();
     Browser::finalize();
     Favorites::finalize();
-    Player::finalize();
     rest::finalize();
     IconManager::finalize();
 
@@ -372,51 +372,45 @@ App::process_ui()
 
         if (ImGui::BeginTabBar("main_tabs")) {
 
-            if (ImGui::BeginTabItem("★ Favorites", nullptr,
-                                    should_switch(TabIndex::favorites)
-                                    ? ImGuiTabItemFlags_SetSelected
-                                    : ImGuiTabItemFlags_None)) {
+            if (ImGui::BeginTabItem("★ Favorites",
+                                    nullptr,
+                                    get_tab_item_flags_for(TabIndex::favorites))) {
                 Favorites::process_ui();
                 ImGui::EndTabItem();
             }
 
-            if (ImGui::BeginTabItem("🔍 Browser", nullptr,
-                                    should_switch(TabIndex::browser)
-                                    ? ImGuiTabItemFlags_SetSelected
-                                    : ImGuiTabItemFlags_None)) {
+            if (ImGui::BeginTabItem("🔍 Browser",
+                                    nullptr,
+                                    get_tab_item_flags_for(TabIndex::browser))) {
                 Browser::process_ui();
                 ImGui::EndTabItem();
             }
 
-            if (ImGui::BeginTabItem("🕓 Recent", nullptr,
-                                    should_switch(TabIndex::recent)
-                                    ? ImGuiTabItemFlags_SetSelected
-                                    : ImGuiTabItemFlags_None)) {
-                ImGui::Text("List of recent stations.");
+            if (ImGui::BeginTabItem("🕓 Recent",
+                                    nullptr,
+                                    get_tab_item_flags_for(TabIndex::recent))) {
+                Recent::process_ui();
                 ImGui::EndTabItem();
             }
 
-            if (ImGui::BeginTabItem("🎧 Player", nullptr,
-                                    should_switch(TabIndex::player)
-                                    ? ImGuiTabItemFlags_SetSelected
-                                    : ImGuiTabItemFlags_None)) {
+            if (ImGui::BeginTabItem("🎧 Player",
+                                    nullptr,
+                                    get_tab_item_flags_for(TabIndex::player))) {
                 Player::process_ui();
                 ImGui::EndTabItem();
 
             }
 
-            if (ImGui::BeginTabItem("⚙ Settings", nullptr,
-                                    should_switch(TabIndex::settings)
-                                    ? ImGuiTabItemFlags_SetSelected
-                                    : ImGuiTabItemFlags_None)) {
+            if (ImGui::BeginTabItem("⚙ Settings",
+                                    nullptr,
+                                    get_tab_item_flags_for(TabIndex::settings))) {
                 Settings::process_ui();
                 ImGui::EndTabItem();
             }
 
-            if (ImGui::BeginTabItem("About", nullptr,
-                                    should_switch(TabIndex::about)
-                                    ? ImGuiTabItemFlags_SetSelected
-                                    : ImGuiTabItemFlags_None)) {
+            if (ImGui::BeginTabItem("About",
+                                    nullptr,
+                                    get_tab_item_flags_for(TabIndex::about))) {
                 About::process_ui();
                 ImGui::EndTabItem();
             }

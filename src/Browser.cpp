@@ -281,7 +281,7 @@ namespace Browser {
             update_list();
         }
         catch (std::exception& e) {
-            cout << "Error loading browser state: " << e.what() << endl;
+            cout << "Error loading browser: " << e.what() << endl;
         }
     }
 
@@ -290,38 +290,26 @@ namespace Browser {
     save()
     {
         try {
-            json::object obj;
-
-            json::object fobj;
+            json::object filter;
             if (!filter_name.empty())
-                fobj["name"] = filter_name;
+                filter["name"] = filter_name;
             if (!filter_tag.empty())
-                fobj["tag"] = filter_tag;
+                filter["tag"] = filter_tag;
             if (!filter_country.empty())
-                fobj["country"] = filter_country;
-            if (!fobj.empty())
-                obj["filter"] = std::move(fobj);
+                filter["country"] = filter_country;
 
-            obj["order"] = to_string(order);
-            obj["reverse"] = reverse;
+            json::object root;
+            if (!filter.empty())
+                root["filter"] = std::move(filter);
 
-            obj["page"] = 1 + page_index;
+            root["order"] = to_string(order);
+            root["reverse"] = reverse;
+            root["page"] = 1 + page_index;
 
-            const std::filesystem::path old_browser = cfg::base_dir / "browser.json";
-            const std::filesystem::path new_browser = cfg::base_dir / "browser.json.new";
-#ifdef __WIIU__
-            if (exists(new_browser))
-                remove(new_browser);
-#endif
-            json::save(std::move(obj), new_browser);
-#ifdef __WIIU__
-            if (exists(old_browser))
-                remove(old_browser);
-#endif
-            rename(new_browser, old_browser);
+            json::save(std::move(root), cfg::base_dir / "browser.json");
         }
         catch (std::exception& e) {
-            cout << "Error saving browser state: " << e.what() << endl;
+            cout << "Error saving browser: " << e.what() << endl;
         }
     }
 

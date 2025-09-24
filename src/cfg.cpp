@@ -125,7 +125,7 @@ namespace cfg {
                 start_on_favorites = root.at("start_on_favorites").as<bool>();
         }
         catch (std::exception& e) {
-            cout << "Could not load settings: " << e.what() << endl;
+            cout << "Error loading settings: " << e.what() << endl;
         }
     }
 
@@ -141,19 +141,7 @@ namespace cfg {
             root["disable_auto_power_down"] = disable_auto_power_down;
             root["browser_page_size"]       = browser_page_size;
             root["start_on_favorites"]      = start_on_favorites;
-
-            std::filesystem::path old_settings = base_dir / "settings.json";
-            std::filesystem::path new_settings = base_dir / "settings.json.new";
-#ifdef __WIIU__
-            if (exists(new_settings))
-                remove(new_settings);
-#endif
-            json::save(root, new_settings);
-#ifdef __WIIU__
-            if (exists(old_settings))
-                remove(old_settings);
-#endif
-            rename(new_settings, old_settings);
+            json::save(std::move(root), base_dir / "settings.json");
         }
         catch (std::exception& e) {
             cout << "Error saving settings: " << e.what() << endl;

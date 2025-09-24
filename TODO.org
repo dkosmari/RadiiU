@@ -1,4 +1,4 @@
-* Pending features for v0.1 [63%]
+* Pending features for v0.1 [70%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
@@ -18,17 +18,18 @@
     - [X] Remove entry
     - [X] Reorder entry
     - [X] Load/save
-  - [ ] Recent [0/2]
-    - [ ] Implement
-    - [ ] Save history on exit
-  - [ ] Player [0/4]
+  - [X] Recent [2/2]
+    - [X] Implement
+    - [X] Save history on exit
+  - [ ] Player [0/5]
     - [ ] Parse m3u playlists
     - [ ] Show stream details (bitrate, codec)
     - [ ] Add/remove to favorites
     - [ ] Show track change history.
-  - [-] Settings [2/3]
+    - [ ] Handle loss of internet connection.
+  - [-] Settings [2/4]
     - [X] Load/save (store as save game on Wii U)
     - [X] Select server
+    - [ ] Select which page to start on.
     - [ ] Cosmetic: use a table to line up all fields.
   - [X] Add "About" tab, for credits and version number for all components
-  - [ ] Handle loss of internet connection.

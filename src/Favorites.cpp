@@ -23,11 +23,10 @@
 #include "constants.hpp"
 #include "IconManager.hpp"
 #include "imgui_extras.hpp"
+#include "json.hpp"
 #include "Player.hpp"
 #include "Station.hpp"
 
-
-using sdl::vec2;
 
 using std::cout;
 using std::endl;
@@ -79,9 +78,9 @@ namespace Favorites {
             uuids.clear();
             for (auto& elem : list) {
                 stations.push_back(Station::from_json(elem.as<json::object>()));
-                const auto& st = stations.back();
-                if (!st.uuid.empty())
-                    uuids.insert(st.uuid);
+                const auto& station = stations.back();
+                if (!station.uuid.empty())
+                    uuids.insert(station.uuid);
             }
             cout << "Loaded " << stations.size() << " favorites" << endl;
         }
@@ -96,22 +95,9 @@ namespace Favorites {
     {
         try {
             json::array list;
-            for (const Station& st : stations)
-                list.push_back(st.to_json());
-            const std::filesystem::path old_favorites = cfg::base_dir / "favorites.json";
-            const std::filesystem::path new_favorites = cfg::base_dir / "favorites.json.new";
-
-            json::value root = std::move(list);
-#ifdef __WIIU__
-            if (exists(new_favorites))
-                remove(new_favorites);
-#endif
-            save(root, new_favorites);
-#ifdef __WIIU__
-            if (exists(old_favorites))
-                remove(old_favorites);
-#endif
-            rename(new_favorites, old_favorites);
+            for (const Station& station : stations)
+                list.push_back(station.to_json());
+            json::save(std::move(list), cfg::base_dir / "favorites.json");
         }
         catch (std::exception& e) {
             cout << "Error saving favorites: " << e.what() << endl;
@@ -354,7 +340,7 @@ namespace Favorites {
                                   ImGuiChildFlags_AutoResizeX |
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
-                const vec2 play_size = {96, 96};
+                const sdl::vec2 play_size = {96, 96};
                 if (ImGui::ImageButton("play_button",
                                        *IconManager::get("ui/play-button.png"),
                                        play_size)) {
@@ -399,7 +385,7 @@ namespace Favorites {
             if (!station.favicon.empty()) {
                 auto icon = IconManager::get(station.favicon);
                 auto icon_size = icon->get_size();
-                vec2 size = {128, 128};
+                sdl::vec2 size = {128, 128};
                 size.x = icon_size.x * size.y / icon_size.y;
                 ImGui::Image(*IconManager::get(station.favicon), size);
                 ImGui::SameLine();
@@ -407,7 +393,7 @@ namespace Favorites {
 
             // ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.5f, 0.0f, 0.0f, 1.0f));
 
-            if (ImGui::BeginChild("station_info",
+            if (ImGui::BeginChild("details",
                                   {0, 0},
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
@@ -427,7 +413,7 @@ namespace Favorites {
                 ImGui::Spacing();
             }
             ImGui::HandleDragScroll(scroll_target);
-            ImGui::EndChild(); // station_info
+            ImGui::EndChild(); // details
 
             // ImGui::PopStyleColor();
 
@@ -442,7 +428,7 @@ namespace Favorites {
     void
     process_ui()
     {
-        if (ImGui::BeginChild("status_bar",
+        if (ImGui::BeginChild("toolbar",
                               {0, 0},
                               ImGuiChildFlags_NavFlattened |
                               ImGuiChildFlags_AutoResizeY)) {
@@ -461,7 +447,6 @@ namespace Favorites {
             ImGui::SameLine();
 
             ImGui::AlignTextToFramePadding();
-            //ImGui::Value("Size", stations.size());
             ImGui::TextRight("%zu stations", stations.size());
 
         }

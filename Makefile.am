@@ -63,6 +63,8 @@ radiiu_elf_SOURCES = \
 	src/main.cpp \
 	src/Player.cpp \
 	src/Player.hpp \
+	src/Recent.cpp \
+	src/Recent.hpp \
 	src/rest.cpp \
 	src/rest.hpp \
 	src/Settings.cpp \
