@@ -1,4 +1,4 @@
-* Pending features for v0.1 [70%]
+* Pending features for v0.1 [74%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
@@ -27,9 +27,9 @@
     - [ ] Add/remove to favorites
     - [ ] Show track change history.
     - [ ] Handle loss of internet connection.
-  - [-] Settings [2/4]
+  - [-] Settings [3/4]
     - [X] Load/save (store as save game on Wii U)
     - [X] Select server
-    - [ ] Select which page to start on.
+    - [X] Select which page to start on.
     - [ ] Cosmetic: use a table to line up all fields.
   - [X] Add "About" tab, for credits and version number for all components
