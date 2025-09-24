@@ -23,20 +23,17 @@ int
 main(int, char* [])
 {
     cout << "Started " << PACKAGE_STRING << endl;
-
-    // cout << "mpg123 decoders:" << endl;
-    // const char** decoders = mpg123_decoders();
-    // for (unsigned i = 0; decoders[i]; ++i)
-    //     cout << "  - " << decoders[i] << endl;
+    int status = 0;
 
     try {
-        App app;
-        app.run();
+        App::initialize();
+        App::run();
     }
     catch (std::exception& e) {
         cout << "ERROR: " << e.what() << endl;
-        return -1;
+        status = -1;
     }
+    App::finalize();
     cout << "Exiting..." << endl;
-    return 0;
+    return status;
 }

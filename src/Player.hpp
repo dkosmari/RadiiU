@@ -28,7 +28,7 @@ namespace Player {
 
 
     void
-    process_playback();
+    process_logic();
 
 
     void

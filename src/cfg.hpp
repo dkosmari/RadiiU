@@ -12,6 +12,8 @@
 #include <string>
 #include <filesystem>
 
+#include "TabIndex.hpp"
+
 
 namespace cfg {
 
@@ -21,7 +23,10 @@ namespace cfg {
     extern unsigned    player_buffer_size;
     extern bool        disable_auto_power_down;
     extern unsigned    browser_page_size;
-    extern bool        start_on_favorites;
+    extern TabIndex    start_tab;
+    extern bool        remember_last_tab;
+    extern unsigned    max_recent;
+
 
     void
     initialize();

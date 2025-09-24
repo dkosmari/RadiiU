@@ -192,6 +192,15 @@ namespace ImGui {
 
 
     bool
+    BeginTabItem(const std::string& label,
+                 bool* p_open,
+                 ImGuiTabItemFlags flags)
+    {
+        return BeginTabItem(label.data(), p_open, flags);
+    }
+
+
+    bool
     Button(const std::string& label,
            const ImVec2& size)
     {

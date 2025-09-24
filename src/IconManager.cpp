@@ -24,7 +24,6 @@
 
 #include "IconManager.hpp"
 
-#include "App.hpp"
 #include "async_queue.hpp"
 #include "crc32.hpp"
 #include "thread_safe.hpp"
@@ -88,13 +87,12 @@ namespace IconManager {
 
 
     void
-    initialize()
+    initialize(sdl::renderer& rend)
     {
         user_agent = utils::get_user_agent();
         content_prefix = utils::get_content_path();
 
-        App* app = App::get_instance();
-        renderer = &app->renderer;
+        renderer = &rend;
 
         error_icon   = sdl::img::load_texture(*renderer,
                                               content_prefix / "ui/error-icon.png");

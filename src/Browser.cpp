@@ -315,7 +315,7 @@ namespace Browser {
 
 
     void
-    process()
+    process_logic()
     {
         if (pending_connect) {
             pending_connect = false;
@@ -726,9 +726,8 @@ namespace Browser {
                 if (ImGui::BeginCombo("##Order", to_string(order))) {
                     for (unsigned i = 0; i < order_strings.size(); ++i) {
                         Order o{i};
-                        if (ImGui::Selectable(to_string(o), order == o)) {
+                        if (ImGui::Selectable(to_string(o), order == o))
                             order = o;
-                        }
                     }
                     ImGui::EndCombo();
                 }

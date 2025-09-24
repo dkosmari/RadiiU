@@ -8,63 +8,18 @@
 #ifndef APP_HPP
 #define APP_HPP
 
-#include <memory>
-#include <vector>
+namespace App {
 
-#include <sdl2xx/sdl.hpp>
-#include <sdl2xx/img.hpp>
-#include <sdl2xx/ttf.hpp>
+    void
+    initialize();
 
-#include <imgui.h>
-
-
-struct App {
-
-    sdl::init sdl_init;
-    sdl::img::init img_init;
-    sdl::ttf::init ttf_init;
-
-    sdl::window window;
-    sdl::renderer renderer;
-    sdl::texture title_texture;
-
-    sdl::vec2 window_size;
-
-    sdl::vector<sdl::game_controller::device> controllers;
-
-    bool running;
-
-
-    App();
-    ~App();
+    void
+    finalize();
 
 
     void
     run();
 
-
-    void
-    quit();
-
-
-    void
-    draw();
-
-
-    void
-    process_events();
-
-    void
-    process_ui();
-
-
-    void
-    process();
-
-
-    static App* instance;
-    static App* get_instance();
-
-};
+} // namespace App
 
 #endif

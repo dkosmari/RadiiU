@@ -28,6 +28,10 @@ namespace Favorites {
     process_ui();
 
 
+    void
+    process_logic();
+
+
     bool
     contains(const std::string& uuid);
 

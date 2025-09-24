@@ -26,6 +26,10 @@ namespace Recent {
 
 
     void
+    process_logic();
+
+
+    void
     add(const Station& station);
 
 } // namespace Recent

@@ -8,17 +8,25 @@
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <utility>
+#include <vector>
+
 
 #ifdef __WIIU__
 #include <coreinit/memory.h>
 #endif
 
+#include <imgui.h>
 #include <backends/imgui_impl_sdl2.h>
 #include <backends/imgui_impl_sdlrenderer2.h>
 #include <misc/freetype/imgui_freetype.h>
+
+#include <sdl2xx/sdl.hpp>
+#include <sdl2xx/img.hpp>
+#include <sdl2xx/ttf.hpp>
 
 #include "App.hpp"
 
@@ -32,9 +40,8 @@
 #include "Recent.hpp"
 #include "rest.hpp"
 #include "Settings.hpp"
+#include "TabIndex.hpp"
 #include "utils.hpp"
-
-#include "net/resolver.hpp"
 
 
 #ifdef HAVE_CONFIG_H
@@ -50,13 +57,53 @@ using std::filesystem::path;
 using namespace sdl::literals;
 
 
-App* App::instance = nullptr;
+namespace App {
+
+    // RAII-managed resources are stored here.
+    struct Resources {
+
+        sdl::init sdl_init{sdl::init::flag::video,
+                           sdl::init::flag::audio,
+                           sdl::init::flag::game_controller};
+        sdl::img::init img_init;
+        sdl::ttf::init ttf_init;
+
+        sdl::window window;
+        sdl::renderer renderer;
+        sdl::texture title_texture;
+
+        sdl::vector<sdl::game_controller::device> controllers;
+
+    }; // struct Resources
+
+    std::optional<Resources> res;
 
 
-namespace {
+    bool running;
 
     const float cafe_size = 32;
     const float symbola_size = cafe_size * 1.2f;
+
+    std::optional<TabIndex> next_tab;
+    TabIndex current_tab;
+
+    sdl::vec2 window_size;
+
+
+    void
+    quit();
+
+    void
+    draw();
+
+    void
+    process_events();
+
+    void
+    process_ui();
+
+    void
+    process();
 
 
     void
@@ -106,17 +153,6 @@ namespace {
     }
 
 
-    enum class TabIndex {
-        favorites,
-        browser,
-        recent,
-        player,
-        settings,
-        about,
-    };
-
-    std::optional<TabIndex> next_tab;
-
     ImGuiTabItemFlags
     get_tab_item_flags_for(TabIndex idx)
     {
@@ -150,332 +186,354 @@ namespace {
     }
 
 
-} // namespace
+    void
+    setup_imgui_style()
+    {
+        ImGui::StyleColorsDark();
 
+        auto& style = ImGui::GetStyle();
+        const float radius = 8;
 
-App::App() :
-    sdl_init{sdl::init::flag::video,
-             sdl::init::flag::audio,
-             sdl::init::flag::game_controller},
-    running{false}
-{
-    instance = this;
+        style.WindowBorderSize = 0;
+        style.WindowRounding = 0;
+        style.WindowPadding = {12, 12};
 
-    cfg::initialize();
+        style.ScrollbarSize = 32;
+        style.ScrollbarRounding = radius;
 
-    if (cfg::start_on_favorites)
-        next_tab = TabIndex::favorites;
-    else
-        next_tab = TabIndex::browser;
+        style.GrabMinSize = 32;
+        style.GrabRounding = radius;
 
-    // Create an audio device to stop the boot sound.
-    sdl::audio::spec aspec;
-    aspec.freq = 44100;
-    aspec.format = AUDIO_S16SYS;
-    aspec.channels = 2;
-    aspec.samples = 2048;
-    sdl::audio::device adev{nullptr, false, aspec};
+        style.FrameRounding = radius;
+        style.FramePadding = {12, 12};
 
-    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
-    SDL_SetHint(SDL_HINT_RENDER_LINE_METHOD, "2");
+        style.ImageBorderSize = 0;
 
-    window.create(PACKAGE,
-                  sdl::window::pos_centered,
-                  {1280, 720},
-                  0);
+        style.ItemSpacing = {12, 12};
+        style.ItemInnerSpacing = {12, 12};
 
-    window_size = window.get_size();
-    cout << "SDL window size: " << window_size << endl;
+        style.ChildBorderSize = 0;
+        style.ChildRounding = 0;
 
-    renderer.create(window, -1,
-                    sdl::renderer::flag::accelerated,
-                    sdl::renderer::flag::present_vsync);
-    renderer.set_logical_size(window_size);
-
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-
-    ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-
-    io.Fonts->FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
-    io.Fonts->FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
-
-    io.LogFilename = nullptr;
-    io.IniFilename = nullptr;
-
-    load_fonts();
-
-    ImGui::StyleColorsDark();
-
-    // Custom styling
-    auto& style = ImGui::GetStyle();
-    const float radius = 8;
-
-    style.WindowBorderSize = 0;
-    style.WindowRounding = 0;
-    style.WindowPadding = {12, 12};
-
-    style.ScrollbarSize = 32;
-    style.ScrollbarRounding = radius;
-
-    style.GrabMinSize = 32;
-    style.GrabRounding = radius;
-
-    style.FrameRounding = radius;
-    style.FramePadding = {12, 12};
-
-    style.ImageBorderSize = 0;
-
-    style.ItemSpacing = {12, 12};
-    style.ItemInnerSpacing = {12, 12};
-
-    style.ChildBorderSize = 0;
-    style.ChildRounding = 0;
-
-    style.TabRounding = radius;
-
-    ImGui_ImplSDL2_InitForSDLRenderer(window.data(), renderer.data());
-    ImGui_ImplSDLRenderer2_Init(renderer.data());
-
-    title_texture = make_logo_texture(renderer);
-
-    IconManager::initialize();
-    rest::initialize(utils::get_user_agent());
-
-    Favorites::initialize();
-    Browser::initialize();
-    Recent::initialize();
-    Player::initialize();
-
-    cout << "Finished App constructor" << endl;
-}
-
-
-App::~App()
-{
-    Player::finalize();
-    Recent::finalize();
-    Browser::finalize();
-    Favorites::finalize();
-    rest::finalize();
-    IconManager::finalize();
-
-    ImGui_ImplSDLRenderer2_Shutdown();
-    ImGui_ImplSDL2_Shutdown();
-    ImGui::DestroyContext();
-
-    cfg::finalize();
-    cout << "All done!" << endl;
-}
-
-
-void
-App::run()
-{
-    running = true;
-
-    while (running) {
-
-        process();
-
-        if (!running)
-            break;
-
-        draw();
-
+        style.TabRounding = radius;
     }
-    cout << "Stopped running" << endl;
-}
 
 
-void
-App::process_events()
-{
-    sdl::events::event event;
-    while (sdl::events::poll(event)) {
+    void
+    initialize_imgui()
+    {
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
 
-        ImGui_ImplSDL2_ProcessEvent(&event);
+        ImGuiIO& io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 
-        switch (event.type) {
+        io.Fonts->FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
+        io.Fonts->FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
 
-            case sdl::events::type::e_quit:
-                quit();
+        io.LogFilename = nullptr; // don't save log
+        io.IniFilename = nullptr; // don't save ini
+
+        load_fonts();
+
+        setup_imgui_style();
+
+        ImGui_ImplSDL2_InitForSDLRenderer(res->window.data(),
+                                          res->renderer.data());
+        ImGui_ImplSDLRenderer2_Init(res->renderer.data());
+    }
+
+
+    void
+    initialize()
+    {
+        // Note: initialize cfg module early.
+        cfg::initialize();
+        next_tab = cfg::start_tab;
+
+        res.emplace();
+
+        // Create a temporary audio device to stop the boot sound.
+        sdl::audio::spec aspec;
+        aspec.freq = 44100;
+        aspec.format = AUDIO_S16SYS;
+        aspec.channels = 2;
+        aspec.samples = 2048;
+        sdl::audio::device adev{nullptr, false, aspec};
+
+        SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
+        SDL_SetHint(SDL_HINT_RENDER_LINE_METHOD, "2");
+
+        res->window.create(PACKAGE,
+                           sdl::window::pos_centered,
+                           {1280, 720},
+                           0);
+
+        window_size = res->window.get_size();
+        cout << "SDL window size: " << window_size << endl;
+
+        res->renderer.create(res->window,
+                             -1,
+                             sdl::renderer::flag::accelerated,
+                             sdl::renderer::flag::present_vsync);
+        res->renderer.set_logical_size(window_size);
+
+        initialize_imgui();
+
+        res->title_texture = make_logo_texture(res->renderer);
+
+        // Initialize modules.
+        IconManager::initialize(res->renderer);
+        rest::initialize(utils::get_user_agent());
+
+        // Initialize tabs.
+        Favorites::initialize();
+        Browser::initialize();
+        Recent::initialize();
+        Player::initialize();
+
+        cout << "Finished App::initialize()" << endl;
+    }
+
+
+    void
+    finalize()
+    {
+        // Finalize tabs.
+        Player::finalize();
+        Recent::finalize();
+        Browser::finalize();
+        Favorites::finalize();
+
+        // Finalize modules.
+        rest::finalize();
+        IconManager::finalize();
+
+        ImGui_ImplSDLRenderer2_Shutdown();
+        ImGui_ImplSDL2_Shutdown();
+        ImGui::DestroyContext();
+
+        // Finalize cfg module last.
+        if (cfg::remember_last_tab)
+            cfg::start_tab = current_tab;
+        cfg::finalize();
+
+        res.reset();
+
+        cout << "finished App::finalize()" << endl;
+    }
+
+
+    void
+    run()
+    {
+        running = true;
+
+        while (running) {
+
+            process();
+
+            if (!running)
                 break;
 
-            case sdl::events::type::e_window:
-                switch (event.window.event) {
-                    case SDL_WINDOWEVENT_RESIZED:
-                        window_size.x = event.window.data1;
-                        window_size.y = event.window.data2;
-                        break;
+            draw();
+
+        }
+        cout << "Stopped running" << endl;
+    }
+
+
+    void
+    process_events()
+    {
+        sdl::events::event event;
+        while (sdl::events::poll(event)) {
+
+            ImGui_ImplSDL2_ProcessEvent(&event);
+
+            switch (event.type) {
+
+                case sdl::events::type::e_quit:
+                    quit();
+                    break;
+
+                case sdl::events::type::e_window:
+                    switch (event.window.event) {
+                        case SDL_WINDOWEVENT_RESIZED:
+                            window_size.x = event.window.data1;
+                            window_size.y = event.window.data2;
+                            break;
+                    }
+                    break;
+
+                case sdl::events::type::e_controller_device_added:
+                {
+                    auto gc = sdl::game_controller::device(event.cdevice.which);
+                    cout << "Added controller: " << gc.get_name() << endl;
+                    res->controllers.push_back(std::move(gc));
+                    break;
                 }
-                break;
 
-            case sdl::events::type::e_controller_device_added:
-            {
-                auto gc = sdl::game_controller::device(event.cdevice.which);
-                cout << "Added controller: " << gc.get_name() << endl;
-                controllers.push_back(std::move(gc));
-                break;
-            }
+                case sdl::events::type::e_controller_device_removed:
+                {
+                    std::erase_if(res->controllers,
+                                  [id=event.cdevice.which](sdl::game_controller::device& gc)
+                                  {
+                                      return id == gc.get_id();
+                                  });
+                    break;
+                }
+            } // switch (event.type)
 
-            case sdl::events::type::e_controller_device_removed:
-            {
-                std::erase_if(controllers,
-                              [id=event.cdevice.which](sdl::game_controller::device& gc) -> bool
-                              {
-                                  return id == gc.get_id();
-                              });
-            }
-            break;
-        } // switch (event.type)
-
+        }
     }
-}
 
 
-void
-App::process_ui()
-{
-    ImGui_ImplSDLRenderer2_NewFrame();
-    ImGui_ImplSDL2_NewFrame();
+    void
+    process_ui()
+    {
+        ImGui_ImplSDLRenderer2_NewFrame();
+        ImGui_ImplSDL2_NewFrame();
 
-    ImGui::NewFrame();
+        ImGui::NewFrame();
 
-    auto& style = ImGui::GetStyle();
+        auto& style = ImGui::GetStyle();
 
-    ImGui::SetNextWindowPos({0, 0},
-                            ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(window_size.x, window_size.y),
-                             ImGuiCond_Always);
-    if (ImGui::Begin("##MainWindow",
-                     nullptr,
-                     ImGuiWindowFlags_NoTitleBar |
-                     ImGuiWindowFlags_NoMove |
-                     ImGuiWindowFlags_NoSavedSettings |
-                     ImGuiWindowFlags_NoResize)) {
+        ImGui::SetNextWindowPos({0, 0},
+                                ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(window_size.x, window_size.y),
+                                 ImGuiCond_Always);
+        if (ImGui::Begin("##MainWindow",
+                         nullptr,
+                         ImGuiWindowFlags_NoTitleBar |
+                         ImGuiWindowFlags_NoMove |
+                         ImGuiWindowFlags_NoSavedSettings |
+                         ImGuiWindowFlags_NoResize)) {
 
-        // Draw logo on top, centered
-        auto window_width = ImGui::GetWindowSize().x;
-        ImGui::ImageCentered(title_texture);
-        ImGui::SameLine();
-        // Put a button to the right of the logo.
-        auto close_button_tex = IconManager::get("ui/close-button.png");
-        ImGui::SetCursorPosX(window_width
-                             - close_button_tex->get_size().x
-                             - 2 * style.FramePadding.x
-                             - style.WindowPadding.x);
-        if (ImGui::ImageButton("close_button", *close_button_tex))
-            quit();
+            // Draw logo on top, centered
+            auto window_width = ImGui::GetWindowSize().x;
+            ImGui::ImageCentered(res->title_texture);
+            ImGui::SameLine();
+            // Put a button to the right of the logo.
+            auto close_button_tex = IconManager::get("ui/close-button.png");
+            ImGui::SetCursorPosX(window_width
+                                 - close_button_tex->get_size().x
+                                 - 2 * style.FramePadding.x
+                                 - style.WindowPadding.x);
+            if (ImGui::ImageButton("close_button", *close_button_tex))
+                quit();
 
-        if (ImGui::BeginTabBar("main_tabs")) {
+            if (ImGui::BeginTabBar("main_tabs")) {
 
-            if (ImGui::BeginTabItem("★ Favorites",
-                                    nullptr,
-                                    get_tab_item_flags_for(TabIndex::favorites))) {
-                Favorites::process_ui();
-                ImGui::EndTabItem();
+                if (ImGui::BeginTabItem(to_ui_string(TabIndex::favorites),
+                                        nullptr,
+                                        get_tab_item_flags_for(TabIndex::favorites))) {
+                    current_tab = TabIndex::favorites;
+                    Favorites::process_ui();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem(to_ui_string(TabIndex::browser),
+                                        nullptr,
+                                        get_tab_item_flags_for(TabIndex::browser))) {
+                    current_tab = TabIndex::browser;
+                    Browser::process_ui();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem(to_ui_string(TabIndex::recent),
+                                        nullptr,
+                                        get_tab_item_flags_for(TabIndex::recent))) {
+                    current_tab = TabIndex::recent;
+                    Recent::process_ui();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem(to_ui_string(TabIndex::player),
+                                        nullptr,
+                                        get_tab_item_flags_for(TabIndex::player))) {
+                    current_tab = TabIndex::player;
+                    Player::process_ui();
+                    ImGui::EndTabItem();
+
+                }
+
+                if (ImGui::BeginTabItem(to_ui_string(TabIndex::settings),
+                                        nullptr,
+                                        get_tab_item_flags_for(TabIndex::settings))) {
+                    current_tab = TabIndex::settings;
+                    Settings::process_ui();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem(to_ui_string(TabIndex::about),
+                                        nullptr,
+                                        get_tab_item_flags_for(TabIndex::about))) {
+                    current_tab = TabIndex::about;
+                    About::process_ui();
+                    ImGui::EndTabItem();
+                }
+
+                next_tab.reset();
+
+                ImGui::EndTabBar();
             }
 
-            if (ImGui::BeginTabItem("🔍 Browser",
-                                    nullptr,
-                                    get_tab_item_flags_for(TabIndex::browser))) {
-                Browser::process_ui();
-                ImGui::EndTabItem();
-            }
-
-            if (ImGui::BeginTabItem("🕓 Recent",
-                                    nullptr,
-                                    get_tab_item_flags_for(TabIndex::recent))) {
-                Recent::process_ui();
-                ImGui::EndTabItem();
-            }
-
-            if (ImGui::BeginTabItem("🎧 Player",
-                                    nullptr,
-                                    get_tab_item_flags_for(TabIndex::player))) {
-                Player::process_ui();
-                ImGui::EndTabItem();
-
-            }
-
-            if (ImGui::BeginTabItem("⚙ Settings",
-                                    nullptr,
-                                    get_tab_item_flags_for(TabIndex::settings))) {
-                Settings::process_ui();
-                ImGui::EndTabItem();
-            }
-
-            if (ImGui::BeginTabItem("About",
-                                    nullptr,
-                                    get_tab_item_flags_for(TabIndex::about))) {
-                About::process_ui();
-                ImGui::EndTabItem();
-            }
-
-            next_tab.reset();
-
-            ImGui::EndTabBar();
         }
 
+        ImGui::End();
+
+        // ImGui::ShowStyleEditor();
+
+        ImGui::EndFrame();
+        ImGui::Render();
+
+        ImGui::KineticScrollFrameEnd();
     }
 
-    ImGui::End();
 
-    // ImGui::ShowStyleEditor();
+    void
+    process()
+    {
+        process_events();
+        if (!running)
+            return;
 
-    ImGui::EndFrame();
-    ImGui::Render();
+        rest::process();
 
-    ImGui::KineticScrollFrameEnd();
-}
+        Favorites::process_logic();
+        Browser::process_logic();
+        Recent::process_logic();
+        Player::process_logic();
 
-
-void
-App::process()
-{
-    process_events();
-    if (!running)
-        return;
-
-    rest::process();
-
-    Browser::process();
-    Player::process_playback();
-
-    process_ui();
-}
+        process_ui();
+    }
 
 
-void
-App::quit()
-{
-    running = false;
-}
+    void
+    quit()
+    {
+        running = false;
+    }
 
 
-void
-App::draw()
-{
-    renderer.set_color(sdl::color::black);
-    renderer.clear();
+    void
+    draw()
+    {
+        res->renderer.set_color(sdl::color::black);
+        res->renderer.clear();
 
-    ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer.data());
+        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(),
+                                              res->renderer.data());
 
 #ifdef __WIIU__
-    // WORKAROUND: the Wii U port does not update the clipping until the next draw
-    renderer.set_color(sdl::color::transparent);
-    renderer.draw_point(0, 0);
+        // WORKAROUND: the Wii U port does not update the clipping until the next draw
+        res->renderer.set_color(sdl::color::transparent);
+        res->renderer.draw_point(0, 0);
 #endif
 
-    renderer.present();
-}
+        res->renderer.present();
+    }
 
-
-App*
-App::get_instance()
-{
-    return instance;
-}
+} // namespace App

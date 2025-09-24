@@ -342,7 +342,7 @@ namespace Player {
 
 
     void
-    process_playback()
+    process_logic()
     {
         if (state == State::stopped)
             return;

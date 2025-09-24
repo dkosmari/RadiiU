@@ -59,13 +59,28 @@ namespace Settings {
 
             ImGui::Checkbox("Disable Auto Power-Down", &cfg::disable_auto_power_down);
 
-            ImGui::Checkbox("Start on Favorites tab", &cfg::start_on_favorites);
+            if (ImGui::BeginCombo("Start tab", to_ui_string(cfg::start_tab))) {
+                for (unsigned i = 0; i <= static_cast<unsigned>(TabIndex::last); ++i) {
+                    TabIndex idx{i};
+                    if (ImGui::Selectable(to_ui_string(idx), cfg::start_tab == idx))
+                        cfg::start_tab = idx;
+                }
+                ImGui::EndCombo();
+            }
+
+            ImGui::Checkbox("Remember last tab", &cfg::remember_last_tab);
 
             ImGui::Slider("Browser page size",
                           cfg::browser_page_size,
                           10u, 50u);
             if (ImGui::IsItemDeactivatedAfterEdit())
                 Browser::update_list();
+
+            ImGui::Drag("Max recent stations",
+                        cfg::max_recent,
+                        0u,
+                        50u,
+                        0.1f);
 
         }
 

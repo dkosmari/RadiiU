@@ -10,12 +10,13 @@
 
 #include <string>
 
+#include <sdl2xx/renderer.hpp>
 #include <sdl2xx/texture.hpp>
 
 namespace IconManager {
 
     void
-    initialize();
+    initialize(sdl::renderer& rend);
 
     void
     finalize();

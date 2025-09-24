@@ -31,8 +31,6 @@ namespace Recent {
 
     namespace {
 
-        const std::size_t max_stations = 6;
-
         std::deque<Station> stations;
 
         std::optional<Station> to_add;
@@ -189,7 +187,31 @@ namespace Recent {
         }
         ImGui::HandleDragScroll();
         ImGui::EndChild();
+    }
 
+
+    void
+    real_add(Station&& station)
+    {
+        if (!stations.empty() && station == stations.back())
+            return;
+        stations.push_back(std::move(station));
+    }
+
+
+    void
+    prune()
+    {
+        if (stations.size() > cfg::max_recent) {
+            std::size_t to_remove = stations.size() - cfg::max_recent;
+            stations.erase(stations.begin(), stations.begin() + to_remove);
+        }
+    }
+
+
+    void
+    process_logic()
+    {
         // Handle any addition
         if (to_add) {
             real_add(std::move(*to_add));
@@ -203,23 +225,10 @@ namespace Recent {
                 stations.erase(stations.begin() + index);
             to_remove.reset();
         }
+
+        prune();
     }
 
-
-    void
-    real_add(Station&& station)
-    {
-        if (!stations.empty() && station == stations.back())
-            return;
-
-        if (max_stations > 0)
-            stations.push_back(std::move(station));
-
-        if (stations.size() > max_stations) {
-            std::size_t to_remove = stations.size() - max_stations;
-            stations.erase(stations.begin(), stations.begin() + to_remove);
-        }
-    }
 
     void
     add(const Station& station)
@@ -227,4 +236,5 @@ namespace Recent {
         to_add = station;
     }
 
-} // Recent
+
+} // namespace Recent

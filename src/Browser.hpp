@@ -37,7 +37,7 @@ namespace Browser {
 
 
     void
-    process();
+    process_logic();
 
     void
     process_ui();

@@ -138,7 +138,7 @@ namespace Favorites {
 
             // Cancel button
             {
-                if (ImGui::Button("Cancel"))
+                if (ImGui::Button("🗙 Cancel"))
                     ImGui::CloseCurrentPopup();
                 ImGui::SetItemDefaultFocus();
             }
@@ -149,7 +149,7 @@ namespace Favorites {
             {
                 // Line it up to the right of the window
                 auto& style = ImGui::GetStyle();
-                const std::string label = "Delete";
+                const std::string label = "🗑 Delete";
                 ImVec2 btn_size = ImGui::CalcTextSize(label, true) + style.FramePadding * 2;
                 float new_x = window_size.x - btn_size.x;
                 float cur_x = ImGui::GetCursorPosX();
@@ -228,7 +228,7 @@ namespace Favorites {
 
             // Cancel button
             {
-                if (ImGui::Button("Cancel")) {
+                if (ImGui::Button("🗙 Cancel")) {
                     ImGui::CloseCurrentPopup();
                     edited_station.reset();
                 }
@@ -241,7 +241,7 @@ namespace Favorites {
             {
                 // Line it up to the right of the window
                 auto& style = ImGui::GetStyle();
-                const std::string label = "Apply";
+                const std::string label = "✔ Apply";
                 ImVec2 btn_size = ImGui::CalcTextSize(label, true) + style.FramePadding * 2;
                 float new_x = window_size.x - btn_size.x;
                 float cur_x = ImGui::GetCursorPosX();
@@ -290,7 +290,7 @@ namespace Favorites {
 
             // Cancel button
             {
-                if (ImGui::Button("Cancel")) {
+                if (ImGui::Button("🗙 Cancel")) {
                     ImGui::CloseCurrentPopup();
                     created_station.reset();
                 }
@@ -303,7 +303,7 @@ namespace Favorites {
             {
                 // Line it up to the right of the window
                 auto& style = ImGui::GetStyle();
-                const std::string label = "Create";
+                const std::string label = "✔ Create";
                 ImVec2 btn_size = ImGui::CalcTextSize(label, true) + style.FramePadding * 2;
                 float new_x = window_size.x - btn_size.x;
                 float cur_x = ImGui::GetCursorPosX();
@@ -365,7 +365,7 @@ namespace Favorites {
                 }
                 ImGui::EndDisabled();
 
-                if (ImGui::Button("🖊")) {
+                if (ImGui::Button("✎")) {
                     edited_station = station;
                     ImGui::OpenPopup(popup_edit_title);
                 }
@@ -433,7 +433,7 @@ namespace Favorites {
                               ImGuiChildFlags_NavFlattened |
                               ImGuiChildFlags_AutoResizeY)) {
 
-            if (ImGui::Button("Create")) {
+            if (ImGui::Button("➕")) {
                 ImGui::OpenPopup(popup_create_title);
                 created_station.emplace();
             }
@@ -441,7 +441,7 @@ namespace Favorites {
 
             ImGui::SameLine();
 
-            if (ImGui::Button("Save"))
+            if (ImGui::Button("💾 Save"))
                 save();
 
             ImGui::SameLine();
@@ -466,7 +466,12 @@ namespace Favorites {
         }
         ImGui::HandleDragScroll();
         ImGui::EndChild();
+    }
 
+
+    void
+    process_logic()
+    {
         // Handle any pending move
         if (move_operation) {
             auto [src, dst] = *move_operation;
@@ -484,7 +489,6 @@ namespace Favorites {
             remove(*station_to_remove);
             station_to_remove.reset();
         }
-
     }
 
 
