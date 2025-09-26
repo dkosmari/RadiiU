@@ -99,9 +99,7 @@ namespace About {
                 ImGui::EndTable();
             }
 
-            ImGui::Separator();
-
-            ImGui::TextColored(label_color, "Components:");
+            ImGui::SeparatorTextColored(label_color, "Components:");
 
             SDL_version sdl_ver;
             SDL_GetVersion(&sdl_ver);
@@ -122,18 +120,13 @@ namespace About {
             ImGui::Bullet();
             ImGui::TextWrapped("MPG123 decoders: %s", mpg_decoders.data());
 
-            ImGui::Separator();
-
-            ImGui::TextColored(label_color, "Authors:");
+            ImGui::SeparatorTextColored(label_color, "Authors:");
 
             static const auto authors = get_authors();
             for (auto& author : authors) {
                 ImGui::Bullet();
                 ImGui::TextUnformatted(author);
             }
-
-            // WORKAROUND: ImGui is cutting the end of child windows
-            ImGui::Spacing();
 
         }
 

@@ -168,6 +168,15 @@ namespace ImGui {
                const ImVec2& size = ImVec2(0, 0));
 
 
+    void
+    SeparatorText(const std::string& label);
+
+    
+    void
+    SeparatorTextColored(const ImVec4& color,
+                         const std::string& label);
+    
+
     template<concepts::arithmetic T>
     bool
     Slider(const std::string& label,
@@ -202,6 +211,10 @@ namespace ImGui {
         IM_FMTARGS(1);
 
 
+    bool
+    TextLink(const std::string& label);
+
+    
     void
     TextRight(const char* fmt,
               ...)

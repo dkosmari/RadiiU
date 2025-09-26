@@ -33,7 +33,7 @@ namespace Browser {
 
 
     void
-    update_list();
+    queue_update_stations();
 
 
     void

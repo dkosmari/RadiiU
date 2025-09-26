@@ -44,7 +44,7 @@ namespace Settings {
                 ImGui::EndCombo();
             }
             ImGui::SameLine();
-            if (ImGui::Button("Update"))
+            if (ImGui::Button("🔃"))
                 Browser::refresh_mirrors();
 
             unsigned player_buffer_size_kb = cfg::player_buffer_size / 1024;
@@ -74,7 +74,7 @@ namespace Settings {
                           cfg::browser_page_size,
                           10u, 50u);
             if (ImGui::IsItemDeactivatedAfterEdit())
-                Browser::update_list();
+                Browser::queue_update_stations();
 
             ImGui::Drag("Max recent stations",
                         cfg::max_recent,
@@ -82,8 +82,8 @@ namespace Settings {
                         50u,
                         0.1f);
 
-        }
 
+        } // settings
         ImGui::HandleDragScroll();
         ImGui::EndChild();
     }

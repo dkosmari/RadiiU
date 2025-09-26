@@ -111,44 +111,46 @@ namespace App {
     {
         auto& io = ImGui::GetIO();
 
-        ImFontConfig font_config;
-
+        // Load main font: CafeStd
+        {
+            ImFontConfig font_config;
+            // Note: CafeStd seems to always be too low
+            font_config.GlyphOffset.y = - cafe_size * (5.0f / 32.0f);
 #ifdef __WIIU__
-
-        font_config.FontDataOwnedByAtlas = false;
-
-        void* cafe_font_ptr = nullptr;
-        uint32_t cafe_font_size = 0;
-        if (OSGetSharedData(OS_SHAREDDATATYPE_FONT_STANDARD,
-                            0,
-                            &cafe_font_ptr,
-                            &cafe_font_size)) {
-            if (!io.Fonts->AddFontFromMemoryTTF(cafe_font_ptr,
-                                                cafe_font_size,
-                                                cafe_size,
-                                                &font_config))
+            font_config.FontDataOwnedByAtlas = false;
+            void* cafe_font_ptr = nullptr;
+            uint32_t cafe_font_size = 0;
+            if (OSGetSharedData(OS_SHAREDDATATYPE_FONT_STANDARD,
+                                0,
+                                &cafe_font_ptr,
+                                &cafe_font_size)) {
+                if (!io.Fonts->AddFontFromMemoryTTF(cafe_font_ptr,
+                                                    cafe_font_size,
+                                                    cafe_size,
+                                                    &font_config))
+                    throw std::runtime_error{"Could not load font!"};
+            } else
+                throw std::runtime_error{"Is CafeStd font missing?"};
+#else
+            if (!io.Fonts->AddFontFromFileTTF("CafeStd.ttf",
+                                              cafe_size,
+                                              &font_config))
                 throw std::runtime_error{"Could not load font!"};
+#endif
         }
 
-        font_config.FontDataOwnedByAtlas = true;
-
-#else
-
-        if (!io.Fonts->AddFontFromFileTTF("CafeStd.ttf",
-                                          cafe_size,
-                                          &font_config))
-            throw std::runtime_error{"Could not load font!"};
-
-#endif
-
-        font_config.MergeMode = true;
-        font_config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
-        font_config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
-
-        if (!io.Fonts->AddFontFromFileTTF((utils::get_content_path() / "Symbola.ttf").c_str(),
-                                          symbola_size,
-                                          &font_config))
-            throw std::runtime_error{"Could not load font!"};
+        // Load Symbola font
+        {
+            ImFontConfig font_config;
+            font_config.GlyphOffset.y = - symbola_size * (5.0f / 32.0f);
+            font_config.MergeMode = true;
+            // font_config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
+            // font_config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
+            if (!io.Fonts->AddFontFromFileTTF((utils::get_content_path() / "Symbola.ttf").c_str(),
+                                              symbola_size,
+                                              &font_config))
+                throw std::runtime_error{"Could not load font!"};
+        }
 
     }
 
@@ -192,30 +194,43 @@ namespace App {
         ImGui::StyleColorsDark();
 
         auto& style = ImGui::GetStyle();
-        const float radius = 8;
+        const float rounding = 8;
+        const ImVec2 padding = {9, 9};
+        const ImVec2 spacing = {9, 9};
 
-        style.WindowBorderSize = 0;
+        // style.Alpha = 0.5f;
+
+        style.WindowPadding = padding;
         style.WindowRounding = 0;
-        style.WindowPadding = {12, 12};
+        style.WindowBorderSize = 0;
+
+        style.ChildRounding = rounding;
+        style.ChildBorderSize = 1;
+
+        style.PopupRounding = rounding;
+
+        style.FramePadding = padding;
+        style.FrameRounding = rounding;
+        style.FrameBorderSize = 0;
+
+        style.ItemSpacing = spacing;
+        style.ItemInnerSpacing = spacing;
+
+        style.CellPadding = padding / 2;
 
         style.ScrollbarSize = 32;
-        style.ScrollbarRounding = radius;
+        style.ScrollbarRounding = rounding;
 
         style.GrabMinSize = 32;
-        style.GrabRounding = radius;
-
-        style.FrameRounding = radius;
-        style.FramePadding = {12, 12};
+        style.GrabRounding = rounding;
 
         style.ImageBorderSize = 0;
 
-        style.ItemSpacing = {12, 12};
-        style.ItemInnerSpacing = {12, 12};
+        style.TabRounding = rounding;
+        style.TabBorderSize = 0;
 
-        style.ChildBorderSize = 0;
-        style.ChildRounding = 0;
+        style.TabBarBorderSize = 2;
 
-        style.TabRounding = radius;
     }
 
 
@@ -507,6 +522,8 @@ namespace App {
         Recent::process_logic();
         Player::process_logic();
 
+        res->renderer.set_color(sdl::color::black);
+        res->renderer.clear();
         process_ui();
     }
 
@@ -521,8 +538,8 @@ namespace App {
     void
     draw()
     {
-        res->renderer.set_color(sdl::color::black);
-        res->renderer.clear();
+        // res->renderer.set_color(sdl::color::black);
+        // res->renderer.clear();
 
         ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(),
                                               res->renderer.data());

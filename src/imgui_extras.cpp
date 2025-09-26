@@ -619,6 +619,23 @@ namespace ImGui {
     }
 
 
+    void
+    SeparatorText(const std::string& label)
+    {
+        SeparatorText(label.data());
+    }
+
+
+    void
+    SeparatorTextColored(const ImVec4& color,
+                         const std::string& label)
+    {
+        PushStyleColor(ImGuiCol_Text, color);
+        SeparatorText(label.data());
+        PopStyleColor();
+    }
+
+
     template<concepts::arithmetic T>
     bool
     Slider(const std::string& label,
@@ -742,6 +759,13 @@ namespace ImGui {
 
         SetCursorPosX(0.5f * (window_width - text_width));
         Text("%s", text.data());
+    }
+
+
+    bool
+    TextLink(const std::string& label)
+    {
+        return TextLink(label.data());
     }
 
 

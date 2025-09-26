@@ -146,9 +146,6 @@ namespace Recent {
                     ImGui::Text("🏳 %s", station.country_code.data());
                 if (!station.tags.empty())
                     ImGui::TextWrapped("🏷 %s", station.tags.data());
-
-                // WORKAROUND to bad layout from ImGui
-                ImGui::Spacing();
             }
             ImGui::HandleDragScroll(scroll_target);
             ImGui::EndChild(); // details

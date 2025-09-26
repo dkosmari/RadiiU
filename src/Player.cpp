@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <functional>
 #include <iostream>
 #include <map>
 #include <optional>
@@ -35,6 +36,8 @@
 using std::cout;
 using std::endl;
 using namespace std::literals;
+using namespace std::placeholders;
+
 using sdl::vec2;
 
 
@@ -49,26 +52,6 @@ namespace Player {
     State state = State::stopped;
 
     std::optional<Station> station;
-    curl::multi multi;
-    curl::easy easy;
-    mpg123::handle mpg;
-    sdl::audio::device audio_dev;
-
-    // iecast headers
-    std::size_t icy_metaint = 0;
-    std::string icy_name;
-    std::string icy_url;
-    std::string icy_genre;
-    std::string icy_description;
-    bool parsed_header = false;
-
-    byte_stream raw_stream;
-    byte_stream data_stream;
-    byte_stream meta_stream;
-    std::size_t data_left = 0;
-    std::size_t meta_left = 0;
-
-    std::map<std::string, std::string> meta;
 
 
     namespace {
@@ -105,28 +88,118 @@ namespace Player {
                 s.erase(i);
         }
 
+    } // namespace
 
-        // FIXME: we don't take into account how much data is queued up in mpg123 and SDL.
-        std::size_t
-        calc_buffer_size()
+
+    /*
+     * RAII-managed resources are stored here.
+     * Note that they're only allocated while playback is active.
+     */
+    struct Resources {
+
+        curl::multi multi;
+        curl::easy easy;
+        mpg123::handle mpg;
+        sdl::audio::device audio_dev;
+
+        byte_stream raw_stream;
+        byte_stream data_stream;
+        byte_stream meta_stream;
+
+        // State variables to help separating data from metadata.
+        std::size_t data_left = 0;
+        std::size_t meta_left = 0;
+        bool parsed_header = false;
+
+        // Parsed iecast headers
+        std::size_t icy_metaint = 0;
+        std::string icy_name;
+        std::string icy_url;
+        std::string icy_genre;
+        std::string icy_description;
+
+        std::map<std::string, std::string> meta;
+
+
+        Resources(const std::string& url)
         {
-            return raw_stream.size()
-                + data_stream.size()
-                + meta_stream.size();
+            mpg.set_verbose(true);
+            mpg.open_feed();
+
+            easy.set_verbose(false);
+            easy.set_user_agent(utils::get_user_agent());
+            easy.set_url(url);
+            easy.set_forbid_reuse(true);
+            easy.set_follow(true);
+            easy.set_ssl_verify_peer(false);
+            easy.set_http_headers({
+                    "Icy-MetaData: 1",
+                    "Accept: audio/mpeg"
+                });
+            easy.set_write_function(std::bind(&Resources::easy_write_callback, this, _1));
+
+            multi.set_max_total_connections(2);
+            multi.add(easy);
+
+            if (cfg::disable_auto_power_down) {
+#ifdef __WUT__
+                IMDisableAPD();
+#else
+                // TODO: write similar code for desktop, to prevent computer from
+                // suspending.
+#endif
+            }
         }
 
 
-        bool
-        is_buffer_too_empty()
+        ~Resources()
         {
-            return calc_buffer_size() < cfg::player_buffer_size;
+
+            multi.remove(easy);
+#ifdef __WUT__
+            IMEnableAPD();
+#endif
         }
 
 
-        bool
-        is_buffer_too_full()
+        // Disallow moving.
+        Resources(Resources&&) = delete;
+
+
+        void
+        parse_stream()
         {
-            return calc_buffer_size() > 2 * cfg::player_buffer_size;
+            if (raw_stream.empty())
+                return;
+
+            if (icy_metaint) {
+                // we alternate between reading data and metadata
+                if (data_left) {
+                    data_left -= data_stream.consume(raw_stream, data_left);
+                } else {
+                    // no more data to read, we start reading metadata
+                    if (meta_left == 0) {
+                        // if both data_left and meta_left are zero, we're waiting for the meta
+                        // size prefix
+                        auto c = raw_stream.try_load_u8();
+                        if (!c)
+                            return;
+                        meta_left = *c * 16u;
+                        if (meta_left == 0) {
+                            // empty metadata, just go back to reading data
+                            data_left = icy_metaint;
+                            return;
+                        }
+                    }
+                    meta_left -= meta_stream.consume(raw_stream, meta_left);
+                    if (meta_left == 0)
+                        // finished reading metadata, go back to reading data
+                        data_left = icy_metaint;
+                }
+            } else {
+                // not metadata, so everything is data
+                data_stream.consume(raw_stream);
+            }
         }
 
 
@@ -134,6 +207,7 @@ namespace Player {
         easy_write_callback(std::span<const char> buf)
         {
             if (buf.empty()) {
+                cout << "End of connection detected." << endl;
                 state = State::stopping;
                 return 0;
             }
@@ -175,7 +249,126 @@ namespace Player {
             return raw_stream.write(buf);
         }
 
-    } // namespace
+
+        // FIXME: we don't take into account how much data is queued up in mpg123 and SDL.
+        std::size_t
+        calc_buffer_size()
+        {
+            return raw_stream.size()
+                 + data_stream.size()
+                 + meta_stream.size();
+        }
+
+
+        bool
+        is_buffer_too_empty()
+        {
+            return calc_buffer_size() < cfg::player_buffer_size;
+        }
+
+
+        bool
+        is_buffer_too_full()
+        {
+            return calc_buffer_size() > 2 * cfg::player_buffer_size;
+        }
+
+
+        void
+        process_meta()
+        {
+            std::string meta_str = meta_stream.read_str();
+            trim(meta_str);
+
+            meta = icy_meta::parse(std::move(meta_str));
+            cout << "Metadata:\n";
+            for (auto [key, val] : meta) {
+                cout << "    " << key << "=\"" << val << "\"\n";
+            }
+            cout << endl;
+        }
+
+
+        void
+        process()
+        {
+            try {
+                multi.perform();
+
+                parse_stream();
+
+                if (meta_left == 0 && !meta_stream.empty())
+                    process_meta();
+
+                if (is_buffer_too_empty())
+                    return;
+
+                auto chunk = data_stream.read_as<char>();
+                mpg.feed(std::span<const char>(chunk));
+
+                if (!audio_dev) {
+                    // see if we have enough bytes to initialize audio_dev properly.
+                    if (auto fmt = mpg.try_get_format()) {
+                        cout << "got mpg123 format: " << *fmt << endl;
+                        sdl::audio::spec spec;
+                        spec.freq = fmt->rate;
+                        spec.channels = fmt->channels & MPG123_STEREO ? 2 : 1;
+                        spec.format = mpg_to_sdl_format(fmt->encoding);
+                        spec.samples = 4096;
+                        if (!spec.format) {
+                            // no exact match, ask mpg123 to convert it to S16
+                            spec.format = AUDIO_S16SYS;
+                            mpg.set_format(fmt->rate, fmt->channels, MPG123_ENC_SIGNED_16);
+                        }
+
+                        cout << "Creating SDL audio device..." << endl;
+                        audio_dev.create(nullptr, false, spec);
+                        audio_dev.unpause();
+                    }
+                }
+
+                if (!audio_dev)
+                    return;
+
+                while (auto res = mpg.try_decode_frame()) {
+                    audio_dev.play(res->samples);
+
+                    auto meta_flags = mpg.meta_check();
+                    if (meta_flags & MPG123_NEW_ID3) {
+                        cout << "Got ID3 metadata." << endl;
+                        auto id3 = mpg.get_id3();
+                        if (id3.v2) {
+                            auto& tag = *id3.v2;
+                            if (!tag.title.empty())
+                                cout << "Title: " << tag.title << endl;
+                            if (!tag.artist.empty())
+                                cout << "Artist: " << tag.artist << endl;
+                            if (!tag.album.empty())
+                                cout << "Album: " << tag.album << endl;
+                        } else if (id3.v1) {
+                            auto& tag = *id3.v1;
+                            if (!tag.title.empty())
+                                cout << "Title: " << tag.title << endl;
+                            if (!tag.artist.empty())
+                                cout << "Artist: " << tag.artist << endl;
+                            if (!tag.album.empty())
+                                cout << "Album: " << tag.album << endl;
+                        }
+                    }
+                }
+
+                if (!is_buffer_too_full())
+                    easy.unpause();
+
+            }
+            catch (std::exception& e) {
+                cout << "ERROR: " << e.what() << endl;
+            }
+        }
+
+    }; // struct Resources
+
+    std::optional<Resources> res;
 
 
     void
@@ -185,17 +378,29 @@ namespace Player {
 
     void
     finalize()
-    {}
+    {
+        res.reset();
+    }
 
 
     void
     play()
     {
+        if (station)
+            play(*station);
+    }
+
+
+    void
+    play(const Station& st)
+    {
         if (state == State::playing)
             stop();
 
-        if (!station)
-            return;
+        cout << "Starting playback of station \"" << st.name << "\"" << endl;
+
+        station = st;
+        Recent::add(st);
 
         std::string url;
         if (!station->url_resolved.empty())
@@ -203,62 +408,20 @@ namespace Player {
 
         if (url.empty())
             if (!station->url.empty())
-                url = station->url; // TODO: might need resolving
+                url = station->url; // TODO: implement parsing m3u playlist
 
         if (url.empty()) {
             cout << "No usable URL found" << endl;
             return;
         }
+        cout << "Playing URL: " << url << endl;
 
-        if (!station->uuid.empty())
-            Browser::send_click(station->uuid);
-
-        cout << "starting to play " << url << endl;
+        Browser::send_click(station->uuid);
 
         state = State::playing;
 
-        parsed_header = false;
-
-        icy_metaint = 0;
-
-        mpg = mpg123::handle{};
-        mpg.set_verbose();
-        mpg.open_feed();
-
-        easy.set_verbose(false);
-        easy.set_user_agent(utils::get_user_agent());
-        easy.set_url(url);
-        easy.set_forbid_reuse(true);
-        easy.set_follow(true);
-        easy.set_ssl_verify_peer(false);
-        easy.set_http_headers({
-                "Icy-MetaData: 1",
-                "Accept: audio/mpeg"
-            });
-        easy.set_write_function(easy_write_callback);
-
-        multi.set_max_total_connections(2);
-        multi.add(easy);
-
-        // TODO: write similar code for desktop
-        if (cfg::disable_auto_power_down) {
-#ifdef __WUT__
-            IMDisableAPD();
-#endif
-        }
-
+        res.emplace(url); // allocate and initialize resources here
     }
-
-
-    void
-    play(const Station& st)
-    {
-        cout << "Starting playback of station \"" << st.name << "\"" << endl;
-        station = st;
-        Recent::add(st);
-        play();
-    }
-
 
 
     void
@@ -267,77 +430,8 @@ namespace Player {
         if (state == State::stopped)
             return;
         state = State::stopped;
-        multi.remove(easy);
-        easy.reset();
-        audio_dev.destroy();
-        mpg.destroy();
-        raw_stream.clear();
-        data_stream.clear();
-        meta_stream.clear();
 
-        icy_metaint = 0;
-        icy_name = "";
-        icy_url = "";
-        icy_genre = "";
-        icy_description = "";
-        meta.clear();
-
-#ifdef __WUT__
-        IMEnableAPD();
-#endif
-    }
-
-
-    void
-    parse_stream()
-    {
-        if (raw_stream.empty())
-            return;
-
-        if (icy_metaint) {
-            // we alternate between reading data and metadata
-            if (data_left) {
-                data_left -= data_stream.consume(raw_stream, data_left);
-            } else {
-                // no more data to read, we start reading metadata
-                if (meta_left == 0) {
-                    // if both data_left and meta_left are zero, we're waiting for the meta
-                    // size prefix
-                    auto c = raw_stream.try_load_u8();
-                    if (!c)
-                        return;
-                    meta_left = *c * 16u;
-                    if (meta_left == 0) {
-                        // empty metadata, just go back to reading data
-                        data_left = icy_metaint;
-                        return;
-                    }
-                }
-                meta_left -= meta_stream.consume(raw_stream, meta_left);
-                if (meta_left == 0)
-                    // finished reading metadata, go back to reading data
-                    data_left = icy_metaint;
-            }
-        } else {
-            // not metadata, so everything is data
-            data_stream.consume(raw_stream);
-        }
-    }
-
-
-    void
-    process_meta()
-    {
-        std::string meta_str = meta_stream.read_str();
-        trim(meta_str);
-
-        meta = icy_meta::parse(std::move(meta_str));
-        cout << "Metadata:\n";
-        for (auto [key, val] : meta) {
-            cout << "    " << key << "=\"" << val << "\"\n";
-        }
-        cout << endl;
-
+        res.reset();
     }
 
 
@@ -352,78 +446,15 @@ namespace Player {
             return;
         }
 
-        try {
-            multi.perform();
+        if (res)
+            res->process();
+    }
 
-            parse_stream();
 
-            if (meta_left == 0 && !meta_stream.empty())
-                process_meta();
-
-            if (is_buffer_too_empty())
-                return;
-
-            auto chunk = data_stream.read_as<char>();
-            mpg.feed(std::span<const char>(chunk));
-
-            if (!audio_dev) {
-                // see if we have enough bytes to initialize audio_dev properly.
-                if (auto fmt = mpg.try_get_format()) {
-                    cout << "got mpg123 format: " << *fmt << endl;
-                    sdl::audio::spec spec;
-                    spec.freq = fmt->rate;
-                    spec.channels = fmt->channels & MPG123_STEREO ? 2 : 1;
-                    spec.format = mpg_to_sdl_format(fmt->encoding);
-                    spec.samples = 4096;
-                    if (!spec.format) {
-                        // no exact match, ask mpg123 to convert it to S16
-                        spec.format = AUDIO_S16SYS;
-                        mpg.set_format(fmt->rate, fmt->channels, MPG123_ENC_SIGNED_16);
-                    }
-
-                    cout << "Creating SDL audio device..." << endl;
-                    audio_dev.create(nullptr, false, spec);
-                    audio_dev.unpause();
-                }
-            }
-
-            if (!audio_dev)
-                return;
-
-            while (auto res = mpg.try_decode_frame()) {
-                audio_dev.play(res->samples);
-
-                auto meta_flags = mpg.meta_check();
-                if (meta_flags & MPG123_NEW_ID3) {
-                    cout << "Got ID3 metadata." << endl;
-                    auto id3 = mpg.get_id3();
-                    if (id3.v2) {
-                        auto& tag = *id3.v2;
-                        if (!tag.title.empty())
-                            cout << "Title: " << tag.title << endl;
-                        if (!tag.artist.empty())
-                            cout << "Artist: " << tag.artist << endl;
-                        if (!tag.album.empty())
-                            cout << "Album: " << tag.album << endl;
-                    } else if (id3.v1) {
-                        auto& tag = *id3.v1;
-                        if (!tag.title.empty())
-                            cout << "Title: " << tag.title << endl;
-                        if (!tag.artist.empty())
-                            cout << "Artist: " << tag.artist << endl;
-                        if (!tag.album.empty())
-                            cout << "Album: " << tag.album << endl;
-                    }
-                }
-            }
-
-            if (!is_buffer_too_full())
-                easy.unpause();
-
-        }
-        catch (std::exception& e) {
-            cout << "ERROR: " << e.what() << endl;
-        }
+    void
+    show_station()
+    {
+        // TODO
     }
 
 
@@ -436,7 +467,7 @@ namespace Player {
 
             ImGui::BeginDisabled(!station);
 
-            const vec2 button_size = {64, 64};
+            const vec2 button_size = {96, 96};
             if (state == State::playing) {
                 if (ImGui::ImageButton("stop",
                                        *IconManager::get("ui/stop-button.png"),
@@ -449,27 +480,34 @@ namespace Player {
                     play();
             }
 
-            ImGui::ValueWrapped("Name", icy_name);
-            if (!icy_url.empty())
-                ImGui::TextLink(icy_url.data());
-            if (!icy_genre.empty())
-                ImGui::ValueWrapped("Genre", icy_genre);
-            if (!icy_description.empty())
-                ImGui::ValueWrapped("Description", icy_description);
+            if (res) {
+
+                ImGui::ValueWrapped("Name", res->icy_name);
+
+                if (!res->icy_url.empty())
+                    ImGui::TextLink(res->icy_url);
+
+                if (!res->icy_genre.empty())
+                    ImGui::ValueWrapped("Genre", res->icy_genre);
+
+                if (!res->icy_description.empty())
+                    ImGui::ValueWrapped("Description", res->icy_description);
 
 
-            std::string status_str;
-            if (state == State::playing) {
-                status_str = "Playing ";
-                auto it = meta.find("StreamTitle");
-                if (it != meta.end())
-                    status_str += it->second;
-                else
-                    status_str += "?";
-            } else {
-                status_str = "Stopped";
+                std::string status_str;
+                if (state == State::playing) {
+                    status_str = "Playing ";
+                    auto it = res->meta.find("StreamTitle");
+                    if (it != res->meta.end())
+                        status_str += it->second;
+                    else
+                        status_str += "?";
+                } else {
+                    status_str = "Stopped";
+                }
+                ImGui::ValueWrapped("Status", status_str);
+
             }
-            ImGui::ValueWrapped("Status", status_str);
 
             ImGui::EndDisabled();
 
@@ -480,6 +518,5 @@ namespace Player {
         ImGui::EndChild();
 
     }
-
 
 } // namespace Player
