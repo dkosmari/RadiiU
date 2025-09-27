@@ -35,7 +35,7 @@
 #include "imgui_extras.hpp"
 #include "Recent.hpp"
 #include "Station.hpp"
-#include "ui_utils.hpp"
+#include "ui_common.hpp"
 #include "utils.hpp"
 
 
@@ -470,18 +470,7 @@ namespace Player {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                const sdl::vec2 button_size = {96, 96};
-                if (state == State::playing) {
-                    if (ImGui::ImageButton("stop_button",
-                                           *IconManager::get("ui/stop-button.png"),
-                                           button_size))
-                        stop();
-                } else {
-                    if (ImGui::ImageButton("play_button",
-                                           *IconManager::get("ui/play-button.png"),
-                                           button_size))
-                        play();
-                }
+                ui_common::show_play_button(*station);
 
                 if (Favorites::contains(*station)) {
                     if (ImGui::Button("♥"))
@@ -508,37 +497,18 @@ namespace Player {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui_utils::show_favicon(station->favicon);
+                ui_common::show_favicon(station->favicon);
 
-                if (ImGui::BeginChild("basic_info",
+                ImGui::SameLine();
+
+                ui_common::show_station_basic_info(*station, scroll_target);
+
+                if (ImGui::BeginChild("extra_info",
                                       {0, 0},
                                       ImGuiChildFlags_AutoResizeY |
                                       ImGuiChildFlags_NavFlattened)) {
 
-                    ImGui::TextWrapped("%s", station->name.data());
-
-                    if (!station->homepage.empty()) {
-                        if (ImGui::TextLink(station->homepage)) {
-                            // TODO: show QR code for link
-                        }
-                    }
-
-                    if (!station->country_code.empty())
-                        ImGui::Text("🏳 %s", station->country_code.data());
-
-                } // basic_info
-                ImGui::EndChild();
-
-                if (ImGui::BeginChild("extra_info")) {
-                    const std::string& url = station->url_resolved.empty()
-                                             ? station->url
-                                             : station->url_resolved;
-                    if (!url.empty())
-                        if (ImGui::TextLink(url)) {
-                            // TODO: show QR code for link
-                        }
-
-                    ui_utils::show_tags(station->tags, scroll_target);
+                    ui_common::show_tags(station->tags, scroll_target);
 
                 } // extra_info
                 ImGui::HandleDragScroll(scroll_target);
@@ -555,67 +525,68 @@ namespace Player {
 
 
     void
+    show_playback(ImGuiID scroll_target)
+    {
+        if (!res)
+            return;
+
+        if (ImGui::BeginChild("playback",
+                              {0,0},
+                              ImGuiChildFlags_AutoResizeY |
+                              ImGuiChildFlags_FrameStyle)) {
+
+            if (ImGui::BeginTable("icy_meta", 2)) {
+
+                ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
+                ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
+
+                if (!res->icy_name.empty())
+                    ui_common::show_info_row("Name", res->icy_name);
+
+                if (!res->icy_url.empty())
+                    ui_common::show_link_row("URL", res->icy_url);
+
+                if (!res->icy_genre.empty())
+                    ui_common::show_info_row("Genre", res->icy_genre);
+
+                if (!res->icy_description.empty())
+                    ui_common::show_info_row("Description", res->icy_description);
+
+
+                auto it = res->meta.find("StreamTitle");
+                if (it != res->meta.end())
+                    ui_common::show_info_row("Title", it->second);
+
+                ImGui::EndTable();
+            }
+
+        } // playback
+        ImGui::HandleDragScroll(scroll_target);
+        ImGui::EndChild();
+    }
+
+
+    void
     process_ui()
     {
         if (ImGui::BeginChild("player",
                               {0, 0},
                               ImGuiChildFlags_NavFlattened)) {
-#if 0
-            ImGui::BeginDisabled(!station);
-
-            const vec2 button_size = {96, 96};
-            if (state == State::playing) {
-                if (ImGui::ImageButton("stop",
-                                       *IconManager::get("ui/stop-button.png"),
-                                       button_size))
-                    stop();
-            } else {
-                if (ImGui::ImageButton("play",
-                                       *IconManager::get("ui/play-button.png"),
-                                       button_size))
-                    play();
-            }
-
-            if (res) {
-
-                ImGui::ValueWrapped("Name", res->icy_name);
-
-                if (!res->icy_url.empty())
-                    ImGui::TextLink(res->icy_url);
-
-                if (!res->icy_genre.empty())
-                    ImGui::ValueWrapped("Genre", res->icy_genre);
-
-                if (!res->icy_description.empty())
-                    ImGui::ValueWrapped("Description", res->icy_description);
-
-
-                std::string status_str;
-                if (state == State::playing) {
-                    status_str = "Playing ";
-                    auto it = res->meta.find("StreamTitle");
-                    if (it != res->meta.end())
-                        status_str += it->second;
-                    else
-                        status_str += "?";
-                } else {
-                    status_str = "Stopped";
-                }
-                ImGui::ValueWrapped("Status", status_str);
-
-            }
-
-            ImGui::EndDisabled();
-#else
             auto scroll_target = ImGui::GetCurrentWindow()->ID;
             show_station(scroll_target);
-#endif
-        }
-
+            show_playback(scroll_target);
+        } // player
         ImGui::HandleDragScroll();
-
         ImGui::EndChild();
+    }
 
+
+    bool
+    is_playing(const Station& st)
+    {
+        if (state != State::playing || !station)
+            return false;
+        return st == *station;
     }
 
 } // namespace Player

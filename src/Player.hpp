@@ -41,6 +41,10 @@ namespace Player {
     void
     stop();
 
+
+    bool
+    is_playing(const Station& station);
+
 } // namespace Player
 
 #endif

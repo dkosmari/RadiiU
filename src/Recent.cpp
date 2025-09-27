@@ -21,7 +21,7 @@
 #include "json.hpp"
 #include "Player.hpp"
 #include "Station.hpp"
-#include "ui_utils.hpp"
+#include "ui_common.hpp"
 #include "utils.hpp"
 
 
@@ -108,12 +108,8 @@ namespace Recent {
                                   ImGuiChildFlags_AutoResizeX |
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
-                const sdl::vec2 play_size = {96, 96};
-                if (ImGui::ImageButton("play_button",
-                                       *IconManager::get("ui/play-button.png"),
-                                       play_size)) {
-                    Player::play(station);
-                }
+
+                ui_common::show_play_button(station);
 
                 if (ImGui::Button("🗑"))
                     to_remove = index;
@@ -129,35 +125,18 @@ namespace Recent {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui_utils::show_favicon(station.favicon);
+                ui_common::show_favicon(station.favicon);
 
                 ImGui::SameLine();
 
-                if (ImGui::BeginChild("basic_info",
-                                      {0, 0},
-                                      ImGuiChildFlags_AutoResizeY |
-                                      ImGuiChildFlags_NavFlattened)) {
-
-                    ImGui::TextWrapped("%s", station.name.data());
-
-                    if (!station.homepage.empty()) {
-                        if (ImGui::TextLink(station.homepage)) {
-                            // TODO: show QR code
-                        }
-                    }
-
-                    if (!station.country_code.empty())
-                        ImGui::Text("🏳 %s", station.country_code.data());
-                } // basic_info
-                ImGui::HandleDragScroll(scroll_target);
-                ImGui::EndChild();
+                ui_common::show_station_basic_info(station, scroll_target);
 
                 if (ImGui::BeginChild("extra_info",
                                       {0, 0},
                                       ImGuiChildFlags_AutoResizeY |
                                       ImGuiChildFlags_NavFlattened)) {
 
-                    ui_utils::show_tags(station.tags, scroll_target);
+                    ui_common::show_tags(station.tags, scroll_target);
                 } // extra_info
                 ImGui::HandleDragScroll(scroll_target);
                 ImGui::EndChild();

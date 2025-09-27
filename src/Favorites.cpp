@@ -26,7 +26,7 @@
 #include "json.hpp"
 #include "Player.hpp"
 #include "Station.hpp"
-#include "ui_utils.hpp"
+#include "ui_common.hpp"
 #include "utils.hpp"
 
 
@@ -58,13 +58,43 @@ namespace Favorites {
         const std::string popup_delete_title = "Delete station?";
         std::optional<std::size_t> station_to_remove;
 
+        struct StationAndTags {
+
+            Station station;
+            std::string tags_str;
+
+            StationAndTags()
+                noexcept
+            {}
+
+            StationAndTags(const Station& st) :
+                station{st}
+            {
+                join_tags();
+            }
+
+            void
+            split_tags()
+            {
+                // copy tags_str into the tags vector
+                station.tags = utils::split(tags_str, ",");
+                for (auto& t : station.tags)
+                    t = utils::trimmed(t, ' ');
+            }
+
+            void
+            join_tags()
+            {
+                tags_str = utils::join(station.tags, ", ");
+            }
+
+        }; // struct StationAndTags
 
         const std::string popup_edit_title = "Edit station";
-        std::optional<Station> edited_station;
-        std::optional<std::string> edited_tags;
+        std::optional<StationAndTags> edited_station;
 
         const std::string popup_create_title = "Create station";
-        std::optional<Station> created_station;
+        std::optional<StationAndTags> created_station;
 
     } // namespace
 
@@ -183,23 +213,22 @@ namespace Favorites {
 
 
     void
-    show_station_fields(Station& station)
+    show_station_fields(StationAndTags& sat)
     {
-        if (ImGui::BeginTable("fields", 2,
-                              ImGuiTableFlags_None)) {
+        if (ImGui::BeginTable("fields", 2)) {
 
             ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
             ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-            show_row_for("name", station.name);
-            show_row_for("url", station.url);
-            show_row_for("url_resolved", station.url_resolved);
-            show_row_for("homepage", station.homepage);
-            show_row_for("favicon", station.favicon);
-            show_row_for("tags", *edited_tags);
-            show_row_for("country_code", station.country_code);
-            show_row_for("language", station.language);
-            show_row_for("uuid", station.uuid);
+            show_row_for("name",         sat.station.name);
+            show_row_for("url",          sat.station.url);
+            show_row_for("url_resolved", sat.station.url_resolved);
+            show_row_for("homepage",     sat.station.homepage);
+            show_row_for("favicon",      sat.station.favicon);
+            show_row_for("tags",         sat.tags_str);
+            show_row_for("country_code", sat.station.country_code);
+            show_row_for("language",     sat.station.language);
+            show_row_for("uuid",         sat.station.uuid);
 
             ImGui::EndTable();
         }
@@ -233,7 +262,6 @@ namespace Favorites {
                 if (ImGui::Button("🗙 Cancel")) {
                     ImGui::CloseCurrentPopup();
                     edited_station.reset();
-                    edited_tags.reset();
                 }
                 ImGui::SetItemDefaultFocus();
             }
@@ -257,18 +285,12 @@ namespace Favorites {
                         if (it != uuids.end())
                             uuids.erase(it);
 
-                        // copy the tags string into the tags vector
-                        auto tags = utils::split(*edited_tags, ",");
-                        for (auto& t : tags)
-                            t = utils::trimmed(t, ' ');
-                        edited_station->tags = std::move(tags);
-
-                        station = std::move(*edited_station);
+                        edited_station->split_tags();
+                        station = std::move(edited_station->station);
                         if (!station.uuid.empty())
                             uuids.insert(station.uuid);
                     }
                     edited_station.reset();
-                    edited_tags.reset();
                 }
             }
 
@@ -322,8 +344,10 @@ namespace Favorites {
                     ImGui::SetCursorPosX(new_x);
                 if (ImGui::Button(label)) {
                     ImGui::CloseCurrentPopup();
-                    if (created_station)
-                        add(*created_station);
+                    if (created_station) {
+                        created_station->split_tags();
+                        add(std::move(created_station->station));
+                    }
                     created_station.reset();
                 }
             }
@@ -351,12 +375,8 @@ namespace Favorites {
                                   ImGuiChildFlags_AutoResizeX |
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
-                const sdl::vec2 button_size = {96, 96};
-                if (ImGui::ImageButton("play_button",
-                                       *IconManager::get("ui/play-button.png"),
-                                       button_size)) {
-                    Player::play(station);
-                }
+
+                ui_common::show_play_button(station);
 
                 ImGui::BeginDisabled(index == 0);
                 if (ImGui::Button("▲")) {
@@ -377,8 +397,7 @@ namespace Favorites {
                 ImGui::EndDisabled();
 
                 if (ImGui::Button("✎")) {
-                    edited_station = station;
-                    edited_tags = utils::join(edited_station->tags, ", ");
+                    edited_station.emplace(station);
                     ImGui::OpenPopup(popup_edit_title);
                 }
                 process_popup_edit(station);
@@ -399,35 +418,18 @@ namespace Favorites {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui_utils::show_favicon(station.favicon);
+                ui_common::show_favicon(station.favicon);
 
                 ImGui::SameLine();
 
-                if (ImGui::BeginChild("basic_info",
-                                      {0, 0},
-                                      ImGuiChildFlags_AutoResizeY |
-                                      ImGuiChildFlags_NavFlattened)) {
-
-                    ImGui::TextWrapped("%s", station.name.data());
-
-                    if (!station.homepage.empty()) {
-                        if (ImGui::TextLink(station.homepage)) {
-                            // TODO: show QR code
-                        }
-                    }
-
-                    if (!station.country_code.empty())
-                        ImGui::Text("🏳 %s", station.country_code.data());
-                } // basic_info
-                ImGui::HandleDragScroll(scroll_target);
-                ImGui::EndChild();
+                ui_common::show_station_basic_info(station, scroll_target);
 
                 if (ImGui::BeginChild("extra_info",
                                       {0, 0},
                                       ImGuiChildFlags_AutoResizeY |
                                       ImGuiChildFlags_NavFlattened)) {
 
-                    ui_utils::show_tags(station.tags, scroll_target);
+                    ui_common::show_tags(station.tags, scroll_target);
                 } // extra_info
                 ImGui::HandleDragScroll(scroll_target);
                 ImGui::EndChild();

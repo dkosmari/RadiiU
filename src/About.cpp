@@ -17,6 +17,7 @@
 #include "constants.hpp"
 #include "IconManager.hpp"
 #include "imgui_extras.hpp"
+#include "ui_common.hpp"
 #include "utils.hpp"
 
 #ifdef HAVE_CONFIG_H
@@ -34,6 +35,20 @@ using constants::label_color;
 namespace About {
 
     namespace {
+
+        std::string
+        get_sdl_version_str()
+        {
+                SDL_version sdl_ver;
+                SDL_GetVersion(&sdl_ver);
+                char buf[32];
+                std::snprintf(buf, sizeof buf,
+                              "%u.%u.%u",
+                              sdl_ver.major,
+                              sdl_ver.minor,
+                              sdl_ver.patch);
+                return buf;
+        }
 
         std::string
         get_mpg_decoders()
@@ -84,50 +99,40 @@ namespace About {
                 ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
 
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                ImGui::TextRightColored(label_color, "Homepage");
-                ImGui::TableNextColumn();
-                ImGui::TextLink(PACKAGE_URL);
-
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                ImGui::TextRightColored(label_color, "Bugs");
-                ImGui::TableNextColumn();
-                ImGui::TextLink(PACKAGE_BUGREPORT);
+                ui_common::show_link_row("Homepage", PACKAGE_URL);
+                ui_common::show_link_row("Bugs", PACKAGE_BUGREPORT);
+                ui_common::show_info_row("User Agent", utils::get_user_agent());
 
                 ImGui::EndTable();
             }
 
-            ImGui::SeparatorTextColored(label_color, "Components:");
-
-            SDL_version sdl_ver;
-            SDL_GetVersion(&sdl_ver);
-            ImGui::BulletText("SDL: %u.%u.%u", sdl_ver.major, sdl_ver.minor, sdl_ver.patch);
-
-            ImGui::BulletText("ImGui: %s", IMGUI_VERSION);
-
-            ImGui::Bullet();
-            ImGui::TextWrapped("CURL: %s", curl_version());
-
-            ImGui::Bullet();
-            ImGui::TextWrapped("User Agent: %s", utils::get_user_agent().data());
-
-            ImGui::Bullet();
-            ImGui::TextWrapped("JANSSON: %s", jansson_version_str());
-
-            static const std::string mpg_decoders = get_mpg_decoders();
-            ImGui::Bullet();
-            ImGui::TextWrapped("MPG123 decoders: %s", mpg_decoders.data());
-
             ImGui::SeparatorTextColored(label_color, "Authors:");
-
             static const auto authors = get_authors();
             for (auto& author : authors) {
                 ImGui::Bullet();
                 ImGui::TextUnformatted(author);
             }
 
+            ImGui::SeparatorTextColored(label_color, "Components:");
+            if (ImGui::BeginTable("components", 2)) {
+
+                ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
+                ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
+
+                static const std::string sdl_version = get_sdl_version_str();
+                ui_common::show_info_row("SDL", sdl_version);
+
+                ui_common::show_info_row("ImGui", IMGUI_VERSION);
+
+                ui_common::show_info_row("libCURL", curl_version());
+
+                ui_common::show_info_row("JANSSON", jansson_version_str());
+
+                static const std::string mpg_decoders = get_mpg_decoders();
+                ui_common::show_info_row("MPG123 decoders", mpg_decoders);
+
+                ImGui::EndTable();
+            }
         }
 
         ImGui::HandleDragScroll();

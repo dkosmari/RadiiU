@@ -9,7 +9,6 @@
 #include <array>
 #include <atomic>
 #include <cinttypes>
-#include <concepts>
 #include <exception>
 #include <filesystem>
 #include <iostream>
@@ -40,7 +39,7 @@
 #include "Station.hpp"
 #include "net/address.hpp"
 #include "net/resolver.hpp"
-#include "ui_utils.hpp"
+#include "ui_common.hpp"
 #include "utils.hpp"
 #include "thread_safe.hpp"
 
@@ -498,37 +497,6 @@ namespace Browser {
 
 
     void
-    show_info_row(const std::string& label,
-                  const std::string& value)
-    {
-        ImGui::TableNextRow();
-
-        ImGui::TableNextColumn();
-        ImGui::TextRightColored(label_color,  "%s", label.data());
-
-        ImGui::TableNextColumn();
-        ImGui::TextWrapped("%s", value.data());
-        // show_last_bounding_box();
-    }
-
-
-    template<std::integral T>
-    void
-    show_info_row(const std::string& label,
-                  T value)
-    {
-        ImGui::TableNextRow();
-
-        ImGui::TableNextColumn();
-        ImGui::TextRightColored(label_color, "%s", label.data());
-
-        ImGui::TableNextColumn();
-        const std::string fmt = "%" + utils::format(value);
-        ImGui::TextWrapped(fmt.data(), value);
-    }
-
-
-    void
     process_server_info_popup()
     {
         // ImGui::SetNextWindowSize({550, 0}, ImGuiCond_Always);
@@ -552,6 +520,7 @@ namespace Browser {
                     ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
                     ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
+                    using ui_common::show_info_row;
                     show_info_row("software_version", server_info->software_version);
                     show_info_row("stations", server_info->stations);
                     show_info_row("stations_broken", server_info->stations_broken);
@@ -762,10 +731,12 @@ namespace Browser {
                 ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
+                using ui_common::show_info_row;
+                using ui_common::show_link_row;
                 show_info_row("name", station.name);
-                show_info_row("url", station.url);
-                show_info_row("url_resolved", station.url_resolved);
-                show_info_row("homepage", station.homepage);
+                show_link_row("url", station.url);
+                show_link_row("url_resolved", station.url_resolved);
+                show_link_row("homepage", station.homepage);
                 show_info_row("favicon", station.favicon);
                 show_info_row("tags", utils::join(station.tags, ","));
                 show_info_row("country_code", station.country_code);
@@ -803,11 +774,7 @@ namespace Browser {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                if (ImGui::ImageButton("play_button",
-                                       *IconManager::get("ui/play-button.png"),
-                                       vec2{96, 96})) {
-                    Player::play(station);
-                }
+                ui_common::show_play_button(station);
 
                 if (Favorites::contains(station.uuid)) {
                     if (ImGui::Button("♥"))
@@ -843,29 +810,11 @@ namespace Browser {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui_utils::show_favicon(station.favicon);
+                ui_common::show_favicon(station.favicon);
 
                 ImGui::SameLine();
 
-                if (ImGui::BeginChild("basic_info",
-                                      {0, 0},
-                                      ImGuiChildFlags_AutoResizeY |
-                                      ImGuiChildFlags_NavFlattened)) {
-
-                    ImGui::TextWrapped("%s", station.name.data());
-
-                    if (!station.homepage.empty()) {
-                        if (ImGui::TextLink(station.homepage)) {
-                            // TODO: show QR code
-                        }
-                    }
-
-                    if (!station.country_code.empty())
-                        ImGui::Text("🏳 %s", station.country_code.data());
-
-                } // basic_info
-                ImGui::HandleDragScroll(scroll_target);
-                ImGui::EndChild();
+                ui_common::show_station_basic_info(station, scroll_target);
 
                 if (ImGui::BeginChild("extra_info",
                                       {0, 0},
@@ -883,7 +832,7 @@ namespace Browser {
                         ImGui::BulletText("👂 %u kbps", station.bitrate);
                     }
 
-                    ui_utils::show_tags(station.tags, scroll_target);
+                    ui_common::show_tags(station.tags, scroll_target);
                 }
                 ImGui::HandleDragScroll(scroll_target);
                 ImGui::EndChild();

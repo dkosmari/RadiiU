@@ -215,6 +215,14 @@ namespace ImGui {
     TextLink(const std::string& label);
 
 
+    bool
+    TextLinkOpenURL(const std::string& label);
+
+    bool
+    TextLinkOpenURL(const std::string& label,
+                    const std::string& url);
+
+
     void
     TextRight(const char* fmt,
               ...)

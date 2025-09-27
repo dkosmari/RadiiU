@@ -50,7 +50,7 @@ namespace Settings {
             unsigned player_buffer_size_kb = cfg::player_buffer_size / 1024;
             if (ImGui::Slider("Player buffer (KiB)",
                               player_buffer_size_kb,
-                              2u,
+                              4u,
                               64u,
                               nullptr,
                               ImGuiSliderFlags_Logarithmic)) {
