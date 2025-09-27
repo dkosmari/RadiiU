@@ -21,6 +21,8 @@
 #include "json.hpp"
 #include "Player.hpp"
 #include "Station.hpp"
+#include "ui_utils.hpp"
+#include "utils.hpp"
 
 
 using std::cout;
@@ -122,30 +124,44 @@ namespace Recent {
 
             ImGui::SameLine();
 
-            if (!station.favicon.empty()) {
-                auto icon = IconManager::get(station.favicon);
-                auto icon_size = icon->get_size();
-                sdl::vec2 size = {128, 128};
-                size.x = icon_size.x * size.y / icon_size.y;
-                ImGui::Image(*IconManager::get(station.favicon), size);
-                ImGui::SameLine();
-            }
-
             if (ImGui::BeginChild("details",
                                   {0, 0},
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
-                ImGui::TextUnformatted(station.name);
-                if (!station.homepage.empty()) {
-                    ImVec4 link_color = ImGui::GetStyle().Colors[ImGuiCol_TextLink];
-                    ImGui::PushStyleColor(ImGuiCol_Text, link_color);
-                    ImGui::TextUnformatted(station.homepage);
-                    ImGui::PopStyleColor();
-                }
-                if (!station.country_code.empty())
-                    ImGui::Text("🏳 %s", station.country_code.data());
-                if (!station.tags.empty())
-                    ImGui::TextWrapped("🏷 %s", station.tags.data());
+
+                ui_utils::show_favicon(station.favicon);
+
+                ImGui::SameLine();
+
+                if (ImGui::BeginChild("basic_info",
+                                      {0, 0},
+                                      ImGuiChildFlags_AutoResizeY |
+                                      ImGuiChildFlags_NavFlattened)) {
+
+                    ImGui::TextWrapped("%s", station.name.data());
+
+                    if (!station.homepage.empty()) {
+                        if (ImGui::TextLink(station.homepage)) {
+                            // TODO: show QR code
+                        }
+                    }
+
+                    if (!station.country_code.empty())
+                        ImGui::Text("🏳 %s", station.country_code.data());
+                } // basic_info
+                ImGui::HandleDragScroll(scroll_target);
+                ImGui::EndChild();
+
+                if (ImGui::BeginChild("extra_info",
+                                      {0, 0},
+                                      ImGuiChildFlags_AutoResizeY |
+                                      ImGuiChildFlags_NavFlattened)) {
+
+                    ui_utils::show_tags(station.tags, scroll_target);
+                } // extra_info
+                ImGui::HandleDragScroll(scroll_target);
+                ImGui::EndChild();
+
             }
             ImGui::HandleDragScroll(scroll_target);
             ImGui::EndChild(); // details

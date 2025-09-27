@@ -35,6 +35,9 @@ namespace Favorites {
     bool
     contains(const std::string& uuid);
 
+    bool
+    contains(const Station& station);
+
 
     void
     add(const Station& st);
@@ -45,6 +48,9 @@ namespace Favorites {
 
     void
     remove(std::size_t index);
+
+    void
+    remove(const Station& station);
 
 } // namespace Favorites
 

@@ -9,6 +9,8 @@
 
 #include "Station.hpp"
 
+#include "utils.hpp"
+
 
 namespace {
 
@@ -82,7 +84,6 @@ Station::from_json(const json::object& obj)
     h.load("url_resolved", result.url_resolved);
     h.load("homepage",     result.homepage);
     h.load("favicon",      result.favicon);
-    h.load("tags",         result.tags);
     h.load("countrycode",  result.country_code);
     h.load("language",     result.language);
     h.load("stationuuid",  result.uuid);
@@ -90,6 +91,11 @@ Station::from_json(const json::object& obj)
     h.load("clickcount",   result.click_count);
     h.load("clicktrend",   result.click_trend);
     h.load("bitrate",      result.bitrate);
+
+    std::string tags;
+    h.load("tags", tags);
+    result.tags = utils::split(tags, ",");
+
     return result;
 }
 
@@ -139,10 +145,11 @@ Station::to_json()
     h.store("url_resolved", url_resolved);
     h.store("homepage", homepage);
     h.store("favicon", favicon);
-    h.store("tags", tags);
     h.store("countrycode", country_code);
     h.store("language", language);
     h.store("stationuuid", uuid);
+
+    h.store("tags", utils::join(tags, ","));
     // Note: these fields are volatile, no point in serializing them.
     // h.store("votes", votes);
     // h.store("clickcount", click_count);

@@ -26,6 +26,8 @@
 #include "json.hpp"
 #include "Player.hpp"
 #include "Station.hpp"
+#include "ui_utils.hpp"
+#include "utils.hpp"
 
 
 using std::cout;
@@ -59,7 +61,7 @@ namespace Favorites {
 
         const std::string popup_edit_title = "Edit station";
         std::optional<Station> edited_station;
-
+        std::optional<std::string> edited_tags;
 
         const std::string popup_create_title = "Create station";
         std::optional<Station> created_station;
@@ -194,7 +196,7 @@ namespace Favorites {
             show_row_for("url_resolved", station.url_resolved);
             show_row_for("homepage", station.homepage);
             show_row_for("favicon", station.favicon);
-            show_row_for("tags", station.tags);
+            show_row_for("tags", *edited_tags);
             show_row_for("country_code", station.country_code);
             show_row_for("language", station.language);
             show_row_for("uuid", station.uuid);
@@ -231,6 +233,7 @@ namespace Favorites {
                 if (ImGui::Button("🗙 Cancel")) {
                     ImGui::CloseCurrentPopup();
                     edited_station.reset();
+                    edited_tags.reset();
                 }
                 ImGui::SetItemDefaultFocus();
             }
@@ -253,11 +256,19 @@ namespace Favorites {
                         auto it = uuids.find(station.uuid);
                         if (it != uuids.end())
                             uuids.erase(it);
+
+                        // copy the tags string into the tags vector
+                        auto tags = utils::split(*edited_tags, ",");
+                        for (auto& t : tags)
+                            t = utils::trimmed(t, ' ');
+                        edited_station->tags = std::move(tags);
+
                         station = std::move(*edited_station);
                         if (!station.uuid.empty())
                             uuids.insert(station.uuid);
                     }
                     edited_station.reset();
+                    edited_tags.reset();
                 }
             }
 
@@ -340,10 +351,10 @@ namespace Favorites {
                                   ImGuiChildFlags_AutoResizeX |
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
-                const sdl::vec2 play_size = {96, 96};
+                const sdl::vec2 button_size = {96, 96};
                 if (ImGui::ImageButton("play_button",
                                        *IconManager::get("ui/play-button.png"),
-                                       play_size)) {
+                                       button_size)) {
                     Player::play(station);
                 }
 
@@ -367,6 +378,7 @@ namespace Favorites {
 
                 if (ImGui::Button("✎")) {
                     edited_station = station;
+                    edited_tags = utils::join(edited_station->tags, ", ");
                     ImGui::OpenPopup(popup_edit_title);
                 }
                 process_popup_edit(station);
@@ -376,47 +388,56 @@ namespace Favorites {
                 if (ImGui::Button("🗑"))
                     ImGui::OpenPopup(popup_delete_title);
                 process_popup_delete(station, index);
-            }
+            } // actions
             ImGui::HandleDragScroll(scroll_target);
-            ImGui::EndChild(); // actions
+            ImGui::EndChild();
 
             ImGui::SameLine();
-
-            if (!station.favicon.empty()) {
-                auto icon = IconManager::get(station.favicon);
-                auto icon_size = icon->get_size();
-                sdl::vec2 size = {128, 128};
-                size.x = icon_size.x * size.y / icon_size.y;
-                ImGui::Image(*IconManager::get(station.favicon), size);
-                ImGui::SameLine();
-            }
-
-            // ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.5f, 0.0f, 0.0f, 1.0f));
 
             if (ImGui::BeginChild("details",
                                   {0, 0},
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
-                ImGui::TextUnformatted(station.name);
-                if (!station.homepage.empty()) {
-                    ImVec4 link_color = ImGui::GetStyle().Colors[ImGuiCol_TextLink];
-                    ImGui::PushStyleColor(ImGuiCol_Text, link_color);
-                    ImGui::TextUnformatted(station.homepage);
-                    ImGui::PopStyleColor();
-                }
-                if (!station.country_code.empty())
-                    ImGui::Text("🏳 %s", station.country_code.data());
-                if (!station.tags.empty())
-                    ImGui::TextWrapped("🏷 %s", station.tags.data());
-            }
+
+                ui_utils::show_favicon(station.favicon);
+
+                ImGui::SameLine();
+
+                if (ImGui::BeginChild("basic_info",
+                                      {0, 0},
+                                      ImGuiChildFlags_AutoResizeY |
+                                      ImGuiChildFlags_NavFlattened)) {
+
+                    ImGui::TextWrapped("%s", station.name.data());
+
+                    if (!station.homepage.empty()) {
+                        if (ImGui::TextLink(station.homepage)) {
+                            // TODO: show QR code
+                        }
+                    }
+
+                    if (!station.country_code.empty())
+                        ImGui::Text("🏳 %s", station.country_code.data());
+                } // basic_info
+                ImGui::HandleDragScroll(scroll_target);
+                ImGui::EndChild();
+
+                if (ImGui::BeginChild("extra_info",
+                                      {0, 0},
+                                      ImGuiChildFlags_AutoResizeY |
+                                      ImGuiChildFlags_NavFlattened)) {
+
+                    ui_utils::show_tags(station.tags, scroll_target);
+                } // extra_info
+                ImGui::HandleDragScroll(scroll_target);
+                ImGui::EndChild();
+
+            } // details
             ImGui::HandleDragScroll(scroll_target);
-            ImGui::EndChild(); // details
-
-            // ImGui::PopStyleColor();
-
-        }
+            ImGui::EndChild();
+        } // station
         ImGui::HandleDragScroll(scroll_target);
-        ImGui::EndChild(); // station
+        ImGui::EndChild();
 
         ImGui::PopID();
     }
@@ -498,6 +519,19 @@ namespace Favorites {
     }
 
 
+    bool
+    contains(const Station& station)
+    {
+        if (!station.uuid.empty())
+            return contains(station.uuid);
+
+        for (const Station& st : stations)
+            if (station == st)
+                return true;
+        return false;
+    }
+
+
     void
     add(const Station& st)
     {
@@ -551,5 +585,16 @@ namespace Favorites {
 
         stations.erase(stations.begin() + index);
     }
+
+
+    void
+    remove(const Station& station)
+    {
+        if (!station.uuid.empty())
+            return remove(station.uuid);
+
+        std::erase(stations, station);
+    }
+
 
 } // namespace Favorites

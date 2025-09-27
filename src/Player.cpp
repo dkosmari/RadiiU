@@ -16,8 +16,12 @@
 #endif
 
 #include <curlxx/curl.hpp>
+
 #include <imgui.h>
+#include <imgui_internal.h>
+
 #include <mpg123xx/mpg123.hpp>
+
 #include <sdl2xx/audio.hpp>
 
 #include "Player.hpp"
@@ -25,11 +29,13 @@
 #include "Browser.hpp"
 #include "byte_stream.hpp"
 #include "cfg.hpp"
+#include "Favorites.hpp"
 #include "IconManager.hpp"
 #include "icy_meta.hpp"
 #include "imgui_extras.hpp"
 #include "Recent.hpp"
 #include "Station.hpp"
+#include "ui_utils.hpp"
 #include "utils.hpp"
 
 
@@ -54,41 +60,28 @@ namespace Player {
     std::optional<Station> station;
 
 
-    namespace {
+    SDL_AudioFormat
+    mpg_to_sdl_format(unsigned fmt)
+    {
+        switch (fmt) {
 
-        SDL_AudioFormat
-        mpg_to_sdl_format(unsigned fmt)
-        {
-            switch (fmt) {
+            case MPG123_ENC_SIGNED_16:
+                return AUDIO_S16SYS;
 
-                case MPG123_ENC_SIGNED_16:
-                    return AUDIO_S16SYS;
+            case MPG123_ENC_UNSIGNED_16:
+                return AUDIO_U16SYS;
 
-                case MPG123_ENC_UNSIGNED_16:
-                    return AUDIO_U16SYS;
+            case MPG123_ENC_SIGNED_32:
+                return AUDIO_S32SYS;
 
-                case MPG123_ENC_SIGNED_32:
-                    return AUDIO_S32SYS;
+            case MPG123_ENC_FLOAT_32:
+                return AUDIO_F32SYS;
 
-                case MPG123_ENC_FLOAT_32:
-                    return AUDIO_F32SYS;
+            default:
+                return 0;
 
-                default:
-                    return 0;
-
-            }
         }
-
-
-        void
-        trim(std::string& s)
-        {
-            auto i = s.find_last_not_of('\0');
-            if (i != std::string::npos)
-                s.erase(i);
-        }
-
-    } // namespace
+    }
 
 
     /*
@@ -277,8 +270,7 @@ namespace Player {
         void
         process_meta()
         {
-            std::string meta_str = meta_stream.read_str();
-            trim(meta_str);
+            std::string meta_str = utils::trimmed(meta_stream.read_str(), '\0');
 
             meta = icy_meta::parse(std::move(meta_str));
             cout << "Metadata:\n";
@@ -452,9 +444,113 @@ namespace Player {
 
 
     void
-    show_station()
+    show_station(ImGuiID scroll_target)
     {
-        // TODO
+        if (!station) {
+            if (ImGui::BeginChild("no_station",
+                                  {0, 0},
+                                  ImGuiChildFlags_AutoResizeY |
+                                  ImGuiChildFlags_FrameStyle |
+                                  ImGuiChildFlags_NavFlattened)) {
+                ImGui::TextDisabled("No station set");
+            } // no_station
+            ImGui::EndChild();
+            return;
+        }
+
+        if (ImGui::BeginChild("station",
+                              {0, 0},
+                              ImGuiChildFlags_AutoResizeY |
+                              ImGuiChildFlags_FrameStyle |
+                              ImGuiChildFlags_NavFlattened)) {
+
+            if (ImGui::BeginChild("actions",
+                                  {0, 0},
+                                  ImGuiChildFlags_AutoResizeX |
+                                  ImGuiChildFlags_AutoResizeY |
+                                  ImGuiChildFlags_NavFlattened)) {
+
+                const sdl::vec2 button_size = {96, 96};
+                if (state == State::playing) {
+                    if (ImGui::ImageButton("stop_button",
+                                           *IconManager::get("ui/stop-button.png"),
+                                           button_size))
+                        stop();
+                } else {
+                    if (ImGui::ImageButton("play_button",
+                                           *IconManager::get("ui/play-button.png"),
+                                           button_size))
+                        play();
+                }
+
+                if (Favorites::contains(*station)) {
+                    if (ImGui::Button("♥"))
+                        Favorites::remove(*station);
+                } else {
+                    if (ImGui::Button("♡"))
+                        Favorites::add(*station);
+                }
+
+                ImGui::SameLine();
+
+                ImGui::BeginDisabled(station->uuid.empty());
+                if (ImGui::Button("🛈")) {
+                    // TODO
+                }
+                ImGui::EndDisabled();
+            } // actions
+            ImGui::EndChild();
+
+            ImGui::SameLine();
+
+            if (ImGui::BeginChild("details",
+                                  {0, 0},
+                                  ImGuiChildFlags_AutoResizeY |
+                                  ImGuiChildFlags_NavFlattened)) {
+
+                ui_utils::show_favicon(station->favicon);
+
+                if (ImGui::BeginChild("basic_info",
+                                      {0, 0},
+                                      ImGuiChildFlags_AutoResizeY |
+                                      ImGuiChildFlags_NavFlattened)) {
+
+                    ImGui::TextWrapped("%s", station->name.data());
+
+                    if (!station->homepage.empty()) {
+                        if (ImGui::TextLink(station->homepage)) {
+                            // TODO: show QR code for link
+                        }
+                    }
+
+                    if (!station->country_code.empty())
+                        ImGui::Text("🏳 %s", station->country_code.data());
+
+                } // basic_info
+                ImGui::EndChild();
+
+                if (ImGui::BeginChild("extra_info")) {
+                    const std::string& url = station->url_resolved.empty()
+                                             ? station->url
+                                             : station->url_resolved;
+                    if (!url.empty())
+                        if (ImGui::TextLink(url)) {
+                            // TODO: show QR code for link
+                        }
+
+                    ui_utils::show_tags(station->tags, scroll_target);
+
+                } // extra_info
+                ImGui::HandleDragScroll(scroll_target);
+                ImGui::EndChild();
+
+            } // details
+            ImGui::HandleDragScroll(scroll_target);
+            ImGui::EndChild();
+
+        } // station
+        ImGui::HandleDragScroll(scroll_target);
+        ImGui::EndChild();
     }
 
 
@@ -464,7 +560,7 @@ namespace Player {
         if (ImGui::BeginChild("player",
                               {0, 0},
                               ImGuiChildFlags_NavFlattened)) {
-
+#if 0
             ImGui::BeginDisabled(!station);
 
             const vec2 button_size = {96, 96};
@@ -510,7 +606,10 @@ namespace Player {
             }
 
             ImGui::EndDisabled();
-
+#else
+            auto scroll_target = ImGui::GetCurrentWindow()->ID;
+            show_station(scroll_target);
+#endif
         }
 
         ImGui::HandleDragScroll();

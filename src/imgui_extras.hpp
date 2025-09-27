@@ -171,11 +171,11 @@ namespace ImGui {
     void
     SeparatorText(const std::string& label);
 
-    
+
     void
     SeparatorTextColored(const ImVec4& color,
                          const std::string& label);
-    
+
 
     template<concepts::arithmetic T>
     bool
@@ -214,7 +214,7 @@ namespace ImGui {
     bool
     TextLink(const std::string& label);
 
-    
+
     void
     TextRight(const char* fmt,
               ...)

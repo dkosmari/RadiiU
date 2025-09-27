@@ -9,8 +9,6 @@
 #define STATION_HPP
 
 #include <cstdint>
-#include <filesystem>
-#include <map>
 #include <string>
 #include <vector>
 
@@ -25,7 +23,6 @@ struct Station {
     std::string url_resolved;
     std::string homepage;
     std::string favicon;
-    std::string tags;
     std::string country_code;
     std::string language;
     std::string uuid;
@@ -34,6 +31,8 @@ struct Station {
     std::uint64_t click_count = 0;
     std::int64_t click_trend = 0;
     unsigned bitrate = 0;
+
+    std::vector<std::string> tags;
 
 
     static

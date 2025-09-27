@@ -40,6 +40,7 @@
 #include "Station.hpp"
 #include "net/address.hpp"
 #include "net/resolver.hpp"
+#include "ui_utils.hpp"
 #include "utils.hpp"
 #include "thread_safe.hpp"
 
@@ -766,7 +767,7 @@ namespace Browser {
                 show_info_row("url_resolved", station.url_resolved);
                 show_info_row("homepage", station.homepage);
                 show_info_row("favicon", station.favicon);
-                show_info_row("tags", station.tags);
+                show_info_row("tags", utils::join(station.tags, ","));
                 show_info_row("country_code", station.country_code);
                 show_info_row("language", station.language);
                 show_info_row("uuid", station.uuid);
@@ -788,7 +789,9 @@ namespace Browser {
     show_station(const Station& station,
                  ImGuiID scroll_target)
     {
-        if (ImGui::BeginChild(station.uuid.data(),
+        ImGui::PushID(&station);
+
+        if (ImGui::BeginChild("station",
                               {0, 0},
                               ImGuiChildFlags_AutoResizeY |
                               ImGuiChildFlags_FrameStyle |
@@ -799,14 +802,14 @@ namespace Browser {
                                   ImGuiChildFlags_AutoResizeX |
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
+
                 if (ImGui::ImageButton("play_button",
                                        *IconManager::get("ui/play-button.png"),
                                        vec2{96, 96})) {
                     Player::play(station);
                 }
 
-                bool is_favorited = Favorites::contains(station.uuid);
-                if (is_favorited) {
+                if (Favorites::contains(station.uuid)) {
                     if (ImGui::Button("♥"))
                         Favorites::remove(station.uuid);
                 } else {
@@ -817,9 +820,19 @@ namespace Browser {
                 ImGui::SameLine();
 
                 if (ImGui::Button("🛈"))
+                    // TODO: refactor station info popup so it can be used from Favorites and Player
                     ImGui::OpenPopup(station_info_popup_id);
                 process_station_info_popup(station);
-            }
+
+                bool voted = votes_cast.contains(station.uuid);
+                // TODO: shorten the string so it fits under the favorite/info buttons
+                std::string vote_label = "👍" + std::to_string(station.votes);
+                ImGui::BeginDisabled(voted);
+                if (ImGui::Button(vote_label))
+                    send_vote(station.uuid);
+                ImGui::EndDisabled();
+
+            } // actions
             ImGui::HandleDragScroll(scroll_target);
             ImGui::EndChild();
 
@@ -830,37 +843,34 @@ namespace Browser {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                if (ImGui::BeginChild("first_line",
+                ui_utils::show_favicon(station.favicon);
+
+                ImGui::SameLine();
+
+                if (ImGui::BeginChild("basic_info",
                                       {0, 0},
                                       ImGuiChildFlags_AutoResizeY |
                                       ImGuiChildFlags_NavFlattened)) {
-
-                    if (!station.favicon.empty()) {
-                        auto icon = IconManager::get(station.favicon);
-                        auto icon_size = icon->get_size();
-                        vec2 size = {128, 128};
-                        size.x = icon_size.x * size.y / icon_size.y;
-                        ImGui::Image(*IconManager::get(station.favicon), size);
-                        ImGui::SameLine();
-                    }
 
                     ImGui::TextWrapped("%s", station.name.data());
 
-                }
+                    if (!station.homepage.empty()) {
+                        if (ImGui::TextLink(station.homepage)) {
+                            // TODO: show QR code
+                        }
+                    }
+
+                    if (!station.country_code.empty())
+                        ImGui::Text("🏳 %s", station.country_code.data());
+
+                } // basic_info
                 ImGui::HandleDragScroll(scroll_target);
                 ImGui::EndChild();
 
-                if (ImGui::BeginChild("second_line",
+                if (ImGui::BeginChild("extra_info",
                                       {0, 0},
                                       ImGuiChildFlags_AutoResizeY |
                                       ImGuiChildFlags_NavFlattened)) {
-
-                    bool voted = votes_cast.contains(station.uuid);
-                    std::string vote_label = "👍" + std::to_string(station.votes);
-                    ImGui::BeginDisabled(voted);
-                    if (ImGui::Button(vote_label))
-                        send_vote(station.uuid);
-                    ImGui::EndDisabled();
 
                     ImGui::SameLine();
                     ImGui::AlignTextToFramePadding();
@@ -872,31 +882,19 @@ namespace Browser {
                         ImGui::AlignTextToFramePadding();
                         ImGui::BulletText("👂 %u kbps", station.bitrate);
                     }
-                    if (!station.country_code.empty()) {
-                        ImGui::SameLine();
-                        ImGui::AlignTextToFramePadding();
-#if 0
-                        std::string region_glyph;
-                        for (char c : station.country_code) {
-                            if ('A' <= c && c <= 'Z') {
-                                region_glyph += "🇦";
-                                region_glyph.back() += c - 'A';
-                            }
-                        }
-                        ImGui::BulletText("%s", region_glyph.data());
-#else
-                        ImGui::BulletText("🏳 %s", station.country_code.data());
-                    }
-#endif
+
+                    ui_utils::show_tags(station.tags, scroll_target);
                 }
                 ImGui::HandleDragScroll(scroll_target);
                 ImGui::EndChild();
-            }
+            } // extra_info
             ImGui::HandleDragScroll(scroll_target);
             ImGui::EndChild();
-        }
+        } // station
         ImGui::HandleDragScroll(scroll_target);
         ImGui::EndChild();
+
+        ImGui::PopID();
     }
 
 
