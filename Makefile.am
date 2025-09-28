@@ -54,8 +54,8 @@ radiiu_elf_SOURCES = \
 	src/Favorites.hpp \
 	src/IconManager.cpp \
 	src/IconManager.hpp \
-	src/icy_meta.cpp \
-	src/icy_meta.hpp \
+	src/icy.cpp \
+	src/icy.hpp \
 	src/imgui_extras.cpp \
 	src/imgui_extras.hpp \
 	src/json.cpp \

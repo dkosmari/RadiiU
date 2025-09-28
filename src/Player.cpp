@@ -7,7 +7,6 @@
 
 #include <functional>
 #include <iostream>
-#include <map>
 #include <optional>
 #include <vector>
 
@@ -31,7 +30,7 @@
 #include "cfg.hpp"
 #include "Favorites.hpp"
 #include "IconManager.hpp"
-#include "icy_meta.hpp"
+#include "icy.hpp"
 #include "imgui_extras.hpp"
 #include "Recent.hpp"
 #include "Station.hpp"
@@ -111,7 +110,7 @@ namespace Player {
         std::string icy_genre;
         std::string icy_description;
 
-        std::map<std::string, std::string> meta;
+        icy::dict_t meta;
 
 
         Resources(const std::string& url)
@@ -273,7 +272,7 @@ namespace Player {
             // Note: icy metadata is often padded with null bytes.
             std::string meta_str = utils::trimmed(meta_stream.read_str(), '\0');
 
-            meta = icy_meta::parse(std::move(meta_str));
+            meta = icy::parse(meta_str);
             cout << "Metadata:\n";
             for (auto [key, val] : meta) {
                 cout << "    " << key << "=\"" << val << "\"\n";
