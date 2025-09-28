@@ -235,6 +235,12 @@ namespace ImGui {
                      ...)
         IM_FMTARGS(2);
 
+    void
+    TextRightColoredV(const ImVec4& color,
+                     const char* fmt,
+                      std::va_list args)
+        IM_FMTLIST(2);
+
 
     void
     TextUnformatted(const std::string& text);

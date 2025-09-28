@@ -73,7 +73,12 @@ namespace utils {
     [[nodiscard]]
     std::string
     trimmed(const std::string& input,
-            char discard = ' ');
+            char discard);
+
+    [[nodiscard]]
+    std::string
+    trimmed(const std::string& input,
+            const std::string& discard = " \r\n\t");
 
 } // namespace utils
 

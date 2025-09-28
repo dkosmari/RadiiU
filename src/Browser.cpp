@@ -39,7 +39,7 @@
 #include "Station.hpp"
 #include "net/address.hpp"
 #include "net/resolver.hpp"
-#include "ui_common.hpp"
+#include "ui.hpp"
 #include "utils.hpp"
 #include "thread_safe.hpp"
 
@@ -48,9 +48,6 @@ using std::cout;
 using std::endl;
 
 using sdl::vec2;
-
-
-using constants::label_color;
 
 
 namespace Browser {
@@ -520,7 +517,7 @@ namespace Browser {
                     ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
                     ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-                    using ui_common::show_info_row;
+                    using ui::show_info_row;
                     show_info_row("software_version", server_info->software_version);
                     show_info_row("stations", server_info->stations);
                     show_info_row("stations_broken", server_info->stations_broken);
@@ -731,22 +728,20 @@ namespace Browser {
                 ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-                using ui_common::show_info_row;
-                using ui_common::show_link_row;
-                show_info_row("name", station.name);
-                show_link_row("url", station.url);
-                show_link_row("url_resolved", station.url_resolved);
-                show_link_row("homepage", station.homepage);
-                show_info_row("favicon", station.favicon);
-                show_info_row("tags", utils::join(station.tags, ","));
-                show_info_row("country_code", station.country_code);
-                show_info_row("language", station.language);
-                show_info_row("uuid", station.uuid);
+                ui::show_info_row("name", station.name);
+                ui::show_link_row("url", station.url);
+                ui::show_link_row("url_resolved", station.url_resolved);
+                ui::show_link_row("homepage", station.homepage);
+                ui::show_info_row("favicon", station.favicon);
+                ui::show_info_row("tags", utils::join(station.tags, ","));
+                ui::show_info_row("country_code", station.country_code);
+                ui::show_info_row("language", station.language);
+                ui::show_info_row("uuid", station.uuid);
 
-                show_info_row("votes", station.votes);
-                show_info_row("click_count", station.click_count);
-                show_info_row("click_trend", station.click_trend);
-                show_info_row("bitrate", station.bitrate);
+                ui::show_info_row("votes", station.votes);
+                ui::show_info_row("click_count", station.click_count);
+                ui::show_info_row("click_trend", station.click_trend);
+                ui::show_info_row("bitrate", station.bitrate);
 
                 ImGui::EndTable();
             }
@@ -774,7 +769,7 @@ namespace Browser {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui_common::show_play_button(station);
+                ui::show_play_button(station);
 
                 if (Favorites::contains(station.uuid)) {
                     if (ImGui::Button("♥"))
@@ -810,11 +805,11 @@ namespace Browser {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui_common::show_favicon(station.favicon);
+                ui::show_favicon(station.favicon);
 
                 ImGui::SameLine();
 
-                ui_common::show_station_basic_info(station, scroll_target);
+                ui::show_station_basic_info(station, scroll_target);
 
                 if (ImGui::BeginChild("extra_info",
                                       {0, 0},
@@ -832,7 +827,7 @@ namespace Browser {
                         ImGui::BulletText("👂 %u kbps", station.bitrate);
                     }
 
-                    ui_common::show_tags(station.tags, scroll_target);
+                    ui::show_tags(station.tags, scroll_target);
                 }
                 ImGui::HandleDragScroll(scroll_target);
                 ImGui::EndChild();

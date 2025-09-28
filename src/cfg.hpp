@@ -19,13 +19,13 @@ namespace cfg {
 
     extern std::filesystem::path base_dir;
 
-    extern std::string server;
-    extern unsigned    player_buffer_size;
-    extern bool        disable_auto_power_down;
     extern unsigned    browser_page_size;
-    extern TabIndex    start_tab;
-    extern bool        remember_last_tab;
+    extern bool        disable_apd;
+    extern TabIndex    initial_tab;
     extern unsigned    max_recent;
+    extern unsigned    player_buffer_size;
+    extern bool        remember_tab;
+    extern std::string server;
 
 
     void

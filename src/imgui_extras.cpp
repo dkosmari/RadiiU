@@ -802,8 +802,17 @@ namespace ImGui {
     {
         std::va_list args;
         va_start(args, fmt);
-        TextAlignedColoredV(1.0f, -FLT_MIN, color, fmt, args);
+        TextRightColoredV(color, fmt, args);
         va_end(args);
+    }
+
+
+    void
+    TextRightColoredV(const ImVec4& color,
+                     const char* fmt,
+                      std::va_list args)
+    {
+        TextAlignedColoredV(1.0f, -FLT_MIN, color, fmt, args);
     }
 
 

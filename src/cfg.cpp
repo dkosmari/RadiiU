@@ -29,25 +29,24 @@
 
 using std::cout;
 using std::endl;
-
+using std::string;
 
 namespace cfg {
 
     std::filesystem::path base_dir;
 
-    std::string server;
-    unsigned    player_buffer_size      = 8192;
-    bool        disable_auto_power_down = true;
-    unsigned    browser_page_size       = 20;
-    TabIndex    start_tab               = TabIndex::browser;
-    bool        remember_last_tab       = true;
-    unsigned    max_recent              = 10;
+    unsigned browser_page_size  = 20;
+    bool     disable_apd        = true;
+    TabIndex initial_tab        = TabIndex::browser;
+    unsigned max_recent         = 10;
+    unsigned player_buffer_size = 8192;
+    bool     remember_tab       = true;
+    string   server;
 
-    namespace {
 
-        std::filesystem::path
-        get_user_config_path()
-        {
+    std::filesystem::path
+    get_user_config_path()
+    {
 #ifdef __WIIU__
             char buf[256];
             std::snprintf(buf, sizeof buf, "/vol/save/%08x", nn::act::GetPersistentId());
@@ -62,23 +61,21 @@ namespace cfg {
             wordfree(&expanded);
             return config_dir / PACKAGE_NAME;
 #endif
+    }
+
+
+    template<typename T>
+    std::optional<T>
+    try_get(const json::object& obj,
+            const string& key)
+    {
+        try {
+            return obj.at(key).as<T>();
         }
-
-
-        template<typename T>
-        std::optional<T>
-        try_get(const json::object& obj,
-                const std::string& key)
-        {
-            try {
-                return obj.at(key).as<T>();
-            }
-            catch (...) {
-                return {};
-            }
+        catch (...) {
+            return {};
         }
-
-    } // namespace
+    }
 
 
     void
@@ -132,17 +129,17 @@ namespace cfg {
             if (auto val = try_get<json::integer>(root, "player_buffer_size"))
                 player_buffer_size = *val;
 
-            if (auto val = try_get<bool>(root, "disable_auto_power_down"))
-                disable_auto_power_down = *val;
+            if (auto val = try_get<bool>(root, "disable_apd"))
+                disable_apd = *val;
 
             if (auto val = try_get<json::integer>(root, "browser_page_size"))
                 browser_page_size = *val;
 
-            if (auto val = try_get<json::string>(root, "start_tab"))
-                start_tab = to_tab_index(*val);
+            if (auto val = try_get<json::string>(root, "initial_tab"))
+                initial_tab = to_tab_index(*val);
 
-            if (auto val = try_get<bool>(root, "remember_last_tab"))
-                remember_last_tab = *val;
+            if (auto val = try_get<bool>(root, "remember_tab"))
+                remember_tab = *val;
         }
         catch (std::exception& e) {
             cout << "Error loading settings: " << e.what() << endl;
@@ -157,11 +154,11 @@ namespace cfg {
             json::object root;
             if (!server.empty())
                 root["server"] = server;
-            root["player_buffer_size"]      = player_buffer_size;
-            root["disable_auto_power_down"] = disable_auto_power_down;
-            root["browser_page_size"]       = browser_page_size;
-            root["start_tab"]               = to_string(start_tab);
-            root["remember_last_tab"]       = remember_last_tab;
+            root["player_buffer_size"] = player_buffer_size;
+            root["disable_apd"]        = disable_apd;
+            root["browser_page_size"]  = browser_page_size;
+            root["initial_tab"]        = to_string(initial_tab);
+            root["remember_tab"]       = remember_tab;
             json::save(std::move(root), base_dir / "settings.json");
         }
         catch (std::exception& e) {

@@ -21,7 +21,7 @@
 #include "json.hpp"
 #include "Player.hpp"
 #include "Station.hpp"
-#include "ui_common.hpp"
+#include "ui.hpp"
 #include "utils.hpp"
 
 
@@ -109,14 +109,14 @@ namespace Recent {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui_common::show_play_button(station);
+                ui::show_play_button(station);
 
                 if (ImGui::Button("🗑"))
                     to_remove = index;
 
-            }
+            } // actions
             ImGui::HandleDragScroll(scroll_target);
-            ImGui::EndChild(); // actions
+            ImGui::EndChild();
 
             ImGui::SameLine();
 
@@ -125,30 +125,30 @@ namespace Recent {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui_common::show_favicon(station.favicon);
+                ui::show_favicon(station.favicon);
 
                 ImGui::SameLine();
 
-                ui_common::show_station_basic_info(station, scroll_target);
+                ui::show_station_basic_info(station, scroll_target);
 
                 if (ImGui::BeginChild("extra_info",
                                       {0, 0},
                                       ImGuiChildFlags_AutoResizeY |
                                       ImGuiChildFlags_NavFlattened)) {
 
-                    ui_common::show_tags(station.tags, scroll_target);
+                    ui::show_tags(station.tags, scroll_target);
+
                 } // extra_info
                 ImGui::HandleDragScroll(scroll_target);
                 ImGui::EndChild();
 
-            }
+            } // details
             ImGui::HandleDragScroll(scroll_target);
-            ImGui::EndChild(); // details
+            ImGui::EndChild();
 
-
-        }
+        } // station
         ImGui::HandleDragScroll(scroll_target);
-        ImGui::EndChild(); // station
+        ImGui::EndChild();
 
         ImGui::PopID();
     }
@@ -161,6 +161,7 @@ namespace Recent {
                               {0, 0},
                               ImGuiChildFlags_NavFlattened |
                               ImGuiChildFlags_AutoResizeY)) {
+
             if (ImGui::Button("Clear"))
                 stations.clear();
 
@@ -168,15 +169,18 @@ namespace Recent {
 
             ImGui::AlignTextToFramePadding();
             ImGui::TextRight("%zu stations", stations.size());
-        }
+
+        } // toolbar
         ImGui::EndChild();
 
         // Note: flat navigation doesn't work well on child windows that scroll.
         if (ImGui::BeginChild("recent")) {
+
             auto scroll_target = ImGui::GetCurrentWindow()->ID;
             for (std::size_t index = stations.size() - 1; index + 1 > 0; --index)
                 show_station(stations[index], index, scroll_target);
-        }
+
+        } // recent
         ImGui::HandleDragScroll();
         ImGui::EndChild();
     }

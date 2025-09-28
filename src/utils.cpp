@@ -195,4 +195,16 @@ namespace utils {
         return input.substr(start, finish - start + 1);
     }
 
+
+    std::string
+    trimmed(const std::string& input,
+            const std::string& discard)
+    {
+        auto start = input.find_first_not_of(discard);
+        if (start == std::string::npos)
+            return {};
+        auto finish = input.find_last_not_of(discard);
+        return input.substr(start, finish - start + 1);
+    }
+
 } // namespace utils

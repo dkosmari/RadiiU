@@ -5,8 +5,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#ifndef UI_COMMON_HPP
-#define UI_COMMON_HPP
+#ifndef UI_HPP
+#define UI_HPP
 
 #include <concepts>
 #include <string>
@@ -18,7 +18,7 @@
 struct Station;
 
 
-namespace ui_common {
+namespace ui {
 
     void
     show_favicon(const std::string& favicon);
@@ -33,6 +33,12 @@ namespace ui_common {
     void
     show_info_row(const std::string& label,
                   T value);
+
+
+    void
+    show_label(const char* fmt,
+               ...)
+        IM_FMTARGS(1);
 
 
     void
@@ -53,6 +59,6 @@ namespace ui_common {
     show_tags(const std::vector<std::string>& tags,
               ImGuiID scroll_target);
 
-} // namespace ui_common
+} // namespace ui
 
 #endif

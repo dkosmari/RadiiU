@@ -35,7 +35,7 @@
 #include "imgui_extras.hpp"
 #include "Recent.hpp"
 #include "Station.hpp"
-#include "ui_common.hpp"
+#include "ui.hpp"
 #include "utils.hpp"
 
 
@@ -134,7 +134,7 @@ namespace Player {
             multi.set_max_total_connections(2);
             multi.add(easy);
 
-            if (cfg::disable_auto_power_down) {
+            if (cfg::disable_apd) {
 #ifdef __WUT__
                 IMDisableAPD();
 #else
@@ -209,7 +209,7 @@ namespace Player {
                 return CURL_WRITEFUNC_PAUSE;
 
             if (!parsed_header) {
-                if (auto hdr = easy.try_get_header("icy-metaint", 0, CURLH_HEADER, -1)) {
+                if (auto hdr = easy.try_get_header("icy-metaint")) {
                     parsed_header = true;
                     cout << "Got icy-metaint: " << hdr->value << endl;
                     icy_metaint = std::stoull(hdr->value);
@@ -217,23 +217,23 @@ namespace Player {
                         data_left = icy_metaint;
                 }
 
-                if (auto hdr = easy.try_get_header("icy-name", 0, CURLH_HEADER, -1))
-                    icy_name = hdr->value;
+                if (auto hdr = easy.try_get_header("icy-name"))
+                    icy_name = utils::trimmed(hdr->value);
                 else
                     icy_name = "";
 
-                if (auto hdr = easy.try_get_header("icy-url", 0, CURLH_HEADER, -1))
-                    icy_url = hdr->value;
+                if (auto hdr = easy.try_get_header("icy-url"))
+                    icy_url = utils::trimmed(hdr->value);
                 else
                     icy_url = "";
 
-                if (auto hdr = easy.try_get_header("icy-genre", 0, CURLH_HEADER, -1))
-                    icy_genre = hdr->value;
+                if (auto hdr = easy.try_get_header("icy-genre"))
+                    icy_genre = utils::trimmed(hdr->value);
                 else
                     icy_genre = "";
 
-                if (auto hdr = easy.try_get_header("icy-description", 0, CURLH_HEADER, -1))
-                    icy_description = hdr->value;
+                if (auto hdr = easy.try_get_header("icy-description"))
+                    icy_description = utils::trimmed(hdr->value);
                 else
                     icy_description = "";
             }
@@ -256,20 +256,21 @@ namespace Player {
         bool
         is_buffer_too_empty()
         {
-            return calc_buffer_size() < cfg::player_buffer_size;
+            return calc_buffer_size() < cfg::player_buffer_size * 1024;
         }
 
 
         bool
         is_buffer_too_full()
         {
-            return calc_buffer_size() > 2 * cfg::player_buffer_size;
+            return calc_buffer_size() > 2 * cfg::player_buffer_size * 1024;
         }
 
 
         void
         process_meta()
         {
+            // Note: icy metadata is often padded with null bytes.
             std::string meta_str = utils::trimmed(meta_stream.read_str(), '\0');
 
             meta = icy_meta::parse(std::move(meta_str));
@@ -470,7 +471,7 @@ namespace Player {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui_common::show_play_button(*station);
+                ui::show_play_button(*station);
 
                 if (Favorites::contains(*station)) {
                     if (ImGui::Button("♥"))
@@ -497,18 +498,18 @@ namespace Player {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui_common::show_favicon(station->favicon);
+                ui::show_favicon(station->favicon);
 
                 ImGui::SameLine();
 
-                ui_common::show_station_basic_info(*station, scroll_target);
+                ui::show_station_basic_info(*station, scroll_target);
 
                 if (ImGui::BeginChild("extra_info",
                                       {0, 0},
                                       ImGuiChildFlags_AutoResizeY |
                                       ImGuiChildFlags_NavFlattened)) {
 
-                    ui_common::show_tags(station->tags, scroll_target);
+                    ui::show_tags(station->tags, scroll_target);
 
                 } // extra_info
                 ImGui::HandleDragScroll(scroll_target);
@@ -540,22 +541,31 @@ namespace Player {
                 ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
 
-                if (!res->icy_name.empty())
-                    ui_common::show_info_row("Name", res->icy_name);
-
-                if (!res->icy_url.empty())
-                    ui_common::show_link_row("URL", res->icy_url);
-
-                if (!res->icy_genre.empty())
-                    ui_common::show_info_row("Genre", res->icy_genre);
-
-                if (!res->icy_description.empty())
-                    ui_common::show_info_row("Description", res->icy_description);
-
-
                 auto it = res->meta.find("StreamTitle");
                 if (it != res->meta.end())
-                    ui_common::show_info_row("Title", it->second);
+                    ui::show_info_row("Title", it->second);
+
+                // Show all icy metadata too, even if we don't know what they are
+                for (auto& [key, val] : res->meta) {
+                    if (key == "StreamTitle")
+                        continue;
+                    auto tval = utils::trimmed(val);
+                    if (tval.empty())
+                        continue;
+                    ui::show_info_row(key, tval);
+                }
+
+                if (!utils::trimmed(res->icy_name).empty())
+                    ui::show_info_row("Name", res->icy_name);
+
+                if (!res->icy_url.empty())
+                    ui::show_link_row("URL", res->icy_url);
+
+                if (!res->icy_genre.empty())
+                    ui::show_info_row("Genre", res->icy_genre);
+
+                if (!res->icy_description.empty())
+                    ui::show_info_row("Description", res->icy_description);
 
                 ImGui::EndTable();
             }

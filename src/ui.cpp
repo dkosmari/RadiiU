@@ -11,7 +11,7 @@
 
 #include <imgui_internal.h>
 
-#include "ui_common.hpp"
+#include "ui.hpp"
 
 #include "constants.hpp"
 #include "IconManager.hpp"
@@ -21,7 +21,7 @@
 #include "utils.hpp"
 
 
-namespace ui_common {
+namespace ui {
 
     void
     show_favicon(const std::string& favicon)
@@ -46,7 +46,7 @@ namespace ui_common {
         ImGui::PushID(label);
 
         ImGui::TableNextColumn();
-        ImGui::TextRightColored(constants::label_color,  "%s", label.data());
+        ImGui::TextRightColored(constants::label_color, "%s", label.data());
 
         ImGui::TableNextColumn();
         ImGui::TextWrapped("%s", value.data());
@@ -94,6 +94,17 @@ namespace ui_common {
 
 
     void
+    show_label(const char* fmt,
+               ...)
+    {
+        std::va_list args;
+        va_start(args, fmt);
+        ImGui::TextRightColoredV(constants::label_color, fmt, args);
+        va_end(args);
+    }
+
+
+    void
     show_link_row(const std::string& label,
                   const std::string& url)
     {
@@ -102,7 +113,7 @@ namespace ui_common {
         ImGui::PushID(label);
 
         ImGui::TableNextColumn();
-        ImGui::TextRightColored(constants::label_color,  "%s", label.data());
+        ImGui::TextRightColored(constants::label_color, "%s", label.data());
 
         ImGui::TableNextColumn();
         if (ImGui::TextLinkOpenURL(url, url)) {
@@ -199,4 +210,4 @@ namespace ui_common {
         }
     }
 
-} // namespace ui_common
+} // namespace ui

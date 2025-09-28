@@ -265,7 +265,7 @@ namespace App {
     {
         // Note: initialize cfg module early.
         cfg::initialize();
-        next_tab = cfg::start_tab;
+        next_tab = cfg::initial_tab;
 
         res.emplace();
 
@@ -330,8 +330,8 @@ namespace App {
         ImGui::DestroyContext();
 
         // Finalize cfg module last.
-        if (cfg::remember_last_tab)
-            cfg::start_tab = current_tab;
+        if (cfg::remember_tab)
+            cfg::initial_tab = current_tab;
         cfg::finalize();
 
         res.reset();

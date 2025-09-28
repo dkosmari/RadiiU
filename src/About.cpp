@@ -17,7 +17,7 @@
 #include "constants.hpp"
 #include "IconManager.hpp"
 #include "imgui_extras.hpp"
-#include "ui_common.hpp"
+#include "ui.hpp"
 #include "utils.hpp"
 
 #ifdef HAVE_CONFIG_H
@@ -99,37 +99,39 @@ namespace About {
                 ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
 
-                ui_common::show_link_row("Homepage", PACKAGE_URL);
-                ui_common::show_link_row("Bugs", PACKAGE_BUGREPORT);
-                ui_common::show_info_row("User Agent", utils::get_user_agent());
+                ui::show_link_row("Homepage", PACKAGE_URL);
+                ui::show_link_row("Bugs", PACKAGE_BUGREPORT);
+                ui::show_info_row("User Agent", utils::get_user_agent());
 
                 ImGui::EndTable();
             }
 
-            ImGui::SeparatorTextColored(label_color, "Authors:");
+            // ImGui::SeparatorTextColored(label_color, "Authors");
+            ImGui::SeparatorText("Authors");
             static const auto authors = get_authors();
             for (auto& author : authors) {
                 ImGui::Bullet();
                 ImGui::TextUnformatted(author);
             }
 
-            ImGui::SeparatorTextColored(label_color, "Components:");
+            // ImGui::SeparatorTextColored(label_color, "Components");
+            ImGui::SeparatorText("Components");
             if (ImGui::BeginTable("components", 2)) {
 
                 ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
 
                 static const std::string sdl_version = get_sdl_version_str();
-                ui_common::show_info_row("SDL", sdl_version);
+                ui::show_info_row("SDL", sdl_version);
 
-                ui_common::show_info_row("ImGui", IMGUI_VERSION);
+                ui::show_info_row("ImGui", IMGUI_VERSION);
 
-                ui_common::show_info_row("libCURL", curl_version());
+                ui::show_info_row("libCURL", curl_version());
 
-                ui_common::show_info_row("JANSSON", jansson_version_str());
+                ui::show_info_row("JANSSON", jansson_version_str());
 
                 static const std::string mpg_decoders = get_mpg_decoders();
-                ui_common::show_info_row("MPG123 decoders", mpg_decoders);
+                ui::show_info_row("MPG123 decoders", mpg_decoders);
 
                 ImGui::EndTable();
             }

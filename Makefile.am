@@ -75,8 +75,8 @@ radiiu_elf_SOURCES = \
 	src/TabIndex.cpp \
 	src/TabIndex.hpp \
 	src/thread_safe.hpp \
-	src/ui_common.cpp \
-	src/ui_common.hpp \
+	src/ui.cpp \
+	src/ui.hpp \
 	src/utils.cpp \
 	src/utils.hpp
 

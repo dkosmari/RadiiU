@@ -20,21 +20,17 @@
 #include "Favorites.hpp"
 
 #include "cfg.hpp"
-#include "constants.hpp"
 #include "IconManager.hpp"
 #include "imgui_extras.hpp"
 #include "json.hpp"
 #include "Player.hpp"
 #include "Station.hpp"
-#include "ui_common.hpp"
+#include "ui.hpp"
 #include "utils.hpp"
 
 
 using std::cout;
 using std::endl;
-
-
-using constants::label_color;
 
 
 namespace Favorites {
@@ -205,7 +201,7 @@ namespace Favorites {
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
         ImGui::AlignTextToFramePadding();
-        ImGui::TextRightColored(label_color, "%s", label.data());
+        ui::show_label("%s", label.data());
         ImGui::TableNextColumn();
         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
         ImGui::InputText("##" + label, value);
@@ -376,7 +372,7 @@ namespace Favorites {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui_common::show_play_button(station);
+                ui::show_play_button(station);
 
                 ImGui::BeginDisabled(index == 0);
                 if (ImGui::Button("▲")) {
@@ -418,18 +414,18 @@ namespace Favorites {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui_common::show_favicon(station.favicon);
+                ui::show_favicon(station.favicon);
 
                 ImGui::SameLine();
 
-                ui_common::show_station_basic_info(station, scroll_target);
+                ui::show_station_basic_info(station, scroll_target);
 
                 if (ImGui::BeginChild("extra_info",
                                       {0, 0},
                                       ImGuiChildFlags_AutoResizeY |
                                       ImGuiChildFlags_NavFlattened)) {
 
-                    ui_common::show_tags(station.tags, scroll_target);
+                    ui::show_tags(station.tags, scroll_target);
                 } // extra_info
                 ImGui::HandleDragScroll(scroll_target);
                 ImGui::EndChild();
