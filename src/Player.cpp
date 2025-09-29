@@ -300,6 +300,16 @@ namespace Player {
         {
             try {
                 multi.perform();
+                auto done = multi.get_done();
+                for (const auto& msg : done) {
+                    if (msg.handle == &easy) {
+                        // it's our handle
+                        state = State::stopping;
+                        if (msg.result != CURLE_OK) {
+                            cout << "Streaming session ended in error: " << msg.result << endl;
+                        }
+                    }
+                }
 
                 parse_stream();
 

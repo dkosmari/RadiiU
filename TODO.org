@@ -1,4 +1,4 @@
-* Pending features for v0.1 [93%]
+* Pending features for v0.1 [100%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
@@ -23,11 +23,11 @@
   - [X] Recent [2/2]
     - [X] Implement.
     - [X] Save history on exit.
-  - [-] Player [3/4]
+  - [X] Player [4/4]
     - [X] Show stream details.
     - [X] Add/remove to favorites.
     - [X] Show track change history.
-    - [ ] Handle loss of internet connection.
+    - [X] Handle loss of internet connection.
   - [X] Settings [4/4]
     - [X] Load/save (store as save game on Wii U).
     - [X] Select server.
