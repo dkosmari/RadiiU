@@ -19,7 +19,9 @@ enum class TabIndex : unsigned {
     settings,
     about,
 
-    last = about
+    last_active,
+
+    num_tabs
 };
 
 

@@ -25,6 +25,8 @@ to_tab_index(const std::string& str)
         return TabIndex::settings;
     if (str == "about")
         return TabIndex::about;
+    if (str == "last_active")
+        return TabIndex::last_active;
     throw std::runtime_error{"invalid TabIndex string: " + str};
 }
 
@@ -45,6 +47,8 @@ to_string(TabIndex idx)
             return "settings";
         case TabIndex::about:
             return "about";
+        case TabIndex::last_active:
+            return "last_active";
         default:
             throw std::runtime_error{"invalid TabIndex value: " + static_cast<int>(idx)};
     }
@@ -67,6 +71,8 @@ to_ui_string(TabIndex idx)
             return "⚙ Settings";
         case TabIndex::about:
             return "❗ About";
+        case TabIndex::last_active:
+            return "Last active";
         default:
             throw std::runtime_error{"invalid TabIndex value: " + static_cast<int>(idx)};
     }

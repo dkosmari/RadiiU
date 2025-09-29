@@ -216,7 +216,7 @@ namespace App {
         style.ItemSpacing = spacing;
         style.ItemInnerSpacing = spacing;
 
-        style.CellPadding = padding / 2;
+        style.CellPadding = {padding.x, padding.y / 2};
 
         style.ScrollbarSize = 32;
         style.ScrollbarRounding = rounding;
@@ -266,6 +266,8 @@ namespace App {
         // Note: initialize cfg module early.
         cfg::initialize();
         next_tab = cfg::initial_tab;
+        if (cfg::remember_tab)
+            cfg::initial_tab = TabIndex::last_active;
 
         res.emplace();
 
@@ -330,6 +332,7 @@ namespace App {
         ImGui::DestroyContext();
 
         // Finalize cfg module last.
+        cfg::remember_tab = cfg::initial_tab == TabIndex::last_active;
         if (cfg::remember_tab)
             cfg::initial_tab = current_tab;
         cfg::finalize();

@@ -106,8 +106,8 @@ namespace About {
                 ImGui::EndTable();
             }
 
-            // ImGui::SeparatorTextColored(label_color, "Authors");
-            ImGui::SeparatorText("Authors");
+            // ImGui::SeparatorTextColored(label_color, "Credits");
+            ImGui::SeparatorText("Credits");
             static const auto authors = get_authors();
             for (auto& author : authors) {
                 ImGui::Bullet();

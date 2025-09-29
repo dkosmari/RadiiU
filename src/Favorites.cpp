@@ -159,9 +159,10 @@ namespace Favorites {
                                    ImGuiWindowFlags_NoSavedSettings)) {
             auto window_size = ImGui::GetContentRegionAvail();
 
-            if (ImGui::BeginChild("content", {0, -ImGui::GetFrameHeightWithSpacing()})) {
+            // Note: use a helper child window to push the response buttons to the bottom.
+            if (ImGui::BeginChild("content",
+                                  {0, -ImGui::GetFrameHeightWithSpacing()}))
                 ImGui::TextWrapped("%s", station.name.data());
-            }
             ImGui::EndChild();
 
             // Cancel button
@@ -244,6 +245,7 @@ namespace Favorites {
                                    nullptr,
                                    ImGuiWindowFlags_NoSavedSettings)) {
 
+            // Note: use a helper child window to push the response buttons to the bottom.
             if (ImGui::BeginChild("content",
                                   {0, -ImGui::GetFrameHeightWithSpacing()}))
                 show_station_fields(*edited_station);
@@ -308,10 +310,10 @@ namespace Favorites {
                                    nullptr,
                                    ImGuiWindowFlags_NoSavedSettings)) {
 
+            // Note: use a helper child window to push the response buttons to the bottom.
             if (ImGui::BeginChild("content",
-                                  {0, -ImGui::GetFrameHeightWithSpacing()})) {
+                                  {0, -ImGui::GetFrameHeightWithSpacing()}))
                 show_station_fields(*created_station);
-            }
             ImGui::HandleDragScroll();
             ImGui::EndChild();
 
@@ -446,8 +448,8 @@ namespace Favorites {
     {
         if (ImGui::BeginChild("toolbar",
                               {0, 0},
-                              ImGuiChildFlags_NavFlattened |
-                              ImGuiChildFlags_AutoResizeY)) {
+                              ImGuiChildFlags_AutoResizeY |
+                              ImGuiChildFlags_NavFlattened)) {
 
             if (ImGui::Button("➕")) {
                 ImGui::OpenPopup(popup_create_title);

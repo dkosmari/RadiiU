@@ -35,12 +35,13 @@ namespace cfg {
 
     std::filesystem::path base_dir;
 
-    unsigned browser_page_size  = 20;
-    bool     disable_apd        = true;
-    TabIndex initial_tab        = TabIndex::browser;
-    unsigned max_recent         = 10;
-    unsigned player_buffer_size = 8192;
-    bool     remember_tab       = true;
+    unsigned browser_page_limit   = 20;
+    bool     disable_apd          = true;
+    TabIndex initial_tab          = TabIndex::browser;
+    unsigned player_buffer_size   = 8192;
+    unsigned player_history_limit = 20;
+    unsigned recent_limit         = 10;
+    bool     remember_tab         = true;
     string   server;
 
 
@@ -123,23 +124,29 @@ namespace cfg {
         try {
             auto root = json::load(base_dir / "settings.json").as<json::object>();
 
-            if (auto val = try_get<json::string>(root, "server"))
-                server = *val;
-
-            if (auto val = try_get<json::integer>(root, "player_buffer_size"))
-                player_buffer_size = *val;
+            if (auto val = try_get<json::integer>(root, "browser_page_limit"))
+                browser_page_limit = *val;
 
             if (auto val = try_get<bool>(root, "disable_apd"))
                 disable_apd = *val;
 
-            if (auto val = try_get<json::integer>(root, "browser_page_size"))
-                browser_page_size = *val;
-
             if (auto val = try_get<json::string>(root, "initial_tab"))
                 initial_tab = to_tab_index(*val);
 
+            if (auto val = try_get<json::integer>(root, "player_buffer_size"))
+                player_buffer_size = *val;
+
+            if (auto val = try_get<json::integer>(root, "player_history_limit"))
+                player_history_limit = *val;
+
+            if (auto val = try_get<json::integer>(root, "recent_limit"))
+                recent_limit = *val;
+
             if (auto val = try_get<bool>(root, "remember_tab"))
                 remember_tab = *val;
+
+            if (auto val = try_get<json::string>(root, "server"))
+                server = *val;
         }
         catch (std::exception& e) {
             cout << "Error loading settings: " << e.what() << endl;
@@ -152,13 +159,16 @@ namespace cfg {
     {
         try {
             json::object root;
-            if (!server.empty())
-                root["server"] = server;
-            root["player_buffer_size"] = player_buffer_size;
-            root["disable_apd"]        = disable_apd;
-            root["browser_page_size"]  = browser_page_size;
-            root["initial_tab"]        = to_string(initial_tab);
-            root["remember_tab"]       = remember_tab;
+
+            root["browser_page_limit"]   = browser_page_limit;
+            root["disable_apd"]          = disable_apd;
+            root["initial_tab"]          = to_string(initial_tab);
+            root["player_buffer_size"]   = player_buffer_size;
+            root["player_history_limit"] = player_history_limit;
+            root["recent_limit"]         = recent_limit;
+            root["remember_tab"]         = remember_tab;
+            root["server"]               = server;
+
             json::save(std::move(root), base_dir / "settings.json");
         }
         catch (std::exception& e) {

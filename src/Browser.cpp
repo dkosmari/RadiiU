@@ -32,16 +32,17 @@
 #include "cfg.hpp"
 #include "constants.hpp"
 #include "Favorites.hpp"
+#include "humanize.hpp"
 #include "IconManager.hpp"
 #include "imgui_extras.hpp"
+#include "net/address.hpp"
+#include "net/resolver.hpp"
 #include "Player.hpp"
 #include "rest.hpp"
 #include "Station.hpp"
-#include "net/address.hpp"
-#include "net/resolver.hpp"
+#include "thread_safe.hpp"
 #include "ui.hpp"
 #include "utils.hpp"
-#include "thread_safe.hpp"
 
 
 using std::cout;
@@ -388,8 +389,8 @@ namespace Browser {
         busy = true;
 
         std::map<std::string, std::string> params;
-        params["offset"] = std::to_string(cfg::browser_page_size * page_index);
-        params["limit"] = std::to_string(cfg::browser_page_size);
+        params["offset"] = std::to_string(cfg::browser_page_limit * page_index);
+        params["limit"] = std::to_string(cfg::browser_page_limit);
         params["codec"] = "MP3";
         params["hidebroken"] = "true";
 
@@ -416,7 +417,7 @@ namespace Browser {
                            cout << "Received " << list.size() << " stations" << endl;
                            for (auto& entry : list) {
                                // ensure the page size limit is respected
-                               if (stations.size() >= cfg::browser_page_size)
+                               if (stations.size() >= cfg::browser_page_limit)
                                    break;
                                stations.push_back(Station::from_json(entry.as<json::object>()));
                            }
@@ -542,7 +543,8 @@ namespace Browser {
     {
         if (ImGui::BeginChild("status",
                               {0, 0},
-                              ImGuiChildFlags_AutoResizeY)) {
+                              ImGuiChildFlags_AutoResizeY |
+                              ImGuiChildFlags_NavFlattened)) {
 
             if (ImGui::Button("🔃"))
                 connect();
@@ -574,8 +576,8 @@ namespace Browser {
     {
         if (ImGui::BeginChild("options",
                               {0, 0},
-                              // ImGuiChildFlags_FrameStyle |
                               ImGuiChildFlags_AutoResizeY |
+                              ImGuiChildFlags_FrameStyle |
                               ImGuiChildFlags_NavFlattened)) {
 
             ImGui::SetNextItemOpen(options_visible);
@@ -587,9 +589,9 @@ namespace Browser {
 
                 if (ImGui::BeginChild("filters",
                                       {0, 0},
-                                      ImGuiChildFlags_FrameStyle |
                                       ImGuiChildFlags_AutoResizeX |
                                       ImGuiChildFlags_AutoResizeY |
+                                      ImGuiChildFlags_FrameStyle |
                                       ImGuiChildFlags_NavFlattened)) {
 
                     ImGui::TextUnformatted("Filters");
@@ -612,9 +614,9 @@ namespace Browser {
 
                 if (ImGui::BeginChild("sorting",
                                       {0, 0},
-                                      ImGuiChildFlags_FrameStyle |
                                       ImGuiChildFlags_AutoResizeX |
                                       ImGuiChildFlags_AutoResizeY |
+                                      ImGuiChildFlags_FrameStyle |
                                       ImGuiChildFlags_NavFlattened)) {
 
                     ImGui::TextUnformatted("Order");
@@ -788,7 +790,7 @@ namespace Browser {
 
                 bool voted = votes_cast.contains(station.uuid);
                 // TODO: shorten the string so it fits under the favorite/info buttons
-                std::string vote_label = "👍" + std::to_string(station.votes);
+                std::string vote_label = "👍" + humanize::value(station.votes);
                 ImGui::BeginDisabled(voted);
                 if (ImGui::Button(vote_label))
                     send_vote(station.uuid);
@@ -947,6 +949,5 @@ namespace Browser {
                            }
                        });
     }
-
 
 } // namespace Browser

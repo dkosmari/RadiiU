@@ -5,9 +5,12 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <chrono>
+#include <deque>
 #include <functional>
 #include <iostream>
 #include <optional>
+#include <ranges>
 #include <vector>
 
 #ifdef __WUT__
@@ -29,6 +32,7 @@
 #include "byte_stream.hpp"
 #include "cfg.hpp"
 #include "Favorites.hpp"
+#include "humanize.hpp"
 #include "IconManager.hpp"
 #include "icy.hpp"
 #include "imgui_extras.hpp"
@@ -40,6 +44,8 @@
 
 using std::cout;
 using std::endl;
+using std::chrono::system_clock;
+
 using namespace std::literals;
 using namespace std::placeholders;
 
@@ -81,6 +87,10 @@ namespace Player {
 
         }
     }
+
+
+    void
+    history_add(const std::string& title);
 
 
     /*
@@ -273,11 +283,15 @@ namespace Player {
             std::string meta_str = utils::trimmed(meta_stream.read_str(), '\0');
 
             meta = icy::parse(meta_str);
-            cout << "Metadata:\n";
+
+            cout << "Icy Metadata:\n";
             for (auto [key, val] : meta) {
                 cout << "    " << key << "=\"" << val << "\"\n";
             }
             cout << endl;
+
+            if (meta.contains("StreamTitle"))
+                history_add(meta.at("StreamTitle"));
         }
 
 
@@ -325,6 +339,7 @@ namespace Player {
                 while (auto res = mpg.try_decode_frame()) {
                     audio_dev.play(res->samples);
 
+                    // TODO: these don't show up on streams, but do if playing a mp3 file.
                     auto meta_flags = mpg.meta_check();
                     if (meta_flags & MPG123_NEW_ID3) {
                         cout << "Got ID3 metadata." << endl;
@@ -361,6 +376,14 @@ namespace Player {
     }; // struct Resources
 
     std::optional<Resources> res;
+
+
+    struct TrackInfo {
+        system_clock::time_point when;
+        std::string title;
+    };
+
+    std::deque<TrackInfo> history;
 
 
     void
@@ -503,17 +526,6 @@ namespace Player {
 
                 ui::show_station_basic_info(*station, scroll_target);
 
-                if (ImGui::BeginChild("extra_info",
-                                      {0, 0},
-                                      ImGuiChildFlags_AutoResizeY |
-                                      ImGuiChildFlags_NavFlattened)) {
-
-                    ui::show_tags(station->tags, scroll_target);
-
-                } // extra_info
-                ImGui::HandleDragScroll(scroll_target);
-                ImGui::EndChild();
-
             } // details
             ImGui::HandleDragScroll(scroll_target);
             ImGui::EndChild();
@@ -525,17 +537,18 @@ namespace Player {
 
 
     void
-    show_playback(ImGuiID scroll_target)
+    show_stream(ImGuiID scroll_target)
     {
-        if (!res)
-            return;
 
-        if (ImGui::BeginChild("playback",
-                              {0,0},
+        if (ImGui::BeginChild("stream",
+                              {0, 0},
                               ImGuiChildFlags_AutoResizeY |
-                              ImGuiChildFlags_FrameStyle)) {
+                              ImGuiChildFlags_FrameStyle |
+                              ImGuiChildFlags_NavFlattened)) {
 
-            if (ImGui::BeginTable("icy_meta", 2)) {
+            ImGui::SeparatorText("Stream");
+
+            if (res && ImGui::BeginTable("icy_meta", 2)) {
 
                 ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
@@ -569,7 +582,45 @@ namespace Player {
                 ImGui::EndTable();
             }
 
-        } // playback
+        } // stream
+        ImGui::HandleDragScroll(scroll_target);
+        ImGui::EndChild();
+    }
+
+
+    void
+    show_history(ImGuiID scroll_target)
+    {
+        auto now = system_clock::now();
+
+        if (ImGui::BeginChild("history",
+                              {0, 0},
+                              ImGuiChildFlags_AutoResizeY |
+                              ImGuiChildFlags_FrameStyle |
+                              ImGuiChildFlags_NavFlattened)) {
+
+            ImGui::SeparatorText("Track history");
+
+            if (ImGui::BeginTable("table",
+                                  2,
+                                  ImGuiTableFlags_BordersInnerH)) {
+
+                ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
+                ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+
+                for (const auto& [when, title] : history | std::views::reverse) {
+
+                    auto t = duration_cast<std::chrono::seconds>(now - when);
+                    std::string label = humanize::duration(t) + " ago";
+
+                    ui::show_info_row(label, title);
+
+                }
+
+                ImGui::EndTable();
+            }
+
+        } // history
         ImGui::HandleDragScroll(scroll_target);
         ImGui::EndChild();
     }
@@ -583,7 +634,8 @@ namespace Player {
                               ImGuiChildFlags_NavFlattened)) {
             auto scroll_target = ImGui::GetCurrentWindow()->ID;
             show_station(scroll_target);
-            show_playback(scroll_target);
+            show_stream(scroll_target);
+            show_history(scroll_target);
         } // player
         ImGui::HandleDragScroll();
         ImGui::EndChild();
@@ -596,6 +648,19 @@ namespace Player {
         if (state != State::playing || !station)
             return false;
         return st == *station;
+    }
+
+
+    void
+    history_add(const std::string& title)
+    {
+        if (!history.empty() && history.back().title == title)
+            return;
+
+        history.emplace_back(system_clock::now(), title);
+
+        if (history.size() > cfg::player_history_limit)
+            history.erase(history.begin(), history.begin() + cfg::player_history_limit);
     }
 
 } // namespace Player

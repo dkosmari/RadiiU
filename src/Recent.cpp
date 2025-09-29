@@ -159,8 +159,8 @@ namespace Recent {
     {
         if (ImGui::BeginChild("toolbar",
                               {0, 0},
-                              ImGuiChildFlags_NavFlattened |
-                              ImGuiChildFlags_AutoResizeY)) {
+                              ImGuiChildFlags_AutoResizeY |
+                              ImGuiChildFlags_NavFlattened)) {
 
             if (ImGui::Button("Clear"))
                 stations.clear();
@@ -198,8 +198,8 @@ namespace Recent {
     void
     prune()
     {
-        if (stations.size() > cfg::max_recent) {
-            std::size_t to_remove = stations.size() - cfg::max_recent;
+        if (stations.size() > cfg::recent_limit) {
+            std::size_t to_remove = stations.size() - cfg::recent_limit;
             stations.erase(stations.begin(), stations.begin() + to_remove);
         }
     }
@@ -231,6 +231,5 @@ namespace Recent {
     {
         to_add = station;
     }
-
 
 } // namespace Recent

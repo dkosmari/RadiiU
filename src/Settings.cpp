@@ -25,6 +25,8 @@ namespace Settings {
     void
     process_ui()
     {
+        const ImGuiStyle& style = ImGui::GetStyle();
+
         // Note: flat navigation doesn't work well on child windows that scroll.
         if (ImGui::BeginChild("settings")) {
 
@@ -32,6 +34,30 @@ namespace Settings {
 
                 ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+
+                /***************
+                 * Initial tab *
+                 ***************/
+
+                ImGui::TableNextRow();
+
+                ImGui::TableNextColumn();
+
+                ImGui::AlignTextToFramePadding();
+                ui::show_label("Initial tab");
+
+                ImGui::TableNextColumn();
+
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                if (ImGui::BeginCombo("##initial_tab", to_ui_string(cfg::initial_tab))) {
+                    for (unsigned i = 0; i < static_cast<unsigned>(TabIndex::num_tabs); ++i) {
+                        TabIndex tab{i};
+                        if (ImGui::Selectable(to_ui_string(tab),
+                                              cfg::initial_tab == tab))
+                            cfg::initial_tab = tab;
+                    }
+                    ImGui::EndCombo();
+                }
 
                 /********************
                  * Preferred server *
@@ -46,7 +72,13 @@ namespace Settings {
 
                 ImGui::TableNextColumn();
 
-                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                const char* refresh_label = "🔃";
+                float refresh_width = 2 * style.FramePadding.x
+                                    + 2 * style.FrameBorderSize
+                                    + ImGui::CalcTextSize(refresh_label).x;
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x
+                                        - style.ItemSpacing.x
+                                        - refresh_width);
                 if (ImGui::BeginCombo("##server",
                                       cfg::server.empty()
                                       ? "(random)"
@@ -66,8 +98,47 @@ namespace Settings {
 
                 ImGui::SameLine();
 
-                if (ImGui::Button("🔃"))
-                Browser::refresh_mirrors();
+                if (ImGui::Button(refresh_label))
+                    Browser::refresh_mirrors();
+
+                /*********************
+                 * Stations per page *
+                 *********************/
+
+                ImGui::TableNextRow();
+
+                ImGui::TableNextColumn();
+
+                ImGui::AlignTextToFramePadding();
+                ui::show_label("Stations per page");
+
+                ImGui::TableNextColumn();
+
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                ImGui::Slider("##browser_page_limit",
+                              cfg::browser_page_limit,
+                              10u, 50u);
+                if (ImGui::IsItemDeactivatedAfterEdit())
+                    Browser::queue_update_stations();
+
+
+                /*************************
+                 * Recent stations limit *
+                 *************************/
+
+                ImGui::TableNextRow();
+
+                ImGui::TableNextColumn();
+
+                ImGui::AlignTextToFramePadding();
+                ui::show_label("Recent stations limit");
+
+                ImGui::TableNextColumn();
+
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                ImGui::Slider("##recent_limit",
+                              cfg::recent_limit,
+                              10u, 50u);
 
                 /**********************
                  * Player buffer size *
@@ -88,6 +159,23 @@ namespace Settings {
                               4u, 64u,
                               nullptr, ImGuiSliderFlags_Logarithmic);
 
+                /***********************
+                 * Player history limit *
+                 ***********************/
+
+                ImGui::TableNextRow();
+
+                ImGui::TableNextColumn();
+
+                ImGui::AlignTextToFramePadding();
+                ui::show_label("Player history limit");
+
+                ImGui::TableNextColumn();
+
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                ImGui::Slider("##player_history_limit",
+                              cfg::player_history_limit,
+                              0u, 50u);
 
                 /***************
                  * Disable APD *
@@ -104,83 +192,6 @@ namespace Settings {
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::Checkbox("##disable_apd", &cfg::disable_apd);
-
-                /***************
-                 * Initial tab *
-                 ***************/
-
-                ImGui::TableNextRow();
-
-                ImGui::TableNextColumn();
-
-                ImGui::AlignTextToFramePadding();
-                ui::show_label("Initial tab");
-
-                ImGui::TableNextColumn();
-
-                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                if (ImGui::BeginCombo("##initial_tab", to_ui_string(cfg::initial_tab))) {
-                    for (unsigned i = 0; i <= static_cast<unsigned>(TabIndex::last); ++i) {
-                        TabIndex idx{i};
-                        if (ImGui::Selectable(to_ui_string(idx), cfg::initial_tab == idx))
-                            cfg::initial_tab = idx;
-                    }
-                    ImGui::EndCombo();
-                }
-
-                /****************
-                 * Remember tab *
-                 ****************/
-
-                ImGui::TableNextRow();
-
-                ImGui::TableNextColumn();
-
-                ImGui::AlignTextToFramePadding();
-                ui::show_label("Remember tab");
-
-                ImGui::TableNextColumn();
-
-                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::Checkbox("##remember_tab", &cfg::remember_tab);
-
-                /*********************
-                 * Browser page size *
-                 *********************/
-
-                ImGui::TableNextRow();
-
-                ImGui::TableNextColumn();
-
-                ImGui::AlignTextToFramePadding();
-                ui::show_label("Browser page size");
-
-                ImGui::TableNextColumn();
-
-                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::Slider("##browser_page_size",
-                              cfg::browser_page_size,
-                              10u, 50u);
-                if (ImGui::IsItemDeactivatedAfterEdit())
-                    Browser::queue_update_stations();
-
-                /***********************
-                 * Max recent stations *
-                 ***********************/
-
-                ImGui::TableNextRow();
-
-                ImGui::TableNextColumn();
-
-                ImGui::AlignTextToFramePadding();
-                ui::show_label("Max recent stations");
-
-                ImGui::TableNextColumn();
-
-                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::Slider("##max_recent",
-                              cfg::max_recent,
-                              10u, 50u);
 
                 ImGui::EndTable();
             }

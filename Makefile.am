@@ -52,6 +52,8 @@ radiiu_elf_SOURCES = \
 	src/crc32.hpp \
 	src/Favorites.cpp \
 	src/Favorites.hpp \
+	src/humanize.cpp \
+	src/humanize.hpp \
 	src/IconManager.cpp \
 	src/IconManager.hpp \
 	src/icy.cpp \
