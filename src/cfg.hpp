@@ -12,7 +12,7 @@
 #include <string>
 #include <filesystem>
 
-#include "TabIndex.hpp"
+#include "TabID.hpp"
 
 
 namespace cfg {
@@ -21,7 +21,8 @@ namespace cfg {
 
     extern unsigned    browser_page_limit;
     extern bool        disable_apd;
-    extern TabIndex    initial_tab;
+    extern bool        disable_swkbd;
+    extern TabID       initial_tab;
     extern unsigned    player_buffer_size;
     extern unsigned    player_history_limit;
     extern unsigned    recent_limit;

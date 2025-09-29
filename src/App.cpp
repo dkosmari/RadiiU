@@ -40,7 +40,7 @@
 #include "Recent.hpp"
 #include "rest.hpp"
 #include "Settings.hpp"
-#include "TabIndex.hpp"
+#include "TabID.hpp"
 #include "utils.hpp"
 
 
@@ -84,10 +84,15 @@ namespace App {
     const float cafe_size = 32;
     const float symbola_size = cafe_size * 1.2f;
 
-    std::optional<TabIndex> next_tab;
-    TabIndex current_tab;
+    std::optional<TabID> next_tab;
+    TabID current_tab;
 
     sdl::vec2 window_size;
+
+
+#ifdef __WIIU__
+    bool old_disable_swkbd;
+#endif
 
 
     void
@@ -156,11 +161,11 @@ namespace App {
 
 
     ImGuiTabItemFlags
-    get_tab_item_flags_for(TabIndex idx)
+    get_tab_item_flags_for(TabID tab)
     {
         ImGuiTabItemFlags result = ImGuiTabItemFlags_None;
         // If switching tabs, set the SetSelected flag
-        if (next_tab && idx == *next_tab)
+        if (next_tab && tab == *next_tab)
             result |= ImGuiTabItemFlags_SetSelected;
         return result;
     }
@@ -267,7 +272,13 @@ namespace App {
         cfg::initialize();
         next_tab = cfg::initial_tab;
         if (cfg::remember_tab)
-            cfg::initial_tab = TabIndex::last_active;
+            cfg::initial_tab = TabID::last_active;
+
+#ifdef __WIIU__
+        old_disable_swkbd = cfg::disable_swkbd;
+        if (cfg::disable_swkbd)
+            SDL_WiiUSetSWKBDEnabled(SDL_FALSE);
+#endif
 
         res.emplace();
 
@@ -332,7 +343,7 @@ namespace App {
         ImGui::DestroyContext();
 
         // Finalize cfg module last.
-        cfg::remember_tab = cfg::initial_tab == TabIndex::last_active;
+        cfg::remember_tab = cfg::initial_tab == TabID::last_active;
         if (cfg::remember_tab)
             cfg::initial_tab = current_tab;
         cfg::finalize();
@@ -444,51 +455,51 @@ namespace App {
 
             if (ImGui::BeginTabBar("main_tabs")) {
 
-                if (ImGui::BeginTabItem(to_ui_string(TabIndex::favorites),
+                if (ImGui::BeginTabItem(to_ui_string(TabID::favorites),
                                         nullptr,
-                                        get_tab_item_flags_for(TabIndex::favorites))) {
-                    current_tab = TabIndex::favorites;
+                                        get_tab_item_flags_for(TabID::favorites))) {
+                    current_tab = TabID::favorites;
                     Favorites::process_ui();
                     ImGui::EndTabItem();
                 }
 
-                if (ImGui::BeginTabItem(to_ui_string(TabIndex::browser),
+                if (ImGui::BeginTabItem(to_ui_string(TabID::browser),
                                         nullptr,
-                                        get_tab_item_flags_for(TabIndex::browser))) {
-                    current_tab = TabIndex::browser;
+                                        get_tab_item_flags_for(TabID::browser))) {
+                    current_tab = TabID::browser;
                     Browser::process_ui();
                     ImGui::EndTabItem();
                 }
 
-                if (ImGui::BeginTabItem(to_ui_string(TabIndex::recent),
+                if (ImGui::BeginTabItem(to_ui_string(TabID::recent),
                                         nullptr,
-                                        get_tab_item_flags_for(TabIndex::recent))) {
-                    current_tab = TabIndex::recent;
+                                        get_tab_item_flags_for(TabID::recent))) {
+                    current_tab = TabID::recent;
                     Recent::process_ui();
                     ImGui::EndTabItem();
                 }
 
-                if (ImGui::BeginTabItem(to_ui_string(TabIndex::player),
+                if (ImGui::BeginTabItem(to_ui_string(TabID::player),
                                         nullptr,
-                                        get_tab_item_flags_for(TabIndex::player))) {
-                    current_tab = TabIndex::player;
+                                        get_tab_item_flags_for(TabID::player))) {
+                    current_tab = TabID::player;
                     Player::process_ui();
                     ImGui::EndTabItem();
 
                 }
 
-                if (ImGui::BeginTabItem(to_ui_string(TabIndex::settings),
+                if (ImGui::BeginTabItem(to_ui_string(TabID::settings),
                                         nullptr,
-                                        get_tab_item_flags_for(TabIndex::settings))) {
-                    current_tab = TabIndex::settings;
+                                        get_tab_item_flags_for(TabID::settings))) {
+                    current_tab = TabID::settings;
                     Settings::process_ui();
                     ImGui::EndTabItem();
                 }
 
-                if (ImGui::BeginTabItem(to_ui_string(TabIndex::about),
+                if (ImGui::BeginTabItem(to_ui_string(TabID::about),
                                         nullptr,
-                                        get_tab_item_flags_for(TabIndex::about))) {
-                    current_tab = TabIndex::about;
+                                        get_tab_item_flags_for(TabID::about))) {
+                    current_tab = TabID::about;
                     About::process_ui();
                     ImGui::EndTabItem();
                 }
@@ -514,6 +525,13 @@ namespace App {
     void
     process()
     {
+#ifdef __WIIU__
+        if (old_disable_swkbd != cfg::disable_swkbd) {
+            SDL_WiiUSetSWKBDEnabled(cfg::disable_swkbd ? SDL_FALSE : SDL_TRUE);
+            old_disable_swkbd = cfg::disable_swkbd;
+        }
+#endif
+
         process_events();
         if (!running)
             return;

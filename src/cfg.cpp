@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <concepts>
 #include <cstdio>
 #include <exception>
 #include <filesystem>
@@ -37,7 +38,8 @@ namespace cfg {
 
     unsigned browser_page_limit   = 20;
     bool     disable_apd          = true;
-    TabIndex initial_tab          = TabIndex::browser;
+    bool     disable_swkbd        = false;
+    TabID    initial_tab          = TabID::browser;
     unsigned player_buffer_size   = 8192;
     unsigned player_history_limit = 20;
     unsigned recent_limit         = 10;
@@ -119,34 +121,65 @@ namespace cfg {
 
 
     void
+    load(const json::object& root,
+         const char* key,
+         bool& variable)
+    {
+        if (auto val = try_get<bool>(root, key))
+            variable = *val;
+    }
+
+
+    template<std::integral I>
+    void
+    load(const json::object& root,
+         const char* key,
+         I& variable)
+    {
+        if (auto val = try_get<json::integer>(root, key))
+            variable = *val;
+    }
+
+
+    void
+    load(const json::object& root,
+         const char* key,
+         std::string& variable)
+    {
+        if (auto val = try_get<json::string>(root, key))
+            variable = *val;
+    }
+
+
+    template<typename T>
+    requires requires {
+        { T::from_string(std::string{}) } -> std::convertible_to<T>;
+    }
+    void
+    load(const json::object& root,
+         const char* key,
+         T& variable)
+    {
+        if (auto val = try_get<json::string>(root, key))
+            variable = T::from_string(*val);
+    }
+
+
+    void
     load()
     {
         try {
             auto root = json::load(base_dir / "settings.json").as<json::object>();
 
-            if (auto val = try_get<json::integer>(root, "browser_page_limit"))
-                browser_page_limit = *val;
-
-            if (auto val = try_get<bool>(root, "disable_apd"))
-                disable_apd = *val;
-
-            if (auto val = try_get<json::string>(root, "initial_tab"))
-                initial_tab = to_tab_index(*val);
-
-            if (auto val = try_get<json::integer>(root, "player_buffer_size"))
-                player_buffer_size = *val;
-
-            if (auto val = try_get<json::integer>(root, "player_history_limit"))
-                player_history_limit = *val;
-
-            if (auto val = try_get<json::integer>(root, "recent_limit"))
-                recent_limit = *val;
-
-            if (auto val = try_get<bool>(root, "remember_tab"))
-                remember_tab = *val;
-
-            if (auto val = try_get<json::string>(root, "server"))
-                server = *val;
+            load(root, "browser_page_limit",   browser_page_limit);
+            load(root, "disable_apd",          disable_apd);
+            load(root, "disable_swkbd",        disable_swkbd);
+            load(root, "initial_tab",          initial_tab);
+            load(root, "player_buffer_size",   player_buffer_size);
+            load(root, "player_history_limit", player_history_limit);
+            load(root, "recent_limit",         recent_limit);
+            load(root, "remember_tab",         remember_tab);
+            load(root, "server",               server);
         }
         catch (std::exception& e) {
             cout << "Error loading settings: " << e.what() << endl;
@@ -162,6 +195,7 @@ namespace cfg {
 
             root["browser_page_limit"]   = browser_page_limit;
             root["disable_apd"]          = disable_apd;
+            root["disable_swkbd"]        = disable_swkbd;
             root["initial_tab"]          = to_string(initial_tab);
             root["player_buffer_size"]   = player_buffer_size;
             root["player_history_limit"] = player_history_limit;

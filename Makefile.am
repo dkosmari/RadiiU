@@ -74,8 +74,8 @@ radiiu_elf_SOURCES = \
 	src/Station.cpp \
 	src/Station.hpp \
 	src/stdout-wiiu.cpp \
-	src/TabIndex.cpp \
-	src/TabIndex.hpp \
+	src/TabID.cpp \
+	src/TabID.hpp \
 	src/thread_safe.hpp \
 	src/ui.cpp \
 	src/ui.hpp \

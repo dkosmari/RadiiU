@@ -50,8 +50,8 @@ namespace Settings {
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 if (ImGui::BeginCombo("##initial_tab", to_ui_string(cfg::initial_tab))) {
-                    for (unsigned i = 0; i < static_cast<unsigned>(TabIndex::num_tabs); ++i) {
-                        TabIndex tab{i};
+                    for (unsigned i = 0; i < TabID::count(); ++i) {
+                        TabID tab{i};
                         if (ImGui::Selectable(to_ui_string(tab),
                                               cfg::initial_tab == tab))
                             cfg::initial_tab = tab;
@@ -192,6 +192,25 @@ namespace Settings {
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::Checkbox("##disable_apd", &cfg::disable_apd);
+
+                /*****************
+                 * Disable swkbd *
+                 *****************/
+
+                ImGui::TableNextRow();
+
+                ImGui::TableNextColumn();
+                ImGui::AlignTextToFramePadding();
+                ui::show_label("Disable SWKBD");
+
+                ImGui::TableNextColumn();
+
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                ImGui::Checkbox("##disable_swkbd", &cfg::disable_swkbd);
+
+                /*******************
+                 * End of settings *
+                 *******************/
 
                 ImGui::EndTable();
             }
