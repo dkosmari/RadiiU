@@ -347,7 +347,7 @@ namespace Player {
                     return;
 
                 while (auto res = mpg.try_decode_frame()) {
-                    audio_dev.play(res->samples);
+                    audio_dev.play(res->raw_data);
 
                     // TODO: these don't show up on streams, but do if playing a mp3 file.
                     auto meta_flags = mpg.meta_check();

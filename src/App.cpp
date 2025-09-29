@@ -115,7 +115,7 @@ namespace App {
         {
             ImFontConfig font_config;
             // Note: CafeStd seems to always be too low
-            font_config.GlyphOffset.y = - cafe_size * (5.0f / 32.0f);
+            font_config.GlyphOffset.y = - cafe_size * (6.0f / 32.0f);
 #ifdef __WIIU__
             font_config.FontDataOwnedByAtlas = false;
             void* cafe_font_ptr = nullptr;
@@ -142,7 +142,7 @@ namespace App {
         // Load Symbola font
         {
             ImFontConfig font_config;
-            font_config.GlyphOffset.y = - symbola_size * (5.0f / 32.0f);
+            font_config.GlyphOffset.y = - symbola_size * (6.0f / 32.0f);
             font_config.MergeMode = true;
             // font_config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
             // font_config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
