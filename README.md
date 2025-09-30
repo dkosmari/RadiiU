@@ -12,10 +12,16 @@ This is still a work in progress.
 ### Dependencies
 
 - freetype2
+
 - jansson
+
 - libcurl
+
 - libmpg123
+
 - SDL2, SDL2_image, SDL2_ttf
+  - Note: a fork of SDL2 with swkbd support is required:
+    https://github.com/dkosmari/SDL/tree/wiiu-sdl2-devel
 
 
 ### Obtaining the source
@@ -55,7 +61,7 @@ If the Wii U is named `wiiu` in your local network, you can run:
 
 ### Native build
 
-This has only been tested on Linux environments so far.
+This has only been tested on GNU/Linux environments so far.
 
 ```
 ./configure
