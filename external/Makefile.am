@@ -13,7 +13,7 @@ noinst_LIBRARIES = \
 
 
 libimgui_a_SOURCES = \
-	custom_imgui.h \
+	custom_imconfig.h \
 	imgui/backends/imgui_impl_sdl2.h \
 	imgui/backends/imgui_impl_sdl2.cpp \
 	imgui/backends/imgui_impl_sdlrenderer2.cpp \
@@ -35,7 +35,7 @@ libimgui_a_SOURCES = \
 
 libimgui_a_CPPFLAGS = \
 	$(AM_CPPFLAGS) \
-	-DIMGUI_USER_CONFIG='"$(abs_srcdir)/custom_imconfig.h"' \
+	-DIMGUI_USER_CONFIG='"$(srcdir)/custom_imconfig.h"' \
 	-I$(srcdir)/imgui \
 	$(SDL_CFLAGS) \
 	$(FT_CFLAGS)
