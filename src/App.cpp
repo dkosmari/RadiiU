@@ -543,8 +543,6 @@ namespace App {
         Recent::process_logic();
         Player::process_logic();
 
-        res->renderer.set_color(sdl::color::black);
-        res->renderer.clear();
         process_ui();
     }
 
@@ -559,14 +557,15 @@ namespace App {
     void
     draw()
     {
-        // res->renderer.set_color(sdl::color::black);
-        // res->renderer.clear();
+        res->renderer.set_color(sdl::color::black);
+        res->renderer.clear();
 
         ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(),
                                               res->renderer.data());
 
 #ifdef __WIIU__
-        // WORKAROUND: the Wii U port does not update the clipping until the next draw
+        // WORKAROUND: the Wii U SDL2 port does not update the clipping until the next
+        // draw, so we need to dra a transparent point here to reset the GX2 state.
         res->renderer.set_color(sdl::color::transparent);
         res->renderer.draw_point(0, 0);
 #endif
