@@ -17,22 +17,16 @@
 #endif
 
 
+using namespace std::literals;
+
+
 namespace utils {
 
     const std::string&
     get_user_agent()
     {
-        static const std::string user_agent = []
-        {
-            std::string result = PACKAGE_NAME "/" PACKAGE_VERSION " (";
-            result += SDL_GetPlatform();
-#ifdef __WUT__
-            result += "; WUT";
-#endif
-            result += ")";
-            return result;
-        }();
-
+        static const std::string user_agent = PACKAGE_NAME "/" PACKAGE_VERSION
+                                              + " ("s + SDL_GetPlatform() + ")"s;
         return user_agent;
     }
 
