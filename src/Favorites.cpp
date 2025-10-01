@@ -470,7 +470,6 @@ namespace Favorites {
         }
         ImGui::EndChild();
 
-
         // Note: flat navigation doesn't work well on child windows that scroll.
         if (ImGui::BeginChild("favorites")) {
             auto scroll_target = ImGui::GetCurrentWindow()->ID;
@@ -481,7 +480,7 @@ namespace Favorites {
                     scroll_to_station.reset();
                 }
             }
-        }
+        } // favorites
         ImGui::HandleDragScroll();
         ImGui::EndChild();
     }

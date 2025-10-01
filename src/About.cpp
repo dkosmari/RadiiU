@@ -2,6 +2,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include <curl/curl.h>
@@ -50,6 +51,7 @@ namespace About {
                 return buf;
         }
 
+
         std::string
         get_mpg_decoders()
         {
@@ -63,19 +65,40 @@ namespace About {
             return result;
         }
 
-        std::vector<std::string>
-        get_authors()
+
+        struct RoleName {
+            std::string role;
+            std::string name;
+        };
+
+        std::vector<RoleName>
+        get_credits()
         {
-            std::vector<std::string> result;
+            std::vector<RoleName> result;
 
             try {
-                std::ifstream input{ utils::get_content_path() / "AUTHORS" };
+                std::ifstream input{ utils::get_content_path() / "CREDITS" };
                 std::string line;
-                while (getline(input, line))
-                    result.push_back(line);
+                while (getline(input, line)) {
+                    if (!line.empty() && line.front() == '#')
+                        continue;
+                    line = utils::trimmed(line);
+                    if (line.empty())
+                        continue;
+                    auto tokens = utils::split(line, ":", false, 2);
+                    if (tokens.size() != 2) {
+                        cout << "Error in CREDITS file: split into "
+                             << tokens.size()
+                             << " tokens: \""
+                             << line << "\""
+                             << endl;
+                        continue;
+                    }
+                    result.emplace_back(std::move(tokens[0]), std::move(tokens[1]));
+                }
             }
             catch (std::exception& e) {
-                cout << "Error loading AUTHORS file: " << e.what() << endl;
+                cout << "Error loading CREDITS file: " << e.what() << endl;
             }
 
             return result;
@@ -107,11 +130,17 @@ namespace About {
             }
 
             // ImGui::SeparatorTextColored(label_color, "Credits");
+            static const auto credits = get_credits();
             ImGui::SeparatorText("Credits");
-            static const auto authors = get_authors();
-            for (auto& author : authors) {
-                ImGui::Bullet();
-                ImGui::TextUnformatted(author);
+            if (ImGui::BeginTable("credits", 2)) {
+
+                ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
+                ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
+
+                for (const auto& [role, name] : credits)
+                    ui::show_info_row(role, name);
+
+                ImGui::EndTable();
             }
 
             // ImGui::SeparatorTextColored(label_color, "Components");
@@ -131,7 +160,7 @@ namespace About {
                 ui::show_info_row("JANSSON", jansson_version_str());
 
                 static const std::string mpg_decoders = get_mpg_decoders();
-                ui::show_info_row("MPG123 decoders", mpg_decoders);
+                ui::show_info_row("mpg123 decoders", mpg_decoders);
 
                 ImGui::EndTable();
             }

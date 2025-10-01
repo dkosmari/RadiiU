@@ -1,8 +1,8 @@
 EXTRA_DIST = \
 	assets \
-	AUTHORS \
 	bootstrap \
 	COPYING.GPLv3 \
+	CREDITS \
 	radio-browser-info-api.md \
 	README.md \
 	TODO.org
@@ -132,6 +132,8 @@ $(WUHB_FILE): $(RPX_TARGET) $(srcdir)/assets/meta/icon.png
 		$< $@ \
 		--content=$(srcdir)/assets/content \
 		--icon=$(srcdir)/assets/meta/icon.png \
+		--tv-image=$(srcdir)/assets/meta/splash-tv.png \
+		--drc-image=$(srcdir)/assets/meta/splash-drc.png \
 		--name="$(PACKAGE_STRING)" \
 		--short-name="$(PACKAGE_TARNAME)"
 

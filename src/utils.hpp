@@ -61,13 +61,15 @@ namespace utils {
     std::vector<std::string>
     split(const std::string& input,
           const std::vector<std::string>& separators = {","},
-          bool compress = true);
+          bool compress = true,
+          std::size_t max_tokens = 0);
 
     [[nodiscard]]
     std::vector<std::string>
     split(const std::string& input,
           const std::string& separator = ",",
-          bool compress = true);
+          bool compress = true,
+          std::size_t max_tokens = 0);
 
 
     [[nodiscard]]

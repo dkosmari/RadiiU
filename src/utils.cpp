@@ -147,7 +147,8 @@ namespace utils {
     std::vector<std::string>
     split(const std::string& input,
           const std::vector<std::string>& separators,
-          bool compress)
+          bool compress,
+          std::size_t max_tokens)
     {
         std::vector<std::string> result;
 
@@ -155,14 +156,20 @@ namespace utils {
         auto [sep_start, sep_index] = find_first_of(input, separators);
         size_type tok_start = 0;
 
+        // Loop until no more separators are found.
         while (sep_start != std::string::npos) {
-            if (!compress || sep_start > tok_start)
+            if (!compress || sep_start > tok_start) {
+                // If this token reaches the maximum allowed, stop the looop
+                if (max_tokens && result.size() + 1 == max_tokens)
+                    break;
                 result.push_back(input.substr(tok_start, sep_start - tok_start));
+            }
             tok_start = sep_start + separators[sep_index].size();
             if (tok_start >= input.size())
                 break;
             std::tie(sep_start, sep_index) = find_first_of(input, separators, tok_start);
         }
+        // The remainder of the string is the last token, unless (compress && empty)
         if (!compress || tok_start < input.size())
             result.push_back(input.substr(tok_start));
         return result;
@@ -172,9 +179,10 @@ namespace utils {
     std::vector<std::string>
     split(const std::string& input,
           const std::string& separator,
-          bool compress)
+          bool compress,
+          std::size_t max_splits)
     {
-        return split(input, std::vector{separator}, compress);
+        return split(input, std::vector{separator}, compress, max_splits);
     }
 
 
