@@ -87,28 +87,6 @@ namespace ImGui {
 #endif
 
 
-        ImVec2
-        to_imgui(sdl::vec2 p)
-        {
-            return ImVec2(p.x, p.y);
-        }
-
-
-        ImVec2
-        to_imgui(sdl::vec2f p)
-        {
-            return ImVec2(p.x, p.y);
-        }
-
-
-        ImVec4
-        to_imgui(sdl::color c)
-        {
-            auto rgba = c.to_rgba();
-            return ImVec4(rgba.r, rgba.g, rgba.b, rgba.a);
-        }
-
-
         template<concepts::arithmetic T>
         constexpr ImGuiDataType imgui_data_type_v;
 
@@ -323,9 +301,9 @@ namespace ImGui {
           const sdl::vec2f& uv1)
     {
         Image(reinterpret_cast<ImTextureID>(texture.data()),
-              to_imgui(size),
-              to_imgui(uv0),
-              to_imgui(uv1));
+              ToVec2(size),
+              ToVec2(uv0),
+              ToVec2(uv1));
     }
 
 
@@ -349,11 +327,11 @@ namespace ImGui {
     {
         return ImageButton(str_id,
                            reinterpret_cast<ImTextureID>(texture.data()),
-                           to_imgui(size),
-                           to_imgui(uv0),
-                           to_imgui(uv1),
-                           to_imgui(bg_color),
-                           to_imgui(tint_color));
+                           ToVec2(size),
+                           ToVec2(uv0),
+                           ToVec2(uv1),
+                           ToVec4(bg_color),
+                           ToVec4(tint_color));
     }
 
 

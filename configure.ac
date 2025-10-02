@@ -36,7 +36,7 @@ AM_CONDITIONAL([ENABLE_WIIU], [test x$enable_wiiu = xyes])
 PKG_CHECK_MODULES_STATIC([CURL], [libcurl])
 PKG_CHECK_MODULES([JANSSON], [jansson])
 PKG_CHECK_MODULES([MPG123], [libmpg123])
-PKG_CHECK_MODULES([SDL], [sdl2 SDL2_image SDL2_ttf])
+PKG_CHECK_MODULES([SDL], [sdl2 SDL2_image])
 PKG_CHECK_MODULES([FT], [freetype2])
 
 AC_MSG_NOTICE([PATH is $PATH])
@@ -68,7 +68,7 @@ AX_SUBDIRS_CONFIGURE([external/mpg123xx],
 AX_SUBDIRS_CONFIGURE([external/sdl2xx],
                      [[--enable-image],
                       [--disable-mixer],
-                      [--enable-ttf],
+                      [--disable-ttf],
                       [--disable-examples],
                       [CPPFLAGS=$CPPFLAGS],
                       [CFLAGS=$CFLAGS],

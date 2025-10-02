@@ -8,6 +8,7 @@
 #ifndef IMGUI_EXTRAS_HPP
 #define IMGUI_EXTRAS_HPP
 
+#include <concepts>
 #include <cstdarg>
 #include <cstdint>
 #include <string>
@@ -244,6 +245,28 @@ namespace ImGui {
 
     void
     TextUnformatted(const std::string& text);
+
+
+    template<typename T>
+    requires std::convertible_to<decltype(T::x), float> &&
+             std::convertible_to<decltype(T::y), float>
+    ImVec2
+    ToVec2(const T& v)
+    {
+        return ImVec2(v.x, v.y);
+    }
+
+
+    template<typename T>
+    requires std::convertible_to<decltype(T::r), float> &&
+             std::convertible_to<decltype(T::g), float> &&
+             std::convertible_to<decltype(T::b), float> &&
+             std::convertible_to<decltype(T::a), float>
+    ImVec4
+    ToVec4(const T& c)
+    {
+        return ImVec4(c.r, c.g, c.b, c.a);
+    }
 
 
     template<typename T>

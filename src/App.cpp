@@ -26,7 +26,6 @@
 
 #include <sdl2xx/sdl.hpp>
 #include <sdl2xx/img.hpp>
-#include <sdl2xx/ttf.hpp>
 
 #include "App.hpp"
 
@@ -66,11 +65,9 @@ namespace App {
                            sdl::init::flag::audio,
                            sdl::init::flag::game_controller};
         sdl::img::init img_init;
-        sdl::ttf::init ttf_init;
 
         sdl::window window;
         sdl::renderer renderer;
-        sdl::texture title_texture;
 
         sdl::vector<sdl::game_controller::device> controllers;
 
@@ -118,11 +115,12 @@ namespace App {
 
         // Load main font: CafeStd
         {
-            ImFontConfig font_config;
+            ImFontConfig config;
+            config.EllipsisChar = U'…';
             // Note: CafeStd seems to always be too low
-            font_config.GlyphOffset.y = - cafe_size * (6.0f / 32.0f);
+            config.GlyphOffset.y = - cafe_size * (6.0f / 32.0f);
 #ifdef __WIIU__
-            font_config.FontDataOwnedByAtlas = false;
+            config.FontDataOwnedByAtlas = false;
             void* cafe_font_ptr = nullptr;
             uint32_t cafe_font_size = 0;
             if (OSGetSharedData(OS_SHAREDDATATYPE_FONT_STANDARD,
@@ -132,28 +130,28 @@ namespace App {
                 if (!io.Fonts->AddFontFromMemoryTTF(cafe_font_ptr,
                                                     cafe_font_size,
                                                     cafe_size,
-                                                    &font_config))
+                                                    &config))
                     throw std::runtime_error{"Could not load font!"};
             } else
                 throw std::runtime_error{"Is CafeStd font missing?"};
 #else
             if (!io.Fonts->AddFontFromFileTTF("CafeStd.ttf",
                                               cafe_size,
-                                              &font_config))
+                                              &config))
                 throw std::runtime_error{"Could not load font!"};
 #endif
         }
 
         // Load Symbola font
         {
-            ImFontConfig font_config;
-            font_config.GlyphOffset.y = - symbola_size * (6.0f / 32.0f);
-            font_config.MergeMode = true;
-            // font_config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
-            // font_config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
+            ImFontConfig config;
+            config.GlyphOffset.y = - symbola_size * (6.0f / 32.0f);
+            config.MergeMode = true;
+            // config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
+            // config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
             if (!io.Fonts->AddFontFromFileTTF((utils::get_content_path() / "Symbola.ttf").c_str(),
                                               symbola_size,
-                                              &font_config))
+                                              &config))
                 throw std::runtime_error{"Could not load font!"};
         }
 
@@ -168,28 +166,6 @@ namespace App {
         if (next_tab && tab == *next_tab)
             result |= ImGuiTabItemFlags_SetSelected;
         return result;
-    }
-
-
-    sdl::texture
-    make_logo_texture(sdl::renderer& renderer)
-    {
-        sdl::ttf::font title_font;
-#ifdef __WIIU__
-        void* cafe_font_ptr = nullptr;
-        uint32_t cafe_font_size = 0;
-        if (OSGetSharedData(OS_SHAREDDATATYPE_FONT_STANDARD,
-                            0,
-                            &cafe_font_ptr,
-                            &cafe_font_size)) {
-            auto rw = SDL_RWFromMem(cafe_font_ptr, cafe_font_size);
-            title_font.create(rw, true, 60);
-        }
-#else
-        title_font.create("CafeStd.ttf", 60);
-#endif
-        auto title_img = title_font.render_blended(PACKAGE_STRING, sdl::color::white);
-        return sdl::texture{renderer, title_img};
     }
 
 
@@ -308,8 +284,6 @@ namespace App {
         res->renderer.set_logical_size(window_size);
 
         initialize_imgui();
-
-        res->title_texture = make_logo_texture(res->renderer);
 
         // Initialize modules.
         IconManager::initialize(res->renderer);
@@ -440,18 +414,23 @@ namespace App {
                          ImGuiWindowFlags_NoSavedSettings |
                          ImGuiWindowFlags_NoResize)) {
 
-            // Draw logo on top, centered
-            auto window_width = ImGui::GetWindowSize().x;
-            ImGui::ImageCentered(res->title_texture);
-            ImGui::SameLine();
-            // Put a button to the right of the logo.
-            auto close_button_tex = IconManager::get("ui/close-button.png");
-            ImGui::SetCursorPosX(window_width
-                                 - close_button_tex->get_size().x
-                                 - 2 * style.FramePadding.x
-                                 - style.WindowPadding.x);
-            if (ImGui::ImageButton("close_button", *close_button_tex))
-                quit();
+            {
+                // App name, centered
+                ImGui::PushFont(nullptr, 60);
+                ImGui::TextCentered("%s", PACKAGE_STRING);
+                ImGui::PopFont();
+                ImGui::SameLine();
+                // Put a close button on the top right
+                auto tex = IconManager::get("ui/close-button.png");
+                auto tex_size = ImGui::ToVec2(tex->get_size());
+                ImVec2 close_button_size = tex_size
+                    + 2 * (style.FramePadding + style.FrameBorderSize * ImVec2{1, 1});
+                ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x
+                                     - close_button_size.x);
+
+                if (ImGui::ImageButton("close_button", *tex))
+                    quit();
+            }
 
             if (ImGui::BeginTabBar("main_tabs")) {
 

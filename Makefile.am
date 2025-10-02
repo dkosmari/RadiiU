@@ -104,7 +104,6 @@ radiiu_elf_LDADD =  \
 	external/curlxx/libcurlxx.a \
 	external/libimgui.a \
 	external/mpg123xx/libmpg123xx.a \
-	external/sdl2xx/libsdl2xx_ttf.a \
 	external/sdl2xx/libsdl2xx_image.a \
 	external/sdl2xx/libsdl2xx.a \
 	$(CURL_LIBS) \
@@ -112,9 +111,6 @@ radiiu_elf_LDADD =  \
 	$(MPG123_LIBS) \
 	$(SDL_LIBS) \
 	$(FT_LIBS)
-
-
-
 
 
 if ENABLE_WIIU
