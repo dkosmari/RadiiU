@@ -42,7 +42,7 @@ found in the Changelog.
   * [Station check steps](#list-of-station-check-steps)
   * [Streaming servers](#list-of-streaming-servers)
   * [Advanced station search](#advanced-station-search)
-  * [Search radio stations by UUIDs](#search-radio-stations-by-uuid)
+  * [Search radio stations by UUIDs](#search-radio-stations-by-uuids)
   * [Search radio stations by URL](#search-radio-stations-by-url)
   * [Server stats](#server-stats)
   * [Server mirrors](#server-mirrors)
@@ -1186,7 +1186,7 @@ Array of [Station](#struct-station).
 
 * * *
 
-# Search radio stations by UUID
+# Search radio stations by UUIDs
 
 A list of radio stations that have an exact UUID match.
 

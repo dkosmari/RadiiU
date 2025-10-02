@@ -114,6 +114,14 @@ namespace Recent {
                 if (ImGui::Button("🗑"))
                     to_remove = index;
 
+                ImGui::SameLine();
+
+                ImGui::BeginDisabled(station.uuid.empty());
+                if (ImGui::Button("🛈"))
+                    ui::open_station_info_popup(station.uuid);
+                ImGui::EndDisabled();
+                ui::process_station_info_popup();
+
             } // actions
             ImGui::HandleDragScroll(scroll_target);
             ImGui::EndChild();

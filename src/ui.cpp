@@ -6,6 +6,9 @@
  */
 
 #include <cstdint>
+#include <iostream>
+#include <optional>
+#include <stdexcept>
 
 #include <sdl2xx/vec2.hpp>
 
@@ -13,12 +16,18 @@
 
 #include "ui.hpp"
 
+#include "Browser.hpp"
 #include "constants.hpp"
 #include "IconManager.hpp"
 #include "imgui_extras.hpp"
 #include "Player.hpp"
+#include "rest.hpp"
 #include "Station.hpp"
 #include "utils.hpp"
+
+
+using std::cout;
+using std::endl;
 
 
 namespace ui {
@@ -43,7 +52,7 @@ namespace ui {
     {
         ImGui::TableNextRow();
 
-        ImGui::PushID(label);
+        // ImGui::PushID(label);
 
         ImGui::TableNextColumn();
         ImGui::TextRightColored(constants::label_color, "%s", label.data());
@@ -51,7 +60,7 @@ namespace ui {
         ImGui::TableNextColumn();
         ImGui::TextWrapped("%s", value.data());
 
-        ImGui::PopID();
+        // ImGui::PopID();
     }
 
 
@@ -62,12 +71,16 @@ namespace ui {
     {
         ImGui::TableNextRow();
 
+        // ImGui::PushID(label);
+
         ImGui::TableNextColumn();
         ImGui::TextRightColored(constants::label_color, "%s", label.data());
 
         ImGui::TableNextColumn();
         const std::string fmt = "%" + utils::format(value);
         ImGui::TextWrapped(fmt.data(), value);
+
+        // ImGui::PopID();
     }
 
     /* ----------------------------------------------- */
@@ -207,6 +220,125 @@ namespace ui {
             ImGui::HandleDragScroll(scroll_target);
             ImGui::EndChild();
             ImGui::PopID();
+        }
+    }
+
+
+    const std::string station_info_popup_id = "info";
+    std::optional<Station> station_info_result;
+    std::string station_info_error;
+
+
+    void
+    request_station_info(const std::string& uuid)
+    {
+        if (uuid.empty())
+            throw std::logic_error{"no UUID to request info."};
+
+        auto server = Browser::get_server();
+        if (server.empty())
+            throw std::runtime_error{"not connected to a server."};
+
+        rest::get_json("https://" + server + "/json/stations/byuuid",
+                       {{"uuids", uuid}},
+                       [](curl::easy&,
+                          const json::value& response)
+                       {
+                           try {
+                               const auto& list = response.as<json::array>();
+                               if (list.empty())
+                                   throw std::runtime_error{"station not found."};
+                               station_info_result =
+                                   Station::from_json(list.front().as<json::object>());
+                               cout << "station info result" << endl;
+                           }
+                           catch (std::exception& e) {
+                               station_info_error = e.what();
+                               cout << "Failed to read station info: "
+                                    << station_info_error
+                                    << endl;
+                           }
+                       },
+                       [](curl::easy&,
+                          const std::exception& error)
+                       {
+                           station_info_error = error.what();
+                           cout << "Error requesting station info: "
+                                << station_info_error
+                                << endl;
+                       });
+    }
+
+
+    void
+    open_station_info_popup(const std::string& uuid)
+    {
+        if (uuid.empty())
+            return;
+
+        station_info_result.reset();
+        station_info_error.clear();
+
+        try {
+            request_station_info(uuid);
+        }
+        catch (std::exception& e) {
+            station_info_error = e.what();
+            cout << "Error requesting station info: " << station_info_error << endl;
+        }
+
+        ImGui::OpenPopup(station_info_popup_id);
+    }
+
+
+    void
+    process_station_info_popup()
+    {
+        ImGui::SetNextWindowSize({1100, 600}, ImGuiCond_Always);
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(),
+                                ImGuiCond_Always,
+                                {0.5f, 0.5f});
+        if (ImGui::BeginPopup(station_info_popup_id,
+                              ImGuiWindowFlags_NoSavedSettings)) {
+
+            if (!station_info_error.empty()) {
+
+                ImGui::Text("Error: %s", station_info_error.data());
+
+            } else if (station_info_result) {
+
+                if (ImGui::BeginTable("fields", 2,
+                                      ImGuiTableFlags_None)) {
+
+                    ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
+                    ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+
+                    show_info_row("name",         station_info_result->name);
+                    show_link_row("url",          station_info_result->url);
+                    show_link_row("url_resolved", station_info_result->url_resolved);
+                    show_link_row("homepage",     station_info_result->homepage);
+                    show_link_row("favicon",      station_info_result->favicon);
+                    show_info_row("tags", utils::join(station_info_result->tags, ", "));
+                    show_info_row("country_code", station_info_result->country_code);
+                    show_info_row("language",     station_info_result->language);
+                    show_info_row("uuid",         station_info_result->uuid);
+
+                    show_info_row("votes",        station_info_result->votes);
+                    show_info_row("click_count",  station_info_result->click_count);
+                    show_info_row("click_trend",  station_info_result->click_trend);
+                    show_info_row("bitrate",      station_info_result->bitrate);
+
+                    ImGui::EndTable();
+                }
+
+            } else {
+
+                ImGui::Text("Retrieving station info...");
+
+            }
+
+            ImGui::HandleDragScroll();
+            ImGui::EndPopup();
         }
     }
 

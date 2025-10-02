@@ -59,6 +59,13 @@ namespace ui {
     show_tags(const std::vector<std::string>& tags,
               ImGuiID scroll_target);
 
+
+    void
+    open_station_info_popup(const std::string& uuid);
+
+    void
+    process_station_info_popup();
+
 } // namespace ui
 
 #endif

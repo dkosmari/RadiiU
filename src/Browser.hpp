@@ -28,6 +28,10 @@ namespace Browser {
     get_mirrors();
 
 
+    std::string
+    get_server();
+
+
     void
     connect();
 

@@ -97,9 +97,7 @@ namespace Browser {
     std::unordered_set<std::string> votes_cast;
 
 
-    const std::string station_info_popup_id = "info";
     const std::string server_info_popup_id = "info";
-
 
     struct ServerInfo {
 
@@ -130,7 +128,7 @@ namespace Browser {
 
     }; // struct ServerInfo
 
-    std::optional<ServerInfo> server_info;
+    std::optional<ServerInfo> server_info_result;
     std::string server_info_error;
 
 
@@ -374,6 +372,13 @@ namespace Browser {
     }
 
 
+    std::string
+    get_server()
+    {
+        return safe_server.load();
+    }
+
+
     void
     refresh()
     {
@@ -504,7 +509,7 @@ namespace Browser {
             auto server = safe_server.load();
             ImGui::SeparatorText("Server status for " + server);
 
-            if (!server_info) {
+            if (!server_info_result) {
 
                 if (!server_info_error.empty())
                     ImGui::ValueWrapped("Error: ", server_info_error);
@@ -519,14 +524,14 @@ namespace Browser {
                     ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
                     using ui::show_info_row;
-                    show_info_row("software_version", server_info->software_version);
-                    show_info_row("stations", server_info->stations);
-                    show_info_row("stations_broken", server_info->stations_broken);
-                    show_info_row("tags", server_info->tags);
-                    show_info_row("clicks_last_hour", server_info->clicks_last_hour);
-                    show_info_row("clicks_last_day", server_info->clicks_last_day);
-                    show_info_row("languages", server_info->languages);
-                    show_info_row("countries", server_info->countries);
+                    show_info_row("software_version", server_info_result->software_version);
+                    show_info_row("stations",         server_info_result->stations);
+                    show_info_row("stations_broken",  server_info_result->stations_broken);
+                    show_info_row("tags",             server_info_result->tags);
+                    show_info_row("clicks_last_hour", server_info_result->clicks_last_hour);
+                    show_info_row("clicks_last_day",  server_info_result->clicks_last_day);
+                    show_info_row("languages",        server_info_result->languages);
+                    show_info_row("countries",        server_info_result->countries);
 
                     ImGui::EndTable();
                 }
@@ -718,42 +723,6 @@ namespace Browser {
 
 
     void
-    process_station_info_popup(const Station& station)
-    {
-        ImGui::SetNextWindowSize({900, 600}, ImGuiCond_Appearing);
-        if (ImGui::BeginPopup(station_info_popup_id,
-                              ImGuiWindowFlags_NoSavedSettings)) {
-
-            if (ImGui::BeginTable("fields", 2,
-                                  ImGuiTableFlags_None)) {
-
-                ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
-                ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
-
-                ui::show_info_row("name", station.name);
-                ui::show_link_row("url", station.url);
-                ui::show_link_row("url_resolved", station.url_resolved);
-                ui::show_link_row("homepage", station.homepage);
-                ui::show_info_row("favicon", station.favicon);
-                ui::show_info_row("tags", utils::join(station.tags, ","));
-                ui::show_info_row("country_code", station.country_code);
-                ui::show_info_row("language", station.language);
-                ui::show_info_row("uuid", station.uuid);
-
-                ui::show_info_row("votes", station.votes);
-                ui::show_info_row("click_count", station.click_count);
-                ui::show_info_row("click_trend", station.click_trend);
-                ui::show_info_row("bitrate", station.bitrate);
-
-                ImGui::EndTable();
-            }
-            ImGui::HandleDragScroll();
-            ImGui::EndPopup();
-        }
-    }
-
-
-    void
     show_station(const Station& station,
                  ImGuiID scroll_target)
     {
@@ -784,12 +753,10 @@ namespace Browser {
                 ImGui::SameLine();
 
                 if (ImGui::Button("🛈"))
-                    // TODO: refactor station info popup so it can be used from Favorites and Player
-                    ImGui::OpenPopup(station_info_popup_id);
-                process_station_info_popup(station);
+                    ui::open_station_info_popup(station.uuid);
+                ui::process_station_info_popup();
 
                 bool voted = votes_cast.contains(station.uuid);
-                // TODO: shorten the string so it fits under the favorite/info buttons
                 std::string vote_label = "👍" + humanize::value(station.votes);
                 ImGui::BeginDisabled(voted);
                 if (ImGui::Button(vote_label))
@@ -927,7 +894,7 @@ namespace Browser {
     void
     request_server_info()
     {
-        server_info.reset();
+        server_info_result.reset();
         server_info_error.clear();
 
         auto server = safe_server.load();
@@ -939,7 +906,7 @@ namespace Browser {
                           const json::value& response)
                        {
                            try {
-                               server_info = ServerInfo::from_json(response.as<json::object>());
+                               server_info_result = ServerInfo::from_json(response.as<json::object>());
                            }
                            catch (std::exception& e) {
                                server_info_error = e.what();

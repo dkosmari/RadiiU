@@ -516,10 +516,11 @@ namespace Player {
                 ImGui::SameLine();
 
                 ImGui::BeginDisabled(station->uuid.empty());
-                if (ImGui::Button("🛈")) {
-                    // TODO
-                }
+                if (ImGui::Button("🛈"))
+                    ui::open_station_info_popup(station->uuid);
                 ImGui::EndDisabled();
+                ui::process_station_info_popup();
+
             } // actions
             ImGui::EndChild();
 
