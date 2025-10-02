@@ -1,36 +1,10 @@
-* Pending features for v0.1 [100%]
+* Pending features for v0.1.1 [50%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
-  - [X] Browser [11/11]
-    - [X] Send click.
-    - [X] Send upvote.
-    - [X] Clear filters.
-    - [X] Sort order.
-    - [X] Add/remove favorites.
-    - [X] Button to show more info.
-    - [X] Select random server from DNS query.
-    - [X] Show a few more fields like vote count and country.
-    - [X] Save browser state.
-    - [X] Button to reconnect to server.
-    - [X] Show server status (mirror, more info popup).
-  - [X] Favorites [5/5]
-    - [X] Add entry.
-    - [X] Edit entry.
-    - [X] Remove entry.
-    - [X] Reorder entry.
-    - [X] Load/save.
-  - [X] Recent [2/2]
-    - [X] Implement.
-    - [X] Save history on exit.
-  - [X] Player [4/4]
-    - [X] Show stream details.
-    - [X] Add/remove to favorites.
-    - [X] Show track change history.
-    - [X] Handle loss of internet connection.
-  - [X] Settings [4/4]
-    - [X] Load/save (store as save game on Wii U).
-    - [X] Select server.
-    - [X] Select which page to start on.
-    - [X] Cosmetic: use a table to line up all fields.
-  - [X] About
+  - [X] Recent [1/1]
+    - [X] Implement station info button.
+  - [-] Player [1/3]
+    - [X] Implement station info button.
+    - [ ] Make stream info and track history collapsible.
+    - [ ] Add option to put gamepad LCD on standby after timeout.
