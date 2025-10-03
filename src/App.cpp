@@ -16,7 +16,9 @@
 
 
 #ifdef __WIIU__
+#include <coreinit/energysaver.h>
 #include <coreinit/memory.h>
+#include <vpad/input.h>
 #endif
 
 #include <imgui.h>
@@ -508,6 +510,36 @@ namespace App {
         if (old_disable_swkbd != cfg::disable_swkbd) {
             SDL_WiiUSetSWKBDEnabled(cfg::disable_swkbd ? SDL_FALSE : SDL_TRUE);
             old_disable_swkbd = cfg::disable_swkbd;
+        }
+
+        if (cfg::inactive_screen_off) {
+            // TODO: find out how to do it with TV also.
+            IMError e;
+            std::uint32_t dim_enabled = 0;
+            e = IMIsDimEnabled(&dim_enabled);
+            if (!e && dim_enabled) {
+                static bool screen_is_off = false;
+                std::uint32_t seconds_to_dim = 0;
+                e = IMGetTimeBeforeDimming(&seconds_to_dim);
+                if (!e) {
+                    if (seconds_to_dim == 0) {
+                        if (!screen_is_off) {
+                            cout << "Screen dimming started, putting DRC on standby." << endl;
+                            VPADSetLcdMode(VPAD_CHAN_0, VPAD_LCD_STANDBY);
+                            screen_is_off = true;
+                        }
+                    } else {
+                        if (screen_is_off) {
+                            cout << "Screen dimming ended, turning DRC back on." << endl;
+                            screen_is_off = false;
+                            VPADSetLcdMode(VPAD_CHAN_0, VPAD_LCD_ON);
+                        }
+                    }
+                } else {
+                    cout << "IMGetTimeBeforeDimming() returned " << e << endl;
+                    screen_is_off = false;
+                }
+            } // dim_enabled
         }
 #endif
 

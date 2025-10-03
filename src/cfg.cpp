@@ -39,6 +39,7 @@ namespace cfg {
     unsigned browser_page_limit   = 20;
     bool     disable_apd          = true;
     bool     disable_swkbd        = false;
+    bool     inactive_screen_off  = false;
     TabID    initial_tab          = TabID::browser;
     unsigned player_buffer_size   = 8192;
     unsigned player_history_limit = 20;
@@ -174,6 +175,7 @@ namespace cfg {
             load(root, "browser_page_limit",   browser_page_limit);
             load(root, "disable_apd",          disable_apd);
             load(root, "disable_swkbd",        disable_swkbd);
+            load(root, "inactive_screen_off",  inactive_screen_off);
             load(root, "initial_tab",          initial_tab);
             load(root, "player_buffer_size",   player_buffer_size);
             load(root, "player_history_limit", player_history_limit);
@@ -196,6 +198,7 @@ namespace cfg {
             root["browser_page_limit"]   = browser_page_limit;
             root["disable_apd"]          = disable_apd;
             root["disable_swkbd"]        = disable_swkbd;
+            root["inactive_screen_off"]  = inactive_screen_off;
             root["initial_tab"]          = to_string(initial_tab);
             root["player_buffer_size"]   = player_buffer_size;
             root["player_history_limit"] = player_history_limit;

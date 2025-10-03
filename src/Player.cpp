@@ -66,9 +66,9 @@ namespace Player {
 
 
     SDL_AudioFormat
-    mpg_to_sdl_format(unsigned fmt)
+    mpg123_encoding_to_sdl_format(unsigned encoding)
     {
-        switch (fmt) {
+        switch (encoding) {
 
             case MPG123_ENC_SIGNED_16:
                 return AUDIO_S16SYS;
@@ -85,6 +85,29 @@ namespace Player {
             default:
                 return 0;
 
+        }
+    }
+
+
+    std::string
+    mpg123_encoding_to_string(unsigned encoding)
+    {
+        switch (encoding) {
+
+            case MPG123_ENC_SIGNED_16:
+                return "signed-16-bit";
+
+            case MPG123_ENC_UNSIGNED_16:
+                return "unsigned-16-bit";
+
+            case MPG123_ENC_SIGNED_32:
+                return "signed-32-bit";
+
+            case MPG123_ENC_FLOAT_32:
+                return "float-32-bit";
+
+            default:
+                return "forced-signed-16-bit";
         }
     }
 
@@ -121,6 +144,8 @@ namespace Player {
         std::string icy_description;
 
         icy::dict_t meta;
+
+        std::optional<mpg123::format> stream_format;
 
 
         Resources(const std::string& url)
@@ -329,15 +354,15 @@ namespace Player {
                         sdl::audio::spec spec;
                         spec.freq = fmt->rate;
                         spec.channels = fmt->channels & MPG123_STEREO ? 2 : 1;
-                        spec.format = mpg_to_sdl_format(fmt->encoding);
+                        spec.format = mpg123_encoding_to_sdl_format(fmt->encoding);
                         spec.samples = 4096;
                         if (!spec.format) {
                             // no exact match, ask mpg123 to convert it to S16
                             spec.format = AUDIO_S16SYS;
                             mpg.set_format(fmt->rate, fmt->channels, MPG123_ENC_SIGNED_16);
                         }
+                        stream_format = std::move(*fmt);
 
-                        cout << "Creating SDL audio device..." << endl;
                         audio_dev.create(nullptr, false, spec);
                         audio_dev.unpause();
                     }
@@ -349,7 +374,8 @@ namespace Player {
                 while (auto res = mpg.try_decode_frame()) {
                     audio_dev.play(res->raw_data);
 
-                    // TODO: these don't show up on streams, but do if playing a mp3 file.
+                    // TODO: these don't show up on streams, but do if playing a regular
+                    // mp3 file.
                     auto meta_flags = mpg.meta_check();
                     if (meta_flags & MPG123_NEW_ID3) {
                         cout << "Got ID3 metadata." << endl;
@@ -547,6 +573,8 @@ namespace Player {
     }
 
 
+
+
     void
     show_stream(ImGuiID scroll_target)
     {
@@ -557,42 +585,132 @@ namespace Player {
                               ImGuiChildFlags_FrameStyle |
                               ImGuiChildFlags_NavFlattened)) {
 
-            ImGui::SeparatorText("Stream");
+            if (ImGui::CollapsingHeader("Stream details")) {
 
-            if (res && ImGui::BeginTable("icy_meta", 2)) {
+                ImGui::Indent();
 
-                ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
-                ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
+                if (res && ImGui::BeginTable("icy_meta", 2)) {
 
-                auto it = res->meta.find("StreamTitle");
-                if (it != res->meta.end())
-                    ui::show_info_row("Title", it->second);
+                    ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
+                    ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
 
-                // Show all icy metadata too, even if we don't know what they are
-                for (auto& [key, val] : res->meta) {
-                    if (key == "StreamTitle")
-                        continue;
-                    auto tval = utils::trimmed(val);
-                    if (tval.empty())
-                        continue;
-                    ui::show_info_row(key, tval);
+                    auto it = res->meta.find("StreamTitle");
+                    if (it != res->meta.end())
+                        ui::show_info_row("Title", it->second);
+
+
+                    // Show all icy metadata too, even if we don't know what they are
+                    for (auto& [key, val] : res->meta) {
+                        if (key == "StreamTitle")
+                            continue;
+                        auto tval = utils::trimmed(val);
+                        if (tval.empty())
+                            continue;
+                        ui::show_info_row(key, tval);
+                    }
+
+                    if (!utils::trimmed(res->icy_name).empty())
+                        ui::show_info_row("Name", res->icy_name);
+
+                    if (!res->icy_url.empty())
+                        ui::show_link_row("URL", res->icy_url);
+
+                    if (!res->icy_genre.empty())
+                        ui::show_info_row("Genre",
+                                          utils::join(utils::split(res->icy_genre, ","), ", "));
+
+                    if (!res->icy_description.empty())
+                        ui::show_info_row("Description", res->icy_description);
+
+                    if (auto info = res->mpg.try_get_frame_info()) {
+                        {
+                            // MPEG version
+                            std::string value;
+                            switch (info->version) {
+                                case MPG123_1_0:
+                                    value += "1.0";
+                                    break;
+                                case MPG123_2_0:
+                                    value += "2.0";
+                                    break;
+                                case MPG123_2_5:
+                                    value += "2.5";
+                                    break;
+                                default:
+                                    value += "unknown";
+                            }
+                            value += " layer " + std::to_string(info->layer);
+                            ui::show_info_row("MPEG", value);
+                        }
+                        {
+                            // Sampling rate
+                            std::string value;
+                            switch (info->rate) {
+                                case 48000:
+                                    value = "48 k";
+                                    break;
+                                case 44100:
+                                    value = "44.1 k";
+                                    break;
+                                case 22050:
+                                    value = "22.05 k";
+                                    break;
+                                default:
+                                    if ((info->rate % 1000) == 0)
+                                        value = utils::cpp_sprintf("%u k", info->rate / 1000u);
+                                    else // weird rate, just print out without the k
+                                        value = utils::cpp_sprintf("%u ", info->rate);
+                            }
+                            ui::show_info_row("Sampling rate", value + "㎐");
+                        }
+                        {
+                            // Channel mode
+                            std::string value;
+                            switch (info->mode) {
+                                case MPG123_M_STEREO:
+                                    value = "stereo";
+                                    break;
+                                case MPG123_M_JOINT:
+                                    value = "joint stereo";
+                                    break;
+                                case MPG123_M_DUAL:
+                                    value = "dual channel";
+                                    break;
+                                case MPG123_M_MONO:
+                                    value = "mono";
+                                    break;
+                                default:
+                                    value = "unknown";
+                            }
+                            ui::show_info_row("Channels", value);
+                        }
+                        {
+                            // Bitrate
+                            std::string value;
+                            switch (info->vbr_mode) {
+                                case MPG123_CBR:
+                                    value = "constant";
+                                    break;
+                                case MPG123_VBR:
+                                    value = "variable";
+                                    break;
+                                case MPG123_ABR:
+                                    value = "average";
+                                    break;
+                                default:
+                                    value = "unknown";
+                            }
+                            value += " " + std::to_string(info->bitrate) + " kbps";
+                            ui::show_info_row("Bitrate", value);
+                        }
+                    }
+
+                    ImGui::EndTable();
+
+                    ImGui::Unindent();
+
                 }
-
-                if (!utils::trimmed(res->icy_name).empty())
-                    ui::show_info_row("Name", res->icy_name);
-
-                if (!res->icy_url.empty())
-                    ui::show_link_row("URL", res->icy_url);
-
-                if (!res->icy_genre.empty())
-                    ui::show_info_row("Genre", res->icy_genre);
-
-                if (!res->icy_description.empty())
-                    ui::show_info_row("Description", res->icy_description);
-
-                ImGui::EndTable();
-            }
-
+            } // endif (ImGui::CollapsingHeader("Stream details"))
         } // stream
         ImGui::HandleDragScroll(scroll_target);
         ImGui::EndChild();
@@ -610,25 +728,30 @@ namespace Player {
                               ImGuiChildFlags_FrameStyle |
                               ImGuiChildFlags_NavFlattened)) {
 
-            ImGui::SeparatorText("Track history");
+            if (ImGui::CollapsingHeader("Track history")) {
 
-            if (ImGui::BeginTable("table",
-                                  2,
-                                  ImGuiTableFlags_BordersInnerH)) {
+                ImGui::Indent();
 
-                ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
-                ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+                if (ImGui::BeginTable("table",
+                                      2,
+                                      ImGuiTableFlags_BordersInnerH)) {
 
-                for (const auto& [when, title] : history | std::views::reverse) {
+                    ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
+                    ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-                    auto t = duration_cast<std::chrono::seconds>(now - when);
-                    std::string label = humanize::duration(t) + " ago";
+                    for (const auto& [when, title] : history | std::views::reverse) {
 
-                    ui::show_info_row(label, title);
+                        auto t = duration_cast<std::chrono::seconds>(now - when);
+                        std::string label = humanize::duration(t) + " ago";
 
+                        ui::show_info_row(label, title);
+
+                    }
+
+                    ImGui::EndTable();
                 }
 
-                ImGui::EndTable();
+                ImGui::Unindent();
             }
 
         } // history

@@ -22,6 +22,7 @@ namespace cfg {
     extern unsigned    browser_page_limit;
     extern bool        disable_apd;
     extern bool        disable_swkbd;
+    extern bool        inactive_screen_off;
     extern TabID       initial_tab;
     extern unsigned    player_buffer_size;
     extern unsigned    player_history_limit;

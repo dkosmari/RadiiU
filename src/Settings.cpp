@@ -193,6 +193,22 @@ namespace Settings {
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::Checkbox("##disable_apd", &cfg::disable_apd);
 
+                /***********************
+                 * Inactive Screen Off *
+                 ***********************/
+
+                ImGui::TableNextRow();
+
+                ImGui::TableNextColumn();
+
+                ImGui::AlignTextToFramePadding();
+                ui::show_label("Turn DRC screen off on inactivity");
+
+                ImGui::TableNextColumn();
+
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                ImGui::Checkbox("##inactive_screen_off", &cfg::inactive_screen_off);
+
                 /*****************
                  * Disable swkbd *
                  *****************/

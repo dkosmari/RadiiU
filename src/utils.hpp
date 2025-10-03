@@ -82,6 +82,17 @@ namespace utils {
     trimmed(const std::string& input,
             const std::string& discard = " \r\n\t");
 
+
+    std::string
+    cpp_vsprintf(const char* fmt,
+                 va_list args)
+        __attribute__ (( __format__(__printf__, 1, 0) ));
+
+    std::string
+    cpp_sprintf(const char* fmt,
+                ...)
+        __attribute__ (( __format__(__printf__, 1, 2) ));
+
 } // namespace utils
 
 #endif

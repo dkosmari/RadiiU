@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <cstdarg>
 #include <cinttypes>
 #include <tuple>
 
@@ -207,6 +208,41 @@ namespace utils {
             return {};
         auto finish = input.find_last_not_of(discard);
         return input.substr(start, finish - start + 1);
+    }
+
+
+    std::string
+    cpp_vsprintf(const char* fmt,
+                 va_list args)
+    {
+        std::va_list args2;
+        va_copy(args2, args);
+        int size = std::vsnprintf(nullptr, 0, fmt, args2);
+        va_end(args2);
+        if (size < 0)
+            throw std::runtime_error{"vsnprintf() failed"};
+
+        std::string text(size, '\0');
+        std::vsnprintf(text.data(), text.size() + 1, fmt, args);
+        return text;
+    }
+
+
+    std::string
+    cpp_sprintf(const char* fmt,
+                ...)
+    {
+        std::va_list args;
+        va_start(args, fmt);
+        try {
+            auto result = cpp_vsprintf(fmt, args);
+            va_end(args);
+            return result;
+        }
+        catch (...) {
+            va_end(args);
+            throw;
+        }
     }
 
 } // namespace utils

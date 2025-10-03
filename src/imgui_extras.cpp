@@ -40,53 +40,6 @@ namespace ImGui {
 
     namespace {
 
-        std::string
-        cpp_vsprintf(const char* fmt,
-                     va_list args)
-            IM_FMTLIST(1);
-
-        std::string
-        cpp_vsprintf(const char* fmt,
-                     va_list args)
-        {
-            std::va_list args2;
-            va_copy(args2, args);
-            int size = std::vsnprintf(nullptr, 0, fmt, args2);
-            va_end(args2);
-            if (size < 0)
-                throw std::runtime_error{"vsnprintf() failed"};
-
-            std::string text(size, '\0');
-            std::vsnprintf(text.data(), text.size() + 1, fmt, args);
-            return text;
-        }
-
-
-#if 0
-        std::string
-        cpp_sprintf(const char* fmt,
-                    ...)
-            IM_FMTARGS(1);
-
-        std::string
-        cpp_sprintf(const char* fmt,
-                    ...)
-        {
-            std::va_list args;
-            va_start(args, fmt);
-            try {
-                auto result = cpp_vsprintf(fmt, args);
-                va_end(args);
-                return result;
-            }
-            catch (...) {
-                va_end(args);
-                throw;
-            }
-        }
-#endif
-
-
         template<concepts::arithmetic T>
         constexpr ImGuiDataType imgui_data_type_v;
 
@@ -724,7 +677,7 @@ namespace ImGui {
         std::va_list args;
         va_start(args, fmt);
         try {
-            text = cpp_vsprintf(fmt, args);
+            text = utils::cpp_vsprintf(fmt, args);
             va_end(args);
         }
         catch (...) {
