@@ -6,6 +6,12 @@ It uses the station listing from [www.radio-browser.info](https://www.radio-brow
 
 ![RadiiU Favorites tab](assets/hbas/radiiu-favorites.png)
 
+<p align="center">
+    <a href="https://hb-app.store/wiiu/RadiiU">
+        <img src="assets/hbas/hbasbadge-wiiu.png" width="335" height="96">
+    </a>
+</p>
+
 
 ## Build instructions
 
