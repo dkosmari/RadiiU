@@ -616,8 +616,7 @@ namespace Player {
                         ui::show_link_row("URL", res->icy_url);
 
                     if (!res->icy_genre.empty())
-                        ui::show_info_row("Genre",
-                                          utils::join(utils::split(res->icy_genre, ","), ", "));
+                        ui::show_info_row("Genre", res->icy_genre);
 
                     if (!res->icy_description.empty())
                         ui::show_info_row("Description", res->icy_description);
