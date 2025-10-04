@@ -36,15 +36,15 @@ namespace cfg {
 
     std::filesystem::path base_dir;
 
-    unsigned browser_page_limit   = 20;
-    bool     disable_apd          = true;
-    bool     disable_swkbd        = false;
-    bool     inactive_screen_off  = false;
-    TabID    initial_tab          = TabID::browser;
-    unsigned player_buffer_size   = 8192;
-    unsigned player_history_limit = 20;
-    unsigned recent_limit         = 10;
-    bool     remember_tab         = true;
+    unsigned browser_page_limit;
+    bool     disable_apd;
+    bool     disable_swkbd;
+    bool     inactive_screen_off;
+    TabID    initial_tab;
+    unsigned player_buffer_size;
+    unsigned player_history_limit;
+    unsigned recent_limit;
+    bool     remember_tab;
     string   server;
 
 
@@ -83,8 +83,26 @@ namespace cfg {
 
 
     void
+    load_defaults()
+    {
+        browser_page_limit   = 20;
+        disable_apd          = true;
+        disable_swkbd        = false;
+        inactive_screen_off  = false;
+        initial_tab          = TabID::browser;
+        player_buffer_size   = 8;
+        player_history_limit = 20;
+        recent_limit         = 10;
+        remember_tab         = true;
+        server.clear();
+    }
+
+
+    void
     initialize()
     {
+        load_defaults();
+
 #ifdef __WIIU__
         nn::act::Initialize();
         base_dir = get_user_config_path();

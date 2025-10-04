@@ -202,7 +202,7 @@ namespace Settings {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                ui::show_label("Turn DRC screen off on inactivity");
+                ui::show_label("Turn gamepad screen off on inactivity");
 
                 ImGui::TableNextColumn();
 
@@ -216,6 +216,7 @@ namespace Settings {
                 ImGui::TableNextRow();
 
                 ImGui::TableNextColumn();
+
                 ImGui::AlignTextToFramePadding();
                 ui::show_label("Disable SWKBD");
 
@@ -228,6 +229,20 @@ namespace Settings {
                  * End of settings *
                  *******************/
 
+                ImGui::TableNextRow();
+
+                ImGui::TableNextColumn();
+                ImGui::AlignTextToFramePadding();
+                ui::show_label("Reset everything to default");
+
+                ImGui::TableNextColumn();
+
+                if (ImGui::Button("Reset")) {
+                    cfg::load_defaults();
+                    cfg::save();
+                }
+
+                /////////////////
                 ImGui::EndTable();
             }
 

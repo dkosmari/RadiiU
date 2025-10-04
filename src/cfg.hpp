@@ -32,6 +32,10 @@ namespace cfg {
 
 
     void
+    load_defaults();
+
+
+    void
     initialize();
 
 

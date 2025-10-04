@@ -1,10 +1,4 @@
-* Pending features for v0.1.1 [100%]
+* Pending features for v0.2 [%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
-  - [X] Recent [1/1]
-    - [X] Implement station info button.
-  - [X] Player [3/3]
-    - [X] Implement station info button.
-    - [X] Make stream info and track history collapsible.
-    - [X] Add option to put gamepad LCD on standby after timeout.

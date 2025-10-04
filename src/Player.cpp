@@ -290,6 +290,8 @@ namespace Player {
         bool
         is_buffer_too_empty()
         {
+            if (cfg::player_buffer_size == 0)
+                return false;
             return calc_buffer_size() < cfg::player_buffer_size * 1024;
         }
 
