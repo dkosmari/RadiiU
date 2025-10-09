@@ -112,6 +112,95 @@ namespace Player {
     }
 
 
+    std::string
+    get_codec_desc(const mpg123::frame_info& info)
+    {
+        std::string result;
+
+        // MPEG version
+        switch (info.version) {
+            case MPG123_1_0:
+                result += "MPEG 1.0";
+                break;
+            case MPG123_2_0:
+                result += "MPEG 2.0";
+                break;
+            case MPG123_2_5:
+                result += "MPEG 2.5";
+                break;
+            default:
+                result += "MPEG ?";
+        }
+        result += " layer ";
+        result += std::to_string(info.layer);
+
+        result += "; ";
+
+        // Sampling rate
+        switch (info.rate) {
+            case 48000:
+                result += "48 k";
+                break;
+            case 44100:
+                result += "44.1 k";
+                break;
+            case 22050:
+                result += "22.05 k";
+                break;
+            default:
+                if ((info.rate % 1000) == 0)
+                    result += utils::cpp_sprintf("%u k", info.rate / 1000u);
+                else // weird rate, just print out without the k
+                    result += utils::cpp_sprintf("%u ", info.rate);
+        }
+        result += "㎐";
+
+        result += "; ";
+
+        // Channel mode
+        switch (info.mode) {
+            case MPG123_M_STEREO:
+                result += "stereo";
+                break;
+            case MPG123_M_JOINT:
+                result += "joint stereo";
+                break;
+            case MPG123_M_DUAL:
+                result += "dual channel";
+                break;
+            case MPG123_M_MONO:
+                result += "mono";
+                break;
+            default:
+                result += "unknown";
+        }
+
+        return result;
+    }
+
+
+    std::string
+    get_bitrate_desc(const mpg123::frame_info& info)
+    {
+        std::string result;
+        switch (info.vbr_mode) {
+            case MPG123_CBR:
+                result = "constant";
+                break;
+            case MPG123_VBR:
+                result = "variable";
+                break;
+            case MPG123_ABR:
+                result = "average";
+                break;
+            default:
+                result = "unknown";
+        }
+        result += " " + std::to_string(info.bitrate) + " kbps";
+        return result;
+    }
+
+
     void
     history_add(const std::string& title);
 
@@ -624,86 +713,8 @@ namespace Player {
                         ui::show_info_row("Description", res->icy_description);
 
                     if (auto info = res->mpg.try_get_frame_info()) {
-                        {
-                            // MPEG version
-                            std::string value;
-                            switch (info->version) {
-                                case MPG123_1_0:
-                                    value += "1.0";
-                                    break;
-                                case MPG123_2_0:
-                                    value += "2.0";
-                                    break;
-                                case MPG123_2_5:
-                                    value += "2.5";
-                                    break;
-                                default:
-                                    value += "unknown";
-                            }
-                            value += " layer " + std::to_string(info->layer);
-                            ui::show_info_row("MPEG", value);
-                        }
-                        {
-                            // Sampling rate
-                            std::string value;
-                            switch (info->rate) {
-                                case 48000:
-                                    value = "48 k";
-                                    break;
-                                case 44100:
-                                    value = "44.1 k";
-                                    break;
-                                case 22050:
-                                    value = "22.05 k";
-                                    break;
-                                default:
-                                    if ((info->rate % 1000) == 0)
-                                        value = utils::cpp_sprintf("%u k", info->rate / 1000u);
-                                    else // weird rate, just print out without the k
-                                        value = utils::cpp_sprintf("%u ", info->rate);
-                            }
-                            ui::show_info_row("Sampling rate", value + "㎐");
-                        }
-                        {
-                            // Channel mode
-                            std::string value;
-                            switch (info->mode) {
-                                case MPG123_M_STEREO:
-                                    value = "stereo";
-                                    break;
-                                case MPG123_M_JOINT:
-                                    value = "joint stereo";
-                                    break;
-                                case MPG123_M_DUAL:
-                                    value = "dual channel";
-                                    break;
-                                case MPG123_M_MONO:
-                                    value = "mono";
-                                    break;
-                                default:
-                                    value = "unknown";
-                            }
-                            ui::show_info_row("Channels", value);
-                        }
-                        {
-                            // Bitrate
-                            std::string value;
-                            switch (info->vbr_mode) {
-                                case MPG123_CBR:
-                                    value = "constant";
-                                    break;
-                                case MPG123_VBR:
-                                    value = "variable";
-                                    break;
-                                case MPG123_ABR:
-                                    value = "average";
-                                    break;
-                                default:
-                                    value = "unknown";
-                            }
-                            value += " " + std::to_string(info->bitrate) + " kbps";
-                            ui::show_info_row("Bitrate", value);
-                        }
+                        ui::show_info_row("Codec", get_codec_desc(*info));
+                        ui::show_info_row("Bitrate", get_bitrate_desc(*info));
                     }
 
                     ImGui::EndTable();

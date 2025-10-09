@@ -11,7 +11,9 @@
 #include <jansson.h>
 #include <mpg123.h>
 
+#include <freetype/freetype.h>
 #include <SDL_version.h>
+#include <SDL_image.h>
 
 #include "About.hpp"
 
@@ -40,15 +42,49 @@ namespace About {
         std::string
         get_sdl_version_str()
         {
-                SDL_version sdl_ver;
-                SDL_GetVersion(&sdl_ver);
+            SDL_version v;
+            SDL_GetVersion(&v);
+            char buf[32];
+            std::snprintf(buf, sizeof buf,
+                          "%u.%u.%u",
+                          v.major,
+                          v.minor,
+                          v.patch);
+            return buf;
+        }
+
+
+        std::string
+        get_sdl_img_version_str()
+        {
+            const SDL_version* v = IMG_Linked_Version();
+            char buf[32];
+            std::snprintf(buf, sizeof buf,
+                          "%u.%u.%u",
+                          v->major,
+                          v->minor,
+                          v->patch);
+            return buf;
+        }
+
+
+        std::string
+        get_ft_version_str()
+        {
+            FT_Library lib;
+            if (!FT_Init_FreeType(&lib)) {
+                FT_Int major, minor, patch;
+                FT_Library_Version(lib, &major, &minor, &patch);
+                FT_Done_FreeType(lib);
                 char buf[32];
                 std::snprintf(buf, sizeof buf,
-                              "%u.%u.%u",
-                              sdl_ver.major,
-                              sdl_ver.minor,
-                              sdl_ver.patch);
+                              "%d.%d.%d",
+                              major,
+                              minor,
+                              patch);
                 return buf;
+            }
+            return "";
         }
 
 
@@ -153,7 +189,14 @@ namespace About {
                 static const std::string sdl_version = get_sdl_version_str();
                 ui::show_info_row("SDL", sdl_version);
 
+                static const std::string sdl_img_version = get_sdl_img_version_str();
+                ui::show_info_row("SDL_image", sdl_img_version);
+
                 ui::show_info_row("ImGui", IMGUI_VERSION);
+
+                static const std::string ft_version = get_ft_version_str();
+                if (!ft_version.empty())
+                    ui::show_info_row("FreeType", ft_version);
 
                 ui::show_info_row("libCURL", curl_version());
 

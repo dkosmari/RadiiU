@@ -816,7 +816,7 @@ namespace Browser {
             unsigned max_page_num = UINT_MAX;
             if (last_page)
                 max_page_num = page_number;
-            ImGui::Drag("##page"s, page_number, 1u, max_page_num, 0.01f);
+            ImGui::Drag("##page"s, page_number, 1u, max_page_num, 0.05f);
             page_index = page_number - 1;
             if (ImGui::IsItemDeactivatedAfterEdit())
                 queue_refresh_stations();
