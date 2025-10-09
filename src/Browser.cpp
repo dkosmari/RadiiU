@@ -688,10 +688,6 @@ namespace Browser {
                     ImGui::InputText("Name", &filter_name);
 
                     ImGui::SetNextItemWidth(filters_width);
-#if 0
-                    // TODO: should use list of tags
-                    ImGui::InputText("Tag", &filter_tag);
-#else
                     if (ImGui::BeginCombo("Tag", filter_tag)) {
                         static ImGuiTextFilter filter;
                         if (ImGui::IsWindowAppearing()) {
@@ -699,10 +695,8 @@ namespace Browser {
                             filter.Clear();
                         }
                         filter.Draw("##tag_filter");
-
                         if (ImGui::Selectable("(empty)", filter_tag.empty()))
                             filter_tag.clear();
-
                         for (auto& tag : tags) {
                             const bool is_selected = filter_tag == tag;
                             if (filter.PassFilter(tag.data()))
@@ -711,7 +705,6 @@ namespace Browser {
                         }
                         ImGui::EndCombo();
                     }
-#endif
 
                     ImGui::SetNextItemWidth(filters_width);
                     std::string display_country;
@@ -722,15 +715,20 @@ namespace Browser {
                             display_country += " - " + *country_name;
                     }
                     if (ImGui::BeginCombo("Country", display_country)) {
-
+                        static ImGuiTextFilter filter;
+                        if (ImGui::IsWindowAppearing()) {
+                            ImGui::SetKeyboardFocusHere();
+                            filter.Clear();
+                        }
+                        filter.Draw("##country_filter");
                         if (ImGui::Selectable("(none)", filter_country.empty()))
                             filter_country.clear();
-
                         for (const auto& country : countries) {
-                            if (ImGui::Selectable(country.code + " - " + country.name,
-                                                  filter_country == country.code)) {
-                                filter_country = country.code;
-                            }
+                            const bool is_selected = filter_country == country.code;
+                            const std::string entry_name = country.code + " - " + country.name;
+                            if (filter.PassFilter(entry_name.data()))
+                                if (ImGui::Selectable(entry_name, is_selected))
+                                    filter_country = country.code;
                         }
                         ImGui::EndCombo();
                     }
