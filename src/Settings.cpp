@@ -119,7 +119,7 @@ namespace Settings {
                               cfg::browser_page_limit,
                               10u, 50u);
                 if (ImGui::IsItemDeactivatedAfterEdit())
-                    Browser::queue_update_stations();
+                    Browser::queue_refresh_stations();
 
 
                 /*************************

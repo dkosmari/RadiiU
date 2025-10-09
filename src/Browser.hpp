@@ -37,7 +37,7 @@ namespace Browser {
 
 
     void
-    queue_update_stations();
+    queue_refresh_stations();
 
 
     void

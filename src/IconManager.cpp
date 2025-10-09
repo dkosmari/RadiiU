@@ -217,11 +217,15 @@ namespace IconManager {
                 {
                     if (!entry.raw_buf)
                         entry.raw_buf.emplace();
+#ifdef __cpp_lib_containers_ranges
+                    entry.raw_buf->append_range(buf);
+#else
                     entry.raw_buf->insert(entry.raw_buf->end(), buf.begin(), buf.end());
+#endif
                     return buf.size();
                 });
                 multi->add(ez);
-            } else {
+            } else if (location.starts_with("ui/")) {
                 // local path
                 auto img = sdl::img::try_load(content_prefix / location);
                 if (img) {
@@ -235,11 +239,14 @@ namespace IconManager {
                     entry.state = LoadState::error;
                     return;
                 }
+            } else {
+                throw std::runtime_error{"invalid location: \"" + location + "\""};
             }
 
         }
         catch (std::exception& e) {
             cout << "Error processing request " << location << ": " << e.what() << endl;
+            entry.state = LoadState::error;
         }
     }
 

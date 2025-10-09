@@ -48,6 +48,8 @@
 using std::cout;
 using std::endl;
 
+using namespace std::literals;
+
 using sdl::vec2;
 
 
@@ -308,7 +310,7 @@ namespace Browser {
             if (root.contains("page"))
                 page_index = root.at("page").as<json::integer>() - 1;
 
-            queue_update_stations();
+            queue_refresh_stations();
         }
         catch (std::exception& e) {
             cout << "Error loading browser: " << e.what() << endl;
@@ -459,7 +461,7 @@ namespace Browser {
 
 
     void
-    queue_update_stations()
+    queue_refresh_stations()
     {
         need_refresh = true;
         scroll_to_top = true;
@@ -470,7 +472,7 @@ namespace Browser {
     apply_options()
     {
         page_index = 0;
-        queue_update_stations();
+        queue_refresh_stations();
     }
 
 
@@ -485,6 +487,7 @@ namespace Browser {
     }
 
 
+#if 0
     // DEBUG
     void
     show_last_bounding_box()
@@ -497,6 +500,7 @@ namespace Browser {
             draw_list->AddRect(min, max, col);
         }
     }
+#endif
 
 
     void
@@ -674,51 +678,90 @@ namespace Browser {
     void
     show_navigation()
     {
-        if (ImGui::Button("100⏪") && !busy) {
-            if (page_index >= 100)
-                page_index -= 100;
-            else
-                page_index = 0;
-            queue_update_stations();
-        }
-        ImGui::SameLine();
+        const float parent_width = ImGui::GetContentRegionAvail().x;
+        const ImVec2 global_pos = ImGui::GetCursorScreenPos();
+        ImGui::SetNextWindowPos({global_pos.x + parent_width / 2.0f, global_pos.y + 0.0f},
+                                ImGuiCond_Always,
+                                {0.5f, 0.0f});
+        if (ImGui::BeginChild("navigation",
+                              {0, 0},
+                              ImGuiChildFlags_AutoResizeX |
+                              ImGuiChildFlags_AutoResizeY |
+                              ImGuiChildFlags_NavFlattened)) {
 
-        if (ImGui::Button("10⏪") && !busy) {
-            if (page_index >= 10)
-                page_index -= 10;
-            else
-                page_index = 0;
-            queue_update_stations();
-        }
-        ImGui::SameLine();
+            const bool first_page = page_index == 0;
+            const bool last_page = stations.size() < cfg::browser_page_limit;
 
-        if (ImGui::Button("⏴") && !busy) {
-            if (page_index > 0)
-                --page_index;
-            queue_update_stations();
-        }
-        ImGui::SameLine();
+            ImGui::BeginDisabled(first_page);
 
-        ImGui::AlignTextToFramePadding();
-        ImGui::Value("Page", page_index + 1);
-        ImGui::SameLine();
+            if (ImGui::Button("100⏪") && !busy) {
+                if (page_index >= 100)
+                    page_index -= 100;
+                else
+                    page_index = 0;
+                queue_refresh_stations();
+            }
 
-        if (ImGui::Button("⏵") && !busy) {
-            ++page_index;
-            queue_update_stations();
-        }
-        ImGui::SameLine();
+            ImGui::SameLine();
 
-        if (ImGui::Button("⏩10") && !busy) {
-            page_index += 10;
-            queue_update_stations();
-        }
-        ImGui::SameLine();
+            if (ImGui::Button("10⏪") && !busy) {
+                if (page_index >= 10)
+                    page_index -= 10;
+                else
+                    page_index = 0;
+                queue_refresh_stations();
+            }
 
-        if (ImGui::Button("⏩100") && !busy) {
-            page_index += 100;
-            queue_update_stations();
+            ImGui::SameLine();
+
+            if (ImGui::Button("⏴") && !busy) {
+                if (page_index > 0)
+                    --page_index;
+                queue_refresh_stations();
+            }
+
+            ImGui::EndDisabled();
+
+            ImGui::SameLine();
+
+            static unsigned page_number;
+            page_number = page_index + 1;
+            const float page_width = 200;
+            ImGui::SetNextItemWidth(page_width);
+            unsigned max_page_num = UINT_MAX;
+            if (last_page)
+                max_page_num = page_number;
+            ImGui::Drag("##page"s, page_number, 1u, max_page_num, 0.01f);
+            page_index = page_number - 1;
+            if (ImGui::IsItemDeactivatedAfterEdit())
+                queue_refresh_stations();
+
+            ImGui::SameLine();
+
+            ImGui::BeginDisabled(last_page);
+
+            if (ImGui::Button("⏵") && !busy) {
+                ++page_index;
+                queue_refresh_stations();
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("⏩10") && !busy) {
+                page_index += 10;
+                queue_refresh_stations();
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("⏩100") && !busy) {
+                page_index += 100;
+                queue_refresh_stations();
+            }
+
+            ImGui::EndDisabled();
         }
+        ImGui::EndChild();
     }
 
 
@@ -829,8 +872,30 @@ namespace Browser {
                 ImGui::SetScrollY(0);
                 scroll_to_top = false;
             }
+
+#if 0
+            // Disabled until ImGui fixes navigation.
+            const float content_width = ImGui::GetContentRegionAvail().x;
+            if (page_index > 0)
+                if (ImGui::Button("⏴ Go to page " + std::to_string(page_index - 1 + 1),
+                                  {content_width, 0.0f})) {
+                    --page_index;
+                    queue_refresh_stations();
+                }
+#endif
+
             for (const auto& station : stations)
                 show_station(station, scroll_target);
+
+#if 0
+            // Disabled until ImGui fixes navigation.
+            if (stations.size() == cfg::browser_page_limit)
+                if (ImGui::Button("Go page " + std::to_string(page_index + 1 + 1) + " ⏵",
+                                  {content_width, 0.0f})) {
+                    ++page_index;
+                    queue_refresh_stations();
+                }
+#endif
         }
         ImGui::HandleDragScroll();
         ImGui::EndChild(); // stations
