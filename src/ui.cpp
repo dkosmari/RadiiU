@@ -169,6 +169,9 @@ namespace ui {
                 }
             }
 
+            if (!station.languages.empty())
+                ImGui::TextWrapped("🗣 %s", utils::join(station.languages, ", ").data());
+
             if (!station.country_code.empty()) {
                 ImGui::Text("🏳 %s", station.country_code.data());
                 auto name = Browser::get_country_name(station.country_code);
@@ -315,14 +318,14 @@ namespace ui {
                     show_link_row("url_resolved", station_info_result->url_resolved);
                     show_link_row("homepage",     station_info_result->homepage);
                     show_link_row("favicon",      station_info_result->favicon);
+                    show_info_row("countrycode",  station_info_result->country_code);
+                    show_info_row("language", utils::join(station_info_result->languages, ", "));
                     show_info_row("tags", utils::join(station_info_result->tags, ", "));
-                    show_info_row("country_code", station_info_result->country_code);
-                    show_info_row("language",     station_info_result->language);
                     show_info_row("uuid",         station_info_result->uuid);
 
                     show_info_row("votes",        station_info_result->votes);
-                    show_info_row("click_count",  station_info_result->click_count);
-                    show_info_row("click_trend",  station_info_result->click_trend);
+                    show_info_row("clickcount",   station_info_result->click_count);
+                    show_info_row("clicktrend",   station_info_result->click_trend);
                     show_info_row("bitrate",      station_info_result->bitrate);
 
                     ImGui::EndTable();

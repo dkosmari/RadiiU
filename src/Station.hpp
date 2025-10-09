@@ -24,7 +24,6 @@ struct Station {
     std::string homepage;
     std::string favicon;
     std::string country_code;
-    std::string language;
     std::string uuid;
 
     // Volatile values, never stored.
@@ -33,6 +32,7 @@ struct Station {
     std::int64_t click_trend = 0;
     unsigned bitrate = 0;
 
+    std::vector<std::string> languages;
     std::vector<std::string> tags;
 
 

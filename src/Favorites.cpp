@@ -54,43 +54,52 @@ namespace Favorites {
         const std::string popup_delete_title = "Delete station?";
         std::optional<std::size_t> station_to_remove;
 
-        struct StationAndTags {
+        struct StationAndExtras {
 
             Station station;
+            std::string language_str;
             std::string tags_str;
 
-            StationAndTags()
+            StationAndExtras()
                 noexcept
             {}
 
-            StationAndTags(const Station& st) :
+            StationAndExtras(const Station& st) :
                 station{st}
             {
-                join_tags();
+                join_fields();
             }
 
             void
-            split_tags()
+            split_fields()
             {
+                // copy language_str into the languages vector
+                station.languages = utils::split(language_str, ",");
+                for (auto& lang : station.languages)
+                    lang = utils::trimmed(lang, ' ');
+                std::erase(station.languages, "");
+
                 // copy tags_str into the tags vector
                 station.tags = utils::split(tags_str, ",");
-                for (auto& t : station.tags)
-                    t = utils::trimmed(t, ' ');
+                for (auto& tag : station.tags)
+                    tag = utils::trimmed(tag, ' ');
+                std::erase(station.tags, "");
             }
 
             void
-            join_tags()
+            join_fields()
             {
+                language_str = utils::join(station.languages, ", ");
                 tags_str = utils::join(station.tags, ", ");
             }
 
-        }; // struct StationAndTags
+        }; // struct StationAndExtras
 
         const std::string popup_edit_title = "Edit station";
-        std::optional<StationAndTags> edited_station;
+        std::optional<StationAndExtras> edited_station;
 
         const std::string popup_create_title = "Create station";
-        std::optional<StationAndTags> created_station;
+        std::optional<StationAndExtras> created_station;
 
     } // namespace
 
@@ -210,22 +219,22 @@ namespace Favorites {
 
 
     void
-    show_station_fields(StationAndTags& sat)
+    show_station_fields(StationAndExtras& sae)
     {
         if (ImGui::BeginTable("fields", 2)) {
 
             ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
             ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-            show_row_for("name",         sat.station.name);
-            show_row_for("url",          sat.station.url);
-            show_row_for("url_resolved", sat.station.url_resolved);
-            show_row_for("homepage",     sat.station.homepage);
-            show_row_for("favicon",      sat.station.favicon);
-            show_row_for("tags",         sat.tags_str);
-            show_row_for("country_code", sat.station.country_code);
-            show_row_for("language",     sat.station.language);
-            show_row_for("uuid",         sat.station.uuid);
+            show_row_for("name",         sae.station.name);
+            show_row_for("url",          sae.station.url);
+            show_row_for("url_resolved", sae.station.url_resolved);
+            show_row_for("homepage",     sae.station.homepage);
+            show_row_for("favicon",      sae.station.favicon);
+            show_row_for("tags",         sae.tags_str);
+            show_row_for("country_code", sae.station.country_code);
+            show_row_for("language",     sae.language_str);
+            show_row_for("uuid",         sae.station.uuid);
 
             ImGui::EndTable();
         }
@@ -235,6 +244,8 @@ namespace Favorites {
     void
     process_popup_edit(Station& station)
     {
+        // TODO: add button for updating from Browser, if uuid is present
+
         if (!edited_station)
             return;
 
@@ -247,13 +258,14 @@ namespace Favorites {
 
             // Note: use a helper child window to push the response buttons to the bottom.
             if (ImGui::BeginChild("content",
-                                  {0, -ImGui::GetFrameHeightWithSpacing()}))
+                                  {0, -ImGui::GetFrameHeightWithSpacing()},
+                                  ImGuiChildFlags_NavFlattened))
                 show_station_fields(*edited_station);
 
             ImGui::HandleDragScroll();
             ImGui::EndChild();
 
-            auto window_size = ImGui::GetContentRegionAvail();
+            auto content_size = ImGui::GetContentRegionAvail();
 
             // Cancel button
             {
@@ -272,7 +284,7 @@ namespace Favorites {
                 auto& style = ImGui::GetStyle();
                 const std::string label = "✔ Apply";
                 ImVec2 btn_size = ImGui::CalcTextSize(label, true) + style.FramePadding * 2;
-                float new_x = window_size.x - btn_size.x;
+                float new_x = content_size.x - btn_size.x;
                 float cur_x = ImGui::GetCursorPosX();
                 if (new_x > cur_x) // avoid overlapping with Cancel button
                     ImGui::SetCursorPosX(new_x);
@@ -283,7 +295,7 @@ namespace Favorites {
                         if (it != uuids.end())
                             uuids.erase(it);
 
-                        edited_station->split_tags();
+                        edited_station->split_fields();
                         station = std::move(edited_station->station);
                         if (!station.uuid.empty())
                             uuids.insert(station.uuid);
@@ -312,12 +324,13 @@ namespace Favorites {
 
             // Note: use a helper child window to push the response buttons to the bottom.
             if (ImGui::BeginChild("content",
-                                  {0, -ImGui::GetFrameHeightWithSpacing()}))
+                                  {0, -ImGui::GetFrameHeightWithSpacing()},
+                                  ImGuiChildFlags_NavFlattened))
                 show_station_fields(*created_station);
             ImGui::HandleDragScroll();
             ImGui::EndChild();
 
-            auto window_size = ImGui::GetContentRegionAvail();
+            auto content_size = ImGui::GetContentRegionAvail();
 
             // Cancel button
             {
@@ -336,14 +349,14 @@ namespace Favorites {
                 auto& style = ImGui::GetStyle();
                 const std::string label = "✔ Create";
                 ImVec2 btn_size = ImGui::CalcTextSize(label, true) + style.FramePadding * 2;
-                float new_x = window_size.x - btn_size.x;
+                float new_x = content_size.x - btn_size.x;
                 float cur_x = ImGui::GetCursorPosX();
                 if (new_x > cur_x) // avoid overlapping with Cancel button
                     ImGui::SetCursorPosX(new_x);
                 if (ImGui::Button(label)) {
                     ImGui::CloseCurrentPopup();
                     if (created_station) {
-                        created_station->split_tags();
+                        created_station->split_fields();
                         add(std::move(created_station->station));
                     }
                     created_station.reset();

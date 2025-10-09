@@ -284,6 +284,7 @@ namespace IconManager {
 
                 sdl::rwops rw{std::span(*entry->raw_buf)};
                 entry->img = sdl::img::load(rw);
+                // TODO: should scale down images that are too large
                 entry->state = LoadState::loaded;
                 entry->raw_buf.reset();
             }

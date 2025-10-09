@@ -64,11 +64,11 @@ operator ==(const Station& a,
         return false;
     if (a.favicon != b.favicon)
         return false;
-    if (a.tags != b.tags)
-        return false;
     if (a.country_code != b.country_code)
         return false;
-    if (a.language != b.language)
+    if (a.tags != b.tags)
+        return false;
+    if (a.languages != b.languages)
         return false;
     return true;
 }
@@ -85,12 +85,15 @@ Station::from_json(const json::object& obj)
     h.load("homepage",     result.homepage);
     h.load("favicon",      result.favicon);
     h.load("countrycode",  result.country_code);
-    h.load("language",     result.language);
     h.load("stationuuid",  result.uuid);
     h.load("votes",        result.votes);
     h.load("clickcount",   result.click_count);
     h.load("clicktrend",   result.click_trend);
     h.load("bitrate",      result.bitrate);
+
+    std::string language;
+    h.load("language", language);
+    result.languages = utils::split(language, ",");
 
     std::string tags;
     h.load("tags", tags);
@@ -146,14 +149,16 @@ Station::to_json()
     h.store("homepage", homepage);
     h.store("favicon", favicon);
     h.store("countrycode", country_code);
-    h.store("language", language);
     h.store("stationuuid", uuid);
 
+    h.store("language", utils::join(languages, ","));
     h.store("tags", utils::join(tags, ","));
+
     // Note: these fields are volatile, no point in serializing them.
-    // h.store("votes", votes);
-    // h.store("clickcount", click_count);
-    // h.store("clicktrend", click_trend);
-    // h.store("bitrate", bitrate);
+    // - votes
+    // - click_count
+    // - click_trend
+    // - bitrate
+
     return obj;
 }
