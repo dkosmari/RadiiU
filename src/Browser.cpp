@@ -9,8 +9,10 @@
 #include <array>
 #include <atomic>
 #include <cinttypes>
+#include <compare>
 #include <exception>
 #include <filesystem>
+#include <functional>
 #include <iostream>
 #include <random>
 #include <span>
@@ -57,11 +59,10 @@ namespace Browser {
 
     // Note: if safe_server is not empty, we are "connected".
     thread_safe<std::string> safe_server;
-    std::atomic_bool pending_connect{false};
+    std::atomic_bool finished_background_connect{false};
 
     thread_safe<std::vector<std::string>> safe_mirrors;
     std::jthread fetch_mirrors_thread;
-
 
     bool busy = false;
     bool options_visible = false;
@@ -92,8 +93,7 @@ namespace Browser {
     std::vector<Station> stations;
 
     bool scroll_to_top = false;
-    bool need_refresh = false;
-
+    bool station_refresh_requested = false;
 
     // TODO: allow votes to expire after 24 hours.
     std::unordered_set<std::string> votes_cast;
@@ -134,8 +134,49 @@ namespace Browser {
     std::string server_info_error;
 
 
+    struct Country {
+        std::string code;
+        std::string name;
+
+        bool
+        operator ==(const Country& other)
+            const noexcept = default;
+
+        std::strong_ordering
+        operator <=>(const Country& other)
+            const noexcept = default;
+    };
+
+    std::vector<Country> countries;
+
+
+    // Tasks to run during process_logic(), only if server is connected.
+    std::vector<std::function<void()>> pending_tasks;
+
+    template<typename F>
     void
-    refresh();
+    queue_task(F&& func)
+    {
+        pending_tasks.push_back(std::forward<F>(func));
+        assert(pending_tasks.size() < 10);
+    }
+
+
+    void
+    dispatch_tasks()
+    {
+        auto server = safe_server.load();
+        if (server.empty())
+            return;
+
+        for (auto& task : pending_tasks)
+            task();
+        pending_tasks.clear();
+    }
+
+
+    void
+    fetch_stations();
 
     void
     load();
@@ -148,6 +189,20 @@ namespace Browser {
 
     void
     request_server_info();
+
+
+    void
+    queue_refresh_countries();
+
+    void
+    fetch_countries();
+
+
+    const std::string&
+    by_code(const Country& c);
+
+    const std::string&
+    by_name(const Country& c);
 
 
     std::string
@@ -260,7 +315,7 @@ namespace Browser {
                 cout << "Mirror " << name << " returned:\n";
                 dump(result, cout);
                 safe_server.store(name);
-                pending_connect = true;
+                finished_background_connect = true;
                 break;
             }
             catch (std::exception& e) {
@@ -273,8 +328,8 @@ namespace Browser {
     void
     initialize()
     {
-        connect();
         load();
+        connect();
     }
 
 
@@ -282,6 +337,7 @@ namespace Browser {
     finalize()
     {
         fetch_mirrors_thread = {};
+        pending_tasks.clear();
         save();
     }
 
@@ -309,11 +365,9 @@ namespace Browser {
 
             if (root.contains("page"))
                 page_index = root.at("page").as<json::integer>() - 1;
-
-            queue_refresh_stations();
         }
         catch (std::exception& e) {
-            cout << "Error loading browser: " << e.what() << endl;
+            cout << "ERROR: loading browser.json: " << e.what() << endl;
         }
     }
 
@@ -349,14 +403,14 @@ namespace Browser {
     void
     process_logic()
     {
-        if (pending_connect) {
-            pending_connect = false;
+        if (finished_background_connect) {
+            finished_background_connect = false;
             busy = false;
             cout << "Finished selecting mirror: " << safe_server.load() << endl;
-            need_refresh = true;
+            queue_refresh_stations();
         }
-        if (need_refresh)
-            refresh();
+
+        dispatch_tasks();
     }
 
 
@@ -382,14 +436,25 @@ namespace Browser {
 
 
     void
-    refresh()
+    fetch_stations()
     {
-        if (busy)
+        if (busy) {
+            cout << "ERROR: fetch_stations() called while busy." << endl;
             return;
+        }
+
+        if (!station_refresh_requested) {
+            cout << "ERROR: fetch_stations() called while not requested." << endl;
+            return;
+        }
+
+        station_refresh_requested = false;
 
         std::string server = safe_server.load();
-        if (server.empty())
+        if (server.empty()) {
+            cout << "ERROR: fetch_stations() called when not conntected." << endl;
             return;
+        }
 
         cout << "Refreshing page index " << page_index << " ..." << endl;
 
@@ -433,11 +498,9 @@ namespace Browser {
                        [](curl::easy&,
                           const std::exception& error)
                        {
-                           cout << "JSON request failed: " << error.what() << endl;
+                           cout << "ERROR: JSON request failed: " << error.what() << endl;
                            busy = false;
                        });
-
-        need_refresh = false;
     }
 
 
@@ -446,25 +509,29 @@ namespace Browser {
     {
         busy = true;
         auto server = safe_server.lock();
-        if (*server != cfg::server) {
+        if (*server != cfg::server)
             *server = cfg::server;
-            need_refresh = true;
-        }
-        if (server->empty())
-            need_refresh = true;
 
         if (server->empty())
             fetch_mirrors_thread = std::jthread{fetch_mirrors_and_select_random};
         else
             busy = false;
+
+        queue_refresh_countries();
+        queue_refresh_stations();
     }
 
 
     void
     queue_refresh_stations()
     {
-        need_refresh = true;
+        if (station_refresh_requested)
+            return;
+
+        station_refresh_requested = true;
         scroll_to_top = true;
+
+        queue_task(fetch_stations);
     }
 
 
@@ -612,9 +679,27 @@ namespace Browser {
                     ImGui::SetNextItemWidth(400);
                     ImGui::InputText("Tag", &filter_tag);
 
-                    // TODO: should use list of countries
                     ImGui::SetNextItemWidth(400);
-                    ImGui::InputText("Country", &filter_country);
+                    std::string display_country;
+                    if (!filter_country.empty()) {
+                        display_country = filter_country;
+                        auto country_name = get_country_name(filter_country);
+                        if (country_name)
+                            display_country += " - " + *country_name;
+                    }
+                    if (ImGui::BeginCombo("Country", display_country)) {
+
+                        if (ImGui::Selectable("(none)", filter_country.empty()))
+                            filter_country.clear();
+
+                        for (const auto& country : countries) {
+                            if (ImGui::Selectable(country.code + " - " + country.name,
+                                                  filter_country == country.code)) {
+                                filter_country = country.code;
+                            }
+                        }
+                        ImGui::EndCombo();
+                    }
 
                 } // filters
                 ImGui::EndChild();
@@ -980,6 +1065,75 @@ namespace Browser {
                                     << endl;
                            }
                        });
+    }
+
+
+    void
+    queue_refresh_countries()
+    {
+        queue_task(fetch_countries);
+    }
+
+
+    void
+    fetch_countries()
+    {
+        auto server = safe_server.load();
+        if (server.empty()) {
+            cout << "ERROR: fetch_countries() called while not connected." << endl;
+            return;
+        }
+
+        rest::get_json("https://" + server + "/json/countries",
+                       [](curl::easy&,
+                          const json::value& response)
+                       {
+                           try {
+                               countries.clear();
+                               const auto& list = response.as<json::array>();
+                               for (const auto& entry : list) {
+                                   const auto& obj = entry.as<json::object>();
+                                   std::string code = obj.at("iso_3166_1").as<json::string>();
+                                   std::string name = obj.at("name").as<json::string>();
+                                   countries.emplace_back(std::move(code), std::move(name));
+                               }
+                               cout << "Got " << countries.size() << " countries" << endl;
+                               std::ranges::sort(countries, {}, by_code);
+                           }
+                           catch (std::exception& e) {
+                               cout << "Failed to read countries list: "
+                                    << e.what()
+                                    << endl;
+                           }
+                       });
+    }
+
+
+    const std::string*
+    get_country_name(const std::string& code)
+    {
+        if (code.empty())
+            return nullptr;
+        auto it = std::ranges::lower_bound(countries, code, {}, by_code);
+        if (it == countries.end())
+            return nullptr;
+        if (it->code != code)
+            return nullptr;
+        return &it->name;
+    }
+
+
+    const std::string&
+    by_code(const Country& c)
+    {
+        return c.code;
+    }
+
+
+    const std::string&
+    by_name(const Country& c)
+    {
+        return c.name;
     }
 
 } // namespace Browser

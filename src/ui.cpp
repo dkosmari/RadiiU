@@ -176,8 +176,12 @@ namespace ui {
                 }
             }
 
-            if (!station.country_code.empty())
+            if (!station.country_code.empty()) {
                 ImGui::Text("🏳 %s", station.country_code.data());
+                auto name = Browser::get_country_name(station.country_code);
+                if (name)
+                    ImGui::SetItemTooltip("%s", name->data());
+            }
 
         } // basic_info
         ImGui::HandleDragScroll(scroll_target);

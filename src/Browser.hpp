@@ -53,6 +53,10 @@ namespace Browser {
     void
     send_vote(const std::string& uuid);
 
+
+    const std::string*
+    get_country_name(const std::string& code);
+
 } // namespace Browser
 
 #endif

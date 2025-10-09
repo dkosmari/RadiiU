@@ -27,6 +27,7 @@ struct Station {
     std::string language;
     std::string uuid;
 
+    // Volatile values, never stored.
     std::uint64_t votes = 0;
     std::uint64_t click_count = 0;
     std::int64_t click_trend = 0;
