@@ -43,7 +43,7 @@ namespace ui {
         sdl::vec2 size = {128, 128};
         size.x = icon_size.x * size.y / icon_size.y;
         ImGui::Image(*IconManager::get(favicon), size);
-        ImGui::SetItemTooltip("%d x %d\n%s", icon_size.x, icon_size.y, favicon.data());
+        ImGui::SetItemTooltip("%s", favicon.data());
     }
 
 

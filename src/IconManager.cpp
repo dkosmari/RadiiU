@@ -8,16 +8,17 @@
 #include <atomic>
 #include <cassert>
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <iostream>
 #include <map>
 #include <optional>
 #include <queue>
+#include <ranges>
 #include <span>
 #include <string>
 #include <thread>
 #include <vector>
-#include <ranges>
 
 #include <curlxx/curl.hpp>
 #include <sdl2xx/img.hpp>
@@ -283,8 +284,23 @@ namespace IconManager {
                     throw std::runtime_error{"empty download"};
 
                 sdl::rwops rw{std::span(*entry->raw_buf)};
-                entry->img = sdl::img::load(rw);
-                // TODO: should scale down images that are too large
+                auto img = sdl::img::load(rw);
+                const int max_size = 256;
+                const sdl::vec2 old_size = img.get_size();
+                if (old_size.x > max_size || old_size.y > max_size) {
+                    sdl::vec2 new_size;
+                    if (old_size.x > old_size.y) {
+                        new_size.x = max_size;
+                        new_size.y = std::max(1, max_size * old_size.y / old_size.x);
+                    } else {
+                        new_size.y = max_size;
+                        new_size.x = std::max(1, max_size * old_size.x / old_size.y);
+                    }
+                    entry->img.create(new_size, 32, img.get_format_enum());
+                    sdl::blit_scaled(img, nullptr, entry->img, nullptr);
+                } else {
+                    entry->img = std::move(img);
+                }
                 entry->state = LoadState::loaded;
                 entry->raw_buf.reset();
             }
