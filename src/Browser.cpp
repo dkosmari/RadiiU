@@ -149,6 +149,8 @@ namespace Browser {
 
     std::vector<Country> countries;
 
+    std::vector<std::string> tags;
+
 
     // Tasks to run during process_logic(), only if server is connected.
     std::vector<std::function<void()>> pending_tasks;
@@ -195,7 +197,14 @@ namespace Browser {
     queue_refresh_countries();
 
     void
+    queue_refresh_tags();
+
+
+    void
     fetch_countries();
+
+    void
+    fetch_tags();
 
 
     const std::string&
@@ -519,6 +528,7 @@ namespace Browser {
 
         queue_refresh_countries();
         queue_refresh_stations();
+        queue_refresh_tags();
     }
 
 
@@ -670,16 +680,40 @@ namespace Browser {
                                       ImGuiChildFlags_FrameStyle |
                                       ImGuiChildFlags_NavFlattened)) {
 
+                    const float filters_width = 500;
+
                     ImGui::TextUnformatted("Filters");
 
-                    ImGui::SetNextItemWidth(400);
+                    ImGui::SetNextItemWidth(filters_width);
                     ImGui::InputText("Name", &filter_name);
 
+                    ImGui::SetNextItemWidth(filters_width);
+#if 0
                     // TODO: should use list of tags
-                    ImGui::SetNextItemWidth(400);
                     ImGui::InputText("Tag", &filter_tag);
+#else
+                    if (ImGui::BeginCombo("Tag", filter_tag)) {
+                        static ImGuiTextFilter filter;
+                        if (ImGui::IsWindowAppearing()) {
+                            ImGui::SetKeyboardFocusHere();
+                            filter.Clear();
+                        }
+                        filter.Draw("##tag_filter");
 
-                    ImGui::SetNextItemWidth(400);
+                        if (ImGui::Selectable("(empty)", filter_tag.empty()))
+                            filter_tag.clear();
+
+                        for (auto& tag : tags) {
+                            const bool is_selected = filter_tag == tag;
+                            if (filter.PassFilter(tag.data()))
+                                if (ImGui::Selectable(tag, is_selected))
+                                    filter_tag = tag;
+                        }
+                        ImGui::EndCombo();
+                    }
+#endif
+
+                    ImGui::SetNextItemWidth(filters_width);
                     std::string display_country;
                     if (!filter_country.empty()) {
                         display_country = filter_country;
@@ -1076,6 +1110,13 @@ namespace Browser {
 
 
     void
+    queue_refresh_tags()
+    {
+        queue_task(fetch_tags);
+    }
+
+
+    void
     fetch_countries()
     {
         auto server = safe_server.load();
@@ -1101,7 +1142,40 @@ namespace Browser {
                                std::ranges::sort(countries, {}, by_code);
                            }
                            catch (std::exception& e) {
-                               cout << "Failed to read countries list: "
+                               cout << "ERROR: failed to read countries list: "
+                                    << e.what()
+                                    << endl;
+                           }
+                       });
+    }
+
+
+    void
+    fetch_tags()
+    {
+        auto server = safe_server.load();
+        if (server.empty()) {
+            cout << "ERROR: fetch_tags() called while not connected." << endl;
+            return;
+        }
+
+        rest::get_json("https://" + server + "/json/tags",
+                       [](curl::easy&,
+                          const json::value& response)
+                       {
+                           try {
+                               tags.clear();
+                               const auto& list = response.as<json::array>();
+                               for (const auto& entry : list) {
+                                   const auto& obj = entry.as<json::object>();
+                                   std::string name = obj.at("name").as<json::string>();
+                                   tags.push_back(std::move(name));
+                               }
+                               cout << "Got " << tags.size() << " tags" << endl;
+                               std::ranges::sort(tags);
+                           }
+                           catch (std::exception& e) {
+                               cout << "ERROR: failed to read tags list: "
                                     << e.what()
                                     << endl;
                            }

@@ -43,6 +43,7 @@ namespace ui {
         sdl::vec2 size = {128, 128};
         size.x = icon_size.x * size.y / icon_size.y;
         ImGui::Image(*IconManager::get(favicon), size);
+        ImGui::SetItemTooltip("%d x %d\n%s", icon_size.x, icon_size.y, favicon.data());
     }
 
 
@@ -52,15 +53,11 @@ namespace ui {
     {
         ImGui::TableNextRow();
 
-        // ImGui::PushID(label);
-
         ImGui::TableNextColumn();
         ImGui::TextRightColored(constants::label_color, "%s", label.data());
 
         ImGui::TableNextColumn();
         ImGui::TextWrapped("%s", value.data());
-
-        // ImGui::PopID();
     }
 
 
@@ -71,16 +68,12 @@ namespace ui {
     {
         ImGui::TableNextRow();
 
-        // ImGui::PushID(label);
-
         ImGui::TableNextColumn();
         ImGui::TextRightColored(constants::label_color, "%s", label.data());
 
         ImGui::TableNextColumn();
         const std::string fmt = "%" + utils::format(value);
         ImGui::TextWrapped(fmt.data(), value);
-
-        // ImGui::PopID();
     }
 
     /* ----------------------------------------------- */

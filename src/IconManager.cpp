@@ -305,7 +305,7 @@ namespace IconManager {
         try {
             multi.emplace();
             multi->set_max_total_connections(10);
-            multi->set_max_connections(20);
+            multi->set_max_connections(10);
 
             while (!token.stop_requested()) {
                 auto location = requests_queue.try_pop();

@@ -75,7 +75,7 @@ namespace rest {
         cout << "Running rest::initialize()" << endl;
         user_agent = ua;
         multi.set_max_total_connections(5);
-        multi.set_max_connections(10);
+        multi.set_max_connections(5);
     }
 
 
