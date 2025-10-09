@@ -220,32 +220,23 @@ namespace IconManager {
 #ifdef __cpp_lib_containers_ranges
                     entry.raw_buf->append_range(buf);
 #else
-                    entry.raw_buf->insert(entry.raw_buf->end(), buf.begin(), buf.end());
+                    entry.raw_buf->insert(entry.raw_buf->end(),
+                                          buf.begin(),
+                                          buf.end());
 #endif
                     return buf.size();
                 });
                 multi->add(ez);
             } else if (location.starts_with("ui/")) {
                 // local path
-                auto img = sdl::img::try_load(content_prefix / location);
-                if (img) {
-                    entry.img = std::move(*img);
-                    assert(entry.img);
-                    entry.state = LoadState::loaded;
-                } else {
-                    cout << "error processing icon load for \"" + location + "\": "
-                         << img.error().what()
-                         << endl;
-                    entry.state = LoadState::error;
-                    return;
-                }
-            } else {
+                entry.img = sdl::img::load(content_prefix / location);
+                entry.state = LoadState::loaded;
+            } else
                 throw std::runtime_error{"invalid location: \"" + location + "\""};
-            }
 
         }
         catch (std::exception& e) {
-            cout << "Error processing request " << location << ": " << e.what() << endl;
+            cout << "Error processing request \"" << location << "\": " << e.what() << endl;
             entry.state = LoadState::error;
         }
     }
@@ -285,24 +276,19 @@ namespace IconManager {
             }
 
             try {
-                if (!error_code) {
-                    if (entry->raw_buf) {
-                        sdl::rwops rw{std::span(*entry->raw_buf)};
-                        entry->img = sdl::img::load(rw);
-                        entry->state = LoadState::loaded;
-                        rw.destroy();
-                        entry->raw_buf.reset();
-                    } else {
-                        entry->state = LoadState::error;
-                    }
-                } else {
-                    curl::error e{error_code};
-                    cout << "error: " << e.what() << endl;
-                    entry->state = LoadState::error;
-                }
+                if (error_code)
+                    throw curl::error{error_code};
+
+                if (!entry->raw_buf)
+                    throw std::runtime_error{"empty download"};
+
+                sdl::rwops rw{std::span(*entry->raw_buf)};
+                entry->img = sdl::img::load(rw);
+                entry->state = LoadState::loaded;
+                entry->raw_buf.reset();
             }
             catch (std::exception& e) {
-                cout << "error: " << e.what() << endl;
+                cout << "ERROR: " << e.what() << endl;
                 entry->state = LoadState::error;
             }
 
