@@ -13,6 +13,7 @@
 
 #include "Browser.hpp"
 #include "cfg.hpp"
+#include "IconsFontAwesome4.h"
 #include "imgui_extras.hpp"
 #include "ui.hpp"
 
@@ -72,7 +73,7 @@ namespace Settings {
 
                 ImGui::TableNextColumn();
 
-                const char* refresh_label = "🔃";
+                const char* refresh_label = ICON_FA_REFRESH /*🔃*/;
                 float refresh_width = 2 * style.FramePadding.x
                                     + 2 * style.FrameBorderSize
                                     + ImGui::CalcTextSize(refresh_label).x;

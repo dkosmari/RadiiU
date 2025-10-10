@@ -9,6 +9,8 @@
 
 #include "TabID.hpp"
 
+#include "IconsFontAwesome4.h"
+
 
 TabID::TabID(unsigned idx)
     noexcept :
@@ -74,17 +76,17 @@ to_ui_string(TabID tab)
 {
     switch (tab.value) {
         case TabID::Name::favorites:
-            return "★ Favorites";
+            return ICON_FA_HEART " Favorites";
         case TabID::Name::browser:
-            return "🔍 Browser";
+            return ICON_FA_BINOCULARS " Browser";
         case TabID::Name::recent:
-            return "🕓 Recent";
+            return ICON_FA_HISTORY " Recent";
         case TabID::Name::player:
-            return "🎧 Player";
+            return ICON_FA_MUSIC " Player";
         case TabID::Name::settings:
-            return "⚙ Settings";
+            return ICON_FA_SLIDERS " Settings";
         case TabID::Name::about:
-            return "❗ About";
+            return ICON_FA_LIGHTBULB_O " About";
         case TabID::Name::last_active:
             return "Last active";
         default:

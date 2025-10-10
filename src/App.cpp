@@ -35,6 +35,7 @@
 #include "Browser.hpp"
 #include "cfg.hpp"
 #include "Favorites.hpp"
+#include "IconsFontAwesome4.h"
 #include "IconManager.hpp"
 #include "imgui_extras.hpp"
 #include "Player.hpp"
@@ -42,6 +43,7 @@
 #include "rest.hpp"
 #include "Settings.hpp"
 #include "TabID.hpp"
+#include "ui.hpp" // DEBUG
 #include "utils.hpp"
 
 
@@ -81,7 +83,7 @@ namespace App {
     bool running;
 
     const float cafe_size = 32;
-    const float symbola_size = cafe_size * 1.2f;
+    const float symbola_size = cafe_size * 1.0f;
 
     std::optional<TabID> next_tab;
     TabID current_tab;
@@ -115,12 +117,20 @@ namespace App {
     {
         auto& io = ImGui::GetIO();
 
+#define USE_CAFE
+
+#ifdef USE_CAFE
+        // Note: CafeStd seems to always be too low, about 1/8th of the font size
+        const float correct_y = cafe_size * (4.0f / 32.0f);
+#else
+        const float correct_y = 0;
+#endif
+
         // Load main font: CafeStd
         {
             ImFontConfig config;
             config.EllipsisChar = U'…';
-            // Note: CafeStd seems to always be too low
-            config.GlyphOffset.y = - cafe_size * (6.0f / 32.0f);
+            config.GlyphOffset.y = - correct_y;
 #ifdef __WIIU__
             config.FontDataOwnedByAtlas = false;
             void* cafe_font_ptr = nullptr;
@@ -136,23 +146,32 @@ namespace App {
                     throw std::runtime_error{"Could not load font!"};
             } else
                 throw std::runtime_error{"Is CafeStd font missing?"};
-#else
+#else // !__WIIU__
+#  ifdef USE_CAFE
             if (!io.Fonts->AddFontFromFileTTF("CafeStd.ttf",
                                               cafe_size,
                                               &config))
                 throw std::runtime_error{"Could not load font!"};
+#  else // !USE_CAFE
+            if (!io.Fonts->AddFontFromFileTTF("Ubuntu-R.ttf",
+                                              cafe_size,
+                                              &config))
+                throw std::runtime_error{"Could not load font!"};
+#  endif
 #endif
         }
 
-        // Load Symbola font
+
+        // Load FontAwesome
         {
             ImFontConfig config;
-            config.GlyphOffset.y = - symbola_size * (6.0f / 32.0f);
+            config.GlyphOffset.y = - correct_y;
             config.MergeMode = true;
             // config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
             // config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
-            if (!io.Fonts->AddFontFromFileTTF((utils::get_content_path() / "Symbola.ttf").c_str(),
-                                              symbola_size,
+
+            if (!io.Fonts->AddFontFromFileTTF((utils::get_content_path() / FONT_ICON_FILE_NAME_FA).c_str(),
+                                              cafe_size,
                                               &config))
                 throw std::runtime_error{"Could not load font!"};
         }
@@ -418,9 +437,10 @@ namespace App {
 
             {
                 // App name, centered
-                ImGui::PushFont(nullptr, 60);
+                ImGui::PushFont(nullptr, 48);
                 ImGui::TextCentered("%s", PACKAGE_STRING);
                 ImGui::PopFont();
+                // ui::show_last_bounding_box();
                 ImGui::SameLine();
                 // Put a close button on the top right
                 auto tex = IconManager::get("ui/close-button.png");

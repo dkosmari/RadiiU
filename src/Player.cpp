@@ -34,6 +34,7 @@
 #include "Favorites.hpp"
 #include "humanize.hpp"
 #include "IconManager.hpp"
+#include "IconsFontAwesome4.h"
 #include "icy.hpp"
 #include "imgui_extras.hpp"
 #include "Recent.hpp"
@@ -623,17 +624,17 @@ namespace Player {
                 ui::show_play_button(*station);
 
                 if (Favorites::contains(*station)) {
-                    if (ImGui::Button("♥"))
+                    if (ImGui::Button(ICON_FA_HEART /*♥*/))
                         Favorites::remove(*station);
                 } else {
-                    if (ImGui::Button("♡"))
+                    if (ImGui::Button(ICON_FA_HEART_O /*♡*/))
                         Favorites::add(*station);
                 }
 
                 ImGui::SameLine();
 
                 ImGui::BeginDisabled(station->uuid.empty());
-                if (ImGui::Button("🛈"))
+                if (ImGui::Button(ICON_FA_INFO_CIRCLE /*🛈*/))
                     ui::open_station_info_popup(station->uuid);
                 ImGui::EndDisabled();
                 ui::process_station_info_popup();

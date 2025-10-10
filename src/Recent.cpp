@@ -17,6 +17,7 @@
 
 #include "cfg.hpp"
 #include "IconManager.hpp"
+#include "IconsFontAwesome4.h"
 #include "imgui_extras.hpp"
 #include "json.hpp"
 #include "Player.hpp"
@@ -111,13 +112,13 @@ namespace Recent {
 
                 ui::show_play_button(station);
 
-                if (ImGui::Button("🗑"))
+                if (ImGui::Button(ICON_FA_TRASH_O /*🗑*/))
                     to_remove = index;
 
                 ImGui::SameLine();
 
                 ImGui::BeginDisabled(station.uuid.empty());
-                if (ImGui::Button("🛈"))
+                if (ImGui::Button(ICON_FA_INFO_CIRCLE /*🛈*/))
                     ui::open_station_info_popup(station.uuid);
                 ImGui::EndDisabled();
                 ui::process_station_info_popup();

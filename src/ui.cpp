@@ -19,6 +19,7 @@
 #include "Browser.hpp"
 #include "constants.hpp"
 #include "IconManager.hpp"
+#include "IconsFontAwesome4.h"
 #include "imgui_extras.hpp"
 #include "Player.hpp"
 #include "rest.hpp"
@@ -28,6 +29,8 @@
 
 using std::cout;
 using std::endl;
+
+using namespace std::literals;
 
 
 namespace ui {
@@ -55,9 +58,11 @@ namespace ui {
 
         ImGui::TableNextColumn();
         ImGui::TextRightColored(constants::label_color, "%s", label.data());
+        // show_last_bounding_box();
 
         ImGui::TableNextColumn();
         ImGui::TextWrapped("%s", value.data());
+        // show_last_bounding_box();
     }
 
 
@@ -70,10 +75,12 @@ namespace ui {
 
         ImGui::TableNextColumn();
         ImGui::TextRightColored(constants::label_color, "%s", label.data());
+        // show_last_bounding_box();
 
         ImGui::TableNextColumn();
         const std::string fmt = "%" + utils::format(value);
         ImGui::TextWrapped(fmt.data(), value);
+        // show_last_bounding_box();
     }
 
     /* ----------------------------------------------- */
@@ -122,7 +129,7 @@ namespace ui {
         ImGui::TextRightColored(constants::label_color, "%s", label.data());
 
         ImGui::TableNextColumn();
-        if (ImGui::TextLinkOpenURL(url, url)) {
+        if (ImGui::TextLinkOpenURL(/*ICON_FA_LINK " " +*/ url, url)) {
 #ifdef __WIIU__
             // TODO: show QR code
 #endif
@@ -169,14 +176,25 @@ namespace ui {
                 }
             }
 
-            if (!station.languages.empty())
-                ImGui::TextWrapped("🗣 %s", utils::join(station.languages, ", ").data());
-
+            bool has_country = false;
             if (!station.country_code.empty()) {
-                ImGui::Text("🏳 %s", station.country_code.data());
+                has_country = true;
                 auto name = Browser::get_country_name(station.country_code);
-                if (name)
-                    ImGui::SetItemTooltip("%s", name->data());
+                show_boxed(ICON_FA_FLAG_O " " + station.country_code,
+                           name ? *name : ""s,
+                           scroll_target);
+            }
+
+            if (!station.languages.empty()) {
+                if (has_country)
+                    ImGui::SameLine();
+                for (auto& lang : station.languages) {
+                    show_boxed(ICON_FA_LANGUAGE " " + lang,
+                               "Language spoken in this broadcast.",
+                               scroll_target);
+                    ImGui::SameLine();
+                }
+                ImGui::NewLine();
             }
 
         } // basic_info
@@ -192,35 +210,11 @@ namespace ui {
         if (tags.empty())
             return;
 
-        bool first_tag = true;
-        const ImGuiStyle& style = ImGui::GetStyle();
         for (const auto& tag : tags) {
-            ImGui::PushID(&tag);
-
-            if (!first_tag)
-                ImGui::SameLine();
-            first_tag = false;
-
-            std::string label = "🏷 " + tag;
-            float width = ImGui::CalcTextSize(label).x
-                + style.ItemSpacing.x
-                + 2 * style.FramePadding.x
-                + 2 * style.FrameBorderSize;
-            float available = ImGui::GetContentRegionAvail().x;
-            if (width > available)
-                ImGui::NewLine();
-
-            if (ImGui::BeginChild("tag",
-                                  {0,0},
-                                  ImGuiChildFlags_AutoResizeX |
-                                  ImGuiChildFlags_AutoResizeY |
-                                  ImGuiChildFlags_FrameStyle)) {
-                ImGui::Text("%s", label.data());
-            } // tag
-            ImGui::HandleDragScroll(scroll_target);
-            ImGui::EndChild();
-            ImGui::PopID();
+            show_boxed(ICON_FA_TAG /*🏷*/ " " + tag, {}, scroll_target);
+            ImGui::SameLine();
         }
+        ImGui::NewLine();
     }
 
 
@@ -339,6 +333,59 @@ namespace ui {
 
             ImGui::HandleDragScroll();
             ImGui::EndPopup();
+        }
+    }
+
+
+    void
+    show_boxed(const std::string& text,
+               const std::string& tooltip,
+               ImGuiID scroll_target)
+    {
+        ImGui::PushID(text);
+
+        const ImGuiStyle& style = ImGui::GetStyle();
+        const ImVec2 size = ImGui::CalcTextSize(text)
+            + 2 * style.FramePadding
+            + style.FrameBorderSize * ImVec2{2, 2};
+        // if (ImGui::GetCursorPosX() == ImGui::GetCursorStartPos().x)
+        // const float spacing = style.ItemSpacing.x;
+        const ImVec2 available = ImGui::GetContentRegionAvail();
+        if (size.x > available.x)
+            ImGui::NewLine();
+
+        if (ImGui::BeginChild("boxed",
+                              size,
+                              ImGuiChildFlags_FrameStyle)) {
+            ImGui::Text("%s", text.data());
+            if (!tooltip.empty())
+                ImGui::SetItemTooltip("%s", tooltip.data());
+        }
+        ImGui::HandleDragScroll(scroll_target);
+        ImGui::EndChild();
+
+        ImGui::PopID();
+    }
+
+
+    void
+    show_boxed(const std::string& text,
+               ImGuiID scroll_target)
+    {
+        show_boxed(text, {}, scroll_target);
+    }
+
+
+    // DEBUG
+    void
+    show_last_bounding_box()
+    {
+        {
+            auto min = ImGui::GetItemRectMin();
+            auto max = ImGui::GetItemRectMax();
+            ImU32 col = ImGui::GetColorU32(ImVec4{1.0f, 0.0f, 0.0f, 0.5f});
+            auto draw_list = ImGui::GetForegroundDrawList();
+            draw_list->AddRect(min, max, col);
         }
     }
 

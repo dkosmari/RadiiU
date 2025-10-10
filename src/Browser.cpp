@@ -10,6 +10,7 @@
 #include <atomic>
 #include <cinttypes>
 #include <compare>
+#include <cstdio>
 #include <exception>
 #include <filesystem>
 #include <functional>
@@ -17,6 +18,7 @@
 #include <random>
 #include <span>
 #include <thread>
+#include <tuple>
 #include <unordered_set>
 #include <utility>
 
@@ -36,6 +38,7 @@
 #include "Favorites.hpp"
 #include "humanize.hpp"
 #include "IconManager.hpp"
+#include "IconsFontAwesome4.h"
 #include "imgui_extras.hpp"
 #include "net/address.hpp"
 #include "net/resolver.hpp"
@@ -70,24 +73,32 @@ namespace Browser {
     std::string filter_tag;
     std::string filter_country;
 
+
     enum class Order : unsigned {
-        name,
-        country,
-        language,
-        votes,
+        name_asc,
+        name_desc,
+        country_asc,
+        country_desc,
+        language_asc,
+        language_desc,
+        votes_desc,
+        votes_asc,
         random,
     };
 
-    const std::array order_strings = {
-        "name",
-        "country",
-        "language",
-        "votes",
+    const std::array order_strings {
+        "name_asc",
+        "name_desc",
+        "country_asc",
+        "country_desc",
+        "language_asc",
+        "language_desc",
+        "votes_desc",
+        "votes_asc",
         "random",
     };
 
-    Order order = Order::name;
-    bool reverse = false;
+    Order order = Order::name_asc;
 
     unsigned page_index = 0;
     std::vector<Station> stations;
@@ -230,7 +241,61 @@ namespace Browser {
         for (unsigned i = 0; i < order_strings.size(); ++i)
             if (s == order_strings[i])
                 return Order{i};
-        return Order::name;
+        return Order::name_asc;
+    }
+
+
+    std::tuple<const char*, const char*>
+    to_args(Order o)
+    {
+        switch (o) {
+            default:
+            case Order::name_asc:
+                return {"name", "false"};
+            case Order::name_desc:
+                return {"name", "true"};
+            case Order::country_asc:
+                return {"country", "false"};
+            case Order::country_desc:
+                return {"country", "true"};
+            case Order::language_asc:
+                return {"language", "false"};
+            case Order::language_desc:
+                return {"language", "true"};
+            case Order::votes_desc:
+                return {"votes", "true"};
+            case Order::votes_asc:
+                return {"votes", "false"};
+            case Order::random:
+                return {"random", nullptr};
+        }
+    }
+
+
+    std::string
+    to_label(Order o)
+    {
+        switch (o) {
+            default:
+            case Order::name_asc:
+                return "Name " ICON_FA_SORT_ALPHA_ASC;
+            case Order::name_desc:
+                return "Name " ICON_FA_SORT_ALPHA_DESC;
+            case Order::country_asc:
+                return "Country " ICON_FA_SORT_ALPHA_ASC;
+            case Order::country_desc:
+                return "Country " ICON_FA_SORT_ALPHA_DESC;
+            case Order::language_asc:
+                return "Language " ICON_FA_SORT_ALPHA_ASC;
+            case Order::language_desc:
+                return "Language " ICON_FA_SORT_ALPHA_DESC;
+            case Order::votes_desc:
+                return "Votes " ICON_FA_SORT_AMOUNT_DESC;
+            case Order::votes_asc:
+                return "Votes " ICON_FA_SORT_AMOUNT_ASC;
+            case Order::random:
+                return "Random";
+        }
     }
 
 
@@ -369,9 +434,6 @@ namespace Browser {
             if (root.contains("order"))
                 order = to_order(root.at("order").as<json::string>());
 
-            if (root.contains("reverse"))
-                reverse = root.at("reverse").as<bool>();
-
             if (root.contains("page"))
                 page_index = root.at("page").as<json::integer>() - 1;
         }
@@ -398,7 +460,6 @@ namespace Browser {
                 root["filter"] = std::move(filter);
 
             root["order"] = to_string(order);
-            root["reverse"] = reverse;
             root["page"] = 1 + page_index;
 
             json::save(std::move(root), cfg::base_dir / "browser.json");
@@ -482,11 +543,12 @@ namespace Browser {
         if (!filter_country.empty())
             params["countrycode"] = filter_country;
 
-        if (order != Order::name)
-            params["order"] = to_string(order);
-
-        if (reverse)
-            params["reverse"] = "true";
+        if (order != Order::name_asc) {
+            auto [arg_order, arg_reverse] = to_args(order);
+            params["order"] = arg_order;
+            if (arg_reverse)
+                params["reverse"] = arg_reverse;
+        }
 
         rest::get_json("https://" + server + "/json/stations/search",
                        params,
@@ -559,25 +621,8 @@ namespace Browser {
         filter_name = "";
         filter_tag = "";
         filter_country = "";
-        order = Order::name;
-        reverse = false;
+        order = Order::name_asc;
     }
-
-
-#if 0
-    // DEBUG
-    void
-    show_last_bounding_box()
-    {
-        {
-            auto min = ImGui::GetItemRectMin();
-            auto max = ImGui::GetItemRectMax();
-            ImU32 col = ImGui::GetColorU32(ImVec4{1.0f, 0.0f, 0.0f, 1.0f});
-            auto draw_list = ImGui::GetForegroundDrawList();
-            draw_list->AddRect(min, max, col);
-        }
-    }
-#endif
 
 
     void
@@ -632,7 +677,7 @@ namespace Browser {
                               ImGuiChildFlags_AutoResizeY |
                               ImGuiChildFlags_NavFlattened)) {
 
-            if (ImGui::Button("🔃"))
+            if (ImGui::Button(ICON_FA_REFRESH))
                 connect();
 
             ImGui::SameLine();
@@ -640,7 +685,7 @@ namespace Browser {
             std::string server = safe_server.load();
             if (!server.empty()) {
 
-                if (ImGui::Button("🛈")) {
+                if (ImGui::Button(ICON_FA_INFO_CIRCLE)) {
                     request_server_info();
                     ImGui::OpenPopup(server_info_popup_id);
                 }
@@ -682,13 +727,13 @@ namespace Browser {
 
                     const float filters_width = 500;
 
-                    ImGui::TextUnformatted("Filters");
+                    ImGui::TextUnformatted(ICON_FA_FILTER " Filters");
 
                     ImGui::SetNextItemWidth(filters_width);
                     ImGui::InputText("Name", &filter_name);
 
                     ImGui::SetNextItemWidth(filters_width);
-                    if (ImGui::BeginCombo("Tag", filter_tag)) {
+                    if (ImGui::BeginCombo(ICON_FA_TAG " Tag", filter_tag)) {
                         static ImGuiTextFilter filter;
                         if (ImGui::IsWindowAppearing()) {
                             ImGui::SetKeyboardFocusHere();
@@ -714,7 +759,7 @@ namespace Browser {
                         if (country_name)
                             display_country += " - " + *country_name;
                     }
-                    if (ImGui::BeginCombo("Country", display_country)) {
+                    if (ImGui::BeginCombo(ICON_FA_FLAG_O " Country", display_country)) {
                         static ImGuiTextFilter filter;
                         if (ImGui::IsWindowAppearing()) {
                             ImGui::SetKeyboardFocusHere();
@@ -733,6 +778,8 @@ namespace Browser {
                         ImGui::EndCombo();
                     }
 
+                    // TODO: add language filter
+
                 } // filters
                 ImGui::EndChild();
 
@@ -745,19 +792,17 @@ namespace Browser {
                                       ImGuiChildFlags_FrameStyle |
                                       ImGuiChildFlags_NavFlattened)) {
 
-                    ImGui::TextUnformatted("Order");
+                    ImGui::TextUnformatted(ICON_FA_SORT " Order");
 
-                    ImGui::SetNextItemWidth(220);
-                    if (ImGui::BeginCombo("##Order", to_string(order))) {
+                    ImGui::SetNextItemWidth(280);
+                    if (ImGui::BeginCombo("##Order", to_label(order))) {
                         for (unsigned i = 0; i < order_strings.size(); ++i) {
                             Order o{i};
-                            if (ImGui::Selectable(to_string(o), order == o))
+                            if (ImGui::Selectable(to_label(o), order == o))
                                 order = o;
                         }
                         ImGui::EndCombo();
                     }
-
-                    ImGui::Checkbox("Reverse", &reverse);
 
                 } // sorting
                 ImGui::EndChild();
@@ -811,7 +856,7 @@ namespace Browser {
 
             ImGui::BeginDisabled(first_page);
 
-            if (ImGui::Button("100⏪") && !busy) {
+            if (ImGui::Button("100" /*⏪*/ ICON_FA_ANGLE_DOUBLE_LEFT) && !busy) {
                 if (page_index >= 100)
                     page_index -= 100;
                 else
@@ -821,7 +866,7 @@ namespace Browser {
 
             ImGui::SameLine();
 
-            if (ImGui::Button("10⏪") && !busy) {
+            if (ImGui::Button("10" /*⏪*/ ICON_FA_ANGLE_DOUBLE_LEFT) && !busy) {
                 if (page_index >= 10)
                     page_index -= 10;
                 else
@@ -831,7 +876,7 @@ namespace Browser {
 
             ImGui::SameLine();
 
-            if (ImGui::Button("⏴") && !busy) {
+            if (ImGui::Button(/*⏴*/ ICON_FA_ANGLE_LEFT) && !busy) {
                 if (page_index > 0)
                     --page_index;
                 queue_refresh_stations();
@@ -857,21 +902,21 @@ namespace Browser {
 
             ImGui::BeginDisabled(last_page);
 
-            if (ImGui::Button("⏵") && !busy) {
+            if (ImGui::Button(/*⏵*/ ICON_FA_ANGLE_RIGHT) && !busy) {
                 ++page_index;
                 queue_refresh_stations();
             }
 
             ImGui::SameLine();
 
-            if (ImGui::Button("⏩10") && !busy) {
+            if (ImGui::Button(/*⏩*/ ICON_FA_ANGLE_DOUBLE_RIGHT "10") && !busy) {
                 page_index += 10;
                 queue_refresh_stations();
             }
 
             ImGui::SameLine();
 
-            if (ImGui::Button("⏩100") && !busy) {
+            if (ImGui::Button(/*⏩*/ ICON_FA_ANGLE_DOUBLE_RIGHT "100") && !busy) {
                 page_index += 100;
                 queue_refresh_stations();
             }
@@ -903,21 +948,24 @@ namespace Browser {
                 ui::show_play_button(station);
 
                 if (Favorites::contains(station.uuid)) {
-                    if (ImGui::Button("♥"))
+                    if (ImGui::Button(ICON_FA_HEART /*♥*/))
                         Favorites::remove(station.uuid);
                 } else {
-                    if (ImGui::Button("♡"))
+                    if (ImGui::Button(ICON_FA_HEART_O /*♡*/))
                         Favorites::add(station);
                 }
 
                 ImGui::SameLine();
 
-                if (ImGui::Button("🛈"))
+                if (ImGui::Button(ICON_FA_INFO_CIRCLE))
                     ui::open_station_info_popup(station.uuid);
                 ui::process_station_info_popup();
 
                 bool voted = votes_cast.contains(station.uuid);
-                std::string vote_label = "👍" + humanize::value(station.votes);
+                std::string vote_label = (voted
+                                          ? ICON_FA_THUMBS_UP " "
+                                          : ICON_FA_THUMBS_O_UP " ")
+                                         + humanize::value(station.votes);
                 ImGui::BeginDisabled(voted);
                 if (ImGui::Button(vote_label))
                     send_vote(station.uuid);
@@ -945,16 +993,28 @@ namespace Browser {
                                       ImGuiChildFlags_AutoResizeY |
                                       ImGuiChildFlags_NavFlattened)) {
 
-                    ImGui::SameLine();
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::BulletText("🎧 %" PRIu64 " (%+" PRId64 ")",
-                                      station.click_count,
-                                      station.click_trend);
+                    char click_text[32];
+                    std::snprintf(click_text, sizeof click_text,
+                                  ICON_FA_BAR_CHART " %" PRIu64 " (%+" PRId64 ")",
+                                  station.click_count,
+                                  station.click_trend);
+                    ui::show_boxed(click_text,
+                                   "Daily total clicks and trend.",
+                                   scroll_target);
+
                     if (station.bitrate) {
                         ImGui::SameLine();
-                        ImGui::AlignTextToFramePadding();
-                        ImGui::BulletText("👂 %u kbps", station.bitrate);
+                        ui::show_boxed(ICON_FA_HEADPHONES " "
+                                       + std::to_string(station.bitrate) + " kbps",
+                                       "The advertised stream quality.",
+                                       scroll_target);
                     }
+
+                    ImGui::SameLine();
+
+                    ui::show_boxed("MP3",
+                                   "The codec used in this broadcast.",
+                                   scroll_target);
 
                     ui::show_tags(station.tags, scroll_target);
                 }

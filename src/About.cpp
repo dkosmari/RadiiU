@@ -18,6 +18,7 @@
 #include "About.hpp"
 
 #include "constants.hpp"
+#include "IconsFontAwesome4.h"
 #include "IconManager.hpp"
 #include "imgui_extras.hpp"
 #include "ui.hpp"
@@ -102,6 +103,26 @@ namespace About {
         }
 
 
+        std::string
+        replace_brand_glyphs(const std::string& input)
+        {
+            static const std::vector<std::tuple<std::string, std::string>> replacements = {
+                { "github:", ICON_FA_GITHUB },
+                // { "discord:", ICON_FA_DISCORD }
+            };
+
+            std::string result = input;
+
+            for (const auto& [src, dst] : replacements) {
+                auto pos = result.find(src);
+                if (pos == std::string::npos)
+                    continue;
+                result = result.substr(0, pos) + dst + result.substr(pos + src.size());
+            }
+            return result;
+        }
+
+
         struct RoleName {
             std::string role;
             std::string name;
@@ -130,6 +151,7 @@ namespace About {
                              << endl;
                         continue;
                     }
+                    tokens[1] = replace_brand_glyphs(tokens[1]);
                     result.emplace_back(std::move(tokens[0]), std::move(tokens[1]));
                 }
             }

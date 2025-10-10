@@ -21,6 +21,7 @@
 
 #include "cfg.hpp"
 #include "IconManager.hpp"
+#include "IconsFontAwesome4.h"
 #include "imgui_extras.hpp"
 #include "json.hpp"
 #include "Player.hpp"
@@ -176,7 +177,7 @@ namespace Favorites {
 
             // Cancel button
             {
-                if (ImGui::Button("🗙 Cancel"))
+                if (ImGui::Button(ICON_FA_TIMES " Cancel"))
                     ImGui::CloseCurrentPopup();
                 ImGui::SetItemDefaultFocus();
             }
@@ -187,7 +188,7 @@ namespace Favorites {
             {
                 // Line it up to the right of the window
                 auto& style = ImGui::GetStyle();
-                const std::string label = "🗑 Delete";
+                const std::string label = ICON_FA_TRASH_O " Delete";
                 ImVec2 btn_size = ImGui::CalcTextSize(label, true) + style.FramePadding * 2;
                 float new_x = window_size.x - btn_size.x;
                 float cur_x = ImGui::GetCursorPosX();
@@ -269,7 +270,7 @@ namespace Favorites {
 
             // Cancel button
             {
-                if (ImGui::Button("🗙 Cancel")) {
+                if (ImGui::Button(ICON_FA_TIMES " Cancel")) {
                     ImGui::CloseCurrentPopup();
                     edited_station.reset();
                 }
@@ -282,7 +283,7 @@ namespace Favorites {
             {
                 // Line it up to the right of the window
                 auto& style = ImGui::GetStyle();
-                const std::string label = "✔ Apply";
+                const std::string label = ICON_FA_CHECK " Apply";
                 ImVec2 btn_size = ImGui::CalcTextSize(label, true) + style.FramePadding * 2;
                 float new_x = content_size.x - btn_size.x;
                 float cur_x = ImGui::GetCursorPosX();
@@ -334,7 +335,7 @@ namespace Favorites {
 
             // Cancel button
             {
-                if (ImGui::Button("🗙 Cancel")) {
+                if (ImGui::Button(ICON_FA_TIMES " Cancel")) {
                     ImGui::CloseCurrentPopup();
                     created_station.reset();
                 }
@@ -347,7 +348,7 @@ namespace Favorites {
             {
                 // Line it up to the right of the window
                 auto& style = ImGui::GetStyle();
-                const std::string label = "✔ Create";
+                const std::string label = ICON_FA_CHECK " Create";
                 ImVec2 btn_size = ImGui::CalcTextSize(label, true) + style.FramePadding * 2;
                 float new_x = content_size.x - btn_size.x;
                 float cur_x = ImGui::GetCursorPosX();
@@ -390,7 +391,7 @@ namespace Favorites {
                 ui::show_play_button(station);
 
                 ImGui::BeginDisabled(index == 0);
-                if (ImGui::Button("▲")) {
+                if (ImGui::Button(ICON_FA_CHEVRON_UP /*"▲"*/)) {
                     move_operation.emplace();
                     move_operation->src = index;
                     move_operation->dst = index - 1;
@@ -400,14 +401,14 @@ namespace Favorites {
                 ImGui::SameLine();
 
                 ImGui::BeginDisabled(index + 1 >= stations.size());
-                if (ImGui::Button("▼")) {
+                if (ImGui::Button(ICON_FA_CHEVRON_DOWN /*"▼"*/)) {
                     move_operation.emplace();
                     move_operation->src = index;
                     move_operation->dst = index + 1;
                 }
                 ImGui::EndDisabled();
 
-                if (ImGui::Button("✎")) {
+                if (ImGui::Button(ICON_FA_PENCIL /*"✎"*/)) {
                     edited_station.emplace(station);
                     ImGui::OpenPopup(popup_edit_title);
                 }
@@ -415,7 +416,7 @@ namespace Favorites {
 
                 ImGui::SameLine();
 
-                if (ImGui::Button("🗑"))
+                if (ImGui::Button(ICON_FA_TRASH_O /*"🗑"*/))
                     ImGui::OpenPopup(popup_delete_title);
                 process_popup_delete(station, index);
             } // actions
@@ -464,7 +465,7 @@ namespace Favorites {
                               ImGuiChildFlags_AutoResizeY |
                               ImGuiChildFlags_NavFlattened)) {
 
-            if (ImGui::Button("➕")) {
+            if (ImGui::Button(ICON_FA_PLUS /*➕*/ " Add")) {
                 ImGui::OpenPopup(popup_create_title);
                 created_station.emplace();
             }
@@ -472,10 +473,10 @@ namespace Favorites {
 
             ImGui::SameLine();
 
-            if (ImGui::Button("💾 Save"))
-                save();
+            // if (ImGui::Button(ICON_FA_FLOPPY_O /*💾*/ " Save"))
+            //     save();
 
-            ImGui::SameLine();
+            // ImGui::SameLine();
 
             ImGui::AlignTextToFramePadding();
             ImGui::TextRight("%zu stations", stations.size());

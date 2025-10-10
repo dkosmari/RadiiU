@@ -56,6 +56,7 @@ radiiu_elf_SOURCES = \
 	src/humanize.hpp \
 	src/IconManager.cpp \
 	src/IconManager.hpp \
+	src/IconsFontAwesome4.h \
 	src/icy.cpp \
 	src/icy.hpp \
 	src/imgui_extras.cpp \

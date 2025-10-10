@@ -66,6 +66,20 @@ namespace ui {
     void
     process_station_info_popup();
 
+
+    void
+    show_boxed(const std::string& text,
+               const std::string& tooltip,
+               ImGuiID scroll_target);
+
+    void
+    show_boxed(const std::string& text,
+               ImGuiID scroll_target);
+
+
+    void
+    show_last_bounding_box();
+
 } // namespace ui
 
 #endif
