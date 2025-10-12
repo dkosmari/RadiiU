@@ -287,7 +287,7 @@ namespace App {
         SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
         SDL_SetHint(SDL_HINT_RENDER_LINE_METHOD, "2");
 
-        res->window.create(PACKAGE,
+        res->window.create(PACKAGE_STRING,
                            sdl::window::pos_centered,
                            {1280, 720},
                            0);
@@ -411,7 +411,7 @@ namespace App {
 
         ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImGui::ToVec2(res->window.get_size()), ImGuiCond_Always);
-        if (ImGui::Begin("##MainWindow",
+        if (ImGui::Begin(PACKAGE_STRING,
                          nullptr,
                          ImGuiWindowFlags_NoTitleBar |
                          ImGuiWindowFlags_NoMove |
