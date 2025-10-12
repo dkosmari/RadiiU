@@ -63,6 +63,26 @@ namespace humanize {
     }
 
 
+    std::string
+    duration_brief(std::chrono::seconds t)
+    {
+        unsigned total = t.count();
+        unsigned s = total % 60u;
+        total /= 60u;
+        unsigned m = total % 60u;
+        total /= 60;
+        unsigned h = total % 24;
+        total /= 24;
+        unsigned d = total;
+        char buf[64];
+        if (d)
+            std::snprintf(buf, sizeof buf, "%ud %02u:%02u:%02u", d, h, m, s);
+        else
+            std::snprintf(buf, sizeof buf, "%02u:%02u:%02u", h, m, s);
+        return buf;
+    }
+
+
     string
     value(std::uint64_t x)
     {
@@ -114,6 +134,5 @@ namespace humanize {
         std::snprintf(buf, sizeof buf, "%.1fT", fx);
         return buf;
     }
-
 
 } // namespace humanize

@@ -19,6 +19,10 @@ namespace humanize {
 
     [[nodiscard]]
     std::string
+    duration_brief(std::chrono::seconds t);
+
+    [[nodiscard]]
+    std::string
     value(std::uint64_t x);
 
 } // namespace humanize

@@ -3,6 +3,7 @@ EXTRA_DIST = \
 	bootstrap \
 	COPYING.GPLv3 \
 	CREDITS \
+	extras \
 	radio-browser-info-api.md \
 	README.md \
 	TODO.org
@@ -46,10 +47,6 @@ radiiu_elf_SOURCES = \
 	src/byte_stream.hpp \
 	src/cfg.cpp \
 	src/cfg.hpp \
-	src/constants.cpp \
-	src/constants.hpp \
-	src/crc32.cpp \
-	src/crc32.hpp \
 	src/Favorites.cpp \
 	src/Favorites.hpp \
 	src/humanize.cpp \

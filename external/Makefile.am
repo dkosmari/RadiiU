@@ -21,7 +21,6 @@ libimgui_a_SOURCES = \
 	imgui/imconfig.h \
 	imgui/imgui.cpp \
 	imgui/imgui.h \
-	imgui/imgui_demo.cpp \
 	imgui/imgui_draw.cpp \
 	imgui/imgui_internal.h \
 	imgui/imgui_tables.cpp \
@@ -32,6 +31,10 @@ libimgui_a_SOURCES = \
 	imgui/misc/cpp/imgui_stdlib.h \
 	imgui/misc/freetype/imgui_freetype.cpp \
 	imgui/misc/freetype/imgui_freetype.h
+
+# Uncomment this to include Style Editor window.
+# libimgui_a_SOURCES += imgui/imgui_demo.cpp
+
 
 
 libimgui_a_CPPFLAGS = \

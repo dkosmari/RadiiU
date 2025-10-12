@@ -57,7 +57,7 @@ namespace Recent {
                 real_add(Station::from_json(elem.as<json::object>()));
         }
         catch (std::exception& e) {
-            cout << "Error loading recent: " << e.what() << endl;
+            cout << "ERROR: Recent::load(): " << e.what() << endl;
         }
     }
 
@@ -72,7 +72,7 @@ namespace Recent {
             json::save(std::move(list), cfg::base_dir / "recent.json");
         }
         catch (std::exception& e) {
-            cout << "Error saving recent: " << e.what() << endl;
+            cout << "ERROR: Recent::save(): " << e.what() << endl;
         }
     }
 

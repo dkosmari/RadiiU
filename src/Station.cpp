@@ -151,6 +151,7 @@ Station::to_json()
     h.store("countrycode", country_code);
     h.store("stationuuid", uuid);
 
+    // Note: these fields we split into vectors.
     h.store("language", utils::join(languages, ","));
     h.store("tags", utils::join(tags, ","));
 

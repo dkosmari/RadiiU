@@ -83,13 +83,9 @@ namespace App {
     bool running;
 
     const float cafe_size = 32;
-    const float symbola_size = cafe_size * 1.0f;
 
     std::optional<TabID> next_tab;
     TabID current_tab;
-
-    sdl::vec2 window_size;
-
 
 #ifdef __WIIU__
     bool old_disable_swkbd;
@@ -117,6 +113,7 @@ namespace App {
     {
         auto& io = ImGui::GetIO();
 
+// For desktop build: comment this to load Ubuntu-R.ttf from the current dir.
 #define USE_CAFE
 
 #ifdef USE_CAFE
@@ -281,7 +278,7 @@ namespace App {
 
         // Create a temporary audio device to stop the boot sound.
         sdl::audio::spec aspec;
-        aspec.freq = 44100;
+        aspec.freq = 48000;
         aspec.format = AUDIO_S16SYS;
         aspec.channels = 2;
         aspec.samples = 2048;
@@ -295,14 +292,11 @@ namespace App {
                            {1280, 720},
                            0);
 
-        window_size = res->window.get_size();
-        cout << "SDL window size: " << window_size << endl;
-
         res->renderer.create(res->window,
                              -1,
                              sdl::renderer::flag::accelerated,
                              sdl::renderer::flag::present_vsync);
-        res->renderer.set_logical_size(window_size);
+        res->renderer.set_logical_size(res->window.get_size());
 
         initialize_imgui();
 
@@ -345,7 +339,7 @@ namespace App {
 
         res.reset();
 
-        cout << "finished App::finalize()" << endl;
+        cout << "Finished App::finalize()" << endl;
     }
 
 
@@ -364,7 +358,7 @@ namespace App {
             draw();
 
         }
-        cout << "Stopped running" << endl;
+        cout << "Finished App::run()" << endl;
     }
 
 
@@ -380,15 +374,6 @@ namespace App {
 
                 case sdl::events::type::e_quit:
                     quit();
-                    break;
-
-                case sdl::events::type::e_window:
-                    switch (event.window.event) {
-                        case SDL_WINDOWEVENT_RESIZED:
-                            window_size.x = event.window.data1;
-                            window_size.y = event.window.data2;
-                            break;
-                    }
                     break;
 
                 case sdl::events::type::e_controller_device_added:
@@ -424,10 +409,8 @@ namespace App {
 
         auto& style = ImGui::GetStyle();
 
-        ImGui::SetNextWindowPos({0, 0},
-                                ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(window_size.x, window_size.y),
-                                 ImGuiCond_Always);
+        ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImGui::ToVec2(res->window.get_size()), ImGuiCond_Always);
         if (ImGui::Begin("##MainWindow",
                          nullptr,
                          ImGuiWindowFlags_NoTitleBar |
@@ -596,7 +579,7 @@ namespace App {
 
 #ifdef __WIIU__
         // WORKAROUND: the Wii U SDL2 port does not update the clipping until the next
-        // draw, so we need to dra a transparent point here to reset the GX2 state.
+        // draw, so we need to draw a transparent point here to reset the GX2 state.
         res->renderer.set_color(sdl::color::transparent);
         res->renderer.draw_point(0, 0);
 #endif

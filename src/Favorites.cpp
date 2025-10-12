@@ -123,7 +123,7 @@ namespace Favorites {
             cout << "Loaded " << stations.size() << " favorites" << endl;
         }
         catch (std::exception& e) {
-            cout << "Error loading favorites: " << e.what() << endl;
+            cout << "ERROR: Favorites::load(): " << e.what() << endl;
         }
     }
 
@@ -138,7 +138,7 @@ namespace Favorites {
             json::save(std::move(list), cfg::base_dir / "favorites.json");
         }
         catch (std::exception& e) {
-            cout << "Error saving favorites: " << e.what() << endl;
+            cout << "ERROR: Favorites::save(): " << e.what() << endl;
         }
     }
 
@@ -473,11 +473,6 @@ namespace Favorites {
 
             ImGui::SameLine();
 
-            // if (ImGui::Button(ICON_FA_FLOPPY_O /*💾*/ " Save"))
-            //     save();
-
-            // ImGui::SameLine();
-
             ImGui::AlignTextToFramePadding();
             ImGui::TextRight("%zu stations", stations.size());
 
@@ -608,6 +603,5 @@ namespace Favorites {
 
         std::erase(stations, station);
     }
-
 
 } // namespace Favorites

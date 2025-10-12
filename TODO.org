@@ -1,4 +1,14 @@
-* Pending features for v0.2 [%]
+* Plan for 0.2 [0%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
+- [ ] General [0/2]
+  - [ ] Custom fallback fonts.
+  - [ ] Screensaver when idle.
+- [ ] Browser [0/2]
+  - [ ] Filter by codec.
+  - [ ] Show stream codec.
+- [ ] Favorites [0/1]
+  - [ ] Update entry from Browser when editing.
+- [ ] Player [0/1]
+  - [ ] Add Ogg Vorbis suport.

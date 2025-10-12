@@ -200,6 +200,10 @@ namespace cfg {
             load(root, "recent_limit",         recent_limit);
             load(root, "remember_tab",         remember_tab);
             load(root, "server",               server);
+
+            // Remove after 0.2
+            if (player_buffer_size > 64)
+                player_buffer_size = 64;
         }
         catch (std::exception& e) {
             cout << "Error loading settings: " << e.what() << endl;

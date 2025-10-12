@@ -17,7 +17,6 @@
 #include "ui.hpp"
 
 #include "Browser.hpp"
-#include "constants.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
 #include "imgui_extras.hpp"
@@ -34,6 +33,9 @@ using namespace std::literals;
 
 
 namespace ui {
+
+    const ImVec4 label_color = {1.0, 1.0, 0.25, 1.0};
+
 
     void
     show_favicon(const std::string& favicon)
@@ -57,7 +59,7 @@ namespace ui {
         ImGui::TableNextRow();
 
         ImGui::TableNextColumn();
-        ImGui::TextRightColored(constants::label_color, "%s", label.data());
+        ImGui::TextRightColored(label_color, "%s", label.data());
         // show_last_bounding_box();
 
         ImGui::TableNextColumn();
@@ -74,7 +76,7 @@ namespace ui {
         ImGui::TableNextRow();
 
         ImGui::TableNextColumn();
-        ImGui::TextRightColored(constants::label_color, "%s", label.data());
+        ImGui::TextRightColored(label_color, "%s", label.data());
         // show_last_bounding_box();
 
         ImGui::TableNextColumn();
@@ -112,7 +114,7 @@ namespace ui {
     {
         std::va_list args;
         va_start(args, fmt);
-        ImGui::TextRightColoredV(constants::label_color, fmt, args);
+        ImGui::TextRightColoredV(label_color, fmt, args);
         va_end(args);
     }
 
@@ -126,7 +128,7 @@ namespace ui {
         ImGui::PushID(label);
 
         ImGui::TableNextColumn();
-        ImGui::TextRightColored(constants::label_color, "%s", label.data());
+        ImGui::TextRightColored(label_color, "%s", label.data());
 
         ImGui::TableNextColumn();
         if (ImGui::TextLinkOpenURL(/*ICON_FA_LINK " " +*/ url, url)) {
@@ -248,7 +250,7 @@ namespace ui {
                            }
                            catch (std::exception& e) {
                                station_info_error = e.what();
-                               cout << "Failed to read station info: "
+                               cout << "ERROR: Failed to read station info: "
                                     << station_info_error
                                     << endl;
                            }
@@ -257,7 +259,7 @@ namespace ui {
                           const std::exception& error)
                        {
                            station_info_error = error.what();
-                           cout << "Error requesting station info: "
+                           cout << "ERROR: requesting station info: "
                                 << station_info_error
                                 << endl;
                        });
@@ -278,7 +280,7 @@ namespace ui {
         }
         catch (std::exception& e) {
             station_info_error = e.what();
-            cout << "Error requesting station info: " << station_info_error << endl;
+            cout << "ERROR: requesting station info: " << station_info_error << endl;
         }
 
         ImGui::OpenPopup(station_info_popup_id);

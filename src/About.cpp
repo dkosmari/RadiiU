@@ -1,3 +1,10 @@
+/*
+ * RadiiU - an internet radio player for the Wii U.
+ *
+ * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 #include <exception>
 #include <fstream>
 #include <iostream>
@@ -17,7 +24,6 @@
 
 #include "About.hpp"
 
-#include "constants.hpp"
 #include "IconsFontAwesome4.h"
 #include "IconManager.hpp"
 #include "imgui_extras.hpp"
@@ -31,9 +37,6 @@
 
 using std::cout;
 using std::endl;
-
-
-using constants::label_color;
 
 
 namespace About {
@@ -144,9 +147,9 @@ namespace About {
                         continue;
                     auto tokens = utils::split(line, ":", false, 2);
                     if (tokens.size() != 2) {
-                        cout << "Error in CREDITS file: split into "
+                        cout << "ERROR: get_credits(): wrong number of tokens ("
                              << tokens.size()
-                             << " tokens: \""
+                             << "): \""
                              << line << "\""
                              << endl;
                         continue;
@@ -156,7 +159,7 @@ namespace About {
                 }
             }
             catch (std::exception& e) {
-                cout << "Error loading CREDITS file: " << e.what() << endl;
+                cout << "ERROR: get_credits(): " << e.what() << endl;
             }
 
             return result;
@@ -187,9 +190,8 @@ namespace About {
                 ImGui::EndTable();
             }
 
-            // ImGui::SeparatorTextColored(label_color, "Credits");
-            static const auto credits = get_credits();
             ImGui::SeparatorText("Credits");
+            static const auto credits = get_credits();
             if (ImGui::BeginTable("credits", 2)) {
 
                 ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
@@ -201,7 +203,6 @@ namespace About {
                 ImGui::EndTable();
             }
 
-            // ImGui::SeparatorTextColored(label_color, "Components");
             ImGui::SeparatorText("Components");
             if (ImGui::BeginTable("components", 2)) {
 

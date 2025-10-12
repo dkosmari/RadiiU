@@ -19,21 +19,15 @@
 
 namespace rest {
 
-    using success_callback_t = void (curl::easy& ez,
-                                     const std::string& response,
-                                     const std::string& content_type);
-    using success_function_t = std::function<success_callback_t>;
+    using success_function_t = std::function<void (curl::easy& ez,
+                                                   const std::string& response,
+                                                   const std::string& content_type)>;
 
+    using error_function_t = std::function<void (curl::easy& ez,
+                                                 const std::exception& error)>;
 
-    using error_callback_t = void (curl::easy& ez,
-                                   const std::exception& error);
-    using error_function_t = std::function<error_callback_t>;
-
-
-    using json_success_callback_t = void(curl::easy& ez,
-                                         const json::value& response);
-    using json_success_function_t = std::function<json_success_callback_t>;
-
+    using json_success_function_t = std::function<void (curl::easy& ez,
+                                                        const json::value& response)>;
 
     using request_params_t = std::map<std::string, std::string>;
 
@@ -46,16 +40,13 @@ namespace rest {
     finalize();
 
 
-    // TODO: expose the curl::easy object for each request.
-
-
-    void
+    curl::easy&
     get(const std::string& url,
         success_function_t on_success = {},
         error_function_t on_error = {});
 
 
-    void
+    curl::easy&
     get(const std::string& base_url,
         const request_params_t& params,
         success_function_t on_success = {},
@@ -70,12 +61,12 @@ namespace rest {
              const request_params_t& params);
 
 
-    void
+    curl::easy&
     get_json(const std::string& url,
              json_success_function_t on_success = {},
              error_function_t on_error = {});
 
-    void
+    curl::easy&
     get_json(const std::string& base_url,
              const request_params_t& params,
              json_success_function_t on_success = {},

@@ -103,7 +103,7 @@ namespace Settings {
                     Browser::refresh_mirrors();
 
                 /*********************
-                 * Stations per page *
+                 * Browser page size *
                  *********************/
 
                 ImGui::TableNextRow();
@@ -111,7 +111,7 @@ namespace Settings {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                ui::show_label("Stations per page");
+                ui::show_label("Browser page size");
 
                 ImGui::TableNextColumn();
 

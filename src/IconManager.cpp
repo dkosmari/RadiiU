@@ -5,13 +5,16 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <algorithm>
 #include <atomic>
 #include <cassert>
 #include <chrono>
 #include <cmath>
+#include <concepts>
 #include <filesystem>
+#include <functional>
 #include <iostream>
-#include <map>
+#include <unordered_map>
 #include <optional>
 #include <queue>
 #include <ranges>
@@ -26,7 +29,6 @@
 #include "IconManager.hpp"
 
 #include "async_queue.hpp"
-#include "crc32.hpp"
 #include "thread_safe.hpp"
 #include "utils.hpp"
 
@@ -53,7 +55,8 @@ namespace IconManager {
 
     std::optional<curl::multi> multi;
 
-    enum class LoadState {
+
+    enum class LoadState : int {
         unloaded,
         requested,
         loading,
@@ -61,7 +64,11 @@ namespace IconManager {
         error,
     };
 
-    struct IconInfo {
+    std::string
+    to_string(LoadState st);
+
+
+    struct CacheEntry {
         std::atomic<LoadState> state{LoadState::unloaded};
         std::uint64_t last_use = 0;
         sdl::surface img;
@@ -72,7 +79,7 @@ namespace IconManager {
 
 
     // TODO: use a good hash map here
-    using cache_t = std::map<std::string, IconInfo>;
+    using cache_t = std::unordered_map<std::string, CacheEntry>;
     thread_safe<cache_t> safe_cache;
 
 
@@ -128,52 +135,60 @@ namespace IconManager {
     {
         ++use_counter;
         auto cache = safe_cache.lock();
+        auto it = cache->find(location);
         try {
-            auto it = cache->find(location);
             if (it != cache->end()) {
                 auto& status = it->second;
                 status.last_use = use_counter;
 
-                switch (status.state) {
+                try {
+                    switch (status.state) {
 
-                    case LoadState::loaded:
-                        if (!status.tex) {
-                            status.tex.create(*renderer, status.img);
-                            status.img.destroy();
-                        }
-                        return &status.tex;
+                        case LoadState::loaded:
+                            if (!status.tex) {
+                                status.tex.create(*renderer, status.img);
+                                status.img.destroy();
+                            }
+                            return &status.tex;
 
-                    case LoadState::error:
-                        return &error_icon;
+                        case LoadState::error:
+                            return &error_icon;
 
-                    case LoadState::requested:
-                    case LoadState::loading:
-                        return &loading_icon;
+                        case LoadState::requested:
+                        case LoadState::loading:
+                            return &loading_icon;
 
-                    case LoadState::unloaded:
-                        status.state = LoadState::loading;
-                        requests_queue.push(location);
-                        return &loading_icon;
+                        case LoadState::unloaded:
+                            status.state = LoadState::loading;
+                            requests_queue.push(location);
+                            return &loading_icon;
 
+                        default:
+                            throw std::logic_error{"invalid entry state: "
+                                                   + to_string(status.state)};
+                    }
                 }
-
-                return &error_icon;
+                catch (std::exception& e) {
+                    status.state = LoadState::error;
+                    throw;
+                }
             } else {
                 (*cache)[location].state = LoadState::requested;
                 requests_queue.push(location);
                 return &loading_icon;
             }
         }
-        catch (std::exception& /*e*/) {
-            // cout << "error getting icon texture: " << e.what() << "\n";
+        catch (std::exception& e) {
+            cout << "ERROR: IconManager::get(): " << e.what() << endl;
             return &error_icon;
         }
     }
 
 
-    IconInfo*
-    find(const curl::easy* ez,
-         thread_safe<cache_t>::guard<cache_t>& cache)
+    // Find a CacheEntry that contains this specific curl::easy object.
+    CacheEntry*
+    find(thread_safe<cache_t>::guard<cache_t>& cache,
+         const curl::easy* ez)
     {
         // TODO: use an auxiliary data structure to speed this up
         for (auto& [location, entry] : *cache)
@@ -187,7 +202,7 @@ namespace IconManager {
     process_one_request(const std::string& location)
     {
         // cout << "loading location " << location << endl;
-        std::map<std::string, IconInfo>::iterator it;
+        cache_t::iterator it;
 
         {
             auto cache = safe_cache.lock();
@@ -196,7 +211,8 @@ namespace IconManager {
                 return;
             LoadState expected = LoadState::requested;
             if (!it->second.state.compare_exchange_strong(expected, LoadState::loading)) {
-                cout << "unexpected state: got " << static_cast<int>(expected) << endl;
+                cout << "ERROR: IconManager::process_one_request() wrong cache entry state: "
+                     << to_string(expected) << endl;
                 return;
             }
         }
@@ -214,8 +230,19 @@ namespace IconManager {
                     ez.set_user_agent(user_agent);
                 ez.set_url(location);
                 ez.set_follow(true);
+                ez.set_http_headers({ "Accept: image/*" });
                 ez.set_write_function([&entry](std::span<const char> buf) -> std::size_t
                 {
+                    auto content_type_header = entry.easy->try_get_header("Content-Type");
+                    if (content_type_header) {
+                        std::string ct = content_type_header->value;
+                        if (!ct.starts_with("image/")) {
+                            cout << "ERROR: Content-Type should be \"image/*\" but got \""
+                                 << ct << "\"" << endl;
+                            return CURL_READFUNC_ABORT;
+                        }
+                    }
+
                     if (!entry.raw_buf)
                         entry.raw_buf.emplace();
 #ifdef __cpp_lib_containers_ranges
@@ -233,13 +260,61 @@ namespace IconManager {
                 entry.img = sdl::img::load(content_prefix / location);
                 entry.state = LoadState::loaded;
             } else
-                throw std::runtime_error{"invalid location: \"" + location + "\""};
+                throw std::runtime_error{"invalid location"};
 
         }
         catch (std::exception& e) {
-            cout << "Error processing request \"" << location << "\": " << e.what() << endl;
+            cout << "ERROR: IconManager::process_one_request():\n"
+                 << "  location: \"" << location << "\"\n"
+                 << "  exception: " << e.what() << endl;
             entry.state = LoadState::error;
         }
+    }
+
+
+    // Pushes the max element downwards to its correct heap location.
+    template<std::ranges::random_access_range R,
+             typename Comp = std::ranges::less,
+             class Proj = std::identity>
+    requires std::sortable<std::ranges::iterator_t<R>, Comp, Proj>
+    void
+    sift_down_heap(R&& r,
+                   Comp comp = {},
+                   Proj proj = {})
+    {
+        if (std::empty(r))
+            return;
+        const auto size = std::size(r);
+        std::ranges::range_size_t<R> cur_idx = 0;
+        for (;;) {
+            auto left_idx = 2u * cur_idx + 1u;
+            // If reached bottom of heap, we can stop.
+            if (left_idx >= size)
+                break;
+            // Select the largest child to be the next.
+            auto next_idx = left_idx;
+            auto right_idx = 2u * cur_idx + 2u;
+            if (right_idx < size
+                && std::invoke(comp,
+                               std::invoke(proj, r[left_idx]),
+                               std::invoke(proj, r[right_idx])))
+                next_idx = right_idx;
+            // If max-heap property was restored, we can stop.
+            if (!std::invoke(comp,
+                             std::invoke(proj, r[cur_idx]),
+                             std::invoke(proj, r[next_idx])))
+                break;
+            std::swap(r[cur_idx], r[next_idx]);
+            cur_idx = next_idx;
+        }
+    }
+
+
+    std::uint64_t&
+    by_last_use(cache_t::iterator it)
+        noexcept
+    {
+        return it->second.last_use;
     }
 
 
@@ -247,20 +322,42 @@ namespace IconManager {
     trim_cache()
     {
         auto cache = safe_cache.lock();
-        if (cache->size() > max_cache_size) {
-            std::size_t excess = cache->size() - max_cache_size;
-            std::map<std::uint64_t, std::string> to_remove;
-            for (auto& [location, info] : *cache)
-                to_remove.emplace(info.last_use, location);
+        if (cache->size() <= max_cache_size)
+            return;
 
-            for (auto& [last_use, location] : to_remove | std::views::take(excess)) {
-                auto& info = cache->at(location);
-                if (info.easy) {
-                    cout << "Pruning active request" << endl;
-                    multi->remove(*info.easy);
+        std::size_t excess = cache->size() - max_cache_size;
+        // cout << "IconManager: prunning " << excess << " icons" << endl;
+        std::vector<cache_t::iterator> to_remove(excess);
+        auto to_remove_end = to_remove.begin();
+        for (auto it = cache->begin(); it != cache->end(); ++it) {
+            if (to_remove_end != to_remove.end()) {
+                *to_remove_end++ = it;
+                std::ranges::push_heap(to_remove.begin(),
+                                       to_remove_end,
+                                       {},
+                                       by_last_use);
+            } else {
+                /*
+                 * Heap is already full:
+                 * If new element is older than the max element on the heap,
+                 * just replace the max element, and update the heap.
+                 */
+                if (by_last_use(it) < by_last_use(to_remove.front())) {
+                    to_remove.front() = it;
+                    sift_down_heap(to_remove, {}, by_last_use);
                 }
-                cache->erase(location);
             }
+        }
+        // Now to_remove contains the "excess" elements that must be purged.
+        for (auto it : to_remove) {
+            auto& info = it->second;
+            if (info.easy) {
+                // If removing an active request, make sure it's removed from the curl::multi.
+                // cout << "IconManager: prunning an active request" << endl;
+                multi->remove(*info.easy);
+            }
+            // unordered_map guarantees all other iterators remain valid
+            cache->erase(it);
         }
     }
 
@@ -270,9 +367,10 @@ namespace IconManager {
     {
         for (auto [ez, error_code] : multi->get_done()) {
             auto cache = safe_cache.lock();
-            auto* entry = find(ez, cache);
+            auto* entry = find(cache, ez);
             if (!entry) {
-                cout << "ERROR: failed to find entry for " << ez << endl;
+                cout << "ERROR: IconManager::handle_finished_downloads(): failed to find entry for "
+                     << ez << endl;
                 continue;
             }
 
@@ -305,7 +403,7 @@ namespace IconManager {
                 entry->raw_buf.reset();
             }
             catch (std::exception& e) {
-                cout << "ERROR: " << e.what() << endl;
+                cout << "ERROR: IconManager::handle_finished_downloads(): " << e.what() << endl;
                 entry->state = LoadState::error;
             }
 
@@ -336,13 +434,30 @@ namespace IconManager {
                 std::this_thread::sleep_for(50ms);
             }
         }
-        catch (async_queue_exception) {
-        }
         catch (std::exception& e) {
-            cout << "worker thread error: " << e.what() << endl;
+            cout << "ERROR: IconManager::worker_func(): " << e.what() << endl;
         }
         multi.reset();
     }
 
+
+    std::string
+    to_string(LoadState st)
+    {
+        switch (st) {
+            case LoadState::unloaded:
+                return "unloaded";
+            case LoadState::requested:
+                return "requested";
+            case LoadState::loading:
+                return "loading";
+            case LoadState::loaded:
+                return "loaded";
+            case LoadState::error:
+                return "loaded";
+            default:
+                return "unknown (" + std::to_string(static_cast<int>(st)) + ")";
+        }
+    }
 
 } // namespace IconManager

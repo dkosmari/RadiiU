@@ -34,7 +34,6 @@
 #include "Browser.hpp"
 
 #include "cfg.hpp"
-#include "constants.hpp"
 #include "Favorites.hpp"
 #include "humanize.hpp"
 #include "IconManager.hpp"
@@ -313,7 +312,7 @@ namespace Browser {
                     return false;
 
                 if (ar.error.message)
-                    throw std::runtime_error{"failed resolving all.api.radio-browser.info: "
+                    throw std::runtime_error{"failed resolving \"all.api.radio-browser.info\": "
                                              + *ar.error.message};
                 for (const auto& entry : ar.result.entries)
                     addresses.push_back(entry.addr);
@@ -330,13 +329,13 @@ namespace Browser {
                             return false;
 
                         if (nr.error.message)
-                            throw std::runtime_error{"failed to look up name for "
-                                                     + to_string(addr)};
+                            throw std::runtime_error{"failed to look up name for \""
+                                                     + to_string(addr) + "\""};
                         if (nr.result.name)
                             new_mirrors.insert(std::move(*nr.result.name));
                     }
                     catch (std::exception& e) {
-                        cout << "Failed to look up name for " << addr << endl;
+                        cout << "ERROR: " << e.what() << endl;
                     }
                 }
             }
@@ -352,7 +351,7 @@ namespace Browser {
             return true;
         }
         catch (std::exception& e) {
-            cout << "error fetching mirrors: " << e.what() << endl;
+            cout << "ERROR: fetch_mirrors(): " << e.what() << endl;
             return false;
         }
     }
@@ -386,14 +385,14 @@ namespace Browser {
                 return;
             try {
                 auto result = rest::get_json_sync("https://" + name + "/json/stats");
-                cout << "Mirror " << name << " returned:\n";
+                cout << "Mirror \"" << name << "\" returned:\n";
                 dump(result, cout);
                 safe_server.store(name);
                 finished_background_connect = true;
                 break;
             }
             catch (std::exception& e) {
-                cout << "Mirror " << name << " failed to respond: " << e.what() << endl;
+                cout << "Mirror \"" << name << "\" failed to respond: " << e.what() << endl;
             }
         }
     }
@@ -438,7 +437,7 @@ namespace Browser {
                 page_index = root.at("page").as<json::integer>() - 1;
         }
         catch (std::exception& e) {
-            cout << "ERROR: loading browser.json: " << e.what() << endl;
+            cout << "ERROR: Browser::load(): " << e.what() << endl;
         }
     }
 
@@ -465,7 +464,7 @@ namespace Browser {
             json::save(std::move(root), cfg::base_dir / "browser.json");
         }
         catch (std::exception& e) {
-            cout << "Error saving browser: " << e.what() << endl;
+            cout << "ERROR: Browser::save(): " << e.what() << endl;
         }
     }
 
@@ -733,7 +732,7 @@ namespace Browser {
                     ImGui::InputText("Name", &filter_name);
 
                     ImGui::SetNextItemWidth(filters_width);
-                    if (ImGui::BeginCombo(ICON_FA_TAG " Tag", filter_tag)) {
+                    if (ImGui::BeginCombo("Tag", filter_tag)) {
                         static ImGuiTextFilter filter;
                         if (ImGui::IsWindowAppearing()) {
                             ImGui::SetKeyboardFocusHere();
@@ -759,7 +758,7 @@ namespace Browser {
                         if (country_name)
                             display_country += " - " + *country_name;
                     }
-                    if (ImGui::BeginCombo(ICON_FA_FLAG_O " Country", display_country)) {
+                    if (ImGui::BeginCombo("Country", display_country)) {
                         static ImGuiTextFilter filter;
                         if (ImGui::IsWindowAppearing()) {
                             ImGui::SetKeyboardFocusHere();
@@ -1067,7 +1066,7 @@ namespace Browser {
 #if 0
             // Disabled until ImGui fixes navigation.
             if (stations.size() == cfg::browser_page_limit)
-                if (ImGui::Button("Go page " + std::to_string(page_index + 1 + 1) + " ⏵",
+                if (ImGui::Button("Go to page " + std::to_string(page_index + 1 + 1) + " ⏵",
                                   {content_width, 0.0f})) {
                     ++page_index;
                     queue_refresh_stations();
@@ -1095,7 +1094,7 @@ namespace Browser {
                        {
                            auto obj = response.as<json::object>();
                            if (obj.contains("name"))
-                               cout << "Clicked on "
+                               cout << "Click confirmed for "
                                     << obj.at("name").as<json::string>()
                                     << endl;
                        });
@@ -1125,7 +1124,7 @@ namespace Browser {
                                    votes_cast.insert(uuid);
                            }
                            catch (std::exception& e) {
-                               cout << "Unexpected error reading status of vote: "
+                               cout << "ERROR: unexpected error reading status of vote: "
                                     << e.what()
                                     << endl;
                            }
@@ -1152,7 +1151,7 @@ namespace Browser {
                            }
                            catch (std::exception& e) {
                                server_info_error = e.what();
-                               cout << "Failed to read server stats: "
+                               cout << "ERROR: failed to read server stats: "
                                     << server_info_error
                                     << endl;
                            }

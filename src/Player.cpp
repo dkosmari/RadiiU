@@ -114,91 +114,94 @@ namespace Player {
 
 
     std::string
+    to_string(mpg123_version v)
+    {
+        switch (v) {
+            case MPG123_1_0:
+                return "1.0";
+            case MPG123_2_0:
+                return "2.0";
+            case MPG123_2_5:
+                return "2.5";
+            default:
+                return "?";
+        }
+    }
+
+
+    std::string
+    rate_to_string(unsigned rate)
+    {
+// Note: we know CafeStd has this suffix.
+#define SUFFIX "㎐"
+        switch (rate) {
+            case 48000:
+                return "48 k" SUFFIX;
+            case 44100:
+                return "44.1 k" SUFFIX;
+            case 22050:
+                return "22.05 k" SUFFIX;
+            default:
+                if ((rate % 1000) == 0)
+                    return std::to_string(rate / 1000u) + " k" SUFFIX;
+                else // unusual rate, just show it without the k
+                    return std::to_string(rate) + " " SUFFIX;
+        }
+#undef SUFFIX
+    }
+
+
+    std::string
+    to_string(mpg123_mode mode)
+    {
+        switch (mode) {
+            case MPG123_M_STEREO:
+                return "stereo";
+            case MPG123_M_JOINT:
+                return "joint stereo";
+            case MPG123_M_DUAL:
+                return "dual channel";
+            case MPG123_M_MONO:
+                return "mono";
+            default:
+                return "unknown channel mode";
+        }
+    }
+
+
+    std::string
     get_codec_desc(const mpg123::frame_info& info)
     {
         std::string result;
-
-        // MPEG version
-        switch (info.version) {
-            case MPG123_1_0:
-                result += "MPEG 1.0";
-                break;
-            case MPG123_2_0:
-                result += "MPEG 2.0";
-                break;
-            case MPG123_2_5:
-                result += "MPEG 2.5";
-                break;
-            default:
-                result += "MPEG ?";
-        }
-        result += " layer ";
-        result += std::to_string(info.layer);
-
+        result += "MPEG "s + to_string(info.version) + " layer "s + std::to_string(info.layer);
         result += "; ";
-
-        // Sampling rate
-        switch (info.rate) {
-            case 48000:
-                result += "48 k";
-                break;
-            case 44100:
-                result += "44.1 k";
-                break;
-            case 22050:
-                result += "22.05 k";
-                break;
-            default:
-                if ((info.rate % 1000) == 0)
-                    result += utils::cpp_sprintf("%u k", info.rate / 1000u);
-                else // weird rate, just print out without the k
-                    result += utils::cpp_sprintf("%u ", info.rate);
-        }
-        result += "㎐";
-
+        result += rate_to_string(info.rate);
         result += "; ";
-
-        // Channel mode
-        switch (info.mode) {
-            case MPG123_M_STEREO:
-                result += "stereo";
-                break;
-            case MPG123_M_JOINT:
-                result += "joint stereo";
-                break;
-            case MPG123_M_DUAL:
-                result += "dual channel";
-                break;
-            case MPG123_M_MONO:
-                result += "mono";
-                break;
-            default:
-                result += "unknown";
-        }
-
+        result += to_string(info.mode);
         return result;
+    }
+
+
+    std::string
+    to_string(mpg123_vbr mode)
+    {
+        switch (mode) {
+            case MPG123_CBR:
+                return "constant";
+            case MPG123_VBR:
+                return "variable";
+            case MPG123_ABR:
+                return "average";
+            default:
+                return "unknown vbr mode";
+        }
     }
 
 
     std::string
     get_bitrate_desc(const mpg123::frame_info& info)
     {
-        std::string result;
-        switch (info.vbr_mode) {
-            case MPG123_CBR:
-                result = "constant";
-                break;
-            case MPG123_VBR:
-                result = "variable";
-                break;
-            case MPG123_ABR:
-                result = "average";
-                break;
-            default:
-                result = "unknown";
-        }
-        result += " " + std::to_string(info.bitrate) + " kbps";
-        return result;
+        return to_string(info.vbr_mode) + " " + std::to_string(info.bitrate) + " kbps";
     }
 
 
@@ -423,7 +426,7 @@ namespace Player {
                         // it's our handle
                         state = State::stopping;
                         if (msg.result != CURLE_OK) {
-                            cout << "Streaming session ended in error: " << msg.result << endl;
+                            cout << "ERROR: Player::Resources::process(): streaming session ended: " << msg.result << endl;
                         }
                     }
                 }
@@ -497,7 +500,7 @@ namespace Player {
 
             }
             catch (std::exception& e) {
-                cout << "ERROR: " << e.what() << endl;
+                cout << "ERROR: Player::Resources::process(): " << e.what() << endl;
             }
         }
 
@@ -755,8 +758,11 @@ namespace Player {
                     for (const auto& [when, title] : history | std::views::reverse) {
 
                         auto t = duration_cast<std::chrono::seconds>(now - when);
+#if 0
                         std::string label = humanize::duration(t) + " ago";
-
+#else
+                        std::string label = humanize::duration_brief(t);
+#endif
                         ui::show_info_row(label, title);
 
                     }

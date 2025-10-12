@@ -84,7 +84,7 @@ public:
     pop()
     {
         std::unique_lock guard{mutex};
-        // Stop waiting if a stop was requested, or the queue has data.
+        // Wait until a stop is requested, or the queue has data.
         empty_cond.wait(guard, [this] { return should_stop || !queue.empty(); });
         if (should_stop)
             throw async_queue_exception::stop;

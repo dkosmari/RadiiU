@@ -78,7 +78,7 @@ to_ui_string(TabID tab)
         case TabID::Name::favorites:
             return ICON_FA_HEART " Favorites";
         case TabID::Name::browser:
-            return ICON_FA_BINOCULARS " Browser";
+            return ICON_FA_GLOBE " Browser";
         case TabID::Name::recent:
             return ICON_FA_HISTORY " Recent";
         case TabID::Name::player:

@@ -20,6 +20,9 @@ struct Station;
 
 namespace ui {
 
+    extern const ImVec4 label_color;
+
+
     void
     show_favicon(const std::string& favicon);
 

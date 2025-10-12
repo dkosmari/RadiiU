@@ -104,7 +104,7 @@ namespace rest {
     }
 
 
-    void
+    curl::easy&
     get(const std::string& url,
         success_function_t on_success,
         error_function_t on_error)
@@ -112,19 +112,23 @@ namespace rest {
         auto req = std::make_unique<request>(url,
                                              std::move(on_success),
                                              std::move(on_error));
-        multi.add(req->easy);
+        curl::easy& ez = req->easy;
+        multi.add(ez);
         requests.push_back(std::move(req));
+        return ez;
     }
 
 
-    void
+    curl::easy&
     get(const std::string& base_url,
         const request_params_t& params,
         success_function_t on_success,
         error_function_t on_error)
     {
         std::string full_url = base_url + concat(params);
-        get(full_url, std::move(on_success), std::move(on_error));
+        return get(full_url,
+                   std::move(on_success),
+                   std::move(on_error));
     }
 
 
@@ -156,48 +160,50 @@ namespace rest {
     }
 
 
-    void
+    curl::easy&
     get_json(const std::string& url,
              json_success_function_t on_success,
              error_function_t on_error)
     {
-        get(url,
-            [on_success=std::move(on_success)](curl::easy& ez,
-                                               const std::string& response,
-                                               const std::string& content_type)
-            {
-                if (content_type != "application/json")
-                    throw std::runtime_error{"Content-Type should be application/json, but got "
-                                             + content_type
-                                             + "\nContent:\n"
-                                             + response.substr(0, 256)
-                                             + (response.size() > 256 ? "\n..." : "\n<<EOF>>")};
-                if (content_type != "application/json") {
-                    cout << "ERROR: response was not JSON!" << endl;
-                    return;
-                }
-                try {
-                    json::value response_value = json::parse(response);
-                    if (on_success)
-                        on_success(ez, response_value);
-                }
-                catch (std::exception& e) {
-                    cout << "ERROR parsing JSON: " << e.what() << endl;
-                    throw;
-                }
-            },
-            on_error);
+        auto& ez = get(url,
+                       [on_success=std::move(on_success)](curl::easy& ez,
+                                                          const std::string& response,
+                                                          const std::string& content_type)
+                       {
+                           if (!content_type.starts_with("application/json"))
+                               throw std::runtime_error{"Content-Type should be application/json, but got "
+                                                        + content_type
+                                                        + "\nContent:\n"
+                                                        + response.substr(0, 256)
+                                                        + (response.size() > 256 ? "\n..." : "\n<<EOF>>")};
+                           if (!content_type.starts_with("application/json")) {
+                               cout << "ERROR: response was not JSON!" << endl;
+                               return;
+                           }
+                           try {
+                               json::value response_value = json::parse(response);
+                               if (on_success)
+                                   on_success(ez, response_value);
+                           }
+                           catch (std::exception& e) {
+                               cout << "ERROR: parsing JSON: " << e.what() << endl;
+                               throw;
+                           }
+                       },
+                       on_error);
+        ez.set_http_headers({ "Accept: application/json" });
+        return ez;
     }
 
 
-    void
+    curl::easy&
     get_json(const std::string& base_url,
              const request_params_t& params,
              json_success_function_t on_success,
              error_function_t on_error)
     {
         std::string full_url = base_url + concat(params);
-        get_json(full_url, std::move(on_success), std::move(on_error));
+        return get_json(full_url, std::move(on_success), std::move(on_error));
     }
 
 
@@ -211,6 +217,7 @@ namespace rest {
             ez.set_user_agent(user_agent);
         ez.set_follow(true);
         ez.set_ssl_verify_peer(false);
+        ez.set_http_headers({ "Accept: application/json" });
         byte_stream stream;
         ez.set_write_function([&stream](std::span<const char> buf)
                               {
@@ -219,7 +226,7 @@ namespace rest {
         ez.perform();
         auto content_type_header = ez.try_get_header("Content-Type");
         if (content_type_header)
-            if (content_type_header->value != "application/json")
+            if (!content_type_header->value.starts_with("application/json"))
                 throw std::runtime_error{"Content-Type should be application/json, but got "
                                          + content_type_header->value
                                          + "\nContent:\n"
@@ -291,4 +298,4 @@ namespace rest {
 
     }
 
-}
+} // namespace rest
