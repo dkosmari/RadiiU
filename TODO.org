@@ -1,14 +1,15 @@
-* Plan for 0.2 [0%]
+* Plan for 0.2 [18%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
 - [ ] General [0/2]
-  - [ ] Custom fallback fonts.
+  - [ ] Custom complementary fonts.
   - [ ] Screensaver when idle.
-- [ ] Browser [0/2]
+- [-] Browser [2/3]
   - [ ] Filter by codec.
-  - [ ] Show stream codec.
+  - [X] Show stream codec.
+  - [X] Update click/vote count after clicking/voting.
 - [ ] Favorites [0/1]
-  - [ ] Update entry from Browser when editing.
+  - [ ] Manually update entry from Browser when editing (if UUID exists.)
 - [ ] Player [0/1]
   - [ ] Add Ogg Vorbis suport.

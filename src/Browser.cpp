@@ -19,6 +19,7 @@
 #include <span>
 #include <thread>
 #include <tuple>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 
@@ -100,13 +101,17 @@ namespace Browser {
     Order order = Order::name_asc;
 
     unsigned page_index = 0;
-    std::vector<Station> stations;
+    std::vector<std::shared_ptr<Station>> stations;
 
     bool scroll_to_top = false;
     bool station_refresh_requested = false;
 
-    // TODO: allow votes to expire after 24 hours.
-    std::unordered_set<std::string> votes_cast;
+    // TODO: allow votes to expire after 10 min.
+    struct VoteStatus {
+        bool ok;
+        std::string message;
+    };
+    std::unordered_map<std::string, VoteStatus> votes_cast;
 
 
     const std::string server_info_popup_id = "info";
@@ -561,7 +566,7 @@ namespace Browser {
                                // ensure the page size limit is respected
                                if (stations.size() >= cfg::browser_page_limit)
                                    break;
-                               stations.push_back(Station::from_json(entry.as<json::object>()));
+                               stations.push_back(std::make_shared<Station>(Station::from_json(entry.as<json::object>())));
                            }
                            busy = false;
                        },
@@ -927,9 +932,10 @@ namespace Browser {
 
 
     void
-    show_station(const Station& station,
+    show_station(const std::shared_ptr<Station>& station_ptr,
                  ImGuiID scroll_target)
     {
+        Station& station = *station_ptr;
         ImGui::PushID(&station);
 
         if (ImGui::BeginChild("station",
@@ -960,14 +966,23 @@ namespace Browser {
                     ui::open_station_info_popup(station.uuid);
                 ui::process_station_info_popup();
 
-                bool voted = votes_cast.contains(station.uuid);
-                std::string vote_label = (voted
+                auto vote_record = votes_cast.find(station.uuid);
+                const bool voted = vote_record != votes_cast.end();
+                bool ok = voted ? vote_record->second.ok : false;
+                std::string vote_label = (ok
                                           ? ICON_FA_THUMBS_UP " "
                                           : ICON_FA_THUMBS_O_UP " ")
                                          + humanize::value(station.votes);
                 ImGui::BeginDisabled(voted);
                 if (ImGui::Button(vote_label))
-                    send_vote(station.uuid);
+                    send_vote(station.uuid,
+                              [station_ptr]
+                              {
+                                  refresh_station_async(station_ptr);
+                              });
+                if (voted)
+                    ImGui::SetItemTooltip("%s", vote_record->second.message.data());
+
                 ImGui::EndDisabled();
 
             } // actions
@@ -1060,8 +1075,8 @@ namespace Browser {
                 }
 #endif
 
-            for (const auto& station : stations)
-                show_station(station, scroll_target);
+            for (const auto& station_ptr : stations)
+                show_station(station_ptr, scroll_target);
 
 #if 0
             // Disabled until ImGui fixes navigation.
@@ -1102,7 +1117,8 @@ namespace Browser {
 
 
     void
-    send_vote(const std::string& uuid)
+    send_vote(const std::string& uuid,
+              std::function<void()> on_success)
     {
         if (uuid.empty())
             return;
@@ -1112,21 +1128,57 @@ namespace Browser {
             return;
 
         rest::get_json("https://" + server + "/json/vote/" + uuid,
-                       [uuid](curl::easy&,
-                          const json::value& response)
+                       [uuid, on_success=std::move(on_success)](curl::easy&,
+                                                                const json::value& response)
                        {
-                           const auto& obj = response.as<json::object>();
-                           if (obj.contains("message"))
-                                            cout << obj.at("message").as<json::string>()
-                                                 << endl;
                            try {
-                               if (obj.at("ok").as<bool>())
-                                   votes_cast.insert(uuid);
+                               const auto& obj = response.as<json::object>();
+                               bool ok = obj.at("ok").as<bool>();
+                               std::string message;
+                               if (obj.contains("message")) {
+                                   message = obj.at("message").as<json::string>();
+                                   cout << message << endl;
+                               }
+                               votes_cast.emplace(uuid, VoteStatus{ok, std::move(message)});
+                               if (on_success)
+                                   on_success();
                            }
                            catch (std::exception& e) {
-                               cout << "ERROR: unexpected error reading status of vote: "
-                                    << e.what()
-                                    << endl;
+                               cout << "ERROR: reading status of vote: " << e.what() << endl;
+                           }
+                       });
+    }
+
+
+    void
+    refresh_station_async(std::shared_ptr<Station> station_ptr)
+    {
+        if (!station_ptr)
+            return;
+
+        auto server = safe_server.load();
+        if (server.empty())
+            return;
+
+        rest::request_params_t params;
+        params["uuids"] = station_ptr->uuid;
+
+        rest::get_json("https://" + server + "/json/stations/byuuid",
+                       params,
+                       [station_ptr](curl::easy&,
+                                     const json::value& response)
+                       {
+                           try {
+                               const auto& list = response.as<json::array>();
+                               if (list.size() != 1)
+                                   throw std::runtime_error{"incorrect array size: "
+                                                            + std::to_string(list.size())};
+                               Station updated =
+                                   Station::from_json(list.front().as<json::object>());
+                               *station_ptr = std::move(updated);
+                           }
+                           catch (std::exception& e) {
+                               cout << "ERROR: querying station: " << e.what() << endl;
                            }
                        });
     }

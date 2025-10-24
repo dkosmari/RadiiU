@@ -8,9 +8,13 @@
 #ifndef BROWSER_HPP
 #define BROWSER_HPP
 
+#include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
+
+struct Station;
 
 namespace Browser {
 
@@ -51,8 +55,11 @@ namespace Browser {
     send_click(const std::string& uuid);
 
     void
-    send_vote(const std::string& uuid);
+    send_vote(const std::string& uuid,
+              std::function<void()> on_success = {});
 
+    void
+    refresh_station_async(std::shared_ptr<Station> station_ptr);
 
     const std::string*
     get_country_name(const std::string& code);
