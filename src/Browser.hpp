@@ -52,11 +52,18 @@ namespace Browser {
 
 
     void
-    send_click(const std::string& uuid);
+    send_click(const std::string& uuid,
+               std::function<void()> on_success = {});
+
+    void
+    send_click(std::shared_ptr<Station>& station_ptr);
 
     void
     send_vote(const std::string& uuid,
               std::function<void()> on_success = {});
+
+    void
+    send_vote(std::shared_ptr<Station>& station_ptr);
 
     void
     refresh_station_async(std::shared_ptr<Station> station_ptr);

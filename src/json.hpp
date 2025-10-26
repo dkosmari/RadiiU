@@ -111,7 +111,7 @@ namespace json {
 
 
     void
-    dump(const value& va, std::ostream& outl);
+    dump(const value& va, std::ostream& out);
 
 
     value

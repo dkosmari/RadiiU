@@ -30,14 +30,16 @@ using std::cout;
 using std::endl;
 
 
+// TODO: allow inserting/removing station into Favorites from Recent
+
 namespace Recent {
 
     namespace {
 
-        std::deque<Station> stations;
+        std::deque<std::shared_ptr<Station>> stations;
 
-        std::optional<Station> to_add;
-        std::optional<std::size_t> to_remove;
+        std::shared_ptr<Station> pending_add;
+        std::optional<std::size_t> pending_remove;
 
     } // namespace
 
@@ -53,8 +55,11 @@ namespace Recent {
             auto root = json::load(cfg::base_dir / "recent.json");
             const auto& list = root.as<json::array>();
             stations.clear();
-            for (auto& elem : list)
-                real_add(Station::from_json(elem.as<json::object>()));
+            for (auto& elem : list) {
+                auto& obj = elem.as<json::object>();
+                auto st = std::make_shared<Station>(Station::from_json(obj));
+                stations.push_back(std::move(st));
+            }
         }
         catch (std::exception& e) {
             cout << "ERROR: Recent::load(): " << e.what() << endl;
@@ -67,8 +72,8 @@ namespace Recent {
     {
         try {
             json::array list;
-            for (const Station& station : stations)
-                list.push_back(station.to_json());
+            for (const auto& station : stations)
+                list.push_back(station->to_json());
             json::save(std::move(list), cfg::base_dir / "recent.json");
         }
         catch (std::exception& e) {
@@ -92,7 +97,7 @@ namespace Recent {
 
 
     void
-    show_station(const Station& station,
+    show_station(std::shared_ptr<Station>& station,
                  std::size_t index,
                  ImGuiID scroll_target)
     {
@@ -113,13 +118,13 @@ namespace Recent {
                 ui::show_play_button(station);
 
                 if (ImGui::Button(ICON_FA_TRASH_O /*🗑*/))
-                    to_remove = index;
+                    pending_remove = index;
 
                 ImGui::SameLine();
 
-                ImGui::BeginDisabled(station.uuid.empty());
+                ImGui::BeginDisabled(station->uuid.empty());
                 if (ImGui::Button(ICON_FA_INFO_CIRCLE /*🛈*/))
-                    ui::open_station_info_popup(station.uuid);
+                    ui::open_station_info_popup(station->uuid);
                 ImGui::EndDisabled();
                 ui::process_station_info_popup();
 
@@ -134,18 +139,18 @@ namespace Recent {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui::show_favicon(station.favicon);
+                ui::show_favicon(station->favicon);
 
                 ImGui::SameLine();
 
-                ui::show_station_basic_info(station, scroll_target);
+                ui::show_station_basic_info(*station, scroll_target);
 
                 if (ImGui::BeginChild("extra_info",
                                       {0, 0},
                                       ImGuiChildFlags_AutoResizeY |
                                       ImGuiChildFlags_NavFlattened)) {
 
-                    ui::show_tags(station.tags, scroll_target);
+                    ui::show_tags(station->tags, scroll_target);
 
                 } // extra_info
                 ImGui::HandleDragScroll(scroll_target);
@@ -196,11 +201,27 @@ namespace Recent {
 
 
     void
-    real_add(Station&& station)
+    process_pending_add()
     {
-        if (!stations.empty() && station == stations.back())
+        if (!pending_add)
             return;
-        stations.push_back(std::move(station));
+        if (!stations.empty() && *pending_add == *stations.back())
+            return;
+        stations.push_back(std::move(pending_add));
+    }
+
+
+    void
+    process_pending_remove()
+    {
+        // Handle any pending removal
+        if (!pending_remove)
+            return;
+
+        std::size_t index = *pending_remove;
+        if (index < stations.size())
+            stations.erase(stations.begin() + index);
+        pending_remove.reset();
     }
 
 
@@ -208,8 +229,8 @@ namespace Recent {
     prune()
     {
         if (stations.size() > cfg::recent_limit) {
-            std::size_t to_remove = stations.size() - cfg::recent_limit;
-            stations.erase(stations.begin(), stations.begin() + to_remove);
+            std::size_t pending_remove = stations.size() - cfg::recent_limit;
+            stations.erase(stations.begin(), stations.begin() + pending_remove);
         }
     }
 
@@ -217,28 +238,16 @@ namespace Recent {
     void
     process_logic()
     {
-        // Handle any addition
-        if (to_add) {
-            real_add(std::move(*to_add));
-            to_add.reset();
-        }
-
-        // Handle any removal
-        if (to_remove) {
-            std::size_t index = *to_remove;
-            if (index < stations.size())
-                stations.erase(stations.begin() + index);
-            to_remove.reset();
-        }
-
+        process_pending_add();
+        process_pending_remove();
         prune();
     }
 
 
     void
-    add(const Station& station)
+    add(std::shared_ptr<Station>& station)
     {
-        to_add = station;
+        pending_add = station;
     }
 
 } // namespace Recent

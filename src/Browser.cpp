@@ -932,7 +932,7 @@ namespace Browser {
 
 
     void
-    show_station(const std::shared_ptr<Station>& station_ptr,
+    show_station(std::shared_ptr<Station>& station_ptr,
                  ImGuiID scroll_target)
     {
         Station& station = *station_ptr;
@@ -950,7 +950,7 @@ namespace Browser {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui::show_play_button(station);
+                ui::show_play_button(station_ptr);
 
                 if (Favorites::contains(station.uuid)) {
                     if (ImGui::Button(ICON_FA_HEART /*♥*/))
@@ -975,11 +975,7 @@ namespace Browser {
                                          + humanize::value(station.votes);
                 ImGui::BeginDisabled(voted);
                 if (ImGui::Button(vote_label))
-                    send_vote(station.uuid,
-                              [station_ptr]
-                              {
-                                  refresh_station_async(station_ptr);
-                              });
+                    send_vote(station_ptr);
                 if (voted)
                     ImGui::SetItemTooltip("%s", vote_record->second.message.data());
 
@@ -1075,7 +1071,7 @@ namespace Browser {
                 }
 #endif
 
-            for (const auto& station_ptr : stations)
+            for (auto& station_ptr : stations)
                 show_station(station_ptr, scroll_target);
 
 #if 0
@@ -1096,23 +1092,49 @@ namespace Browser {
 
 
     void
-    send_click(const std::string& uuid)
+    send_click(const std::string& uuid,
+               std::function<void()> on_success)
     {
         if (uuid.empty())
             return;
+
         auto server = safe_server.load();
         if (server.empty())
             return;
+
         rest::get_json("https://" + server + "/json/url/" + uuid,
-                       [](curl::easy&,
-                          const json::value& response)
+                       [on_success=std::move(on_success)](curl::easy&,
+                                                          const json::value& response)
                        {
-                           auto obj = response.as<json::object>();
-                           if (obj.contains("name"))
-                               cout << "Click confirmed for "
-                                    << obj.at("name").as<json::string>()
-                                    << endl;
+                           try {
+                               cout << "click response: ";
+                               json::dump(response, cout);
+                               auto obj = response.as<json::object>();
+                               if (obj.contains("ok"))
+                                   cout << "Click confirmed for "
+                                        << obj.at("name").as<json::string>()
+                                        << endl;
+                               if (on_success)
+                                   on_success();
+                           }
+                           catch (std::exception& e) {
+                               cout << "ERROR: Browser::send_click(): " << e.what() << endl;
+                           }
                        });
+    }
+
+
+    void
+    send_click(std::shared_ptr<Station>& station_ptr)
+    {
+        if (!station_ptr || station_ptr->uuid.empty())
+            return;
+
+        send_click(station_ptr->uuid,
+                   [station_ptr]
+                   {
+                       Browser::refresh_station_async(station_ptr);
+                   });
     }
 
 
@@ -1144,16 +1166,30 @@ namespace Browser {
                                    on_success();
                            }
                            catch (std::exception& e) {
-                               cout << "ERROR: reading status of vote: " << e.what() << endl;
+                               cout << "ERROR: Browser::send_vote(): " << e.what() << endl;
                            }
                        });
     }
 
 
     void
+    send_vote(std::shared_ptr<Station>& station_ptr)
+    {
+        if (!station_ptr || station_ptr->uuid.empty())
+            return;
+
+        send_vote(station_ptr->uuid,
+                  [station_ptr]
+                  {
+                      Browser::refresh_station_async(station_ptr);
+                  });
+    }
+
+
+    void
     refresh_station_async(std::shared_ptr<Station> station_ptr)
     {
-        if (!station_ptr)
+        if (!station_ptr || station_ptr->uuid.empty())
             return;
 
         auto server = safe_server.load();

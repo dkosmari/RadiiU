@@ -8,6 +8,7 @@
 #ifndef PLAYER_HPP
 #define PLAYER_HPP
 
+#include <memory>
 #include <string>
 
 
@@ -35,7 +36,7 @@ namespace Player {
     play();
 
     void
-    play(const Station& station);
+    play(std::shared_ptr<Station>& st);
 
 
     void
@@ -43,7 +44,10 @@ namespace Player {
 
 
     bool
-    is_playing(const Station& station);
+    is_playing(const Station& st);
+
+    bool
+    is_playing(std::shared_ptr<Station>& st);
 
 } // namespace Player
 

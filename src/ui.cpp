@@ -142,7 +142,7 @@ namespace ui {
 
 
     void
-    show_play_button(const Station& station)
+    show_play_button(std::shared_ptr<Station>& station)
     {
         const sdl::vec2 button_size = {96, 96};
         if (Player::is_playing(station)) {

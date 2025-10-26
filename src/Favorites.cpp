@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <vector>
@@ -38,7 +39,7 @@ namespace Favorites {
 
     namespace {
 
-        std::vector<Station> stations;
+        std::vector<std::shared_ptr<Station>> stations;
         std::unordered_multiset<std::string> uuids;
 
 
@@ -53,57 +54,53 @@ namespace Favorites {
 
 
         const std::string popup_delete_title = "Delete station?";
-        std::optional<std::size_t> station_to_remove;
+        std::optional<std::size_t> station_index_to_remove;
 
-        struct StationAndExtras {
+        struct StationExt : Station {
 
-            Station station;
             std::string language_str;
             std::string tags_str;
 
-            StationAndExtras()
+            StationExt()
                 noexcept
             {}
 
-            StationAndExtras(const Station& st) :
-                station{st}
+            StationExt(const Station& st) :
+                Station{st}
             {
-                join_fields();
+                language_str = utils::join(languages, ", ");
+                tags_str = utils::join(tags, ", ");
             }
 
-            void
-            split_fields()
+
+            Station
+            to_base()
+                &&
             {
                 // copy language_str into the languages vector
-                station.languages = utils::split(language_str, ",");
-                for (auto& lang : station.languages)
+                languages = utils::split(language_str, ",");
+                for (auto& lang : languages)
                     lang = utils::trimmed(lang, ' ');
-                std::erase(station.languages, "");
+                std::erase(languages, "");
 
                 // copy tags_str into the tags vector
-                station.tags = utils::split(tags_str, ",");
-                for (auto& tag : station.tags)
+                tags = utils::split(tags_str, ",");
+                for (auto& tag : tags)
                     tag = utils::trimmed(tag, ' ');
-                std::erase(station.tags, "");
+                std::erase(tags, "");
+
+                return std::move(*this);
             }
 
-            void
-            join_fields()
-            {
-                language_str = utils::join(station.languages, ", ");
-                tags_str = utils::join(station.tags, ", ");
-            }
-
-        }; // struct StationAndExtras
+        }; // struct StationExt
 
         const std::string popup_edit_title = "Edit station";
-        std::optional<StationAndExtras> edited_station;
+        std::optional<StationExt> edited_station;
 
         const std::string popup_create_title = "Create station";
-        std::optional<StationAndExtras> created_station;
+        std::optional<StationExt> created_station;
 
     } // namespace
-
 
 
     void
@@ -115,10 +112,11 @@ namespace Favorites {
             stations.clear();
             uuids.clear();
             for (auto& elem : list) {
-                stations.push_back(Station::from_json(elem.as<json::object>()));
-                const auto& station = stations.back();
-                if (!station.uuid.empty())
-                    uuids.insert(station.uuid);
+                auto& obj = elem.as<json::object>();
+                auto st = std::make_shared<Station>(Station::from_json(obj));
+                if (!st->uuid.empty())
+                    uuids.insert(st->uuid);
+                stations.push_back(std::move(st));
             }
             cout << "Loaded " << stations.size() << " favorites" << endl;
         }
@@ -133,8 +131,8 @@ namespace Favorites {
     {
         try {
             json::array list;
-            for (const Station& station : stations)
-                list.push_back(station.to_json());
+            for (const auto& station : stations)
+                list.push_back(station->to_json());
             json::save(std::move(list), cfg::base_dir / "favorites.json");
         }
         catch (std::exception& e) {
@@ -196,7 +194,7 @@ namespace Favorites {
                     ImGui::SetCursorPosX(new_x);
                 if (ImGui::Button(label)) {
                     ImGui::CloseCurrentPopup();
-                    station_to_remove = index;
+                    station_index_to_remove = index;
                 }
             }
             ImGui::HandleDragScroll();
@@ -220,22 +218,22 @@ namespace Favorites {
 
 
     void
-    show_station_fields(StationAndExtras& sae)
+    show_station_fields(StationExt& se)
     {
         if (ImGui::BeginTable("fields", 2)) {
 
             ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
             ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-            show_row_for("name",         sae.station.name);
-            show_row_for("url",          sae.station.url);
-            show_row_for("url_resolved", sae.station.url_resolved);
-            show_row_for("homepage",     sae.station.homepage);
-            show_row_for("favicon",      sae.station.favicon);
-            show_row_for("tags",         sae.tags_str);
-            show_row_for("country_code", sae.station.country_code);
-            show_row_for("language",     sae.language_str);
-            show_row_for("uuid",         sae.station.uuid);
+            show_row_for("name",         se.name);
+            show_row_for("url",          se.url);
+            show_row_for("url_resolved", se.url_resolved);
+            show_row_for("homepage",     se.homepage);
+            show_row_for("favicon",      se.favicon);
+            show_row_for("tags",         se.tags_str);
+            show_row_for("country_code", se.country_code);
+            show_row_for("language",     se.language_str);
+            show_row_for("uuid",         se.uuid);
 
             ImGui::EndTable();
         }
@@ -296,8 +294,7 @@ namespace Favorites {
                         if (it != uuids.end())
                             uuids.erase(it);
 
-                        edited_station->split_fields();
-                        station = std::move(edited_station->station);
+                        station = std::move(*edited_station).to_base();
                         if (!station.uuid.empty())
                             uuids.insert(station.uuid);
                     }
@@ -356,10 +353,8 @@ namespace Favorites {
                     ImGui::SetCursorPosX(new_x);
                 if (ImGui::Button(label)) {
                     ImGui::CloseCurrentPopup();
-                    if (created_station) {
-                        created_station->split_fields();
-                        add(std::move(created_station->station));
-                    }
+                    if (created_station)
+                        add(std::move(*created_station).to_base());
                     created_station.reset();
                 }
             }
@@ -370,11 +365,11 @@ namespace Favorites {
 
 
     void
-    show_station(Station& station,
+    show_station(std::shared_ptr<Station>& station,
                  std::size_t index,
                  ImGuiID scroll_target)
     {
-        ImGui::PushID(std::to_string(index) + ":" + station.uuid);
+        ImGui::PushID(std::to_string(index) + ":" + station->uuid);
 
         if (ImGui::BeginChild("station",
                               {0, 0},
@@ -409,16 +404,16 @@ namespace Favorites {
                 ImGui::EndDisabled();
 
                 if (ImGui::Button(ICON_FA_PENCIL /*"✎"*/)) {
-                    edited_station.emplace(station);
+                    edited_station.emplace(*station);
                     ImGui::OpenPopup(popup_edit_title);
                 }
-                process_popup_edit(station);
+                process_popup_edit(*station);
 
                 ImGui::SameLine();
 
                 if (ImGui::Button(ICON_FA_TRASH_O /*"🗑"*/))
                     ImGui::OpenPopup(popup_delete_title);
-                process_popup_delete(station, index);
+                process_popup_delete(*station, index);
             } // actions
             ImGui::HandleDragScroll(scroll_target);
             ImGui::EndChild();
@@ -430,18 +425,18 @@ namespace Favorites {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui::show_favicon(station.favicon);
+                ui::show_favicon(station->favicon);
 
                 ImGui::SameLine();
 
-                ui::show_station_basic_info(station, scroll_target);
+                ui::show_station_basic_info(*station, scroll_target);
 
                 if (ImGui::BeginChild("extra_info",
                                       {0, 0},
                                       ImGuiChildFlags_AutoResizeY |
                                       ImGuiChildFlags_NavFlattened)) {
 
-                    ui::show_tags(station.tags, scroll_target);
+                    ui::show_tags(station->tags, scroll_target);
                 } // extra_info
                 ImGui::HandleDragScroll(scroll_target);
                 ImGui::EndChild();
@@ -503,7 +498,7 @@ namespace Favorites {
             auto [src, dst] = *move_operation;
             assert(src < stations.size());
             assert(dst < stations.size());
-            Station tmp = std::move(stations[src]);
+            auto tmp = std::move(stations[src]);
             stations.erase(stations.begin() + src);
             stations.insert(stations.begin() + dst, std::move(tmp));
             scroll_to_station = dst;
@@ -511,9 +506,9 @@ namespace Favorites {
         }
 
         // Handle pending delete
-        if (station_to_remove) {
-            remove(*station_to_remove);
-            station_to_remove.reset();
+        if (station_index_to_remove) {
+            remove(*station_index_to_remove);
+            station_index_to_remove.reset();
         }
     }
 
@@ -533,8 +528,8 @@ namespace Favorites {
         if (!station.uuid.empty())
             return contains(station.uuid);
 
-        for (const Station& st : stations)
-            if (station == st)
+        for (const auto& st : stations)
+            if (station == *st)
                 return true;
         return false;
     }
@@ -543,7 +538,7 @@ namespace Favorites {
     void
     add(const Station& st)
     {
-        stations.push_back(st);
+        stations.push_back(std::make_shared<Station>(st));
         if (!st.uuid.empty())
             uuids.insert(st.uuid);
     }
@@ -552,9 +547,9 @@ namespace Favorites {
     namespace {
 
         const std::string&
-        by_id(const Station& st)
+        by_id(const std::shared_ptr<Station>& st)
         {
-            return st.uuid;
+            return st->uuid;
         }
 
     } // namespace
@@ -586,7 +581,7 @@ namespace Favorites {
         if (index >= stations.size())
             return;
         {
-            auto it = uuids.find(stations[index].uuid);
+            auto it = uuids.find(stations[index]->uuid);
             if (it != uuids.end())
                 uuids.erase(it);
         }
@@ -601,7 +596,11 @@ namespace Favorites {
         if (!station.uuid.empty())
             return remove(station.uuid);
 
-        std::erase(stations, station);
+        std::erase_if(stations,
+                      [&station](const std::shared_ptr<Station>& st)
+                      {
+                          return station.uuid == st->uuid;
+                      });
     }
 
 } // namespace Favorites

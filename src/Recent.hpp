@@ -8,6 +8,8 @@
 #ifndef RECENT_HPP
 #define RECENT_HPP
 
+#include <memory>
+
 
 struct Station;
 
@@ -30,7 +32,7 @@ namespace Recent {
 
 
     void
-    add(const Station& station);
+    add(std::shared_ptr<Station>& station);
 
 } // namespace Recent
 

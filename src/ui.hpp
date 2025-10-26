@@ -9,6 +9,7 @@
 #define UI_HPP
 
 #include <concepts>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -50,7 +51,7 @@ namespace ui {
 
 
     void
-    show_play_button(const Station& station);
+    show_play_button(std::shared_ptr<Station>& station);
 
 
     void

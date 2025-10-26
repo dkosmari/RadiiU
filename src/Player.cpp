@@ -9,6 +9,7 @@
 #include <deque>
 #include <functional>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <ranges>
 #include <vector>
@@ -63,7 +64,7 @@ namespace Player {
 
     State state = State::stopped;
 
-    std::optional<Station> station;
+    std::shared_ptr<Station> station;
 
 
     SDL_AudioFormat
@@ -532,21 +533,15 @@ namespace Player {
     void
     play()
     {
-        if (station)
-            play(*station);
-    }
+        if (!station)
+            return;
 
-
-    void
-    play(const Station& st)
-    {
         if (state == State::playing)
             stop();
 
-        cout << "Starting playback of station \"" << st.name << "\"" << endl;
+        cout << "Starting playback of station \"" << station->name << "\"" << endl;
 
-        station = st;
-        Recent::add(st);
+        Recent::add(station);
 
         std::string url;
         if (!station->url_resolved.empty())
@@ -562,11 +557,19 @@ namespace Player {
         }
         cout << "Playing URL: " << url << endl;
 
-        Browser::send_click(station->uuid);
+        Browser::send_click(station);
 
         state = State::playing;
 
         res.emplace(url); // allocate and initialize resources here
+    }
+
+
+    void
+    play(std::shared_ptr<Station>& st)
+    {
+        station = st;
+        play();
     }
 
 
@@ -624,7 +627,7 @@ namespace Player {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui::show_play_button(*station);
+                ui::show_play_button(station);
 
                 if (Favorites::contains(*station)) {
                     if (ImGui::Button(ICON_FA_HEART /*♥*/))
@@ -666,8 +669,6 @@ namespace Player {
         ImGui::HandleDragScroll(scroll_target);
         ImGui::EndChild();
     }
-
-
 
 
     void
@@ -801,6 +802,15 @@ namespace Player {
         if (state != State::playing || !station)
             return false;
         return st == *station;
+    }
+
+
+    bool
+    is_playing(std::shared_ptr<Station>& st)
+    {
+        if (!st)
+            return false;
+        return is_playing(*st);
     }
 
 
