@@ -39,7 +39,7 @@ namespace ui {
 
     const std::string station_details_popup_id = "details";
     std::string station_details_uuid;
-    std::optional<Station> station_details_result;
+    std::optional<StationEx> station_details_result;
     std::string station_details_error;
 
 
@@ -317,6 +317,7 @@ namespace ui {
         if (uuid.empty())
             return;
 
+        station_details_uuid.clear();
         station_details_result.reset();
         station_details_error.clear();
 
@@ -363,8 +364,8 @@ namespace ui {
                     show_link_row("homepage",     station_details_result->homepage);
                     show_link_row("favicon",      station_details_result->favicon);
                     show_info_row("countrycode",  station_details_result->country_code);
-                    show_info_row("language", utils::join(station_details_result->languages, ", "));
-                    show_info_row("tags", utils::join(station_details_result->tags, ", "));
+                    show_info_row("language",     station_details_result->languages_str);
+                    show_info_row("tags",         station_details_result->tags_str);
                     show_info_row("uuid",         station_details_result->uuid);
 
                     show_info_row("votes",        station_details_result->votes);
@@ -385,6 +386,8 @@ namespace ui {
             ImGui::EndPopup();
         } else {
             station_details_uuid.clear();
+            station_details_result.reset();
+            station_details_error.clear();
         }
     }
 

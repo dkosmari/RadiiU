@@ -114,7 +114,7 @@ namespace Browser {
     std::unordered_map<std::string, VoteStatus> votes_cast;
 
 
-    const std::string server_info_popup_id = "info";
+    const std::string server_details_popup_id = "info";
 
     struct ServerInfo {
 
@@ -145,8 +145,8 @@ namespace Browser {
 
     }; // struct ServerInfo
 
-    std::optional<ServerInfo> server_info_result;
-    std::string server_info_error;
+    std::optional<ServerInfo> server_details_result;
+    std::string server_details_error;
 
 
     struct Country {
@@ -205,7 +205,7 @@ namespace Browser {
     apply_options();
 
     void
-    request_server_info();
+    request_server_details();
 
 
     void
@@ -630,21 +630,21 @@ namespace Browser {
 
 
     void
-    process_server_info_popup()
+    process_server_details_popup()
     {
         // ImGui::SetNextWindowSize({550, 0}, ImGuiCond_Always);
-        if (ImGui::BeginPopup(server_info_popup_id,
+        if (ImGui::BeginPopup(server_details_popup_id,
                               ImGuiWindowFlags_NoSavedSettings)) {
 
             auto server = safe_server.load();
             ImGui::SeparatorText("Server status for " + server);
 
-            if (!server_info_result) {
+            if (!server_details_result) {
 
-                if (!server_info_error.empty())
-                    ImGui::ValueWrapped("Error: ", server_info_error);
+                if (!server_details_error.empty())
+                    ImGui::ValueWrapped("Error: ", server_details_error);
                 else
-                    ImGui::Text("Fetching server info...");
+                    ImGui::Text("Fetching server details...");
 
             } else {
 
@@ -654,14 +654,14 @@ namespace Browser {
                     ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
                     using ui::show_info_row;
-                    show_info_row("software_version", server_info_result->software_version);
-                    show_info_row("stations",         server_info_result->stations);
-                    show_info_row("stations_broken",  server_info_result->stations_broken);
-                    show_info_row("tags",             server_info_result->tags);
-                    show_info_row("clicks_last_hour", server_info_result->clicks_last_hour);
-                    show_info_row("clicks_last_day",  server_info_result->clicks_last_day);
-                    show_info_row("languages",        server_info_result->languages);
-                    show_info_row("countries",        server_info_result->countries);
+                    show_info_row("software_version", server_details_result->software_version);
+                    show_info_row("stations",         server_details_result->stations);
+                    show_info_row("stations_broken",  server_details_result->stations_broken);
+                    show_info_row("tags",             server_details_result->tags);
+                    show_info_row("clicks_last_hour", server_details_result->clicks_last_hour);
+                    show_info_row("clicks_last_day",  server_details_result->clicks_last_day);
+                    show_info_row("languages",        server_details_result->languages);
+                    show_info_row("countries",        server_details_result->countries);
 
                     ImGui::EndTable();
                 }
@@ -691,14 +691,14 @@ namespace Browser {
             if (!server.empty()) {
 
                 if (ImGui::Button(ICON_FA_INFO_CIRCLE)) {
-                    request_server_info();
-                    ImGui::OpenPopup(server_info_popup_id);
+                    request_server_details();
+                    ImGui::OpenPopup(server_details_popup_id);
                 }
                 ImGui::SetItemTooltip("Show server details.");
 
                 ImGui::SameLine();
 
-                process_server_info_popup();
+                process_server_details_popup();
                 ImGui::Text("%s", server.data());
 
             }
@@ -1230,10 +1230,10 @@ namespace Browser {
 
 
     void
-    request_server_info()
+    request_server_details()
     {
-        server_info_result.reset();
-        server_info_error.clear();
+        server_details_result.reset();
+        server_details_error.clear();
 
         auto server = safe_server.load();
         if (server.empty())
@@ -1244,12 +1244,12 @@ namespace Browser {
                           const json::value& response)
                        {
                            try {
-                               server_info_result = ServerInfo::from_json(response.as<json::object>());
+                               server_details_result = ServerInfo::from_json(response.as<json::object>());
                            }
                            catch (std::exception& e) {
-                               server_info_error = e.what();
+                               server_details_error = e.what();
                                cout << "ERROR: failed to read server stats: "
-                                    << server_info_error
+                                    << server_details_error
                                     << endl;
                            }
                        });

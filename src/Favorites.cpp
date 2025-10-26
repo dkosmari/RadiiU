@@ -56,49 +56,11 @@ namespace Favorites {
         const std::string popup_delete_title = "Delete station?";
         std::optional<std::size_t> station_index_to_remove;
 
-        struct StationExt : Station {
-
-            std::string language_str;
-            std::string tags_str;
-
-            StationExt()
-                noexcept
-            {}
-
-            StationExt(const Station& st) :
-                Station{st}
-            {
-                language_str = utils::join(languages, ", ");
-                tags_str = utils::join(tags, ", ");
-            }
-
-
-            Station
-            to_base()
-                &&
-            {
-                // copy language_str into the languages vector
-                languages = utils::split(language_str, ",");
-                for (auto& lang : languages)
-                    lang = utils::trimmed(lang, ' ');
-                std::erase(languages, "");
-
-                // copy tags_str into the tags vector
-                tags = utils::split(tags_str, ",");
-                for (auto& tag : tags)
-                    tag = utils::trimmed(tag, ' ');
-                std::erase(tags, "");
-
-                return std::move(*this);
-            }
-
-        }; // struct StationExt
-
         const std::string popup_edit_title = "Edit station";
-        std::optional<StationExt> edited_station;
+        std::optional<StationEx> edited_station;
 
         const std::string popup_create_title = "Create station";
-        std::optional<StationExt> created_station;
+        std::optional<StationEx> created_station;
 
     } // namespace
 
@@ -220,7 +182,7 @@ namespace Favorites {
 
 
     void
-    show_station_fields(StationExt& se)
+    show_station_fields(StationEx& se)
     {
         if (ImGui::BeginTable("fields", 2)) {
 
@@ -234,7 +196,7 @@ namespace Favorites {
             show_row_for("favicon",      se.favicon);
             show_row_for("tags",         se.tags_str);
             show_row_for("country_code", se.country_code);
-            show_row_for("language",     se.language_str);
+            show_row_for("language",     se.languages_str);
             show_row_for("uuid",         se.uuid);
 
             ImGui::EndTable();
@@ -297,7 +259,7 @@ namespace Favorites {
                         if (it != uuids.end())
                             uuids.erase(it);
 
-                        station = std::move(*edited_station).to_base();
+                        station = edited_station->as_station();
                         if (!station.uuid.empty())
                             uuids.insert(station.uuid);
                     }
@@ -359,7 +321,7 @@ namespace Favorites {
                 if (ImGui::Button(label)) {
                     ImGui::CloseCurrentPopup();
                     if (created_station)
-                        add(std::move(*created_station).to_base());
+                        add(created_station->as_station());
                     created_station.reset();
                 }
                 ImGui::SetItemTooltip("Confirm creating a new station.");

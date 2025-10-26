@@ -53,4 +53,24 @@ operator ==(const Station& a,
             const Station& b)
     noexcept;
 
+
+// This version keeps language and tags list as a linear string.
+
+struct StationEx : Station {
+
+    std::string languages_str;
+    std::string tags_str;
+
+    StationEx()
+        noexcept;
+
+    StationEx(const Station& st);
+
+    Station
+    as_station()
+        const;
+
+}; // struct StationEx
+
+
 #endif

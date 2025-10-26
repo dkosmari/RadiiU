@@ -6,6 +6,7 @@
  */
 
 #include <concepts>
+#include <utility>
 
 #include "Station.hpp"
 
@@ -162,4 +163,39 @@ Station::to_json()
     // - bitrate
 
     return obj;
+}
+
+
+StationEx::StationEx()
+        noexcept
+{}
+
+
+StationEx::StationEx(const Station& st) :
+    Station{st},
+    languages_str{utils::join(languages, ", ")},
+    tags_str{utils::join(tags, ", ")}
+{}
+
+
+Station
+StationEx::as_station()
+    const
+{
+    // Note: slicing is okay here.
+    Station result = *this;
+
+    // copy languages_str into the languages vector
+    result.languages = utils::split(languages_str, ",");
+    for (auto& lang : result.languages)
+        lang = utils::trimmed(lang, ' ');
+    std::erase(result.languages, "");
+
+    // copy tags_str into the tags vector
+    result.tags = utils::split(tags_str, ",");
+    for (auto& tag : result.tags)
+        tag = utils::trimmed(tag, ' ');
+    std::erase(result.tags, "");
+
+    return result;
 }
