@@ -17,6 +17,7 @@
 #include "ui.hpp"
 
 #include "Browser.hpp"
+#include "Favorites.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
 #include "imgui_extras.hpp"
@@ -36,19 +37,62 @@ namespace ui {
 
     const ImVec4 label_color = {1.0, 1.0, 0.25, 1.0};
 
+    const std::string station_details_popup_id = "details";
+    std::string station_details_uuid;
+    std::optional<Station> station_details_result;
+    std::string station_details_error;
+
 
     void
-    show_favicon(const std::string& favicon)
+    open_station_details_popup(const std::string& uuid);
+
+    void
+    process_station_details_popup(const std::string& uuid);
+
+
+    void
+    show_details_button(const Station& station)
     {
-        if (favicon.empty())
+        // 🛈
+        ImGui::BeginDisabled(station.uuid.empty());
+        if (ImGui::Button(ICON_FA_INFO_CIRCLE))
+            open_station_details_popup(station.uuid);
+        if (!station.uuid.empty())
+            ImGui::SetItemTooltip("Show station details.");
+        ImGui::EndDisabled();
+        process_station_details_popup(station.uuid);
+    }
+
+
+    void
+    show_favicon(const Station& station)
+    {
+        if (station.favicon.empty())
             return;
 
-        auto icon = IconManager::get(favicon);
+        auto icon = IconManager::get(station.favicon);
         auto icon_size = icon->get_size();
         sdl::vec2 size = {128, 128};
         size.x = icon_size.x * size.y / icon_size.y;
-        ImGui::Image(*IconManager::get(favicon), size);
-        ImGui::SetItemTooltip("%s", favicon.data());
+        ImGui::Image(*IconManager::get(station.favicon), size);
+        ImGui::SetItemTooltip("%s", station.favicon.data());
+    }
+
+
+    void
+    show_favorite_button(const Station& station)
+    {
+        if (Favorites::contains(station)) {
+            // ♥
+            if (ImGui::Button(ICON_FA_HEART))
+                Favorites::remove(station);
+            ImGui::SetItemTooltip("Remove this station from favorites.");
+        } else {
+            // ♡
+            if (ImGui::Button(ICON_FA_HEART_O))
+                Favorites::add(station);
+            ImGui::SetItemTooltip("Add this station to favorites.");
+        }
     }
 
 
@@ -150,11 +194,13 @@ namespace ui {
                                    *IconManager::get("ui/stop-button.png"),
                                    button_size))
                 Player::stop();
+            ImGui::SetItemTooltip("Stop playing.");
         } else {
             if (ImGui::ImageButton("play_button",
                                    *IconManager::get("ui/play-button.png"),
                                    button_size))
                 Player::play(station);
+            ImGui::SetItemTooltip("Start playing.");
         }
     }
 
@@ -220,20 +266,17 @@ namespace ui {
     }
 
 
-    const std::string station_info_popup_id = "info";
-    std::optional<Station> station_info_result;
-    std::string station_info_error;
-
-
     void
-    request_station_info(const std::string& uuid)
+    request_station_details(const std::string& uuid)
     {
         if (uuid.empty())
-            throw std::logic_error{"no UUID to request info."};
+            throw std::logic_error{"no UUID to request details."};
 
         auto server = Browser::get_server();
         if (server.empty())
             throw std::runtime_error{"not connected to a server."};
+
+        station_details_uuid = uuid;
 
         rest::get_json("https://" + server + "/json/stations/byuuid",
                        {{"uuids", uuid}},
@@ -244,64 +287,69 @@ namespace ui {
                                const auto& list = response.as<json::array>();
                                if (list.empty())
                                    throw std::runtime_error{"station not found."};
-                               station_info_result =
-                                   Station::from_json(list.front().as<json::object>());
-                               cout << "station info result" << endl;
+                               const auto& obj = list.front().as<json::object>();
+                               cout << "Station details:\n";
+                               json::dump(obj, cout);
+                               cout << endl;
+                               station_details_result = Station::from_json(obj);
                            }
                            catch (std::exception& e) {
-                               station_info_error = e.what();
-                               cout << "ERROR: Failed to read station info: "
-                                    << station_info_error
+                               station_details_error = e.what();
+                               cout << "ERROR: Failed to read station details: "
+                                    << station_details_error
                                     << endl;
                            }
                        },
                        [](curl::easy&,
                           const std::exception& error)
                        {
-                           station_info_error = error.what();
-                           cout << "ERROR: requesting station info: "
-                                << station_info_error
+                           station_details_error = error.what();
+                           cout << "ERROR: requesting station details: "
+                                << station_details_error
                                 << endl;
                        });
     }
 
 
     void
-    open_station_info_popup(const std::string& uuid)
+    open_station_details_popup(const std::string& uuid)
     {
         if (uuid.empty())
             return;
 
-        station_info_result.reset();
-        station_info_error.clear();
+        station_details_result.reset();
+        station_details_error.clear();
 
         try {
-            request_station_info(uuid);
+            request_station_details(uuid);
         }
         catch (std::exception& e) {
-            station_info_error = e.what();
-            cout << "ERROR: requesting station info: " << station_info_error << endl;
+            station_details_error = e.what();
+            cout << "ERROR: requesting station details: " << station_details_error << endl;
         }
 
-        ImGui::OpenPopup(station_info_popup_id);
+        ImGui::OpenPopup(station_details_popup_id);
     }
 
 
     void
-    process_station_info_popup()
+    process_station_details_popup(const std::string& uuid)
     {
+        if (uuid.empty() || uuid != station_details_uuid)
+            return;
+
         ImGui::SetNextWindowSize({1100, 600}, ImGuiCond_Always);
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(),
                                 ImGuiCond_Always,
                                 {0.5f, 0.5f});
-        if (ImGui::BeginPopup(station_info_popup_id,
+        if (ImGui::BeginPopup(station_details_popup_id,
                               ImGuiWindowFlags_NoSavedSettings)) {
 
-            if (!station_info_error.empty()) {
+            if (!station_details_error.empty()) {
 
-                ImGui::Text("Error: %s", station_info_error.data());
+                ImGui::Text("Error: %s", station_details_error.data());
 
-            } else if (station_info_result) {
+            } else if (station_details_result) {
 
                 if (ImGui::BeginTable("fields", 2,
                                       ImGuiTableFlags_None)) {
@@ -309,32 +357,34 @@ namespace ui {
                     ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
                     ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-                    show_info_row("name",         station_info_result->name);
-                    show_link_row("url",          station_info_result->url);
-                    show_link_row("url_resolved", station_info_result->url_resolved);
-                    show_link_row("homepage",     station_info_result->homepage);
-                    show_link_row("favicon",      station_info_result->favicon);
-                    show_info_row("countrycode",  station_info_result->country_code);
-                    show_info_row("language", utils::join(station_info_result->languages, ", "));
-                    show_info_row("tags", utils::join(station_info_result->tags, ", "));
-                    show_info_row("uuid",         station_info_result->uuid);
+                    show_info_row("name",         station_details_result->name);
+                    show_link_row("url",          station_details_result->url);
+                    show_link_row("url_resolved", station_details_result->url_resolved);
+                    show_link_row("homepage",     station_details_result->homepage);
+                    show_link_row("favicon",      station_details_result->favicon);
+                    show_info_row("countrycode",  station_details_result->country_code);
+                    show_info_row("language", utils::join(station_details_result->languages, ", "));
+                    show_info_row("tags", utils::join(station_details_result->tags, ", "));
+                    show_info_row("uuid",         station_details_result->uuid);
 
-                    show_info_row("votes",        station_info_result->votes);
-                    show_info_row("clickcount",   station_info_result->click_count);
-                    show_info_row("clicktrend",   station_info_result->click_trend);
-                    show_info_row("bitrate",      station_info_result->bitrate);
+                    show_info_row("votes",        station_details_result->votes);
+                    show_info_row("clickcount",   station_details_result->click_count);
+                    show_info_row("clicktrend",   station_details_result->click_trend);
+                    show_info_row("bitrate",      station_details_result->bitrate);
 
                     ImGui::EndTable();
                 }
 
             } else {
 
-                ImGui::Text("Retrieving station info...");
+                ImGui::Text("Retrieving station details...");
 
             }
 
             ImGui::HandleDragScroll();
             ImGui::EndPopup();
+        } else {
+            station_details_uuid.clear();
         }
     }
 

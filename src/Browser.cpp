@@ -683,6 +683,7 @@ namespace Browser {
 
             if (ImGui::Button(ICON_FA_REFRESH))
                 connect();
+            ImGui::SetItemTooltip("Reconnect to server, or try a different random mirror.");
 
             ImGui::SameLine();
 
@@ -693,6 +694,7 @@ namespace Browser {
                     request_server_info();
                     ImGui::OpenPopup(server_info_popup_id);
                 }
+                ImGui::SetItemTooltip("Show server details.");
 
                 ImGui::SameLine();
 
@@ -821,11 +823,13 @@ namespace Browser {
 
                     if (ImGui::Button("Reset"))
                         reset_options();
+                    ImGui::SetItemTooltip("Reset browser options to default.");
 
                     if (ImGui::Button("Apply")) {
                         options_visible = false;
                         apply_options();
                     }
+                    ImGui::SetItemTooltip("Apply the current browser options.");
 
                 } // buttons
                 ImGui::EndChild();
@@ -860,31 +864,37 @@ namespace Browser {
 
             ImGui::BeginDisabled(first_page);
 
-            if (ImGui::Button("100" /*⏪*/ ICON_FA_ANGLE_DOUBLE_LEFT) && !busy) {
+            // 100⏪
+            if (ImGui::Button("100" ICON_FA_ANGLE_DOUBLE_LEFT) && !busy) {
                 if (page_index >= 100)
                     page_index -= 100;
                 else
                     page_index = 0;
                 queue_refresh_stations();
             }
+            ImGui::SetItemTooltip("Go back 100 pages.");
 
             ImGui::SameLine();
 
-            if (ImGui::Button("10" /*⏪*/ ICON_FA_ANGLE_DOUBLE_LEFT) && !busy) {
+            // 10⏪
+            if (ImGui::Button("10" ICON_FA_ANGLE_DOUBLE_LEFT) && !busy) {
                 if (page_index >= 10)
                     page_index -= 10;
                 else
                     page_index = 0;
                 queue_refresh_stations();
             }
+            ImGui::SetItemTooltip("Go back 10 pages.");
 
             ImGui::SameLine();
 
-            if (ImGui::Button(/*⏴*/ ICON_FA_ANGLE_LEFT) && !busy) {
+            // ⏴
+            if (ImGui::Button(ICON_FA_ANGLE_LEFT) && !busy) {
                 if (page_index > 0)
                     --page_index;
                 queue_refresh_stations();
             }
+            ImGui::SetItemTooltip("Go back one page.");
 
             ImGui::EndDisabled();
 
@@ -906,24 +916,30 @@ namespace Browser {
 
             ImGui::BeginDisabled(last_page);
 
-            if (ImGui::Button(/*⏵*/ ICON_FA_ANGLE_RIGHT) && !busy) {
+            // ⏵
+            if (ImGui::Button(ICON_FA_ANGLE_RIGHT) && !busy) {
                 ++page_index;
                 queue_refresh_stations();
             }
+            ImGui::SetItemTooltip("Advance one page.");
 
             ImGui::SameLine();
 
-            if (ImGui::Button(/*⏩*/ ICON_FA_ANGLE_DOUBLE_RIGHT "10") && !busy) {
+            // ⏩10
+            if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "10") && !busy) {
                 page_index += 10;
                 queue_refresh_stations();
             }
+            ImGui::SetItemTooltip("Advance 10 pages.");
 
             ImGui::SameLine();
 
-            if (ImGui::Button(/*⏩*/ ICON_FA_ANGLE_DOUBLE_RIGHT "100") && !busy) {
+            // ⏩100
+            if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "100") && !busy) {
                 page_index += 100;
                 queue_refresh_stations();
             }
+            ImGui::SetItemTooltip("Advance 100 pages.");
 
             ImGui::EndDisabled();
         }
@@ -932,11 +948,10 @@ namespace Browser {
 
 
     void
-    show_station(std::shared_ptr<Station>& station_ptr,
+    show_station(std::shared_ptr<Station>& station,
                  ImGuiID scroll_target)
     {
-        Station& station = *station_ptr;
-        ImGui::PushID(&station);
+        ImGui::PushID(station.get());
 
         if (ImGui::BeginChild("station",
                               {0, 0},
@@ -950,34 +965,28 @@ namespace Browser {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui::show_play_button(station_ptr);
+                ui::show_play_button(station);
 
-                if (Favorites::contains(station.uuid)) {
-                    if (ImGui::Button(ICON_FA_HEART /*♥*/))
-                        Favorites::remove(station.uuid);
-                } else {
-                    if (ImGui::Button(ICON_FA_HEART_O /*♡*/))
-                        Favorites::add(station);
-                }
+                ui::show_favorite_button(*station);
 
                 ImGui::SameLine();
 
-                if (ImGui::Button(ICON_FA_INFO_CIRCLE))
-                    ui::open_station_info_popup(station.uuid);
-                ui::process_station_info_popup();
+                ui::show_details_button(*station);
 
-                auto vote_record = votes_cast.find(station.uuid);
+                auto vote_record = votes_cast.find(station->uuid);
                 const bool voted = vote_record != votes_cast.end();
                 bool ok = voted ? vote_record->second.ok : false;
                 std::string vote_label = (ok
                                           ? ICON_FA_THUMBS_UP " "
                                           : ICON_FA_THUMBS_O_UP " ")
-                                         + humanize::value(station.votes);
+                                         + humanize::value(station->votes);
                 ImGui::BeginDisabled(voted);
                 if (ImGui::Button(vote_label))
-                    send_vote(station_ptr);
+                    send_vote(station);
                 if (voted)
                     ImGui::SetItemTooltip("%s", vote_record->second.message.data());
+                else
+                    ImGui::SetItemTooltip("Vote for this station.");
 
                 ImGui::EndDisabled();
 
@@ -992,11 +1001,11 @@ namespace Browser {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui::show_favicon(station.favicon);
+                ui::show_favicon(*station);
 
                 ImGui::SameLine();
 
-                ui::show_station_basic_info(station, scroll_target);
+                ui::show_station_basic_info(*station, scroll_target);
 
                 if (ImGui::BeginChild("extra_info",
                                       {0, 0},
@@ -1006,16 +1015,16 @@ namespace Browser {
                     char click_text[32];
                     std::snprintf(click_text, sizeof click_text,
                                   ICON_FA_BAR_CHART " %" PRIu64 " (%+" PRId64 ")",
-                                  station.click_count,
-                                  station.click_trend);
+                                  station->click_count,
+                                  station->click_trend);
                     ui::show_boxed(click_text,
                                    "Daily total clicks and trend.",
                                    scroll_target);
 
-                    if (station.bitrate) {
+                    if (station->bitrate) {
                         ImGui::SameLine();
                         ui::show_boxed(ICON_FA_HEADPHONES " "
-                                       + std::to_string(station.bitrate) + " kbps",
+                                       + std::to_string(station->bitrate) + " kbps",
                                        "The advertised stream quality.",
                                        scroll_target);
                     }
@@ -1026,7 +1035,7 @@ namespace Browser {
                                    "The codec used in this broadcast.",
                                    scroll_target);
 
-                    ui::show_tags(station.tags, scroll_target);
+                    ui::show_tags(station->tags, scroll_target);
                 }
                 ImGui::HandleDragScroll(scroll_target);
                 ImGui::EndChild();

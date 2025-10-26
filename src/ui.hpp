@@ -23,10 +23,14 @@ namespace ui {
 
     extern const ImVec4 label_color;
 
+    void
+    show_details_button(const Station& station);
 
     void
-    show_favicon(const std::string& favicon);
+    show_favicon(const Station& station);
 
+    void
+    show_favorite_button(const Station& station);
 
     void
     show_info_row(const std::string& label,
@@ -64,11 +68,11 @@ namespace ui {
               ImGuiID scroll_target);
 
 
-    void
-    open_station_info_popup(const std::string& uuid);
+    // void
+    // open_station_info_popup(const std::string& uuid);
 
-    void
-    process_station_info_popup();
+    // void
+    // process_station_info_popup();
 
 
     void

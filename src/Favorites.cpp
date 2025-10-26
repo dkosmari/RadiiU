@@ -167,7 +167,7 @@ namespace Favorites {
                                    ImGuiWindowFlags_NoSavedSettings)) {
             auto window_size = ImGui::GetContentRegionAvail();
 
-            // Note: use a helper child window to push the response buttons to the bottom.
+            // Note: we use a helper child window to push the response buttons to the bottom.
             if (ImGui::BeginChild("content",
                                   {0, -ImGui::GetFrameHeightWithSpacing()}))
                 ImGui::TextWrapped("%s", station.name.data());
@@ -177,6 +177,7 @@ namespace Favorites {
             {
                 if (ImGui::Button(ICON_FA_TIMES " Cancel"))
                     ImGui::CloseCurrentPopup();
+                ImGui::SetItemTooltip("Cancel deleting this station.");
                 ImGui::SetItemDefaultFocus();
             }
 
@@ -196,6 +197,7 @@ namespace Favorites {
                     ImGui::CloseCurrentPopup();
                     station_index_to_remove = index;
                 }
+                ImGui::SetItemTooltip("Confirm deleting this station.");
             }
             ImGui::HandleDragScroll();
             ImGui::EndPopup();
@@ -272,6 +274,7 @@ namespace Favorites {
                     ImGui::CloseCurrentPopup();
                     edited_station.reset();
                 }
+                ImGui::SetItemTooltip("Cancel editing this station.");
                 ImGui::SetItemDefaultFocus();
             }
 
@@ -300,6 +303,7 @@ namespace Favorites {
                     }
                     edited_station.reset();
                 }
+                ImGui::SetItemTooltip("Confirm editing this station.");
             }
 
             ImGui::EndPopup();
@@ -336,6 +340,7 @@ namespace Favorites {
                     ImGui::CloseCurrentPopup();
                     created_station.reset();
                 }
+                ImGui::SetItemTooltip("Cancel creating a new station.");
                 ImGui::SetItemDefaultFocus();
             }
 
@@ -357,6 +362,7 @@ namespace Favorites {
                         add(std::move(*created_station).to_base());
                     created_station.reset();
                 }
+                ImGui::SetItemTooltip("Confirm creating a new station.");
             }
 
             ImGui::EndPopup();
@@ -386,33 +392,41 @@ namespace Favorites {
                 ui::show_play_button(station);
 
                 ImGui::BeginDisabled(index == 0);
-                if (ImGui::Button(ICON_FA_CHEVRON_UP /*"▲"*/)) {
+                // ▲
+                if (ImGui::Button(ICON_FA_CHEVRON_UP)) {
                     move_operation.emplace();
                     move_operation->src = index;
                     move_operation->dst = index - 1;
                 }
+                ImGui::SetItemTooltip("Move this station up.");
                 ImGui::EndDisabled();
 
                 ImGui::SameLine();
 
                 ImGui::BeginDisabled(index + 1 >= stations.size());
-                if (ImGui::Button(ICON_FA_CHEVRON_DOWN /*"▼"*/)) {
+                // ▼
+                if (ImGui::Button(ICON_FA_CHEVRON_DOWN)) {
                     move_operation.emplace();
                     move_operation->src = index;
                     move_operation->dst = index + 1;
                 }
+                ImGui::SetItemTooltip("Move this station down.");
                 ImGui::EndDisabled();
 
-                if (ImGui::Button(ICON_FA_PENCIL /*"✎"*/)) {
+                // ✎
+                if (ImGui::Button(ICON_FA_PENCIL)) {
                     edited_station.emplace(*station);
                     ImGui::OpenPopup(popup_edit_title);
                 }
+                ImGui::SetItemTooltip("Edit this station.");
                 process_popup_edit(*station);
 
                 ImGui::SameLine();
 
-                if (ImGui::Button(ICON_FA_TRASH_O /*"🗑"*/))
+                // 🗑
+                if (ImGui::Button(ICON_FA_TRASH_O))
                     ImGui::OpenPopup(popup_delete_title);
+                ImGui::SetItemTooltip("Remove this station from favorites.");
                 process_popup_delete(*station, index);
             } // actions
             ImGui::HandleDragScroll(scroll_target);
@@ -425,7 +439,7 @@ namespace Favorites {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui::show_favicon(station->favicon);
+                ui::show_favicon(*station);
 
                 ImGui::SameLine();
 
@@ -460,10 +474,12 @@ namespace Favorites {
                               ImGuiChildFlags_AutoResizeY |
                               ImGuiChildFlags_NavFlattened)) {
 
-            if (ImGui::Button(ICON_FA_PLUS /*➕*/ " Add")) {
+            // ➕
+            if (ImGui::Button(ICON_FA_PLUS " Add")) {
                 ImGui::OpenPopup(popup_create_title);
                 created_station.emplace();
             }
+            ImGui::SetItemTooltip("Add a new station to favorites.");
             process_popup_create();
 
             ImGui::SameLine();

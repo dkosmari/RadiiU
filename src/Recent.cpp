@@ -16,6 +16,7 @@
 #include "Recent.hpp"
 
 #include "cfg.hpp"
+#include "Favorites.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
 #include "imgui_extras.hpp"
@@ -29,8 +30,6 @@
 using std::cout;
 using std::endl;
 
-
-// TODO: allow inserting/removing station into Favorites from Recent
 
 namespace Recent {
 
@@ -101,7 +100,7 @@ namespace Recent {
                  std::size_t index,
                  ImGuiID scroll_target)
     {
-        ImGui::PushID(&station);
+        ImGui::PushID(station.get());
 
         if (ImGui::BeginChild("station",
                               {0, 0},
@@ -117,16 +116,16 @@ namespace Recent {
 
                 ui::show_play_button(station);
 
-                if (ImGui::Button(ICON_FA_TRASH_O /*🗑*/))
-                    pending_remove = index;
+                ui::show_favorite_button(*station);
 
                 ImGui::SameLine();
 
-                ImGui::BeginDisabled(station->uuid.empty());
-                if (ImGui::Button(ICON_FA_INFO_CIRCLE /*🛈*/))
-                    ui::open_station_info_popup(station->uuid);
-                ImGui::EndDisabled();
-                ui::process_station_info_popup();
+                ui::show_details_button(*station);
+
+                // 🗑
+                if (ImGui::Button(ICON_FA_TRASH_O))
+                    pending_remove = index;
+                ImGui::SetItemTooltip("Remove station from recent history.");
 
             } // actions
             ImGui::HandleDragScroll(scroll_target);
@@ -139,7 +138,7 @@ namespace Recent {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui::show_favicon(station->favicon);
+                ui::show_favicon(*station);
 
                 ImGui::SameLine();
 
@@ -178,6 +177,7 @@ namespace Recent {
 
             if (ImGui::Button("Clear"))
                 stations.clear();
+            ImGui::SetItemTooltip("Clear entire recent history.");
 
             ImGui::SameLine();
 

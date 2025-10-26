@@ -629,21 +629,11 @@ namespace Player {
 
                 ui::show_play_button(station);
 
-                if (Favorites::contains(*station)) {
-                    if (ImGui::Button(ICON_FA_HEART /*♥*/))
-                        Favorites::remove(*station);
-                } else {
-                    if (ImGui::Button(ICON_FA_HEART_O /*♡*/))
-                        Favorites::add(*station);
-                }
+                ui::show_favorite_button(*station);
 
                 ImGui::SameLine();
 
-                ImGui::BeginDisabled(station->uuid.empty());
-                if (ImGui::Button(ICON_FA_INFO_CIRCLE /*🛈*/))
-                    ui::open_station_info_popup(station->uuid);
-                ImGui::EndDisabled();
-                ui::process_station_info_popup();
+                ui::show_details_button(*station);
 
             } // actions
             ImGui::EndChild();
@@ -655,7 +645,7 @@ namespace Player {
                                   ImGuiChildFlags_AutoResizeY |
                                   ImGuiChildFlags_NavFlattened)) {
 
-                ui::show_favicon(station->favicon);
+                ui::show_favicon(*station);
 
                 ImGui::SameLine();
 
