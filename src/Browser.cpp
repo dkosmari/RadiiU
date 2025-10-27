@@ -27,6 +27,8 @@
 #include <coreinit/time.h>
 #endif
 
+#include <SDL_stdinc.h>
+
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <imgui_stdlib.h>
@@ -737,10 +739,13 @@ namespace Browser {
                     if (ImGui::BeginCombo("Tag",
                                           filter_tag,
                                           ImGuiComboFlags_HeightLargest)) {
-                        static ImGuiTextFilter filter;
+                        static ImGuiTextFilter filter{filter_tag.data()};
                         if (ImGui::IsWindowAppearing()) {
                             ImGui::SetKeyboardFocusHere();
-                            filter.Clear();
+                            SDL_strlcpy(filter.InputBuf,
+                                        filter_tag.data(),
+                                        sizeof filter.InputBuf);
+                            filter.Build();
                         }
                         filter.Draw("##tag_filter", 900);
                         if (ImGui::Selectable("(empty)", filter_tag.empty()))
@@ -765,10 +770,13 @@ namespace Browser {
                     if (ImGui::BeginCombo("Country",
                                           display_country,
                                           ImGuiComboFlags_HeightLargest)) {
-                        static ImGuiTextFilter filter;
+                        static ImGuiTextFilter filter{display_country.data()};
                         if (ImGui::IsWindowAppearing()) {
                             ImGui::SetKeyboardFocusHere();
-                            filter.Clear();
+                            SDL_strlcpy(filter.InputBuf,
+                                        filter_country.data(),
+                                        sizeof filter.InputBuf);
+                            filter.Build();
                         }
                         filter.Draw("##country_filter");
                         if (ImGui::Selectable("(none)", filter_country.empty()))
