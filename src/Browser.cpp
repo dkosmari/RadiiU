@@ -732,13 +732,17 @@ namespace Browser {
                     ImGui::InputText("Name", &filter_name);
 
                     ImGui::SetNextItemWidth(filters_width);
-                    if (ImGui::BeginCombo("Tag", filter_tag)) {
+                    ImGui::SetNextWindowSizeConstraints({0.0f, 0.0f},
+                                                        {1200.0f, FLT_MAX});
+                    if (ImGui::BeginCombo("Tag",
+                                          filter_tag,
+                                          ImGuiComboFlags_HeightLargest)) {
                         static ImGuiTextFilter filter;
                         if (ImGui::IsWindowAppearing()) {
                             ImGui::SetKeyboardFocusHere();
                             filter.Clear();
                         }
-                        filter.Draw("##tag_filter");
+                        filter.Draw("##tag_filter", 900);
                         if (ImGui::Selectable("(empty)", filter_tag.empty()))
                             filter_tag.clear();
                         for (auto& tag : tags) {
@@ -758,7 +762,9 @@ namespace Browser {
                         if (country_name)
                             display_country += " - " + *country_name;
                     }
-                    if (ImGui::BeginCombo("Country", display_country)) {
+                    if (ImGui::BeginCombo("Country",
+                                          display_country,
+                                          ImGuiComboFlags_HeightLargest)) {
                         static ImGuiTextFilter filter;
                         if (ImGui::IsWindowAppearing()) {
                             ImGui::SetKeyboardFocusHere();
@@ -794,7 +800,9 @@ namespace Browser {
                     ImGui::TextUnformatted(ICON_FA_SORT " Order");
 
                     ImGui::SetNextItemWidth(280);
-                    if (ImGui::BeginCombo("##Order", to_label(order))) {
+                    if (ImGui::BeginCombo("##Order",
+                                          to_label(order),
+                                          ImGuiComboFlags_HeightLargest)) {
                         for (unsigned i = 0; i < order_strings.size(); ++i) {
                             Order o{i};
                             if (ImGui::Selectable(to_label(o), order == o))
@@ -1316,6 +1324,15 @@ namespace Browser {
                                for (const auto& entry : list) {
                                    const auto& obj = entry.as<json::object>();
                                    std::string name = obj.at("name").as<json::string>();
+                                   // ignore some bogus tags
+                                   if (name.size() < 2)
+                                       continue;
+                                   if (name.contains("#"))
+                                       continue;
+                                   if (name.contains(";"))
+                                       continue;
+                                   if (name.contains("\""))
+                                       continue;
                                    tags.push_back(std::move(name));
                                }
                                cout << "Got " << tags.size() << " tags" << endl;

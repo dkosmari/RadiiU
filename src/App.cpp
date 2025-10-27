@@ -83,6 +83,7 @@ namespace App {
     bool running;
 
     const float cafe_size = 32;
+    const float ui_rounding = 8;
 
     std::optional<TabID> next_tab;
     TabID current_tab;
@@ -193,8 +194,9 @@ namespace App {
         ImGui::StyleColorsDark();
 
         auto& style = ImGui::GetStyle();
-        const float rounding = 8;
+
         const ImVec2 padding = {9, 9};
+        const float rounding = ui_rounding;
         const ImVec2 spacing = {9, 9};
 
         // style.Alpha = 0.5f;
@@ -204,7 +206,7 @@ namespace App {
         style.WindowBorderSize = 0;
 
         style.ChildRounding = rounding;
-        style.ChildBorderSize = 1;
+        style.ChildBorderSize = 0;
 
         style.PopupRounding = rounding;
 
@@ -418,6 +420,9 @@ namespace App {
                          ImGuiWindowFlags_NoSavedSettings |
                          ImGuiWindowFlags_NoResize)) {
 
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, ui_rounding);
+
             {
                 // App name, centered
                 ImGui::PushFont(nullptr, 48);
@@ -493,9 +498,11 @@ namespace App {
                 ImGui::EndTabBar();
             }
 
+            ImGui::PopStyleVar(2);
         }
 
         ImGui::End();
+
 
         // ImGui::ShowStyleEditor();
 
