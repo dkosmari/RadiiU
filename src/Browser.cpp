@@ -422,55 +422,48 @@ namespace Browser {
 
     void
     load()
-    {
-        try {
-            const auto root = json::load(cfg::base_dir / "browser.json").as<json::object>();
-            if (root.contains("filter")) {
-                const auto& filter = root.at("filter").as<json::object>();
-                if (filter.contains("name"))
-                    filter_name = filter.at("name").as<json::string>();
-                if (filter.contains("tag"))
-                    filter_tag = filter.at("tag").as<json::string>();
-                if (filter.contains("country"))
-                    filter_country = filter.at("country").as<json::string>();
-            }
-
-            if (root.contains("order"))
-                order = to_order(root.at("order").as<json::string>());
-
-            if (root.contains("page"))
-                page_index = root.at("page").as<json::integer>() - 1;
+    try {
+        const auto root = json::load(cfg::base_dir / "browser.json").as<json::object>();
+        if (root.contains("filter")) {
+            const auto& filter = root.at("filter").as<json::object>();
+            try_get(filter, "name", filter_name);
+            try_get(filter, "tag", filter_tag);
+            try_get(filter, "country", filter_country);
         }
-        catch (std::exception& e) {
-            cout << "ERROR: Browser::load(): " << e.what() << endl;
-        }
+
+        if (auto v = try_get<json::string>(root, "order"))
+            order = to_order(*v);
+
+        if (auto v = try_get<json::integer>(root, "page"))
+            page_index = *v - 1;
+    }
+    catch (std::exception& e) {
+        cout << "ERROR: Browser::load(): " << e.what() << endl;
     }
 
 
     void
     save()
-    {
-        try {
-            json::object filter;
-            if (!filter_name.empty())
-                filter["name"] = filter_name;
-            if (!filter_tag.empty())
-                filter["tag"] = filter_tag;
-            if (!filter_country.empty())
-                filter["country"] = filter_country;
+    try {
+        json::object filter;
+        if (!filter_name.empty())
+            filter["name"] = filter_name;
+        if (!filter_tag.empty())
+            filter["tag"] = filter_tag;
+        if (!filter_country.empty())
+            filter["country"] = filter_country;
 
-            json::object root;
-            if (!filter.empty())
-                root["filter"] = std::move(filter);
+        json::object root;
+        if (!filter.empty())
+            root["filter"] = std::move(filter);
 
-            root["order"] = to_string(order);
-            root["page"] = 1 + page_index;
+        root["order"] = to_string(order);
+        root["page"] = page_index + 1;
 
-            json::save(std::move(root), cfg::base_dir / "browser.json");
-        }
-        catch (std::exception& e) {
-            cout << "ERROR: Browser::save(): " << e.what() << endl;
-        }
+        json::save(std::move(root), cfg::base_dir / "browser.json");
+    }
+    catch (std::exception& e) {
+        cout << "ERROR: Browser::save(): " << e.what() << endl;
     }
 
 

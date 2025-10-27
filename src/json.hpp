@@ -8,12 +8,14 @@
 #ifndef JSON_HPP
 #define JSON_HPP
 
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <iosfwd>
 #include <map>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <variant>
@@ -122,6 +124,116 @@ namespace json {
     save(const value& val,
          const std::filesystem::path& filename,
          bool replace = true);
+
+
+    template<typename T>
+    [[nodiscard]]
+    std::optional<T>
+    try_get(const object& obj,
+            const std::string& key)
+    {
+        auto it = obj.find(key);
+        if (it != obj.end() && it->second.is<T>())
+            return it->second.as<T>();
+        return {};
+    }
+
+
+#if 0
+    // Explicit JSON type.
+    template<typename JT,
+             typename RT>
+    [[nodiscard]]
+    std::optional<RT>
+    try_get2(const object& obj,
+             const std::string& key)
+    {
+        auto it = obj.find(key);
+        if (it != obj.end() && it->second.is<JT>())
+            return static_cast<RT>(it->second.as<JT>());
+        return {};
+    }
+#endif
+
+
+    // Constrained specialization for integral types.
+    template<std::integral I>
+    [[nodiscard]]
+    std::optional<I>
+    try_get(const object& obj,
+            const std::string& key)
+    {
+        auto it = obj.find(key);
+        if (it != obj.end() && it->second.is<json::integer>())
+            return static_cast<I>(it->second.as<json::integer>());
+        return {};
+    }
+
+
+    // Full specialization for bool.
+    template<>
+    [[nodiscard]]
+    std::optional<bool>
+    try_get<bool>(const object& obj,
+                  const std::string& key);
+
+
+    template<typename T>
+    bool
+    try_get(const object& obj,
+            const std::string& key,
+            T& result)
+    {
+        auto it = obj.find(key);
+        if (it != obj.end() && it->second.is<T>()) {
+            result = it->second.as<T>();
+            return true;
+        }
+        return false;
+    }
+
+
+#if 0
+    // Explicit JSON type.
+    template<typename JT,
+             typename RT>
+    bool
+    try_get2(const object& obj,
+             const std::string& key,
+             RT& result)
+    {
+        auto it = obj.find(key);
+        if (it != obj.end() && it->second.is<JT>()) {
+            result = static_cast<RT>(it->second.as<JT>());
+            return true;
+        }
+        return false;
+    }
+#endif
+
+
+    // Constrained specialization for integral types.
+    template<std::integral I>
+    bool
+    try_get(const object& obj,
+            const std::string& key,
+            I& result)
+    {
+        auto it = obj.find(key);
+        if (it != obj.end() && it->second.is<json::integer>()) {
+            result = static_cast<I>(it->second.as<json::integer>());
+            return true;
+        }
+        return false;
+    }
+
+
+    // Full specialization for bool.
+    template<>
+    bool
+    try_get<bool>(const object& obj,
+                  const std::string& key,
+                  bool& result);
 
 } // namespace json
 

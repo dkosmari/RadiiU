@@ -414,4 +414,33 @@ namespace json {
         }
     }
 
+
+    // Full specialization for bool.
+    template<>
+    std::optional<bool>
+    try_get<bool>(const object& obj,
+                  const std::string& key)
+    {
+        auto it = obj.find(key);
+        if (it != obj.end() && it->second.is<bool>())
+            return it->second.as<bool>();
+        return {};
+    }
+
+
+    // Full specialization for bool.
+    template<>
+    bool
+    try_get<bool>(const object& obj,
+                  const std::string& key,
+                  bool& result)
+    {
+        auto it = obj.find(key);
+        if (it != obj.end() && it->second.is<bool>()) {
+            result = it->second.as<bool>();
+            return true;
+        }
+        return false;
+    }
+
 } // namespace json

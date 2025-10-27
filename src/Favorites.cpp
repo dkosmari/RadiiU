@@ -67,39 +67,35 @@ namespace Favorites {
 
     void
     load()
-    {
-        try {
-            auto root = json::load(cfg::base_dir / "favorites.json");
-            const auto& list = root.as<json::array>();
-            stations.clear();
-            uuids.clear();
-            for (auto& elem : list) {
-                auto& obj = elem.as<json::object>();
-                auto st = std::make_shared<Station>(Station::from_json(obj));
-                if (!st->uuid.empty())
-                    uuids.insert(st->uuid);
-                stations.push_back(std::move(st));
-            }
-            cout << "Loaded " << stations.size() << " favorites" << endl;
+    try {
+        auto root = json::load(cfg::base_dir / "favorites.json");
+        const auto& list = root.as<json::array>();
+        stations.clear();
+        uuids.clear();
+        for (auto& elem : list) {
+            auto& obj = elem.as<json::object>();
+            auto st = std::make_shared<Station>(Station::from_json(obj));
+            if (!st->uuid.empty())
+                uuids.insert(st->uuid);
+            stations.push_back(std::move(st));
         }
-        catch (std::exception& e) {
-            cout << "ERROR: Favorites::load(): " << e.what() << endl;
-        }
+        cout << "Loaded " << stations.size() << " favorites" << endl;
+    }
+    catch (std::exception& e) {
+        cout << "ERROR: Favorites::load(): " << e.what() << endl;
     }
 
 
     void
     save()
-    {
-        try {
-            json::array list;
-            for (const auto& station : stations)
-                list.push_back(station->to_json());
-            json::save(std::move(list), cfg::base_dir / "favorites.json");
-        }
-        catch (std::exception& e) {
-            cout << "ERROR: Favorites::save(): " << e.what() << endl;
-        }
+    try {
+        json::array list;
+        for (const auto& station : stations)
+            list.push_back(station->to_json());
+        json::save(std::move(list), cfg::base_dir / "favorites.json");
+    }
+    catch (std::exception& e) {
+        cout << "ERROR: Favorites::save(): " << e.what() << endl;
     }
 
 

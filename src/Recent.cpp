@@ -49,35 +49,31 @@ namespace Recent {
 
     void
     load()
-    {
-        try {
-            auto root = json::load(cfg::base_dir / "recent.json");
-            const auto& list = root.as<json::array>();
-            stations.clear();
-            for (auto& elem : list) {
-                auto& obj = elem.as<json::object>();
-                auto st = std::make_shared<Station>(Station::from_json(obj));
-                stations.push_back(std::move(st));
-            }
+    try {
+        auto root = json::load(cfg::base_dir / "recent.json");
+        const auto& list = root.as<json::array>();
+        stations.clear();
+        for (auto& elem : list) {
+            auto& obj = elem.as<json::object>();
+            auto st = std::make_shared<Station>(Station::from_json(obj));
+            stations.push_back(std::move(st));
         }
-        catch (std::exception& e) {
-            cout << "ERROR: Recent::load(): " << e.what() << endl;
-        }
+    }
+    catch (std::exception& e) {
+        cout << "ERROR: Recent::load(): " << e.what() << endl;
     }
 
 
     void
     save()
-    {
-        try {
-            json::array list;
-            for (const auto& station : stations)
-                list.push_back(station->to_json());
-            json::save(std::move(list), cfg::base_dir / "recent.json");
-        }
-        catch (std::exception& e) {
-            cout << "ERROR: Recent::save(): " << e.what() << endl;
-        }
+    try {
+        json::array list;
+        for (const auto& station : stations)
+            list.push_back(station->to_json());
+        json::save(std::move(list), cfg::base_dir / "recent.json");
+    }
+    catch (std::exception& e) {
+        cout << "ERROR: Recent::save(): " << e.what() << endl;
     }
 
 

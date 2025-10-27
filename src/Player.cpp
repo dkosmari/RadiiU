@@ -38,6 +38,7 @@
 #include "IconsFontAwesome4.h"
 #include "icy.hpp"
 #include "imgui_extras.hpp"
+#include "json.hpp"
 #include "Recent.hpp"
 #include "Station.hpp"
 #include "ui.hpp"
@@ -65,6 +66,16 @@ namespace Player {
     State state = State::stopped;
 
     std::shared_ptr<Station> station;
+
+
+    struct TrackInfo {
+        system_clock::time_point when;
+        std::string title;
+    };
+    std::deque<TrackInfo> history;
+
+    bool details_expanded;
+    bool history_expanded;
 
 
     SDL_AudioFormat
@@ -510,23 +521,52 @@ namespace Player {
     std::optional<Resources> res;
 
 
-    struct TrackInfo {
-        system_clock::time_point when;
-        std::string title;
-    };
+    void
+    load();
 
-    std::deque<TrackInfo> history;
+    void
+    save();
 
 
     void
     initialize()
-    {}
+    {
+        load();
+    }
 
 
     void
     finalize()
     {
+        save();
         res.reset();
+    }
+
+
+    void
+    load()
+    try {
+
+        const auto root = json::load(cfg::base_dir / "player.json").as<json::object>();
+        try_get(root, "details_expanded", details_expanded);
+        try_get(root, "history_expanded", history_expanded);
+    }
+    catch (std::exception& e) {
+        cout << "ERROR: Player::load(): " << e.what() << endl;
+    }
+
+
+    void
+    save()
+    try {
+        json::object root;
+        root["details_expanded"] = details_expanded;
+        root["history_expanded"] = history_expanded;
+
+        json::save(std::move(root), cfg::base_dir / "player.json");
+    }
+    catch (std::exception& e) {
+        cout << "ERROR: Player::save(): " << e.what() << endl;
     }
 
 
@@ -671,7 +711,10 @@ namespace Player {
                               ImGuiChildFlags_FrameStyle |
                               ImGuiChildFlags_NavFlattened)) {
 
+            ImGui::SetNextItemOpen(details_expanded);
             if (ImGui::CollapsingHeader("Stream details")) {
+
+                details_expanded = true;
 
                 ImGui::Indent();
 
@@ -717,7 +760,10 @@ namespace Player {
                     ImGui::Unindent();
 
                 }
-            } // endif (ImGui::CollapsingHeader("Stream details"))
+
+            } else
+                details_expanded = false;
+
         } // stream
         ImGui::HandleDragScroll(scroll_target);
         ImGui::EndChild();
@@ -735,7 +781,10 @@ namespace Player {
                               ImGuiChildFlags_FrameStyle |
                               ImGuiChildFlags_NavFlattened)) {
 
+            ImGui::SetNextItemOpen(history_expanded);
             if (ImGui::CollapsingHeader("Track history")) {
+
+                history_expanded = true;
 
                 ImGui::Indent();
 
@@ -762,7 +811,9 @@ namespace Player {
                 }
 
                 ImGui::Unindent();
-            }
+
+            } else
+                history_expanded = false;
 
         } // history
         ImGui::HandleDragScroll(scroll_target);

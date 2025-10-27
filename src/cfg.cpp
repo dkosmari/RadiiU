@@ -68,20 +68,6 @@ namespace cfg {
     }
 
 
-    template<typename T>
-    std::optional<T>
-    try_get(const json::object& obj,
-            const string& key)
-    {
-        try {
-            return obj.at(key).as<T>();
-        }
-        catch (...) {
-            return {};
-        }
-    }
-
-
     void
     load_defaults()
     {
@@ -140,68 +126,24 @@ namespace cfg {
 
 
     void
-    load(const json::object& root,
-         const char* key,
-         bool& variable)
-    {
-        if (auto val = try_get<bool>(root, key))
-            variable = *val;
-    }
-
-
-    template<std::integral I>
-    void
-    load(const json::object& root,
-         const char* key,
-         I& variable)
-    {
-        if (auto val = try_get<json::integer>(root, key))
-            variable = *val;
-    }
-
-
-    void
-    load(const json::object& root,
-         const char* key,
-         std::string& variable)
-    {
-        if (auto val = try_get<json::string>(root, key))
-            variable = *val;
-    }
-
-
-    template<typename T>
-    requires requires {
-        { T::from_string(std::string{}) } -> std::convertible_to<T>;
-    }
-    void
-    load(const json::object& root,
-         const char* key,
-         T& variable)
-    {
-        if (auto val = try_get<json::string>(root, key))
-            variable = T::from_string(*val);
-    }
-
-
-    void
     load()
     {
         try {
             auto root = json::load(base_dir / "settings.json").as<json::object>();
 
-            load(root, "browser_page_limit",   browser_page_limit);
-            load(root, "disable_apd",          disable_apd);
-            load(root, "disable_swkbd",        disable_swkbd);
-            load(root, "inactive_screen_off",  inactive_screen_off);
-            load(root, "initial_tab",          initial_tab);
-            load(root, "player_buffer_size",   player_buffer_size);
-            load(root, "player_history_limit", player_history_limit);
-            load(root, "recent_limit",         recent_limit);
-            load(root, "remember_tab",         remember_tab);
-            load(root, "server",               server);
+            try_get(root, "browser_page_limit",   browser_page_limit);
+            try_get(root, "disable_apd",          disable_apd);
+            try_get(root, "disable_swkbd",        disable_swkbd);
+            try_get(root, "inactive_screen_off",  inactive_screen_off);
+            if (auto v = try_get<json::string>(root, "initial_tab"))
+                initial_tab = TabID::from_string(*v);
+            try_get(root, "player_buffer_size",   player_buffer_size);
+            try_get(root, "player_history_limit", player_history_limit);
+            try_get(root, "recent_limit",         recent_limit);
+            try_get(root, "remember_tab",         remember_tab);
+            try_get(root, "server",               server);
 
-            // Remove after 0.2
+            // TODO: remove after 0.2
             if (player_buffer_size > 64)
                 player_buffer_size = 64;
         }
