@@ -398,7 +398,7 @@ namespace Browser {
             try {
                 auto result = rest::get_json_sync("https://" + name + "/json/stats");
                 cout << "Mirror \"" << name << "\" returned:\n";
-                dump(result, cout);
+                // json::dump(result, cout);
                 safe_server.store(name);
                 finished_background_connect = true;
                 break;
@@ -1172,7 +1172,7 @@ namespace Browser {
                        {
                            try {
                                cout << "click response: ";
-                               json::dump(response, cout);
+                               // json::dump(response, cout);
                                auto obj = response.as<json::object>();
                                if (obj.contains("ok"))
                                    cout << "Click confirmed for "
@@ -1223,7 +1223,7 @@ namespace Browser {
                                std::string message;
                                if (obj.contains("message")) {
                                    message = obj.at("message").as<json::string>();
-                                   cout << message << endl;
+                                   // cout << message << endl;
                                }
                                votes_cast.emplace(uuid, VoteStatus{ok, std::move(message)});
                                if (on_success)
