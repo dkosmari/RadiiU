@@ -443,7 +443,7 @@ namespace Browser {
                           std::regex_constants::ECMAScript |
                           std::regex_constants::optimize);
         cout << "tags_regex has " << counter << " rules" << endl;
-        cout << full_regex << endl;
+        // cout << full_regex << endl;
     }
     catch (std::exception& e) {
         cout << "ERROR: load_tags_regex(): " << e.what() << endl;
