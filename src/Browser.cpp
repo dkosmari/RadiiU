@@ -13,9 +13,11 @@
 #include <cstdio>
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <iostream>
 #include <random>
+#include <regex>
 #include <span>
 #include <thread>
 #include <tuple>
@@ -74,6 +76,9 @@ namespace Browser {
     std::string filter_name;
     std::string filter_tag;
     std::string filter_country;
+
+
+    std::regex tags_regex;
 
 
     enum class Order : unsigned {
@@ -405,9 +410,50 @@ namespace Browser {
     }
 
 
+    bool
+    try_open_file(std::ifstream& stream,
+                  const std::filesystem::path& filename)
+    {
+        if (!exists(filename))
+            return false;
+        stream.open(filename);
+        return stream.is_open();
+    }
+
+
+    void
+    load_tags_regex()
+    try {
+        std::ifstream input;
+        if (!try_open_file(input, cfg::base_dir / "tags.ignore"))
+            if (!try_open_file(input, utils::get_content_path() / "tags.ignore"))
+                throw std::runtime_error{"could not find tags.ignore"};
+        std::string line;
+        std::string full_regex;
+        unsigned counter = 0;
+        while (getline(input, line)) {
+            if (line.empty())
+                continue;
+            if (counter)
+                full_regex += "|";
+            full_regex += "(?:" + line + ")";
+            ++counter;
+        }
+        tags_regex.assign(full_regex,
+                          std::regex_constants::ECMAScript |
+                          std::regex_constants::optimize);
+        cout << "tags_regex has " << counter << " rules" << endl;
+        cout << full_regex << endl;
+    }
+    catch (std::exception& e) {
+        cout << "ERROR: load_tags_regex(): " << e.what() << endl;
+    }
+
+
     void
     initialize()
     {
+        load_tags_regex();
         load();
         connect();
     }
@@ -1328,19 +1374,20 @@ namespace Browser {
                        {
                            try {
                                tags.clear();
+                               std::smatch matches;
                                const auto& list = response.as<json::array>();
                                for (const auto& entry : list) {
                                    const auto& obj = entry.as<json::object>();
                                    std::string name = obj.at("name").as<json::string>();
                                    // ignore some bogus tags
-                                   if (name.size() < 2)
+                                   if (name.size() < 2 || name.size() > 32)
                                        continue;
-                                   if (name.contains("#"))
+                                   if (regex_search(name, matches, tags_regex) &&
+                                       matches.length() > 0) {
+                                       // cout << "Ignored tag: " << name << endl;
+                                       // cout << "RE match: " << matches.str() << endl;
                                        continue;
-                                   if (name.contains(";"))
-                                       continue;
-                                   if (name.contains("\""))
-                                       continue;
+                                   }
                                    tags.push_back(std::move(name));
                                }
                                cout << "Got " << tags.size() << " tags" << endl;
