@@ -88,6 +88,8 @@ namespace Browser {
         country_desc,
         language_asc,
         language_desc,
+        clicks_desc,
+        clicks_asc,
         votes_desc,
         votes_asc,
         random,
@@ -100,6 +102,8 @@ namespace Browser {
         "country_desc",
         "language_asc",
         "language_desc",
+        "clicks_desc",
+        "clicks_asc",
         "votes_desc",
         "votes_asc",
         "random",
@@ -273,6 +277,10 @@ namespace Browser {
                 return {"language", "false"};
             case Order::language_desc:
                 return {"language", "true"};
+            case Order::clicks_desc:
+                return {"clickcount", "true"};
+            case Order::clicks_asc:
+                return {"clickcount", "false"};
             case Order::votes_desc:
                 return {"votes", "true"};
             case Order::votes_asc:
@@ -287,7 +295,6 @@ namespace Browser {
     to_label(Order o)
     {
         switch (o) {
-            default:
             case Order::name_asc:
                 return "Name " ICON_FA_SORT_ALPHA_ASC;
             case Order::name_desc:
@@ -300,12 +307,18 @@ namespace Browser {
                 return "Language " ICON_FA_SORT_ALPHA_ASC;
             case Order::language_desc:
                 return "Language " ICON_FA_SORT_ALPHA_DESC;
+            case Order::clicks_desc:
+                return "Clicks " ICON_FA_SORT_AMOUNT_DESC;
+            case Order::clicks_asc:
+                return "Clicks " ICON_FA_SORT_AMOUNT_ASC;
             case Order::votes_desc:
                 return "Votes " ICON_FA_SORT_AMOUNT_DESC;
             case Order::votes_asc:
                 return "Votes " ICON_FA_SORT_AMOUNT_ASC;
             case Order::random:
                 return "Random";
+            default:
+                return "ERROR";
         }
     }
 

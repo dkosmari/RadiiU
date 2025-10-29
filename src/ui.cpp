@@ -86,12 +86,10 @@ namespace ui {
             // ♥
             if (ImGui::Button(ICON_FA_HEART))
                 Favorites::remove(station);
-            ImGui::SetItemTooltip("Remove this station from favorites.");
         } else {
             // ♡
             if (ImGui::Button(ICON_FA_HEART_O))
                 Favorites::add(station);
-            ImGui::SetItemTooltip("Add this station to favorites.");
         }
     }
 
@@ -194,13 +192,11 @@ namespace ui {
                                    *IconManager::get("ui/stop-button.png"),
                                    button_size))
                 Player::stop();
-            ImGui::SetItemTooltip("Stop playing.");
         } else {
             if (ImGui::ImageButton("play_button",
                                    *IconManager::get("ui/play-button.png"),
                                    button_size))
                 Player::play(station);
-            ImGui::SetItemTooltip("Start playing.");
         }
     }
 
