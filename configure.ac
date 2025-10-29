@@ -1,9 +1,9 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ([2.69])
+AC_PREREQ([2.71])
 AC_INIT([RadiiU],
-        [0.1.3+],
+        [0.1.4],
         [https://github.com/dkosmari/RadiiU/issues],
         [radiiu],
         [https://github.com/dkosmari/RadiiU])
