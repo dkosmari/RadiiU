@@ -8,6 +8,7 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
+#include <concepts>
 #include <filesystem>
 #include <string>
 #include <type_traits>
@@ -83,15 +84,29 @@ namespace utils {
             const std::string& discard = " \r\n\t");
 
 
+    [[nodiscard]]
     std::string
     cpp_vsprintf(const char* fmt,
                  va_list args)
         __attribute__ (( __format__(__printf__, 1, 0) ));
 
+    [[nodiscard]]
     std::string
     cpp_sprintf(const char* fmt,
                 ...)
         __attribute__ (( __format__(__printf__, 1, 2) ));
+
+
+    template<typename T,
+             std::floating_point F>
+    [[nodiscard]]
+    T
+    lerp(const T& a,
+         const T& b,
+         F t)
+    {
+        return a + t * (b - a);
+    }
 
 } // namespace utils
 

@@ -33,7 +33,7 @@ libimgui_a_SOURCES = \
 	imgui/misc/freetype/imgui_freetype.h
 
 # Uncomment this to include Style Editor window.
-# libimgui_a_SOURCES += imgui/imgui_demo.cpp
+libimgui_a_SOURCES += imgui/imgui_demo.cpp
 
 
 
