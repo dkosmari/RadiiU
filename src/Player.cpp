@@ -138,8 +138,12 @@ namespace Player {
             try {
                 radio.process();
                 if (auto meta = radio.get_metadata())
-                    if (meta->title)
-                        history_add(*meta->title);
+                    if (meta->title) {
+                        if (meta->artist)
+                            history_add(*meta->artist + " - " + *meta->title);
+                        else
+                            history_add(*meta->title);
+                    }
 
                 if (is_buffer_too_empty()) {
                     // cout << "buffer too empty" << endl;
