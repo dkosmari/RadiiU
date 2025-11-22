@@ -142,6 +142,25 @@ namespace utils {
             return { result_pos, result_index };
         }
 
+
+        std::tuple<std::string_view::size_type,
+                   std::vector<std::string_view>::size_type>
+        find_first_of(const std::string_view& haystack,
+                      const std::vector<std::string_view>& needles,
+                      std::string_view::size_type start = 0)
+        {
+            std::string_view::size_type result_pos = std::string_view::npos;
+            std::vector<std::string_view>::size_type result_index = 0;
+            for (std::vector<std::string_view>::size_type i = 0; i < needles.size(); ++i) {
+                auto pos = haystack.find(needles[i], start);
+                if (pos < result_pos) {
+                    result_pos = pos;
+                    result_index = i;
+                }
+            }
+            return { result_pos, result_index };
+        }
+
     } // namespace
 
 
@@ -181,9 +200,51 @@ namespace utils {
     split(const std::string& input,
           const std::string& separator,
           bool compress,
-          std::size_t max_splits)
+          std::size_t max_tokens)
     {
-        return split(input, std::vector{separator}, compress, max_splits);
+        return split(input, std::vector{separator}, compress, max_tokens);
+    }
+
+
+    std::vector<std::string_view>
+    split(const std::string_view& input,
+          const std::vector<std::string_view>& separators,
+          bool compress,
+          std::size_t max_tokens)
+    {
+        std::vector<std::string_view> result;
+
+        using size_type = std::string::size_type;
+        auto [sep_start, sep_index] = find_first_of(input, separators);
+        size_type tok_start = 0;
+
+        // Loop until no more separators are found.
+        while (sep_start != std::string_view::npos) {
+            if (!compress || sep_start > tok_start) {
+                // If this token reaches the maximum allowed, stop the looop
+                if (max_tokens && result.size() + 1 == max_tokens)
+                    break;
+                result.push_back(input.substr(tok_start, sep_start - tok_start));
+            }
+            tok_start = sep_start + separators[sep_index].size();
+            if (tok_start >= input.size())
+                break;
+            std::tie(sep_start, sep_index) = find_first_of(input, separators, tok_start);
+        }
+        // The remainder of the string is the last token, unless (compress && empty)
+        if (!compress || tok_start < input.size())
+            result.push_back(input.substr(tok_start));
+        return result;
+    }
+
+
+    std::vector<std::string_view>
+    split(const std::string_view& input,
+          const std::string_view& separator,
+          bool compress,
+          std::size_t max_tokens)
+    {
+        return split(input, std::vector{separator}, compress, max_tokens);
     }
 
 

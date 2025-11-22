@@ -84,6 +84,28 @@ public:
     read_str();
 
 
+    [[nodiscard]]
+    std::size_t
+    peek(void* buf,
+         std::size_t count)
+        const noexcept;
+
+    template<typename T,
+             std::size_t E>
+    [[nodiscard]]
+    std::size_t
+    peek(std::span<T, E> buf)
+        const noexcept
+    {
+        return peek(buf.data(), buf.size_bytes());
+    }
+
+
+    std::size_t
+    discard(std::size_t count)
+        noexcept;
+
+
     std::optional<std::uint8_t>
     try_load_u8();
 
@@ -95,7 +117,7 @@ public:
     template<typename T,
              std::size_t E>
     std::size_t
-    write(std::span<const T, E> buf)
+    write(std::span<T, E> buf)
     {
         return write(buf.data(), buf.size_bytes());
     }

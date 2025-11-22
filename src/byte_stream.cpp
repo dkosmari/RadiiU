@@ -78,6 +78,32 @@ byte_stream::read_str()
 }
 
 
+std::size_t
+byte_stream::peek(void* buf,
+                  std::size_t count)
+    const noexcept
+{
+    std::size_t total = 0;
+    for (auto b : data) {
+        if (total >= count)
+            break;
+        reinterpret_cast<std::byte*>(buf)[total++] = b;
+    }
+    return total;
+}
+
+
+std::size_t
+byte_stream::discard(std::size_t count)
+    noexcept
+{
+    if (count > data.size())
+        count = data.size();
+    data.erase(data.begin(), data.begin() + count);
+    return count;
+}
+
+
 std::optional<std::uint8_t>
 byte_stream::try_load_u8()
 {

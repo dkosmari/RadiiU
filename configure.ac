@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.71])
 AC_INIT([RadiiU],
-        [0.1.4],
+        [0.1.4+],
         [https://github.com/dkosmari/RadiiU/issues],
         [radiiu],
         [https://github.com/dkosmari/RadiiU])
@@ -38,6 +38,7 @@ PKG_CHECK_MODULES([JANSSON], [jansson])
 PKG_CHECK_MODULES([MPG123], [libmpg123])
 PKG_CHECK_MODULES([SDL], [sdl2 SDL2_image])
 PKG_CHECK_MODULES([FT], [freetype2])
+PKG_CHECK_MODULES([VORBISFILE], [vorbisfile])
 
 AC_MSG_NOTICE([PATH is $PATH])
 AC_MSG_NOTICE([CPPFLAGS is "$CPPFLAGS"])

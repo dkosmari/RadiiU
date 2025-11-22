@@ -11,6 +11,7 @@
 #include <concepts>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -69,6 +70,20 @@ namespace utils {
     std::vector<std::string>
     split(const std::string& input,
           const std::string& separator = ",",
+          bool compress = true,
+          std::size_t max_tokens = 0);
+
+    [[nodiscard]]
+    std::vector<std::string_view>
+    split(const std::string_view& input,
+          const std::vector<std::string_view>& separators = {","},
+          bool compress = true,
+          std::size_t max_tokens = 0);
+
+    [[nodiscard]]
+    std::vector<std::string_view>
+    split(const std::string_view& input,
+          const std::string_view& separator = ",",
           bool compress = true,
           std::size_t max_tokens = 0);
 

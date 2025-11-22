@@ -47,8 +47,16 @@ radiiu_elf_SOURCES = \
 	src/byte_stream.hpp \
 	src/cfg.cpp \
 	src/cfg.hpp \
+	src/decoder.cpp \
+	src/decoder.hpp \
+	src/decoder_mp3.cpp \
+	src/decoder_mp3.hpp \
+	src/decoder_vorbis.cpp \
+	src/decoder_vorbis.hpp \
 	src/Favorites.cpp \
 	src/Favorites.hpp \
+	src/http_client.cpp \
+	src/http_client.hpp \
 	src/humanize.cpp \
 	src/humanize.hpp \
 	src/IconManager.cpp \
@@ -56,6 +64,8 @@ radiiu_elf_SOURCES = \
 	src/IconsFontAwesome4.h \
 	src/icy.cpp \
 	src/icy.hpp \
+	src/icy_stream.cpp \
+	src/icy_stream.hpp \
 	src/imgui_extras.cpp \
 	src/imgui_extras.hpp \
 	src/json.cpp \
@@ -63,6 +73,8 @@ radiiu_elf_SOURCES = \
 	src/main.cpp \
 	src/Player.cpp \
 	src/Player.hpp \
+	src/radio_client.cpp \
+	src/radio_client.hpp \
 	src/Recent.cpp \
 	src/Recent.hpp \
 	src/rest.cpp \
@@ -72,6 +84,8 @@ radiiu_elf_SOURCES = \
 	src/Station.cpp \
 	src/Station.hpp \
 	src/stdout-wiiu.cpp \
+	src/stream_metadata.cpp \
+	src/stream_metadata.hpp \
 	src/TabID.cpp \
 	src/TabID.hpp \
 	src/thread_safe.hpp \
@@ -88,6 +102,8 @@ radiiu_elf_CPPFLAGS = \
 	$(MPG123_CFLAGS) \
 	$(SDL_CFLAGS) \
 	$(FT_CFLAGS) \
+	$(VORBISFILE_CFLAGS) \
+	-DOV_EXCLUDE_STATIC_CALLBACKS \
 	-I$(srcdir)/external/curlxx/include \
 	-DIMGUI_USER_CONFIG='"$(srcdir)/external/custom_imconfig.h"' \
 	-I$(srcdir)/external/imgui \
@@ -107,6 +123,7 @@ radiiu_elf_LDADD =  \
 	$(CURL_LIBS) \
 	$(JANSSON_LIBS) \
 	$(MPG123_LIBS) \
+	$(VORBISFILE_LIBS) \
 	$(SDL_LIBS) \
 	$(FT_LIBS)
 
