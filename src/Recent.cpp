@@ -96,7 +96,7 @@ namespace Recent {
                  std::size_t index,
                  ImGuiID scroll_target)
     {
-        ImGui::PushID(station.get());
+        ImGui::PushID(index);
 
         if (ImGui::BeginChild("station",
                               {0, 0},
