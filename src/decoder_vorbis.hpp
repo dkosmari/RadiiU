@@ -10,6 +10,7 @@
 
 #include <vector>
 
+#define OV_EXCLUDE_STATIC_CALLBACKS
 #include <vorbis/vorbisfile.h>
 
 #include "byte_stream.hpp"

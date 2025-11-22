@@ -17,6 +17,7 @@
 #include <imgui_internal.h>
 #include <jansson.h>
 #include <mpg123.h>
+#include <vorbis/codec.h>
 
 #include <freetype/freetype.h>
 #include <SDL_version.h>
@@ -221,12 +222,14 @@ namespace About {
                 if (!ft_version.empty())
                     ui::show_info_row("FreeType", ft_version);
 
-                ui::show_info_row("libCURL", curl_version());
+                ui::show_info_row("libcurl", curl_version());
 
                 ui::show_info_row("JANSSON", jansson_version_str());
 
                 static const std::string mpg_decoders = get_mpg_decoders();
                 ui::show_info_row("mpg123 decoders", mpg_decoders);
+
+                ui::show_info_row("libVorbis", vorbis_version_string());
 
                 ImGui::EndTable();
             }

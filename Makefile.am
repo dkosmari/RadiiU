@@ -103,7 +103,6 @@ radiiu_elf_CPPFLAGS = \
 	$(SDL_CFLAGS) \
 	$(FT_CFLAGS) \
 	$(VORBISFILE_CFLAGS) \
-	-DOV_EXCLUDE_STATIC_CALLBACKS \
 	-I$(srcdir)/external/curlxx/include \
 	-DIMGUI_USER_CONFIG='"$(srcdir)/external/custom_imconfig.h"' \
 	-I$(srcdir)/external/imgui \

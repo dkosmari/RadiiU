@@ -166,7 +166,6 @@ namespace decoder {
             auto& key = tokens[0];
             auto& val = tokens[1];
 
-            // TODO: use case insensitive compare
             if (equal_case(key, "TITLE"sv))
                 result.title = val;
             else if (equal_case(key, "ARTIST"sv))
