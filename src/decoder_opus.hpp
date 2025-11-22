@@ -5,16 +5,15 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#ifndef DECODER_VORBIS_HPP
-#define DECODER_VORBIS_HPP
+#ifndef DECODER_OPUS_HPP
+#define DECODER_OPUS_HPP
 
 #include <span>
-#include <vector>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
-#define OV_EXCLUDE_STATIC_CALLBACKS
-#include <vorbis/vorbisfile.h>
+#include <opus/opusfile.h>
 
 #include "byte_stream.hpp"
 #include "decoder.hpp"
@@ -22,7 +21,7 @@
 
 namespace decoder {
 
-    struct vorbis : base {
+    struct opus : base {
 
         struct error : std::runtime_error {
             error(int code);
@@ -31,16 +30,21 @@ namespace decoder {
         };
 
 
-        OggVorbis_File ovf;
+        OggOpusFile* oof = nullptr;
         byte_stream stream;
-        std::vector<char> samples;
-        long bitrate = 0;
+        std::vector<opus_int16> samples;
+        opus_int32 bitrate = 0;
 
 
-        vorbis(std::span<const char> data);
 
-        ~vorbis()
+
+
+
+        opus(std::span<const char> data);
+
+        ~opus()
             noexcept override;
+
 
         std::size_t
         feed(std::span<const char> data)
@@ -64,13 +68,13 @@ namespace decoder {
 
 
         static
-        std::size_t
-        read_callback(void* buf,
-                      std::size_t size,
-                      std::size_t count,
-                      void* ctx);
+        int
+        read_callback(void* ctx,
+                      unsigned char* buf,
+                      int size);
 
-    }; // struct vorbis
+
+    }; // struct opus
 
 } // namespace decoder
 

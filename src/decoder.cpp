@@ -12,6 +12,7 @@
 #include "decoder.hpp"
 
 #include "decoder_mp3.hpp"
+#include "decoder_opus.hpp"
 #include "decoder_vorbis.hpp"
 
 
@@ -53,6 +54,11 @@ namespace decoder {
         }
 
         if (content_type == "audio/vorbis") {
+            cout << "Creating opus decoder from content type: " << content_type << endl;
+            return std::make_unique<opus>(data);
+        }
+
+        if (content_type == "audio/vorbis") {
             cout << "Creating vorbis decoder from content type: " << content_type << endl;
             return std::make_unique<vorbis>(data);
         }
@@ -63,8 +69,16 @@ namespace decoder {
         }
 
         if (match(data, "OggS")) {
-            cout << "Creating vorbis decoder from data signature" << endl;
-            return std::make_unique<vorbis>(data);
+            try {
+                return std::make_unique<opus>(data);
+            }
+            catch (...) {
+            }
+            try {
+                return std::make_unique<vorbis>(data);
+            }
+            catch (...) {
+            }
         }
 
         // Note: FLAC is  66 4C 61 43   "fLaC"

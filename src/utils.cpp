@@ -5,8 +5,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <cstdarg>
 #include <cinttypes>
+#include <cstdarg>
+#include <locale>
 #include <tuple>
 
 #include <SDL2/SDL_platform.h>
@@ -304,6 +305,21 @@ namespace utils {
             va_end(args);
             throw;
         }
+    }
+
+
+    bool
+    equal_case(std::string_view a,
+               std::string_view b)
+    {
+        if (a.size() != b.size())
+            return false;
+        for (std::size_t i = 0; i <a.size(); ++i) {
+            if (std::toupper(a[i], std::locale::classic()) !=
+                std::toupper(b[i], std::locale::classic()))
+                return false;
+        }
+        return true;
     }
 
 } // namespace utils

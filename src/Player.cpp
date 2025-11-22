@@ -126,13 +126,6 @@ namespace Player {
 
 
         void
-        process_meta()
-        {
-
-        }
-
-
-        void
         process()
         {
             try {

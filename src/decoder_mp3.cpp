@@ -24,6 +24,8 @@ namespace decoder {
         mpg.set_verbose(true);
         mpg.open_feed();
         feed(data);
+
+        cout << "Created mp3 decoder." << endl;
     }
 
 

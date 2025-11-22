@@ -25,6 +25,10 @@ It uses the station listing from [www.radio-browser.info](https://www.radio-brow
 
 - libmpg123
 
+- libopusfile
+
+- libvorbisfile
+
 - SDL2, SDL2_image, SDL2_ttf
   - Note: a fork of SDL2 with swkbd support is required:
     https://github.com/dkosmari/SDL/tree/wiiu-sdl2-devel

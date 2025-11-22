@@ -123,6 +123,11 @@ namespace utils {
         return a + t * (b - a);
     }
 
+
+    bool
+    equal_case(std::string_view a,
+               std::string_view b);
+
 } // namespace utils
 
 #endif

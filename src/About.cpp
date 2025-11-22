@@ -17,6 +17,7 @@
 #include <imgui_internal.h>
 #include <jansson.h>
 #include <mpg123.h>
+#include <opus/opus_defines.h>
 #include <vorbis/codec.h>
 
 #include <freetype/freetype.h>
@@ -229,7 +230,9 @@ namespace About {
                 static const std::string mpg_decoders = get_mpg_decoders();
                 ui::show_info_row("mpg123 decoders", mpg_decoders);
 
-                ui::show_info_row("libVorbis", vorbis_version_string());
+                ui::show_info_row("Opus", opus_get_version_string());
+
+                ui::show_info_row("Vorbis", vorbis_version_string());
 
                 ImGui::EndTable();
             }

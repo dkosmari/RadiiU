@@ -8,10 +8,7 @@
 #include <bit>
 #include <cerrno>
 #include <iostream>
-#include <locale>
-#include <stdexcept>
 #include <string_view>
-#include <vector>
 
 #include "decoder_vorbis.hpp"
 
@@ -25,6 +22,59 @@ using namespace std::literals;
 
 
 namespace decoder {
+
+    namespace {
+
+        std::string
+        vorbis_error_to_string(int code)
+        {
+            switch (code) {
+                case OV_FALSE:
+                    return "OV_FALSE";
+                case OV_EOF:
+                    return "OV_EOF";
+                case OV_HOLE:
+                    return "OV_HOLE";
+                case OV_EREAD:
+                    return "OV_EREAD";
+                case OV_EFAULT:
+                    return "OV_EFAULT";
+                case OV_EIMPL:
+                    return "OV_EIMPL";
+                case OV_EINVAL:
+                    return "OV_EINVAL";
+                case OV_ENOTVORBIS:
+                    return "OV_ENOTVORBIS";
+                case OV_EBADHEADER:
+                    return "OV_EBADHEADER";
+                case OV_EVERSION:
+                    return "OV_EVERSION";
+                case OV_ENOTAUDIO:
+                    return "OV_ENOTAUDIO";
+                case OV_EBADPACKET:
+                    return "OV_EBADPACKET";
+                case OV_EBADLINK:
+                    return "OV_EBADLINK";
+                case OV_ENOSEEK:
+                    return "OV_ENOSEEK";
+                default:
+                    return "unknown Vorbis error " + std::to_string(code);
+            }
+        }
+
+    } // namespace
+
+
+    vorbis::error::error(int code) :
+        std::runtime_error{vorbis_error_to_string(code)}
+    {}
+
+
+    vorbis::error::error(const std::string& msg,
+                         int code) :
+        std::runtime_error{msg + ": " + vorbis_error_to_string(code)}
+    {}
+
 
     vorbis::vorbis(std::span<const char> data) :
         samples(8192)
@@ -42,7 +92,9 @@ namespace decoder {
                                   data.size_bytes(),
                                   callbacks);
         if (e)
-            throw std::runtime_error{"failed to create ov handle: " + std::to_string(e)};
+            throw error{"ov_open_callbacks() failed", e};
+
+        cout << "Created vorbis decoder." << endl;
     }
 
 
@@ -63,6 +115,7 @@ namespace decoder {
     std::span<const char>
     vorbis::decode()
     {
+        // TODO: when more than 2 channels, we should reorder them to match SDL channels.
         int bitstream;
         long r = ov_read(&ovf,
                          samples.data(),
@@ -71,8 +124,12 @@ namespace decoder {
                          2,
                          1,
                          &bitstream);
-        if (r <= 0)
+        if (r == 0)
             return {};
+        if (r < 0) {
+            cout << "vorbis::decode(): " << vorbis_error_to_string(r) << endl;
+            return {};
+        }
         return std::span(samples.data(), r);
     }
 
@@ -98,6 +155,7 @@ namespace decoder {
         info result;
 
         result.codec = "Ogg Vorbis"s;
+
         if (auto comment = ov_comment(&ovf, -1)) {
             if (comment->vendor)
                 result.codec += "; "s + comment->vendor;
@@ -130,20 +188,6 @@ namespace decoder {
             return result;
         }
 
-        bool
-        equal_case(std::string_view a,
-                   std::string_view b)
-        {
-            if (a.size() != b.size())
-                return false;
-            for (std::size_t i = 0; i <a.size(); ++i) {
-                if (std::toupper(a[i], std::locale::classic()) !=
-                    std::toupper(b[i], std::locale::classic()))
-                    return false;
-            }
-            return true;
-        }
-
     } // namespace
 
 
@@ -156,16 +200,16 @@ namespace decoder {
             return {};
 
         stream_metadata result;
-        // cout << "vorbis::get_meta() got a comment" << endl;
 
         auto comment_vec = to_vector(comment);
-        for (auto& entry : comment_vec) {
+        for (auto entry : comment_vec) {
             auto tokens = utils::split(entry, "="sv, false, 2);
             if (tokens.size() != 2)
                 continue;
-            auto& key = tokens[0];
-            auto& val = tokens[1];
+            auto key = tokens[0];
+            auto val = tokens[1];
 
+            using utils::equal_case;
             if (equal_case(key, "TITLE"sv))
                 result.title = val;
             else if (equal_case(key, "ARTIST"sv))
@@ -188,17 +232,17 @@ namespace decoder {
                           std::size_t count,
                           void* ctx)
     {
-        auto v = reinterpret_cast<vorbis*>(ctx);
-        if (!v) {
+        auto self = reinterpret_cast<vorbis*>(ctx);
+        if (!self) {
             errno = EINVAL;
             return 0;
         }
-        if (v->stream.empty()) {
-            // errno = EAGAIN;
+        if (self->stream.empty()) {
+            errno = EAGAIN;
             return 0;
         }
 
-        return v->stream.read(buf, size * count);
+        return self->stream.read(buf, size * count);
     }
 
 } // namespace decoder

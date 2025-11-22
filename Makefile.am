@@ -51,6 +51,8 @@ radiiu_elf_SOURCES = \
 	src/decoder.hpp \
 	src/decoder_mp3.cpp \
 	src/decoder_mp3.hpp \
+	src/decoder_opus.cpp \
+	src/decoder_opus.hpp \
 	src/decoder_vorbis.cpp \
 	src/decoder_vorbis.hpp \
 	src/Favorites.cpp \
@@ -102,6 +104,7 @@ radiiu_elf_CPPFLAGS = \
 	$(MPG123_CFLAGS) \
 	$(SDL_CFLAGS) \
 	$(FT_CFLAGS) \
+	$(OPUSFILE_CFLAGS) \
 	$(VORBISFILE_CFLAGS) \
 	-I$(srcdir)/external/curlxx/include \
 	-DIMGUI_USER_CONFIG='"$(srcdir)/external/custom_imconfig.h"' \
@@ -122,6 +125,7 @@ radiiu_elf_LDADD =  \
 	$(CURL_LIBS) \
 	$(JANSSON_LIBS) \
 	$(MPG123_LIBS) \
+	$(OPUSFILE_LIBS) \
 	$(VORBISFILE_LIBS) \
 	$(SDL_LIBS) \
 	$(FT_LIBS)
