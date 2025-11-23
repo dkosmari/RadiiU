@@ -73,7 +73,7 @@ namespace Settings {
 
                 ImGui::TableNextColumn();
 
-                const char* refresh_label = ICON_FA_REFRESH /*🔃*/;
+                const char* refresh_label = ICON_FA_REFRESH;
                 float refresh_width = 2 * style.FramePadding.x
                                     + 2 * style.FrameBorderSize
                                     + ImGui::CalcTextSize(refresh_label).x;
@@ -112,6 +112,7 @@ namespace Settings {
 
                 ImGui::AlignTextToFramePadding();
                 ui::show_label("Browser page size");
+                ImGui::SetItemTooltip("How many stations to show per page.");
 
                 ImGui::TableNextColumn();
 
@@ -150,7 +151,8 @@ namespace Settings {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                ui::show_label("Player buffer (KiB)");
+                ui::show_label("Player buffer size (KiB)");
+                ImGui::SetItemTooltip("Playback will only start after this many bytes are received.");
 
                 ImGui::TableNextColumn();
 
@@ -169,7 +171,7 @@ namespace Settings {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                ui::show_label("Player history limit");
+                ui::show_label("Player track history limit");
 
                 ImGui::TableNextColumn();
 
@@ -188,6 +190,7 @@ namespace Settings {
 
                 ImGui::AlignTextToFramePadding();
                 ui::show_label("Disable Auto Power-Down");
+                ImGui::SetItemTooltip("APD is only disabled while playing.");
 
                 ImGui::TableNextColumn();
 
@@ -204,6 +207,7 @@ namespace Settings {
 
                 ImGui::AlignTextToFramePadding();
                 ui::show_label("Turn gamepad screen off on inactivity");
+                ImGui::SetItemTooltip("When the gamepad screen turns off, it also stops playing sounds.");
 
                 ImGui::TableNextColumn();
 
@@ -220,11 +224,29 @@ namespace Settings {
 
                 ImGui::AlignTextToFramePadding();
                 ui::show_label("Disable SWKBD");
+                ImGui::SetItemTooltip("Use only USB keyboard for text input.");
 
                 ImGui::TableNextColumn();
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::Checkbox("##disable_swkbd", &cfg::disable_swkbd);
+
+                /*************************
+                 * Send clicks and votes *
+                 *************************/
+
+                ImGui::TableNextRow();
+
+                ImGui::TableNextColumn();
+
+                ImGui::AlignTextToFramePadding();
+                ui::show_label("Send clicks and votes");
+                ImGui::SetItemTooltip("Enable this to send clicks and votes to radio-browser.info.");
+
+                ImGui::TableNextColumn();
+
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                ImGui::Checkbox("##send_clicks", &cfg::send_clicks);
 
                 /*******************
                  * End of settings *

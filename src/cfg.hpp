@@ -29,6 +29,7 @@ namespace cfg {
     extern unsigned    recent_limit;
     extern bool        remember_tab;
     extern std::string server;
+    extern bool        send_clicks;
 
 
     void

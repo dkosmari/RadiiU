@@ -46,6 +46,7 @@ namespace cfg {
     unsigned recent_limit;
     bool     remember_tab;
     string   server;
+    bool     send_clicks;
 
 
     std::filesystem::path
@@ -80,6 +81,7 @@ namespace cfg {
         player_history_limit = 20;
         recent_limit         = 10;
         remember_tab         = true;
+        send_clicks          = false;
         server.clear();
     }
 
@@ -142,6 +144,7 @@ namespace cfg {
             try_get(root, "recent_limit",         recent_limit);
             try_get(root, "remember_tab",         remember_tab);
             try_get(root, "server",               server);
+            try_get(root, "send_clicks",          send_clicks);
 
             // TODO: remove after 0.2
             if (player_buffer_size > 64)
@@ -169,6 +172,7 @@ namespace cfg {
             root["recent_limit"]         = recent_limit;
             root["remember_tab"]         = remember_tab;
             root["server"]               = server;
+            root["send_clicks"]          = send_clicks;
 
             json::save(std::move(root), base_dir / "settings.json");
         }

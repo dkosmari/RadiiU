@@ -1048,14 +1048,13 @@ namespace Browser {
                                           ? ICON_FA_THUMBS_UP " "
                                           : ICON_FA_THUMBS_O_UP " ")
                                          + humanize::value(station->votes);
-                ImGui::BeginDisabled(voted);
+                ImGui::BeginDisabled(voted || !cfg::send_clicks);
                 if (ImGui::Button(vote_label))
                     send_vote(station);
                 if (voted)
                     ImGui::SetItemTooltip("%s", vote_record->second.message.data());
                 else
                     ImGui::SetItemTooltip("Vote for this station.");
-
                 ImGui::EndDisabled();
 
             } // actions
@@ -1172,6 +1171,9 @@ namespace Browser {
     send_click(const std::string& uuid,
                std::function<void()> on_success)
     {
+        if (!cfg::send_clicks)
+            return;
+
         if (uuid.empty())
             return;
 
@@ -1219,6 +1221,9 @@ namespace Browser {
     send_vote(const std::string& uuid,
               std::function<void()> on_success)
     {
+        if (!cfg::send_clicks)
+            return;
+
         if (uuid.empty())
             return;
 

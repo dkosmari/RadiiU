@@ -1,8 +1,9 @@
-* Plan for 0.2 [41%]
+* Plan for 0.2 [46%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
-- [ ] General [0/2]
+- [-] General [1/3]
+  - [X] Opt-in data sharing option.
   - [ ] Custom complementary fonts.
   - [ ] Screensaver when idle.
 - [-] Browser [2/3]
