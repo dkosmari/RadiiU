@@ -68,13 +68,6 @@ namespace ui {
               ImGuiID scroll_target);
 
 
-    // void
-    // open_station_info_popup(const std::string& uuid);
-
-    // void
-    // process_station_info_popup();
-
-
     void
     show_boxed(const std::string& text,
                const std::string& tooltip,

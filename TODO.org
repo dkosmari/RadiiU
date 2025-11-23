@@ -1,4 +1,4 @@
-* Plan for 0.2 [46%]
+* Plan for 0.2 [61%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
@@ -6,8 +6,8 @@
   - [X] Opt-in data sharing option.
   - [ ] Custom complementary fonts.
   - [ ] Screensaver when idle.
-- [-] Browser [2/3]
-  - [ ] Filter by codec.
+- [X] Browser [3/3]
+  - [X] Filter by codec.
   - [X] Show stream codec.
   - [X] Update click/vote count after clicking/voting.
 - [ ] Favorites [0/1]

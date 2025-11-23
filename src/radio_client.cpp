@@ -9,6 +9,8 @@
 
 #include "radio_client.hpp"
 
+#include "cfg.hpp"
+
 
 using std::cout;
 using std::endl;
@@ -148,7 +150,7 @@ radio_client::process_audio()
         metadata = icy_stream->get_metadata();
 
     if (!dec) {
-        if (data_stream->size() < 4096)
+        if (data_stream->size() < cfg::player_buffer_size * 1024)
             return; // don't bother creating a decoder when too little data
         try {
             // try to create a decoder
@@ -161,7 +163,9 @@ radio_client::process_audio()
             data_stream->discard(initial_size);
         }
         catch (std::exception& e) {
-            cout << "Failed to create decoder: " << e.what() << endl;
+            cout << "Failed to create decoder with "
+                 << data_stream->size()
+                 << " bytes: " << e.what() << endl;
         }
     }
     if (!dec)

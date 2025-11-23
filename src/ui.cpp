@@ -255,7 +255,7 @@ namespace ui {
             return;
 
         for (const auto& tag : tags) {
-            show_boxed(ICON_FA_TAG /*🏷*/ " " + tag, {}, scroll_target);
+            show_boxed(ICON_FA_TAG " " + tag, {}, scroll_target);
             ImGui::SameLine();
         }
         ImGui::NewLine();
@@ -368,6 +368,7 @@ namespace ui {
                     show_info_row("clickcount",   station_details_result->click_count);
                     show_info_row("clicktrend",   station_details_result->click_trend);
                     show_info_row("bitrate",      station_details_result->bitrate);
+                    show_info_row("codec",        station_details_result->codec);
 
                     ImGui::EndTable();
                 }

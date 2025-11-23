@@ -73,12 +73,23 @@ namespace Browser {
 
     bool busy = false;
     bool options_visible = false;
-    std::string filter_name;
-    std::string filter_tag;
-    std::string filter_country;
-
 
     std::regex tags_regex;
+
+
+    enum class Codec : unsigned {
+        all,
+        mp3,
+        ogg,
+    };
+
+    const std::array codec_strings {
+        "all"s,
+        "MP3"s,
+        "OGG"s,
+    };
+
+    Codec codec = Codec::all;
 
 
     enum class Order : unsigned {
@@ -96,20 +107,25 @@ namespace Browser {
     };
 
     const std::array order_strings {
-        "name_asc",
-        "name_desc",
-        "country_asc",
-        "country_desc",
-        "language_asc",
-        "language_desc",
-        "clicks_desc",
-        "clicks_asc",
-        "votes_desc",
-        "votes_asc",
-        "random",
+        "name_asc"s,
+        "name_desc"s,
+        "country_asc"s,
+        "country_desc"s,
+        "language_asc"s,
+        "language_desc"s,
+        "clicks_desc"s,
+        "clicks_asc"s,
+        "votes_desc"s,
+        "votes_asc"s,
+        "random"s,
     };
 
     Order order = Order::name_asc;
+
+    std::string filter_name;
+    std::string filter_tag;
+    std::string filter_country;
+    Codec filter_codec;
 
     unsigned page_index = 0;
     std::vector<std::shared_ptr<Station>> stations;
@@ -240,7 +256,27 @@ namespace Browser {
     by_name(const Country& c);
 
 
-    std::string
+    const std::string&
+    to_string(Codec c)
+    {
+        auto idx = static_cast<unsigned>(c);
+        if (idx >= codec_strings.size())
+            idx = 0;
+        return codec_strings[idx];
+    }
+
+
+    Codec
+    to_codec(const std::string& s)
+    {
+        for (unsigned i = 0; i < codec_strings.size(); ++i)
+            if (s == codec_strings[i])
+                return Codec{i};
+        return Codec::all;
+    }
+
+
+    const std::string&
     to_string(Order o)
     {
         auto idx = static_cast<unsigned>(o);
@@ -490,6 +526,8 @@ namespace Browser {
             try_get(filter, "name", filter_name);
             try_get(filter, "tag", filter_tag);
             try_get(filter, "country", filter_country);
+            if (auto v = try_get<json::string>(filter, "codec"))
+                filter_codec = to_codec(*v);
         }
 
         if (auto v = try_get<json::string>(root, "order"))
@@ -513,6 +551,8 @@ namespace Browser {
             filter["tag"] = filter_tag;
         if (!filter_country.empty())
             filter["country"] = filter_country;
+        if (filter_codec != Codec::all)
+            filter["codec"] = to_string(filter_codec);
 
         json::object root;
         if (!filter.empty())
@@ -591,7 +631,6 @@ namespace Browser {
         std::map<std::string, std::string> params;
         params["offset"] = std::to_string(cfg::browser_page_limit * page_index);
         params["limit"] = std::to_string(cfg::browser_page_limit);
-        params["codec"] = "MP3";
         params["hidebroken"] = "true";
 
         if (!filter_name.empty())
@@ -600,6 +639,8 @@ namespace Browser {
             params["tag"] = filter_tag;
         if (!filter_country.empty())
             params["countrycode"] = filter_country;
+        if (filter_codec != Codec::all)
+            params["codec"] = to_string(filter_codec);
 
         if (order != Order::name_asc) {
             auto [arg_order, arg_reverse] = to_args(order);
@@ -789,9 +830,15 @@ namespace Browser {
 
                     ImGui::TextUnformatted(ICON_FA_FILTER " Filters");
 
+                    /*******************
+                     * Filter by name. *
+                     *******************/
                     ImGui::SetNextItemWidth(filters_width);
                     ImGui::InputText("Name", &filter_name);
 
+                    /******************
+                     * Filter by tag. *
+                     ******************/
                     ImGui::SetNextItemWidth(filters_width);
                     ImGui::SetNextWindowSizeConstraints({0.0f, 0.0f},
                                                         {1200.0f, FLT_MAX});
@@ -818,6 +865,9 @@ namespace Browser {
                         ImGui::EndCombo();
                     }
 
+                    /**********************
+                     * Filter by country. *
+                     **********************/
                     ImGui::SetNextItemWidth(filters_width);
                     std::string display_country;
                     if (!filter_country.empty()) {
@@ -851,6 +901,21 @@ namespace Browser {
                     }
 
                     // TODO: add language filter
+
+                    /********************
+                     * Filter by codec. *
+                     ********************/
+                    ImGui::SetNextItemWidth(filters_width);
+                    if (ImGui::BeginCombo("Codec",
+                                          to_string(filter_codec),
+                                          ImGuiComboFlags_HeightLargest)) {
+                        for (unsigned i = 0; i < codec_strings.size(); ++i) {
+                            auto c = Codec{i};
+                            if (ImGui::Selectable(to_string(c), filter_codec == c))
+                                filter_codec = c;
+                        }
+                        ImGui::EndCombo();
+                    }
 
                 } // filters
                 ImGui::EndChild();
@@ -1098,7 +1163,7 @@ namespace Browser {
 
                     ImGui::SameLine();
 
-                    ui::show_boxed("MP3",
+                    ui::show_boxed(ICON_FA_FLASK " " + station->codec,
                                    "The codec used in this broadcast.",
                                    scroll_target);
 

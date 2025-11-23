@@ -58,6 +58,7 @@ Station::from_json(const json::object& obj)
     try_get(obj, "clickcount",   result.click_count);
     try_get(obj, "clicktrend",   result.click_trend);
     try_get(obj, "bitrate",      result.bitrate);
+    try_get(obj, "codec",        result.codec);
 
     // Note: these fields we split into vectors.
 
@@ -90,6 +91,7 @@ Station::to_json()
     // - click_count
     // - click_trend
     // - bitrate
+    // - codec
 
     obj["language"] = utils::join(languages, ",");
     obj["tags"] = utils::join(tags, ",");

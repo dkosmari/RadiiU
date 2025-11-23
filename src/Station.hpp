@@ -31,6 +31,7 @@ struct Station {
     std::uint64_t click_count = 0;
     std::int64_t click_trend = 0;
     unsigned bitrate = 0;
+    std::string codec;
 
     std::vector<std::string> languages;
     std::vector<std::string> tags;
