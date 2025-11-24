@@ -133,9 +133,11 @@ namespace icy {
 
         for (const auto& [k, v] : meta) {
             // TODO: check if there are more special keys
-            if (k == "StreamTitle")
+            if (k == "StreamTitle") {
                 current_meta.title = utils::trimmed(v);
-            else
+            } else if (k == "StreamUrl") {
+                current_meta.cover_art = utils::trimmed(v);
+            } else
                 current_meta.extra[k] = utils::trimmed(v);
         }
 

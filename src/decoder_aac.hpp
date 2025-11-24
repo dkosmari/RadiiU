@@ -5,15 +5,15 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#ifndef DECODER_OPUS_HPP
-#define DECODER_OPUS_HPP
+#ifndef DECODER_AAC_HPP
+#define DECODER_AAC_HPP
 
-#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <cstdint>
 
-#include <opus/opusfile.h>
+#include <neaacdec.h>
 
 #include "byte_stream.hpp"
 #include "decoder.hpp"
@@ -21,26 +21,32 @@
 
 namespace decoder {
 
-    struct opus : base {
+    struct aac : base {
 
         struct error : std::runtime_error {
-            error(int code);
+
+            error(unsigned char code);
+
+            error(const std::string& msg);
+
             error(const std::string& msg,
-                  int code);
-        };
+                  unsigned char code);
+
+        }; // struct error
 
 
-        OggOpusFile* oof = nullptr;
+        NeAACDecHandle handle = nullptr;
+        unsigned long rate = 0;
+        unsigned char channels = 0;
         byte_stream stream;
-        std::vector<opus_int16> samples;
-        opus_int32 bitrate = 0;
+        // std::vector<std::int16_t> samples;
+        unsigned char current_channels = 0;
+        unsigned long current_rate = 0;
 
+        aac(std::span<const char> data);
 
-        opus(std::span<const char> data);
-
-        ~opus()
+        ~aac()
             noexcept override;
-
 
         std::size_t
         feed(std::span<const char> data)
@@ -63,14 +69,18 @@ namespace decoder {
             const override;
 
 
+    private:
+
+
         static
-        int
-        read_callback(void* ctx,
-                      unsigned char* buf,
-                      int size);
+        NeAACDecHandle
+        open();
 
+        void
+        close()
+            noexcept;
 
-    }; // struct opus
+    }; // struct aac
 
 } // namespace decoder
 

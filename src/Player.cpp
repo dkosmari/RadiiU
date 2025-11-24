@@ -392,6 +392,15 @@ namespace Player {
                             ui::show_info_row("Album", *meta->album);
                         if (meta->genre)
                             ui::show_info_row("Genre", *meta->genre);
+                        if (meta->cover_art) {
+                            auto art = IconManager::get(*meta->cover_art);
+                            ImGui::TableNextRow();
+                            ImGui::TableNextColumn();
+                            ui::show_label("Cover art");
+                            ImGui::TableNextColumn();
+                            ImGui::Image(*art);
+                            ImGui::SetItemTooltip("%s", meta->cover_art->data());
+                        }
                         for (auto& [k, v] : meta->extra)
                             ui::show_info_row(k, v);
                         // station metadata

@@ -383,7 +383,7 @@ namespace IconManager {
 
                 sdl::rwops rw{std::span(*entry->raw_buf)};
                 auto img = sdl::img::load(rw);
-                const int max_size = 256;
+                const int max_size = 256; // TODO: make it customizable per icon
                 const sdl::vec2 old_size = img.get_size();
                 if (old_size.x > max_size || old_size.y > max_size) {
                     sdl::vec2 new_size;

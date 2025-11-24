@@ -49,6 +49,8 @@ radiiu_elf_SOURCES = \
 	src/cfg.hpp \
 	src/decoder.cpp \
 	src/decoder.hpp \
+	src/decoder_aac.cpp \
+	src/decoder_aac.hpp \
 	src/decoder_mp3.cpp \
 	src/decoder_mp3.hpp \
 	src/decoder_opus.cpp \
@@ -103,6 +105,7 @@ radiiu_elf_CPPFLAGS = \
 	$(JANSSON_CFLAGS) \
 	$(MPG123_CFLAGS) \
 	$(SDL_CFLAGS) \
+	$(FAAD2_CFLAGS) \
 	$(FT_CFLAGS) \
 	$(OPUSFILE_CFLAGS) \
 	$(VORBISFILE_CFLAGS) \
@@ -123,6 +126,7 @@ radiiu_elf_LDADD =  \
 	external/sdl2xx/libsdl2xx_image.a \
 	external/sdl2xx/libsdl2xx.a \
 	$(CURL_LIBS) \
+	$(FAAD2_LIBS) \
 	$(JANSSON_LIBS) \
 	$(MPG123_LIBS) \
 	$(OPUSFILE_LIBS) \
@@ -187,11 +191,6 @@ company: compile_flags.txt
 compile_flags.txt: Makefile
 	printf "%s" "$(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(radiiu_elf_CPPFLAGS)" | xargs -n1 | sort -u > compile_flags.txt
 	$(CPP) -xc++ /dev/null -E -Wp,-v 2>&1 | sed -n 's,^ ,-I,p' >> compile_flags.txt
-
-
-
-
-
 
 
 DISTCLEANFILES = \

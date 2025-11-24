@@ -17,9 +17,9 @@
 #include <imgui_internal.h>
 #include <jansson.h>
 #include <mpg123.h>
+#include <neaacdec.h>
 #include <opus/opus_defines.h>
 #include <vorbis/codec.h>
-
 #include <freetype/freetype.h>
 #include <SDL_version.h>
 #include <SDL_image.h>
@@ -39,6 +39,8 @@
 
 using std::cout;
 using std::endl;
+
+using namespace std::literals;
 
 
 namespace About {
@@ -233,6 +235,10 @@ namespace About {
                 ui::show_info_row("Opus", opus_get_version_string());
 
                 ui::show_info_row("Vorbis", vorbis_version_string());
+
+                char* faad_id = nullptr;
+                NeAACDecGetVersion(&faad_id, nullptr);
+                ui::show_info_row("FAAD2", faad_id);
 
                 ImGui::EndTable();
             }

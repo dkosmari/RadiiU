@@ -20,6 +20,7 @@ struct stream_metadata {
     std::optional<std::string> artist;
     std::optional<std::string> album;
     std::optional<std::string> genre;
+    std::optional<std::string> cover_art;
     std::optional<std::string> station_name;
     std::optional<std::string> station_genre;
     std::optional<std::string> station_description;

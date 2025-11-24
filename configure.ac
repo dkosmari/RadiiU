@@ -33,6 +33,7 @@ AS_VAR_IF([enable_wiiu], [yes],
 AM_CONDITIONAL([ENABLE_WIIU], [test x$enable_wiiu = xyes])
 
 
+PKG_CHECK_MODULES([FAAD2], [faad2])
 PKG_CHECK_MODULES_STATIC([CURL], [libcurl])
 PKG_CHECK_MODULES([JANSSON], [jansson])
 PKG_CHECK_MODULES([MPG123], [libmpg123])

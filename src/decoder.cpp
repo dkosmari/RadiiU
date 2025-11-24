@@ -11,6 +11,7 @@
 
 #include "decoder.hpp"
 
+#include "decoder_aac.hpp"
 #include "decoder_mp3.hpp"
 #include "decoder_opus.hpp"
 #include "decoder_vorbis.hpp"
@@ -48,6 +49,14 @@ namespace decoder {
     create(const std::string& content_type,
            std::span<const char> data)
     {
+        if (content_type == "audio/aac" ||
+            content_type == "audio/aacp" ||
+            content_type == "audio/x-aac" ||
+            content_type == "audio/audio/x-hx-aac-adts") {
+            cout << "Creating aac decoder from content type: " << content_type << endl;
+            return std::make_unique<aac>(data);
+        }
+
         if (content_type == "audio/mpeg") {
             cout << "Creating mp3 decoder from content type: " << content_type << endl;
             return std::make_unique<mp3>(data);
@@ -62,6 +71,8 @@ namespace decoder {
             cout << "Creating vorbis decoder from content type: " << content_type << endl;
             return std::make_unique<vorbis>(data);
         }
+
+        cout << "No match for content type: " << content_type << endl;
 
         if (match(data, "\xff\xfb") || match(data, "ID3")) {
             cout << "Creating mp3 decoder from data signature" << endl;
@@ -81,8 +92,13 @@ namespace decoder {
             }
         }
 
+        if (match(data, "\xff\xf1") ||
+            match(data, "\xff\xf9")) {
+            cout << "Creating aac decoder from data signature" << endl;
+            return std::make_unique<aac>(data);
+        }
+
         // Note: FLAC is  66 4C 61 43   "fLaC"
-        // Note: AAC is FF F1 or FF F9
 
         throw std::runtime_error{"cannot create decoder"};
     }

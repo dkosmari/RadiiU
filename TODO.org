@@ -1,4 +1,4 @@
-* Plan for 0.2 [61%]
+* Plan for 0.2 [66%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
@@ -12,6 +12,9 @@
   - [X] Update click/vote count after clicking/voting.
 - [ ] Favorites [0/1]
   - [ ] Manually update entry from Browser when editing (if UUID exists.)
-- [X] Player [2/2]
-  - [X] Add Ogg Opus support.
-  - [X] Add Ogg Vorbis suport.
+- [X] Player [4/4]
+  - [X] Add Opus support.
+  - [X] Add Vorbis suport.
+  - [X] Add AAC support.
+  - [X] Show cover art.
+
