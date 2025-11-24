@@ -34,9 +34,12 @@ It uses the station listing from [www.radio-browser.info](https://www.radio-brow
 
 - libvorbisfile
 
-- SDL2, SDL2_image, SDL2_ttf
+- SDL2
   - Wii U package: https://github.com/dkosmari/wiiu-sdl2-package
 
+- SDL2_image
+
+- SDL2_ttf
 
 ### Obtaining the source
 
