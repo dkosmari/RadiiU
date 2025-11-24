@@ -22,6 +22,11 @@ It uses the station listing from [www.radio-browser.info](https://www.radio-brow
 - jansson
 
 - libcurl
+  - Wii U curl: https://github.com/dkosmari/wiiu-curl-package
+  - Wii U mbedtls: https://github.com/dkosmari/wiiu-mbedtls-package
+
+- faad2
+  - PPC package: https://github.com/dkosmari/ppc-faad2-package
 
 - libmpg123
 
@@ -30,8 +35,7 @@ It uses the station listing from [www.radio-browser.info](https://www.radio-brow
 - libvorbisfile
 
 - SDL2, SDL2_image, SDL2_ttf
-  - Note: a fork of SDL2 with swkbd support is required:
-    https://github.com/dkosmari/SDL/tree/wiiu-sdl2-devel
+  - Wii U package: https://github.com/dkosmari/wiiu-sdl2-package
 
 
 ### Obtaining the source
