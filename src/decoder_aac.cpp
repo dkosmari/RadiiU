@@ -37,6 +37,7 @@ namespace decoder {
 
     namespace {
 
+#if 0
         std::string
         obj_type_to_string(unsigned char t)
         {
@@ -97,6 +98,7 @@ namespace decoder {
                  << "  dontUpSampleImplicitSBR: " << (unsigned)cfg->dontUpSampleImplicitSBR
                  << endl;
         }
+#endif
 
     } // namespace
 
@@ -105,7 +107,7 @@ namespace decoder {
         handle{open()}
     {
         auto cfg = NeAACDecGetCurrentConfiguration(handle);
-        dump(cfg);
+        // dump(cfg);
         cfg->outputFormat = FAAD_FMT_16BIT;
         // cfg->defSampleRate = 44100;
         cfg->downMatrix = 1; // downmix to stereo
@@ -129,7 +131,7 @@ namespace decoder {
              << "aac::channels = " << (unsigned)channels << endl;
 
         cfg = NeAACDecGetCurrentConfiguration(handle);
-        dump(cfg);
+        // dump(cfg);
 
         stream.write(data.subspan(r));
     }

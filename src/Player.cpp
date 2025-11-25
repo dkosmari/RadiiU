@@ -392,7 +392,7 @@ namespace Player {
                             ui::show_info_row("Album", *meta->album);
                         if (meta->genre)
                             ui::show_info_row("Genre", *meta->genre);
-                        if (meta->cover_art) {
+                        if (meta->cover_art && !meta->cover_art->empty()) {
                             auto art = IconManager::get(*meta->cover_art);
                             ImGui::TableNextRow();
                             ImGui::TableNextColumn();
@@ -404,13 +404,13 @@ namespace Player {
                         for (auto& [k, v] : meta->extra)
                             ui::show_info_row(k, v);
                         // station metadata
-                        if (meta->station_name)
+                        if (meta->station_name && !meta->station_name->empty())
                             ui::show_info_row("Name", *meta->station_name);
-                        if (meta->station_genre)
+                        if (meta->station_genre && !meta->station_genre->empty())
                             ui::show_info_row("Genre", *meta->station_genre);
-                        if (meta->station_description)
+                        if (meta->station_description && !meta->station_description->empty())
                             ui::show_info_row("Description", *meta->station_description);
-                        if (meta->station_url)
+                        if (meta->station_url && !meta->station_url->empty())
                             ui::show_link_row("URL", *meta->station_url);
                     }
 

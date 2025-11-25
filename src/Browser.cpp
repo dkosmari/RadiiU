@@ -81,12 +81,16 @@ namespace Browser {
         all,
         mp3,
         ogg,
+        aac,
+        aacp,
     };
 
     const std::array codec_strings {
         "all"s,
         "MP3"s,
         "OGG"s,
+        "AAC"s,
+        "AAC+"s,
     };
 
     Codec codec = Codec::all;
