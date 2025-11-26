@@ -1,17 +1,14 @@
-* Plan for 0.2 [66%]
+* Plan for 0.2 [83%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
-- [-] General [1/3]
+- [-] General [1/2]
   - [X] Opt-in data sharing option.
-  - [ ] Custom complementary fonts.
-  - [ ] Screensaver when idle.
+  - [ ] Change color scheme for Holiday season.
 - [X] Browser [3/3]
   - [X] Filter by codec.
   - [X] Show stream codec.
   - [X] Update click/vote count after clicking/voting.
-- [ ] Favorites [0/1]
-  - [ ] Manually update entry from Browser when editing (if UUID exists.)
 - [X] Player [4/4]
   - [X] Add Opus support.
   - [X] Add Vorbis suport.

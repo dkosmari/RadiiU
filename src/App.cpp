@@ -499,7 +499,7 @@ namespace App {
                 // ui::show_last_bounding_box();
                 ImGui::SameLine();
                 // Put a close button on the top right
-                auto tex = IconManager::get("ui/close-button.png");
+                auto tex = IconManager::get("ui/close-button.svg");
                 auto tex_size = ImGui::ToVec2(tex->get_size());
                 ImVec2 close_button_size = tex_size
                     + 2 * (style.FramePadding + style.FrameBorderSize * ImVec2{1, 1});

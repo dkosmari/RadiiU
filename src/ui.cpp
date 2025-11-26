@@ -189,12 +189,12 @@ namespace ui {
         const sdl::vec2 button_size = {96, 96};
         if (Player::is_playing(station)) {
             if (ImGui::ImageButton("stop_button",
-                                   *IconManager::get("ui/stop-button.png"),
+                                   *IconManager::get("ui/stop-button.svg"),
                                    button_size))
                 Player::stop();
         } else {
             if (ImGui::ImageButton("play_button",
-                                   *IconManager::get("ui/play-button.png"),
+                                   *IconManager::get("ui/play-button.svg"),
                                    button_size))
                 Player::play(station);
         }
