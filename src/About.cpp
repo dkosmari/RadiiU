@@ -16,7 +16,6 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <jansson.h>
-#include <mpg123.h>
 #include <neaacdec.h>
 #include <opus/opus_defines.h>
 #include <vorbis/codec.h>
@@ -93,20 +92,6 @@ namespace About {
                 return buf;
             }
             return "";
-        }
-
-
-        std::string
-        get_mpg_decoders()
-        {
-            std::string result;
-            const char** mpg_dec = mpg123_decoders();
-            for (std::size_t i = 0; mpg_dec[i]; ++i) {
-                if (i > 0)
-                    result += ", ";
-                result += mpg_dec[i];
-            }
-            return result;
         }
 
 
@@ -229,8 +214,7 @@ namespace About {
 
                 ui::show_info_row("JANSSON", jansson_version_str());
 
-                static const std::string mpg_decoders = get_mpg_decoders();
-                ui::show_info_row("mpg123 decoders", mpg_decoders);
+                ui::show_info_row("mpg123", MPG123_VERSION);
 
                 ui::show_info_row("Opus", opus_get_version_string());
 

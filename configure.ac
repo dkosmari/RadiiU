@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.71])
 AC_INIT([RadiiU],
-        [0.1.4+],
+        [0.2.0],
         [https://github.com/dkosmari/RadiiU/issues],
         [radiiu],
         [https://github.com/dkosmari/RadiiU])
@@ -80,6 +80,9 @@ AX_SUBDIRS_CONFIGURE([external/sdl2xx],
                       [LIBS=$LIBS],
                       [PATH=$PATH]])
 
+AC_DEFINE_UNQUOTED([MPG123_VERSION],
+                   ["`$PKG_CONFIG --modversion libmpg123`"],
+                   [version of mpg123])
 
 AC_CONFIG_FILES([Makefile
                  external/Makefile])
