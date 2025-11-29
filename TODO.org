@@ -1,10 +1,10 @@
-* Plan for 0.2 [83%]
+* Plan for 0.2 [100%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
-- [-] General [1/2]
+- [X] General [2/2]
   - [X] Opt-in data sharing option.
-  - [ ] Change color scheme for Holiday season.
+  - [X] Change color scheme for Holiday season.
 - [X] Browser [3/3]
   - [X] Filter by codec.
   - [X] Show stream codec.
