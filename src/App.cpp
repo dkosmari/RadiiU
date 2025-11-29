@@ -14,7 +14,6 @@
 #include <utility>
 #include <vector>
 
-
 #ifdef __WIIU__
 #include <coreinit/energysaver.h>
 #include <coreinit/memory.h>
@@ -82,7 +81,7 @@ namespace App {
 
     bool running;
 
-    const float cafe_size = 32;
+    const float default_font_size = 32;
     const float ui_rounding = 8;
 
     std::optional<TabID> next_tab;
@@ -109,71 +108,90 @@ namespace App {
     process();
 
 
+#ifdef __WIIU__
     void
-    load_fonts()
+    load_system_fonts()
+    {
+        auto& io = ImGui::GetIO();
+        // Load main font: CafeStd
+        ImFontConfig config;
+        config.Flags |= ImFontFlags_NoLoadError;
+        config.EllipsisChar = U'…';
+        config.GlyphOffset.y = - default_font_size * (4.0f / 32.0f);
+        config.FontDataOwnedByAtlas = false;
+
+        void* font_data = nullptr;
+        uint32_t font_size = 0;
+
+        if (OSGetSharedData(OS_SHAREDDATATYPE_FONT_STANDARD, 0,
+                            &font_data, &font_size)) {
+            if (!io.Fonts->AddFontFromMemoryTTF(font_data, font_size,
+                                                default_font_size, &config))
+                throw std::runtime_error{"could not load CafeStd"};
+        } else
+            throw std::runtime_error{"CafeStd font is missing"};
+
+        config.MergeMode = true;
+        if (OSGetSharedData(OS_SHAREDDATATYPE_FONT_CHINESE, 0,
+                            &font_data, &font_size)) {
+            io.Fonts->AddFontFromMemoryTTF(font_data, font_size,
+                                           default_font_size, &config);
+        }
+        if (OSGetSharedData(OS_SHAREDDATATYPE_FONT_KOREAN, 0,
+                            &font_data, &font_size)) {
+            io.Fonts->AddFontFromMemoryTTF(font_data, font_size,
+                                           default_font_size, &config);
+        }
+        if (OSGetSharedData(OS_SHAREDDATATYPE_FONT_TAIWANESE, 0,
+                            &font_data, &font_size)) {
+            io.Fonts->AddFontFromMemoryTTF(font_data, font_size,
+                                           default_font_size, &config);
+        }
+    }
+#else // !__WIIU__
+    // native version
+    void
+    load_system_fonts()
     {
         auto& io = ImGui::GetIO();
 
-// For desktop build: comment this to load Ubuntu-R.ttf from the current dir.
-#define USE_CAFE
+        ImFontConfig config;
+        config.EllipsisChar = U'…';
+        config.Flags |= ImFontFlags_NoLoadError;
 
-#ifdef USE_CAFE
+        // TODO: use fontconfig to find a font
+
+#if 1
         // Note: CafeStd seems to always be too low, about 1/8th of the font size
-        const float correct_y = cafe_size * (4.0f / 32.0f);
+        config.GlyphOffset.y = - default_font_size * (4.0f / 32.0f);
+        if (!io.Fonts->AddFontFromFileTTF("CafeStd.ttf", default_font_size, &config))
+            throw std::runtime_error{"could not load CafeStd"};
 #else
-        const float correct_y = 0;
+        if (!io.Fonts->AddFontFromFileTTF("Ubuntu-R.ttf", default_font_size, &config))
+            throw std::runtime_error{"could not load main font"};
 #endif
+    }
+#endif // __WIIU__
 
-        // Load main font: CafeStd
-        {
-            ImFontConfig config;
-            config.EllipsisChar = U'…';
-            config.GlyphOffset.y = - correct_y;
-#ifdef __WIIU__
-            config.FontDataOwnedByAtlas = false;
-            void* cafe_font_ptr = nullptr;
-            uint32_t cafe_font_size = 0;
-            if (OSGetSharedData(OS_SHAREDDATATYPE_FONT_STANDARD,
-                                0,
-                                &cafe_font_ptr,
-                                &cafe_font_size)) {
-                if (!io.Fonts->AddFontFromMemoryTTF(cafe_font_ptr,
-                                                    cafe_font_size,
-                                                    cafe_size,
-                                                    &config))
-                    throw std::runtime_error{"Could not load font!"};
-            } else
-                throw std::runtime_error{"Is CafeStd font missing?"};
-#else // !__WIIU__
-#  ifdef USE_CAFE
-            if (!io.Fonts->AddFontFromFileTTF("CafeStd.ttf",
-                                              cafe_size,
-                                              &config))
-                throw std::runtime_error{"Could not load font!"};
-#  else // !USE_CAFE
-            if (!io.Fonts->AddFontFromFileTTF("Ubuntu-R.ttf",
-                                              cafe_size,
-                                              &config))
-                throw std::runtime_error{"Could not load font!"};
-#  endif
-#endif
-        }
+    void
+    load_fonts()
+    {
+        load_system_fonts();
 
-
+        auto& io = ImGui::GetIO();
         // Load FontAwesome
-        {
-            ImFontConfig config;
-            config.GlyphOffset.y = - correct_y;
-            config.MergeMode = true;
-            // config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
-            // config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
+        ImFontConfig config;
+#ifdef __WIIU__
+        config.GlyphOffset.y = - default_font_size * (4.0f / 32.0f);
+#endif
+        config.Flags |= ImFontFlags_NoLoadError;
+        config.MergeMode = true;
+        // config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
+        // config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
 
-            if (!io.Fonts->AddFontFromFileTTF((utils::get_content_path() / FONT_ICON_FILE_NAME_FA).c_str(),
-                                              cafe_size,
-                                              &config))
-                throw std::runtime_error{"Could not load font!"};
-        }
-
+        std::filesystem::path font_path = utils::get_content_path() / FONT_ICON_FILE_NAME_FA;
+        if (!io.Fonts->AddFontFromFileTTF(font_path.c_str(), default_font_size, &config))
+            throw std::runtime_error{"could not load \"" + font_path.string() + "\""};
     }
 
 
