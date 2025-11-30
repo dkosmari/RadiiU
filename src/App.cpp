@@ -588,7 +588,7 @@ namespace App {
         ImGui::End();
 
 
-        ImGui::ShowStyleEditor();
+        // ImGui::ShowStyleEditor();
 
         ImGui::EndFrame();
         ImGui::Render();
