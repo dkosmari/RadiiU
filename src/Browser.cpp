@@ -50,6 +50,7 @@
 #include "rest.hpp"
 #include "Station.hpp"
 #include "thread_safe.hpp"
+#include "tracer.hpp"
 #include "ui.hpp"
 #include "utils.hpp"
 
@@ -681,6 +682,8 @@ namespace Browser {
     void
     connect()
     {
+        TRACE_FUNC;
+
         busy = true;
         auto server = safe_server.lock();
         if (*server != cfg::server)

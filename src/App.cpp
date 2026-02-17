@@ -42,6 +42,7 @@
 #include "rest.hpp"
 #include "Settings.hpp"
 #include "TabID.hpp"
+#include "tracer.hpp"
 #include "ui.hpp" // DEBUG
 #include "utils.hpp"
 
@@ -275,7 +276,7 @@ namespace App {
     void
     setup_imgui_style()
     {
-        setup_imgui_colors();
+        // setup_imgui_colors();
 
         auto& style = ImGui::GetStyle();
 
@@ -348,6 +349,8 @@ namespace App {
     void
     initialize()
     {
+        TRACE_FUNC;
+
         // Note: initialize cfg module early.
         cfg::initialize();
         next_tab = cfg::initial_tab;
@@ -356,8 +359,10 @@ namespace App {
 
 #ifdef __WIIU__
         old_disable_swkbd = cfg::disable_swkbd;
-        if (cfg::disable_swkbd)
-            SDL_WiiUSetSWKBDEnabled(SDL_FALSE);
+        if (cfg::disable_swkbd) {
+            SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "0");
+            // SDL_StartTextInput();
+        }
 #endif
 
         res.emplace();
@@ -395,14 +400,14 @@ namespace App {
         Browser::initialize();
         Recent::initialize();
         Player::initialize();
-
-        cout << "Finished App::initialize()" << endl;
     }
 
 
     void
     finalize()
     {
+        TRACE_FUNC;
+
         // Finalize tabs.
         Player::finalize();
         Recent::finalize();
@@ -432,6 +437,8 @@ namespace App {
     void
     run()
     {
+        TRACE_FUNC;
+
         running = true;
 
         while (running) {
@@ -444,13 +451,14 @@ namespace App {
             draw();
 
         }
-        cout << "Finished App::run()" << endl;
     }
 
 
     void
     process_events()
     {
+        // TRACE_FUNC;
+
         sdl::events::event event;
         while (sdl::events::poll(event)) {
 
@@ -488,11 +496,14 @@ namespace App {
     void
     process_ui()
     {
+        // TRACE_FUNC;
+
         ImGui_ImplSDLRenderer2_NewFrame();
         ImGui_ImplSDL2_NewFrame();
 
         ImGui::NewFrame();
 
+#if 1
         auto& style = ImGui::GetStyle();
 
         ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Always);
@@ -587,8 +598,8 @@ namespace App {
 
         ImGui::End();
 
-
-        // ImGui::ShowStyleEditor();
+#endif
+        ImGui::ShowStyleEditor();
 
         ImGui::EndFrame();
         ImGui::Render();
@@ -600,9 +611,11 @@ namespace App {
     void
     process()
     {
+        // TRACE_FUNC;
+
 #ifdef __WIIU__
         if (old_disable_swkbd != cfg::disable_swkbd) {
-            SDL_WiiUSetSWKBDEnabled(cfg::disable_swkbd ? SDL_FALSE : SDL_TRUE);
+            SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, cfg::disable_swkbd ? "0" : "1");
             old_disable_swkbd = cfg::disable_swkbd;
         }
 
@@ -662,6 +675,8 @@ namespace App {
     void
     draw()
     {
+        // TRACE_FUNC;
+
         res->renderer.set_color(sdl::color::black);
         res->renderer.clear();
 

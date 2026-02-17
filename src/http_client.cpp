@@ -23,7 +23,7 @@ using namespace std::placeholders;
 
 http_client::http_client(const std::string& url)
 {
-    easy.set_verbose(true);
+    easy.set_verbose(false);
     easy.set_user_agent(utils::get_user_agent());
     easy.set_url(url);
     easy.set_forbid_reuse(true);

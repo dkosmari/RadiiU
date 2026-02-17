@@ -93,6 +93,7 @@ radiiu_elf_SOURCES = \
 	src/TabID.cpp \
 	src/TabID.hpp \
 	src/thread_safe.hpp \
+	src/tracer.hpp \
 	src/ui.cpp \
 	src/ui.hpp \
 	src/utils.cpp \
@@ -157,16 +158,16 @@ $(WUHB_FILE): $(RPX_TARGET) $(srcdir)/assets/meta/icon.png
 
 all-local: $(WUHB_FILE)
 
-PHONY = run
+.PHONY: run
 run: $(WUHB_FILE)
 	WIILOAD=tcp:wiiu wiiload $<
 
 
-install-wiiu: $(WUHB_FILE)
+wiiu-install: $(WUHB_FILE)
 	curl --upload-file $< "ftp://wiiu:/fs/vol/external01/wiiu/apps/"
 
 
-uninstall-wiiu:
+wiiu-uninstall:
 	curl "ftp://wiiu" --quote "DELE /fs/vol/external01/wiiu/apps/$(WUHB_FILE)"
 
 
@@ -174,7 +175,7 @@ CLEANFILES = $(WUHB_FILE) radiiu.map
 
 else !ENABLE_WIIU
 
-PHONY = run
+.PHONY: run
 
 run: radiiu.elf
 	cd $(top_srcdir) && $(abs_top_builddir)/$<
@@ -183,6 +184,9 @@ endif !ENABLE_WIIU
 
 
 @INC_AMINCLUDE@
+
+# %.rpx: %.elf
+# 	$(ELF2RPL) $< $@
 
 
 .PHONY: company

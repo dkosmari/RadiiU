@@ -26,6 +26,10 @@ using std::cout;
 using std::endl;
 
 
+// Define this to handle kinetic scrolling for each axis independently.
+#define KINETIC_AXIS
+
+
 namespace ImGui {
 
     void
@@ -443,20 +447,21 @@ namespace ImGui {
                     SetScrollY(window, scroll.y + state.velocity.y * io.DeltaTime);
             }
 
+            const float scroll_speed_decay = 1.0f / 16.0f;
             if (lock_scroll)
                 state.velocity = {};
             else
-                state.velocity *= std::pow(1.0f/16.0f, io.DeltaTime);
+                state.velocity *= std::pow(scroll_speed_decay, io.DeltaTime);
 
-            const float min_speed = 1.0f/60.0f;
-#if 1
-            if (length(state.velocity) < min_speed)
-                state.velocity = {};
-#else
-            if (std::abs(state.velocity.x) < min_speed)
+            const float stop_speed = 150.0f;
+#ifdef KINETIC_AXIS
+            if (std::abs(state.velocity.x) < stop_speed)
                 state.velocity.x = 0;
-            if (std::abs(state.velocity.y) < min_speed)
+            if (std::abs(state.velocity.y) < stop_speed)
                 state.velocity.y = 0;
+#else
+            if (length(state.velocity) < stop_speed)
+                state.velocity = {};
 #endif
 
             state.dragging = false;
@@ -527,15 +532,30 @@ namespace ImGui {
         state.dragging = held;
 
         if (held) {
+            if (delta.x != 0)
+                SetScrollX(target_window, target_scroll.x + delta.x);
+            if (delta.y != 0)
+                SetScrollY(target_window, target_scroll.y + delta.y);
+
             state.velocity = delta / GetIO().DeltaTime;
+            // don't start kinetic scrolling before it's above the threshold
+            const float speed_threshold = 300.0f;
+#ifdef KINETIC_AXIS
+            if (std::abs(state.velocity.x) < speed_threshold)
+                state.velocity.x = 0;
+            if (std::abs(state.velocity.y) < speed_threshold)
+                state.velocity.y = 0;
+#else
+            if (length(state.velocity) < speed_threshold)
+                state.velocity = {};
+#endif
+            // Don't scroll when not scrollable in that axis.
             if (target_window->ScrollMax.x == 0)
                 state.velocity.x = 0;
             if (target_window->ScrollMax.y == 0)
                 state.velocity.y = 0;
-            if (delta.x != 0.0f)
-                SetScrollX(target_window, target_scroll.x + delta.x);
-            if (delta.y != 0.0f)
-                SetScrollY(target_window, target_scroll.y + delta.y);
+
+
         }
     }
 

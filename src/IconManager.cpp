@@ -30,6 +30,7 @@
 
 #include "async_queue.hpp"
 #include "thread_safe.hpp"
+#include "tracer.hpp"
 #include "utils.hpp"
 
 
@@ -97,6 +98,8 @@ namespace IconManager {
     void
     initialize(sdl::renderer& rend)
     {
+        TRACE_FUNC;
+
         user_agent = utils::get_user_agent();
         content_prefix = utils::get_content_path();
 
@@ -108,6 +111,7 @@ namespace IconManager {
                                               content_prefix / "ui/loading-icon.png");
 
         requests_queue.reset();
+        cout << "IconManager: launching worker thread." << endl;
         worker_thread = std::jthread{worker_func};
 
         assert((std::atomic<LoadState>{}.is_lock_free()));
@@ -117,14 +121,22 @@ namespace IconManager {
     void
     finalize()
     {
+        TRACE_FUNC;
+
+        cout << "Stopping requests_queue" << endl;
         requests_queue.stop();
+
+        cout << "Destroying thread." << endl;
         worker_thread = {};
+        cout << "Thread destroyed." << endl;
 
         {
+            cout << "Clearing safe_cache" << endl;
             auto cache = safe_cache.lock();
             cache->clear();
         }
 
+        cout << "Destroying predefined icons" << endl;
         loading_icon.destroy();
         error_icon.destroy();
     }
@@ -201,7 +213,8 @@ namespace IconManager {
     void
     process_one_request(const std::string& location)
     {
-        // cout << "loading location " << location << endl;
+        // TRACE("IconManager::process_one_request(\"" + location + "\")");
+
         cache_t::iterator it;
 
         {
@@ -417,21 +430,30 @@ namespace IconManager {
     void
     worker_func(std::stop_token token)
     {
+        TRACE_FUNC;
+
         try {
             multi.emplace();
             multi->set_max_total_connections(10);
             multi->set_max_connections(10);
 
             while (!token.stop_requested()) {
+#if 1
+                auto location = requests_queue.try_pop_for(100ms);
+#else
                 auto location = requests_queue.try_pop();
-                if (location)
+#endif
+                if (location) {
                     process_one_request(*location);
-                else if (location.error() == async_queue_exception::stop)
+                } else if (location.error() == async_queue_error::stop) {
                     break;
+                } else if (location.error() == async_queue_error::locked) {
+                    cout << "WARNING: requests_queue was locked" << endl;
+                }
                 multi->perform();
                 handle_finished_downloads();
                 trim_cache();
-                std::this_thread::sleep_for(50ms);
+                std::this_thread::sleep_for(100ms);
             }
         }
         catch (std::exception& e) {

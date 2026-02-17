@@ -203,6 +203,7 @@ namespace About {
 
                 static const std::string sdl_img_version = get_sdl_img_version_str();
                 ui::show_info_row("SDL_image", sdl_img_version);
+                // TODO: show versions for all image libraries
 
                 ui::show_info_row("ImGui", IMGUI_VERSION);
 

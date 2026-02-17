@@ -2,13 +2,13 @@
 # devkitpro_wut.m4 - Macros to handle WUT setup.
 # URL: https://github.com/dkosmari/devkitpro-autoconf/
 
-# Copyright (c) 2025 Daniel K. O. <dkosmari>
+# Copyright (c) 2025-2026 Daniel K. O. <dkosmari>
 #
 # Copying and distribution of this file, with or without modification, are permitted in
 # any medium without royalty provided the copyright notice and this notice are
 # preserved. This file is offered as-is, without any warranty.
 
-#serial 6
+#serial 7
 
 # DEVKITPRO_WUT_INIT
 # ------------------
@@ -112,10 +112,17 @@ AC_DEFUN([DEVKITPRO_WUT_SETUP],[
 
     # custom Makefile recipes for building RPX
     AX_ADD_AM_MACRO([
-clean: clean-rpx
+
 .PHONY: clean-rpx
-clean-rpx:; \$(RM) *.rpx
-%.rpx: %.strip.elf; \$(ELF2RPL) \$< \$[@]
+
+clean: clean-rpx
+
+clean-rpx:
+	\$(RM) *.rpx
+
+%.rpx: %.strip.elf
+	\$(ELF2RPL) \$< \$[@]
+
 ])
 
 ])dnl DEVKITPRO_WUT_SETUP
@@ -129,36 +136,17 @@ AC_DEFUN([DEVKITPRO_WUT_SETUP_RPL],[
 
     # custom Makefile recipes for building RPL
     AX_ADD_AM_MACRO([
-clean: clean-rpl
+
 .PHONY: clean-rpl
-clean-rpl:; \$(RM) *.rpl
-%.rpl: %.strip.elf; \$(ELF2RPL) --rpl \$< \$[@]
+
+clean: clean-rpl
+
+clean-rpl:
+	\$(RM) *.rpl
+
+%.rpl: %.strip.elf
+	\$(ELF2RPL) --rpl \$< \$[@]
+
 ])
 
 ])dnl DEVKITPRO_WUT_SETUP_RPL
-
-
-
-# WIIU_WUT_CHECK_LIBMOCHA([ACTION-IF-FOUND], [ACTION-IF-NOT-FOUND])
-# -----------------------------------------------------------------
-#
-# Checks for the presence of libmocha.
-#
-# Output variables:
-#   - `HAVE_WIIU_WUT_LIBMOCHA'
-#   - `WIIU_WUT_LIBMOCHA_LIBS'
-
-AC_DEFUN([WIIU_WUT_CHECK_LIBMOCHA],[
-
-    AS_VAR_SET_IF([WUT_ROOT], [], [AC_MSG_ERROR([WUT_ROOT not set.])])
-
-    DEVKITPRO_CHECK_LIBRARY_FULL([WIIU_WUT_LIBMOCHA],
-                                 [mocha/mocha.h],
-                                 [mocha],
-                                 [],
-                                 [],
-                                 [$1],
-                                 m4_default([$2],
-                                            [AC_MSG_ERROR([libmocha not found; get it from https://github.com/wiiu-env/libmocha])]))
-
-])dnl WIIU_WUT_CHECK_LIBMOCHA

@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.71])
 AC_INIT([RadiiU],
-        [0.2.0],
+        [0.2.0+],
         [https://github.com/dkosmari/RadiiU/issues],
         [radiiu],
         [https://github.com/dkosmari/RadiiU])
@@ -32,6 +32,11 @@ AS_VAR_IF([enable_wiiu], [yes],
           ])
 AM_CONDITIONAL([ENABLE_WIIU], [test x$enable_wiiu = xyes])
 
+AX_PTHREAD([
+                AX_APPEND_FLAG([$PTHREAD_CFLAGS], [CFLAGS])
+                AX_APPEND_FLAG([$PTHREAD_CFLAGS], [CXXFLAGS])
+                AX_APPEND_FLAG([$PTHREAD_LIBS],   [LIBS])
+           ])
 
 PKG_CHECK_MODULES([FAAD2], [faad2])
 PKG_CHECK_MODULES_STATIC([CURL], [libcurl])
