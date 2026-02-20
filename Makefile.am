@@ -185,6 +185,7 @@ endif !ENABLE_WIIU
 
 @INC_AMINCLUDE@
 
+# Uncomment this to use the non-stripped .elf
 # %.rpx: %.elf
 # 	$(ELF2RPL) $< $@
 
