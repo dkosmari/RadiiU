@@ -92,6 +92,19 @@ namespace App {
     bool old_disable_swkbd;
 #endif
 
+    Uint64 last_activity;
+    Uint64 fade_start;
+
+    enum class State {
+        normal,
+        fading,
+        screen_saver,
+    };
+
+    State state = State::normal;
+
+    Uint64 fade_duration = 5'000;
+
 
     void
     quit();
@@ -104,6 +117,9 @@ namespace App {
 
     void
     process_ui();
+
+    void
+    process_screen_saver();
 
     void
     process();
@@ -429,8 +445,6 @@ namespace App {
         cfg::finalize();
 
         res.reset();
-
-        cout << "Finished App::finalize()" << endl;
     }
 
 
@@ -459,6 +473,8 @@ namespace App {
     {
         // TRACE_FUNC;
 
+        Uint64 now = SDL_GetTicks64();
+
         sdl::events::event event;
         while (sdl::events::poll(event)) {
 
@@ -470,23 +486,52 @@ namespace App {
                     quit();
                     break;
 
-                case sdl::events::type::e_controller_device_added:
-                {
+                case sdl::events::type::e_controller_device_added: {
                     auto gc = sdl::game_controller::device(event.cdevice.which);
                     cout << "Added controller: " << gc.get_name() << endl;
                     res->controllers.push_back(std::move(gc));
+                    last_activity = now;
                     break;
                 }
 
-                case sdl::events::type::e_controller_device_removed:
-                {
+                case sdl::events::type::e_controller_device_removed: {
                     std::erase_if(res->controllers,
                                   [id=event.cdevice.which](sdl::game_controller::device& gc)
                                   {
                                       return id == gc.get_id();
                                   });
+                    last_activity = now;
                     break;
                 }
+
+                case sdl::events::type::e_controller_axis:
+                case sdl::events::type::e_controller_down:
+                case sdl::events::type::e_controller_up:
+                case sdl::events::type::e_key_down:
+                case sdl::events::type::e_key_up:
+                case sdl::events::type::e_mouse_down:
+                case sdl::events::type::e_mouse_motion:
+                case sdl::events::type::e_mouse_up:
+                case sdl::events::type::e_mouse_wheel:
+                case sdl::events::type::e_text_editing:
+                case sdl::events::type::e_text_editing_ext:
+                case sdl::events::type::e_text_input:
+                case sdl::events::type::e_will_enter_foreground:
+                    last_activity = now;
+                    break;
+
+                case sdl::events::type::e_window:
+                    switch (event.window.event) {
+                        case SDL_WINDOWEVENT_SHOWN:
+                        case SDL_WINDOWEVENT_EXPOSED:
+                        case SDL_WINDOWEVENT_RESTORED:
+                        case SDL_WINDOWEVENT_FOCUS_GAINED:
+                        case SDL_WINDOWEVENT_ENTER:
+                            last_activity = now;
+                            break;
+                    }
+                    break;
+
             } // switch (event.type)
 
         }
@@ -496,110 +541,119 @@ namespace App {
     void
     process_ui()
     {
-        // TRACE_FUNC;
-
         ImGui_ImplSDLRenderer2_NewFrame();
         ImGui_ImplSDL2_NewFrame();
 
         ImGui::NewFrame();
 
-#if 1
-        auto& style = ImGui::GetStyle();
+        if (state == State::normal || state == State::fading) {
 
-        ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImGui::ToVec2(res->window.get_size()), ImGuiCond_Always);
-        if (ImGui::Begin(PACKAGE_STRING,
-                         nullptr,
-                         ImGuiWindowFlags_NoTitleBar |
-                         ImGuiWindowFlags_NoMove |
-                         ImGuiWindowFlags_NoSavedSettings |
-                         ImGuiWindowFlags_NoResize)) {
-
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, ui_rounding);
-
-            {
-                // App name, centered
-                ImGui::PushFont(nullptr, 48);
-                ImGui::TextCentered("%s", PACKAGE_STRING);
-                ImGui::PopFont();
-                // ui::show_last_bounding_box();
-                ImGui::SameLine();
-                // Put a close button on the top right
-                auto tex = IconManager::get("ui/close-button.svg");
-                auto tex_size = ImGui::ToVec2(tex->get_size());
-                ImVec2 close_button_size = tex_size
-                    + 2 * (style.FramePadding + style.FrameBorderSize * ImVec2{1, 1});
-                ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x
-                                     - close_button_size.x);
-
-                if (ImGui::ImageButton("close_button", *tex))
-                    quit();
+            auto& style = ImGui::GetStyle();
+            if (state == State::fading) {
+                Uint64 now = SDL_GetTicks64();
+                float ratio = 1.0f - (now - fade_start) / float(fade_duration);
+                if (ratio < 0)
+                    ratio = 0;
+                style.Alpha = ratio;
+            } else {
+                style.Alpha = 1.0f;
             }
 
-            if (ImGui::BeginTabBar("main_tabs")) {
+            ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Always);
+            ImGui::SetNextWindowSize(ImGui::ToVec2(res->window.get_size()), ImGuiCond_Always);
+            if (ImGui::Begin(PACKAGE_STRING,
+                             nullptr,
+                             ImGuiWindowFlags_NoTitleBar |
+                             ImGuiWindowFlags_NoMove |
+                             ImGuiWindowFlags_NoSavedSettings |
+                             ImGuiWindowFlags_NoResize)) {
 
-                if (ImGui::BeginTabItem(to_ui_string(TabID::favorites),
-                                        nullptr,
-                                        get_tab_item_flags_for(TabID::favorites))) {
-                    current_tab = TabID::favorites;
-                    Favorites::process_ui();
-                    ImGui::EndTabItem();
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, ui_rounding);
+
+                {
+                    // App name, centered
+                    ImGui::PushFont(nullptr, 48);
+                    ImGui::TextCentered("%s", PACKAGE_STRING);
+                    ImGui::PopFont();
+                    // ui::show_last_bounding_box();
+                    ImGui::SameLine();
+                    // Put a close button on the top right
+                    auto tex = IconManager::get("ui/close-button.svg");
+                    auto tex_size = ImGui::ToVec2(tex->get_size());
+                    ImVec2 close_button_size = tex_size
+                        + 2 * (style.FramePadding + style.FrameBorderSize * ImVec2{1, 1});
+                    ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x
+                                         - close_button_size.x);
+
+                    if (ImGui::ImageButton("close_button", *tex))
+                        quit();
                 }
 
-                if (ImGui::BeginTabItem(to_ui_string(TabID::browser),
-                                        nullptr,
-                                        get_tab_item_flags_for(TabID::browser))) {
-                    current_tab = TabID::browser;
-                    Browser::process_ui();
-                    ImGui::EndTabItem();
+                if (ImGui::BeginTabBar("main_tabs")) {
+
+                    if (ImGui::BeginTabItem(to_ui_string(TabID::favorites),
+                                            nullptr,
+                                            get_tab_item_flags_for(TabID::favorites))) {
+                        current_tab = TabID::favorites;
+                        Favorites::process_ui();
+                        ImGui::EndTabItem();
+                    }
+
+                    if (ImGui::BeginTabItem(to_ui_string(TabID::browser),
+                                            nullptr,
+                                            get_tab_item_flags_for(TabID::browser))) {
+                        current_tab = TabID::browser;
+                        Browser::process_ui();
+                        ImGui::EndTabItem();
+                    }
+
+                    if (ImGui::BeginTabItem(to_ui_string(TabID::recent),
+                                            nullptr,
+                                            get_tab_item_flags_for(TabID::recent))) {
+                        current_tab = TabID::recent;
+                        Recent::process_ui();
+                        ImGui::EndTabItem();
+                    }
+
+                    if (ImGui::BeginTabItem(to_ui_string(TabID::player),
+                                            nullptr,
+                                            get_tab_item_flags_for(TabID::player))) {
+                        current_tab = TabID::player;
+                        Player::process_ui();
+                        ImGui::EndTabItem();
+
+                    }
+
+                    if (ImGui::BeginTabItem(to_ui_string(TabID::settings),
+                                            nullptr,
+                                            get_tab_item_flags_for(TabID::settings))) {
+                        current_tab = TabID::settings;
+                        Settings::process_ui();
+                        ImGui::EndTabItem();
+                    }
+
+                    if (ImGui::BeginTabItem(to_ui_string(TabID::about),
+                                            nullptr,
+                                            get_tab_item_flags_for(TabID::about))) {
+                        current_tab = TabID::about;
+                        About::process_ui();
+                        ImGui::EndTabItem();
+                    }
+
+                    next_tab.reset();
+
+                    ImGui::EndTabBar();
                 }
 
-                if (ImGui::BeginTabItem(to_ui_string(TabID::recent),
-                                        nullptr,
-                                        get_tab_item_flags_for(TabID::recent))) {
-                    current_tab = TabID::recent;
-                    Recent::process_ui();
-                    ImGui::EndTabItem();
-                }
-
-                if (ImGui::BeginTabItem(to_ui_string(TabID::player),
-                                        nullptr,
-                                        get_tab_item_flags_for(TabID::player))) {
-                    current_tab = TabID::player;
-                    Player::process_ui();
-                    ImGui::EndTabItem();
-
-                }
-
-                if (ImGui::BeginTabItem(to_ui_string(TabID::settings),
-                                        nullptr,
-                                        get_tab_item_flags_for(TabID::settings))) {
-                    current_tab = TabID::settings;
-                    Settings::process_ui();
-                    ImGui::EndTabItem();
-                }
-
-                if (ImGui::BeginTabItem(to_ui_string(TabID::about),
-                                        nullptr,
-                                        get_tab_item_flags_for(TabID::about))) {
-                    current_tab = TabID::about;
-                    About::process_ui();
-                    ImGui::EndTabItem();
-                }
-
-                next_tab.reset();
-
-                ImGui::EndTabBar();
+                ImGui::PopStyleVar(2);
             }
 
-            ImGui::PopStyleVar(2);
+            ImGui::End();
+
+            // ImGui::ShowStyleEditor();
+
         }
-
-        ImGui::End();
-
-#endif
-        ImGui::ShowStyleEditor();
 
         ImGui::EndFrame();
         ImGui::Render();
@@ -609,10 +663,15 @@ namespace App {
 
 
     void
+    process_screen_saver()
+    {
+        // TODO
+    }
+
+
+    void
     process()
     {
-        // TRACE_FUNC;
-
 #ifdef __WIIU__
         if (old_disable_swkbd != cfg::disable_swkbd) {
             SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, cfg::disable_swkbd ? "0" : "1");
@@ -661,7 +720,39 @@ namespace App {
         Recent::process_logic();
         Player::process_logic();
 
+
+        Uint64 now = SDL_GetTicks64();
+        // process transitions to screen saver
+        switch (state) {
+            case State::normal:
+                // normal -> fading
+                if (cfg::screen_saver_timeout
+                    && (now - last_activity) > cfg::screen_saver_timeout * 1000) {
+                    cout << "Fading out..." << endl;
+                    state = State::fading;
+                    fade_start = now;
+                }
+                break;
+            case State::fading:
+                // fading -> screen_saver
+                if ((now - fade_start) > fade_duration) {
+                    cout << "Full screen saver" << endl;
+                    state = State::screen_saver;
+                }
+                break;
+            case State::screen_saver:
+                ;
+        }
+        // any user activity forces it back to normal state
+        if (state != State::normal)
+            if ((now - last_activity) <= cfg::screen_saver_timeout * 1000) {
+                cout << "Returning to normal" << endl;
+                state = State::normal;
+            }
+
         process_ui();
+
+        process_screen_saver();
     }
 
 
@@ -675,8 +766,6 @@ namespace App {
     void
     draw()
     {
-        // TRACE_FUNC;
-
         res->renderer.set_color(sdl::color::black);
         res->renderer.clear();
 

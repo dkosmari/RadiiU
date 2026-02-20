@@ -3,10 +3,10 @@ EXTRA_DIST = \
 	bootstrap \
 	COPYING.GPLv3 \
 	CREDITS \
-	extras \
 	radio-browser-info-api.md \
 	README.md \
-	TODO.org
+	TODO.org \
+	tools
 
 
 SUBDIRS = external

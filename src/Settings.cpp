@@ -214,6 +214,27 @@ namespace Settings {
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::Checkbox("##inactive_screen_off", &cfg::inactive_screen_off);
 
+                /************************
+                 * Screen Saver Timeout *
+                 ************************/
+
+                ImGui::TableNextRow();
+
+                ImGui::TableNextColumn();
+
+                ImGui::AlignTextToFramePadding();
+                ui::show_label("Screen saver timeout");
+                ImGui::SetItemTooltip("Time to wait to activate the screen saver, in seconds (0 = disable screen saver.");
+
+                ImGui::TableNextColumn();
+
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                ImGui::Slider("##screen_saver_timeout",
+                              cfg::screen_saver_timeout,
+                              0u, 300u,
+                              nullptr,
+                              ImGuiSliderFlags_Logarithmic);
+
                 /*****************
                  * Disable swkbd *
                  *****************/

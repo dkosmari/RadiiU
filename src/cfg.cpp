@@ -43,10 +43,11 @@ namespace cfg {
     TabID    initial_tab;
     unsigned player_buffer_size;
     unsigned player_history_limit;
-    unsigned recent_limit;
     bool     remember_tab;
-    string   server;
+    unsigned recent_limit;
+    unsigned screen_saver_timeout;
     bool     send_clicks;
+    string   server;
 
 
     std::filesystem::path
@@ -75,6 +76,7 @@ namespace cfg {
         browser_page_limit   = 20;
         disable_apd          = true;
         disable_swkbd        = false;
+        screen_saver_timeout = 120;
         inactive_screen_off  = false;
         initial_tab          = TabID::browser;
         player_buffer_size   = 8;
@@ -143,6 +145,7 @@ namespace cfg {
             try_get(root, "player_history_limit", player_history_limit);
             try_get(root, "recent_limit",         recent_limit);
             try_get(root, "remember_tab",         remember_tab);
+            try_get(root, "screen_saver_timeout", screen_saver_timeout);
             try_get(root, "server",               server);
             try_get(root, "send_clicks",          send_clicks);
 
@@ -171,6 +174,7 @@ namespace cfg {
             root["player_history_limit"] = player_history_limit;
             root["recent_limit"]         = recent_limit;
             root["remember_tab"]         = remember_tab;
+            root["screen_saver_timeout"] = screen_saver_timeout;
             root["server"]               = server;
             root["send_clicks"]          = send_clicks;
 

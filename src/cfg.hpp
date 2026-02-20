@@ -26,10 +26,11 @@ namespace cfg {
     extern TabID       initial_tab;
     extern unsigned    player_buffer_size;
     extern unsigned    player_history_limit;
-    extern unsigned    recent_limit;
     extern bool        remember_tab;
-    extern std::string server;
+    extern unsigned    recent_limit;
+    extern unsigned    screen_saver_timeout;
     extern bool        send_clicks;
+    extern std::string server;
 
 
     void
