@@ -300,8 +300,6 @@ namespace App {
         const float rounding = ui_rounding;
         const ImVec2 spacing = {9, 9};
 
-        // style.Alpha = 0.5f;
-
         style.WindowPadding = padding;
         style.WindowRounding = 0;
         style.WindowBorderSize = 0;

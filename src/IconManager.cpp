@@ -76,6 +76,7 @@ namespace IconManager {
         sdl::texture tex;
         std::optional<curl::easy> easy;
         std::optional<std::vector<char>> raw_buf;
+        std::string location; // DEBUG
     };
 
 
@@ -107,8 +108,11 @@ namespace IconManager {
 
         error_icon   = sdl::img::load_texture(*renderer,
                                               content_prefix / "ui/error-icon.png");
+        error_icon.set_blend_mode(SDL_BLENDMODE_BLEND);
+
         loading_icon = sdl::img::load_texture(*renderer,
                                               content_prefix / "ui/loading-icon.png");
+        loading_icon.set_blend_mode(SDL_BLENDMODE_BLEND);
 
         requests_queue.reset();
         cout << "IconManager: launching worker thread." << endl;
@@ -159,6 +163,7 @@ namespace IconManager {
                         case LoadState::loaded:
                             if (!status.tex) {
                                 status.tex.create(*renderer, status.img);
+                                status.tex.set_blend_mode(SDL_BLENDMODE_BLEND);
                                 status.img.destroy();
                             }
                             return &status.tex;
@@ -231,6 +236,7 @@ namespace IconManager {
         }
 
         auto& entry = it->second;
+        entry.location = location; // DEBUG
 
         try {
 
@@ -270,8 +276,12 @@ namespace IconManager {
                 multi->add(ez);
             } else if (location.starts_with("ui/")) {
                 // local path
+                // cout << "Loading local image from " << location << endl;
                 entry.img = sdl::img::load(content_prefix / location);
                 entry.state = LoadState::loaded;
+                // cout << "Created local image in format: "
+                //      << entry.img.get_format_enum()
+                //      << endl;
             } else
                 throw std::runtime_error{"invalid location"};
 
@@ -394,6 +404,7 @@ namespace IconManager {
                 if (!entry->raw_buf)
                     throw std::runtime_error{"empty download"};
 
+                // cout << "Loading image from " << entry->location << endl;
                 sdl::rwops rw{std::span(*entry->raw_buf)};
                 auto img = sdl::img::load(rw);
                 const int max_size = 256; // TODO: make it customizable per icon
@@ -408,9 +419,15 @@ namespace IconManager {
                         new_size.x = std::max(1, max_size * old_size.x / old_size.y);
                     }
                     entry->img.create(new_size, 32, img.get_format_enum());
+                    // cout << "Created shrunk image in format: "
+                    //      << entry->img.get_format_enum()
+                    //      << endl;
                     sdl::blit_scaled(img, nullptr, entry->img, nullptr);
                 } else {
                     entry->img = std::move(img);
+                    // cout << "Created image in format: "
+                    //      << entry->img.get_format_enum()
+                    //      << endl;
                 }
                 entry->state = LoadState::loaded;
                 entry->raw_buf.reset();
