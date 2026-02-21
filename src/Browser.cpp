@@ -1029,7 +1029,7 @@ namespace Browser {
             ImGui::SameLine();
 
             // ⏴
-            if (ImGui::Button(ICON_FA_ANGLE_LEFT) && !busy) {
+            if (ImGui::Button(" " ICON_FA_ANGLE_LEFT " ") && !busy) {
                 if (page_index > 0)
                     --page_index;
                 queue_refresh_stations();
@@ -1057,7 +1057,7 @@ namespace Browser {
             ImGui::BeginDisabled(last_page);
 
             // ⏵
-            if (ImGui::Button(ICON_FA_ANGLE_RIGHT) && !busy) {
+            if (ImGui::Button(" " ICON_FA_ANGLE_RIGHT " ") && !busy) {
                 ++page_index;
                 queue_refresh_stations();
             }
