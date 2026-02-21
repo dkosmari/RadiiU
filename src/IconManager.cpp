@@ -456,7 +456,7 @@ namespace IconManager {
 
             while (!token.stop_requested()) {
 #if 1
-                auto location = requests_queue.try_pop_for(100ms);
+                auto location = requests_queue.try_pop_for(50ms);
 #else
                 auto location = requests_queue.try_pop();
 #endif
@@ -470,7 +470,7 @@ namespace IconManager {
                 multi->perform();
                 handle_finished_downloads();
                 trim_cache();
-                std::this_thread::sleep_for(100ms);
+                std::this_thread::sleep_for(50ms);
             }
         }
         catch (std::exception& e) {

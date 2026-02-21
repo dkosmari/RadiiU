@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.71])
 AC_INIT([RadiiU],
-        [0.2.0+],
+        [0.2.1],
         [https://github.com/dkosmari/RadiiU/issues],
         [radiiu],
         [https://github.com/dkosmari/RadiiU])
@@ -27,7 +27,6 @@ AC_LANG([C++])
 AS_VAR_IF([enable_wiiu], [yes],
           [
               AC_MSG_NOTICE([building Wii U app])
-              DEVKITPRO_PPC_SETUP
               DEVKITPRO_WUT_SETUP
           ])
 AM_CONDITIONAL([ENABLE_WIIU], [test x$enable_wiiu = xyes])
@@ -46,6 +45,10 @@ PKG_CHECK_MODULES([SDL], [sdl2 SDL2_image])
 PKG_CHECK_MODULES([FT], [freetype2])
 PKG_CHECK_MODULES_STATIC([OPUSFILE], [opusfile])
 PKG_CHECK_MODULES_STATIC([VORBISFILE], [vorbisfile])
+
+AC_DEFINE_UNQUOTED([MPG123_VERSION],
+                   ["`$PKG_CONFIG --modversion libmpg123`"],
+                   [version of mpg123])
 
 AC_MSG_NOTICE([PATH is $PATH])
 AC_MSG_NOTICE([CPPFLAGS is "$CPPFLAGS"])
@@ -84,10 +87,6 @@ AX_SUBDIRS_CONFIGURE([external/sdl2xx],
                       [LDFLAGS=$LDFLAGS],
                       [LIBS=$LIBS],
                       [PATH=$PATH]])
-
-AC_DEFINE_UNQUOTED([MPG123_VERSION],
-                   ["`$PKG_CONFIG --modversion libmpg123`"],
-                   [version of mpg123])
 
 AC_CONFIG_FILES([Makefile
                  external/Makefile])
