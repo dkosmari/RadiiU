@@ -1458,7 +1458,11 @@ namespace Browser {
             return;
         }
 
+        rest::request_params_t params{
+            { "limit", "50000" }
+        };
         rest::get_json("https://" + server + "/json/tags",
+                       params,
                        [](curl::easy&,
                           const json::value& response)
                        {

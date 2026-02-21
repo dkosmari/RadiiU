@@ -262,7 +262,7 @@ namespace Settings {
 
                 ImGui::AlignTextToFramePadding();
                 ui::show_label("Send clicks and votes");
-                ImGui::SetItemTooltip("Enable this to send clicks and votes to radio-browser.info.");
+                ImGui::SetItemTooltip("Enable to send clicks and votes to radio-browser.info.");
 
                 ImGui::TableNextColumn();
 

@@ -65,7 +65,7 @@ namespace cfg {
             }
             std::filesystem::path config_dir = expanded.we_wordv[0];
             wordfree(&expanded);
-            return config_dir / PACKAGE_NAME;
+            return config_dir / PACKAGE;
 #endif
     }
 
@@ -76,13 +76,13 @@ namespace cfg {
         browser_page_limit   = 20;
         disable_apd          = true;
         disable_swkbd        = false;
-        screen_saver_timeout = 120;
         inactive_screen_off  = false;
         initial_tab          = TabID::browser;
         player_buffer_size   = 8;
         player_history_limit = 20;
         recent_limit         = 10;
         remember_tab         = true;
+        screen_saver_timeout = 120;
         send_clicks          = false;
         server.clear();
     }
@@ -146,8 +146,8 @@ namespace cfg {
             try_get(root, "recent_limit",         recent_limit);
             try_get(root, "remember_tab",         remember_tab);
             try_get(root, "screen_saver_timeout", screen_saver_timeout);
-            try_get(root, "server",               server);
             try_get(root, "send_clicks",          send_clicks);
+            try_get(root, "server",               server);
 
             // TODO: remove after 0.2
             if (player_buffer_size > 64)
@@ -175,8 +175,8 @@ namespace cfg {
             root["recent_limit"]         = recent_limit;
             root["remember_tab"]         = remember_tab;
             root["screen_saver_timeout"] = screen_saver_timeout;
-            root["server"]               = server;
             root["send_clicks"]          = send_clicks;
+            root["server"]               = server;
 
             json::save(std::move(root), base_dir / "settings.json");
         }
