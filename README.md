@@ -17,22 +17,21 @@ It uses the station listing from [www.radio-browser.info](https://www.radio-brow
 
 ### Dependencies
 
-- freetype2
+- `ppc-freetype`
 
-- jansson
+- `ppc-jansson`
 
 - libcurl
-  - Wii U curl: https://github.com/dkosmari/wiiu-curl-package
-  - Wii U mbedtls: https://github.com/dkosmari/wiiu-mbedtls-package
+  - Wii U curl package: https://github.com/dkosmari/wiiu-curl-package
+  - Wii U mbedtls package: https://github.com/dkosmari/wiiu-mbedtls-package
 
-- faad2
-  - PPC package: https://github.com/dkosmari/ppc-faad2-package
+- `ppc-faad2`
 
-- libmpg123
+- `ppc-mpg123`
 
-- libopusfile
+- `ppc-opusfile`
 
-- libvorbisfile
+- `ppc-vorbisfile`
 
 - SDL2
   - Wii U package: https://github.com/dkosmari/wiiu-sdl2-package
@@ -70,10 +69,10 @@ If the Wii U is named `wiiu` in your local network, you can run:
 - `make run`
   - This will use `wiiload` to run it on the Wii U without installing.
 
-- `make install-wiiu`
+- `make wiiu-install`
   - This will install `radiiu.wuhb`, via ftp.
 
-- `make uninstall-wiiu`
+- `make wiiu-uninstall`
   - This will uninstall `radiiu.wuhb`, via ftp.
 
 ### Native build
