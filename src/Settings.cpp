@@ -229,11 +229,11 @@ namespace Settings {
                 ImGui::TableNextColumn();
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::Slider("##screen_saver_timeout",
-                              cfg::screen_saver_timeout,
-                              0u, 300u,
-                              nullptr,
-                              ImGuiSliderFlags_Logarithmic);
+                ImGui::Drag("##screen_saver_timeout",
+                            cfg::screen_saver_timeout,
+                            0u, 600u,
+                            1.0f / 8.0f,
+                            nullptr);
 
                 /*****************
                  * Disable swkbd *

@@ -76,7 +76,7 @@ namespace IconManager {
         sdl::texture tex;
         std::optional<curl::easy> easy;
         std::optional<std::vector<char>> raw_buf;
-        std::string location; // DEBUG
+        std::string location;
     };
 
 
@@ -236,7 +236,7 @@ namespace IconManager {
         }
 
         auto& entry = it->second;
-        entry.location = location; // DEBUG
+        entry.location = location;
 
         try {
 

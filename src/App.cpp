@@ -224,6 +224,7 @@ namespace App {
     void
     setup_imgui_colors()
     {
+#if 0
         using ImGui::GetStyle;
         ImVec4* colors = GetStyle().Colors;
         colors[ImGuiCol_Text]                   = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
@@ -286,13 +287,14 @@ namespace App {
         colors[ImGuiCol_NavWindowingHighlight]  = ImVec4(1.00f, 1.00f, 1.00f, 0.70f);
         colors[ImGuiCol_NavWindowingDimBg]      = ImVec4(0.80f, 0.80f, 0.80f, 0.20f);
         colors[ImGuiCol_ModalWindowDimBg]       = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
+#endif
     }
 
 
     void
     setup_imgui_style()
     {
-        // setup_imgui_colors();
+        setup_imgui_colors();
 
         auto& style = ImGui::GetStyle();
 
