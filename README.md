@@ -12,6 +12,12 @@ It uses the station listing from [www.radio-browser.info](https://www.radio-brow
 
 ![RadiiU Favorites tab](assets/hbas/radiiu-favorites.png)
 
+![RadiiU Browser tab](assets/hbas/radiiu-browser.png)
+
+![RadiiU Browser tab search](assets/hbas/radiiu-browser-search.png)
+
+![RadiiU Player tab](assets/hbas/radiiu-player.png)
+
 
 ## Build instructions
 
@@ -21,10 +27,6 @@ It uses the station listing from [www.radio-browser.info](https://www.radio-brow
 
 - `ppc-jansson`
 
-- libcurl
-  - Wii U curl package: https://github.com/dkosmari/wiiu-curl-package
-  - Wii U mbedtls package: https://github.com/dkosmari/wiiu-mbedtls-package
-
 - `ppc-faad2`
 
 - `ppc-mpg123`
@@ -32,6 +34,10 @@ It uses the station listing from [www.radio-browser.info](https://www.radio-brow
 - `ppc-opusfile`
 
 - `ppc-vorbisfile`
+
+- libcurl
+  - Wii U curl package: https://github.com/dkosmari/wiiu-curl-package
+  - Wii U mbedtls package: https://github.com/dkosmari/wiiu-mbedtls-package
 
 - SDL2
   - Wii U package: https://github.com/dkosmari/wiiu-sdl2-package
