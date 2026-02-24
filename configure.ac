@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.71])
 AC_INIT([RadiiU],
-        [0.2.1],
+        [0.2.1+],
         [https://github.com/dkosmari/RadiiU/issues],
         [radiiu],
         [https://github.com/dkosmari/RadiiU])

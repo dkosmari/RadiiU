@@ -43,9 +43,7 @@
 #include "Settings.hpp"
 #include "TabID.hpp"
 #include "tracer.hpp"
-#include "ui.hpp" // DEBUG
 #include "utils.hpp"
-
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -534,7 +532,8 @@ namespace App {
 
             } // switch (event.type)
 
-        }
+        } // while (sdl::events::poll())
+
     }
 
 
@@ -576,7 +575,6 @@ namespace App {
                     ImGui::PushFont(nullptr, 48);
                     ImGui::TextCentered("%s", PACKAGE_STRING);
                     ImGui::PopFont();
-                    // ui::show_last_bounding_box();
                     ImGui::SameLine();
                     // Put a close button on the top right
                     auto tex = IconManager::get("ui/close-button.svg");

@@ -10,6 +10,7 @@
 
 #include <concepts>
 #include <filesystem>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -90,13 +91,39 @@ namespace utils {
 
     [[nodiscard]]
     std::string
-    trimmed(const std::string& input,
-            char discard);
+    trimmed(const std::string& input);
+
 
     [[nodiscard]]
     std::string
     trimmed(const std::string& input,
-            const std::string& discard = " \r\n\t");
+            char discard);
+
+
+    [[nodiscard]]
+    std::string
+    trimmed(const std::string& input,
+            const std::string& discard);
+
+
+    [[nodiscard]]
+    std::string
+    trimmed(const std::string& input,
+            const std::function<bool(std::string::value_type)>& predicate);
+
+
+    // Overload to easily use predicates from <cctype>, such as std::isspace()
+    [[nodiscard]]
+    inline
+    std::string
+    trimmed(const std::string& input,
+            int (*predicate)(int))
+    {
+        return trimmed(input, [predicate](std::string::value_type c) -> bool
+        {
+            return predicate(static_cast<unsigned char>(c));
+        });
+    }
 
 
     [[nodiscard]]

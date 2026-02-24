@@ -8,7 +8,9 @@
 
 This is an internet radio player app for the Wii U.
 
-It uses the station listing from [www.radio-browser.info](https://www.radio-browser.info).
+The stations list is provided by [www.radio-browser.info](https://www.radio-browser.info)
+for free. You can donate to them to ensure the project continues running.
+
 
 ![RadiiU Favorites tab](assets/hbas/radiiu-favorites.png)
 

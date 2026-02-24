@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <cctype>
 #include <exception>
 #include <fstream>
 #include <iostream>
@@ -143,6 +144,9 @@ namespace About {
                              << endl;
                         continue;
                     }
+                    for (auto& t : tokens)
+                        t = utils::trimmed(t, ' ');
+
                     tokens[1] = replace_brand_glyphs(tokens[1]);
                     result.emplace_back(std::move(tokens[0]), std::move(tokens[1]));
                 }
@@ -188,6 +192,16 @@ namespace About {
 
                 for (const auto& [role, name] : credits)
                     ui::show_info_row(role, name);
+
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::TextRightColored(ui::label_color, "Stations list");
+                ImGui::TableNextColumn();
+                auto rb_url = "https://www.radio-browser.info";
+                ImGui::TextLinkOpenURL(rb_url, rb_url);
+                // ImGui::SameLine();
+                // auto rb_icon_tex = IconManager::get("https://www.radio-browser.info/favicon.ico");
+                // ImGui::Image(*rb_icon_tex, sdl::vec2{64, 64});
 
                 ImGui::EndTable();
             }

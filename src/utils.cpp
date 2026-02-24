@@ -1,13 +1,17 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <algorithm>
+#include <cctype>
 #include <cinttypes>
 #include <cstdarg>
+#include <iterator>
 #include <locale>
+#include <ranges>
 #include <tuple>
 
 #include <SDL2/SDL_platform.h>
@@ -249,6 +253,14 @@ namespace utils {
     }
 
 
+    [[nodiscard]]
+    std::string
+    trimmed(const std::string& input)
+    {
+        return trimmed(input, std::isspace);
+    }
+
+
     std::string
     trimmed(const std::string& input,
             char discard)
@@ -270,6 +282,16 @@ namespace utils {
             return {};
         auto finish = input.find_last_not_of(discard);
         return input.substr(start, finish - start + 1);
+    }
+
+
+    std::string
+    trimmed(const std::string& input,
+            const std::function<bool(std::string::value_type)>& predicate)
+    {
+        auto start = std::ranges::find_if_not(input, predicate);
+        auto finish = std::ranges::find_if_not(input | std::views::reverse, predicate).base();
+        return std::string{start, finish};
     }
 
 
