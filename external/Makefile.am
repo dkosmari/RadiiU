@@ -8,11 +8,11 @@ AM_CXXFLAGS = \
 	-Wall -Wextra -Werror
 
 
-noinst_LIBRARIES = \
-	libimgui.a
+noinst_LTLIBRARIES = \
+	libimgui.la
 
 
-libimgui_a_SOURCES = \
+libimgui_la_SOURCES = \
 	custom_imconfig.h \
 	imgui/backends/imgui_impl_sdl2.h \
 	imgui/backends/imgui_impl_sdl2.cpp \
@@ -33,11 +33,11 @@ libimgui_a_SOURCES = \
 	imgui/misc/freetype/imgui_freetype.h
 
 # Uncomment this to include Style Editor window.
-libimgui_a_SOURCES += imgui/imgui_demo.cpp
+libimgui_la_SOURCES += imgui/imgui_demo.cpp
 
 
 
-libimgui_a_CPPFLAGS = \
+libimgui_la_CPPFLAGS = \
 	$(AM_CPPFLAGS) \
 	-DIMGUI_USER_CONFIG='"$(srcdir)/custom_imconfig.h"' \
 	-I$(srcdir)/imgui \

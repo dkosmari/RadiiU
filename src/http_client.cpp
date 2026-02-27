@@ -27,7 +27,7 @@ http_client::http_client(const std::string& url)
     easy.set_user_agent(utils::get_user_agent());
     easy.set_url(url);
     easy.set_forbid_reuse(true);
-    easy.set_follow(true);
+    easy.set_follow_location(true);
     easy.set_ssl_verify_peer(false);
 
     // easy.set_http_headers({

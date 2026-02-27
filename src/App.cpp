@@ -478,13 +478,13 @@ namespace App {
 
             ImGui_ImplSDL2_ProcessEvent(&event);
 
-            switch (event.type) {
+            switch (sdl::events::type{event.type}) {
 
-                case sdl::events::type::e_quit:
+                case sdl::events::type::quit:
                     quit();
                     break;
 
-                case sdl::events::type::e_controller_device_added: {
+                case sdl::events::type::controller_device_added: {
                     auto gc = sdl::game_controller::device(event.cdevice.which);
                     cout << "Added controller: " << gc.get_name() << endl;
                     res->controllers.push_back(std::move(gc));
@@ -492,7 +492,7 @@ namespace App {
                     break;
                 }
 
-                case sdl::events::type::e_controller_device_removed: {
+                case sdl::events::type::controller_device_removed: {
                     std::erase_if(res->controllers,
                                   [id=event.cdevice.which](sdl::game_controller::device& gc)
                                   {
@@ -502,23 +502,23 @@ namespace App {
                     break;
                 }
 
-                case sdl::events::type::e_controller_axis:
-                case sdl::events::type::e_controller_down:
-                case sdl::events::type::e_controller_up:
-                case sdl::events::type::e_key_down:
-                case sdl::events::type::e_key_up:
-                case sdl::events::type::e_mouse_down:
-                case sdl::events::type::e_mouse_motion:
-                case sdl::events::type::e_mouse_up:
-                case sdl::events::type::e_mouse_wheel:
-                case sdl::events::type::e_text_editing:
-                case sdl::events::type::e_text_editing_ext:
-                case sdl::events::type::e_text_input:
-                case sdl::events::type::e_will_enter_foreground:
+                case sdl::events::type::controller_axis:
+                case sdl::events::type::controller_down:
+                case sdl::events::type::controller_up:
+                case sdl::events::type::key_down:
+                case sdl::events::type::key_up:
+                case sdl::events::type::mouse_down:
+                case sdl::events::type::mouse_motion:
+                case sdl::events::type::mouse_up:
+                case sdl::events::type::mouse_wheel:
+                case sdl::events::type::text_editing:
+                case sdl::events::type::text_editing_ext:
+                case sdl::events::type::text_input:
+                case sdl::events::type::will_enter_foreground:
                     last_activity = now;
                     break;
 
-                case sdl::events::type::e_window:
+                case sdl::events::type::window:
                     switch (event.window.event) {
                         case SDL_WINDOWEVENT_SHOWN:
                         case SDL_WINDOWEVENT_EXPOSED:
@@ -529,6 +529,9 @@ namespace App {
                             break;
                     }
                     break;
+
+                default:
+                    ;
 
             } // switch (event.type)
 

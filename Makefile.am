@@ -121,11 +121,11 @@ radiiu_elf_CPPFLAGS = \
 radiiu_elf_LDADD =  \
 	libnet.a \
 	$(LDADD) \
-	external/curlxx/libcurlxx.a \
-	external/libimgui.a \
+	external/curlxx/lib/libcurlxx.la \
+	external/libimgui.la \
 	external/mpg123xx/libmpg123xx.a \
-	external/sdl2xx/libsdl2xx_image.a \
-	external/sdl2xx/libsdl2xx.a \
+	external/sdl2xx/lib/libsdl2xx_image.la \
+	external/sdl2xx/lib/libsdl2xx.la \
 	$(CURL_LIBS) \
 	$(FAAD2_LIBS) \
 	$(JANSSON_LIBS) \

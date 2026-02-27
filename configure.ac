@@ -18,7 +18,7 @@ DEVKITPRO_WUT_OPT_INIT
 
 AM_INIT_AUTOMAKE([foreign subdir-objects])
 
-AC_PROG_RANLIB
+LT_INIT
 
 AC_PROG_CXX
 AX_APPEND_COMPILE_FLAGS([-std=c++23], [CXX])
@@ -59,7 +59,8 @@ AC_MSG_NOTICE([LIBS is "$LIBS"])
 
 
 AX_SUBDIRS_CONFIGURE([external/curlxx],
-                     [[--enable-static],
+                     [[--enable-static-libcurl],
+                      [--disable-shared],
                       [CPPFLAGS=$CPPFLAGS],
                       [CFLAGS=$CFLAGS],
                       [CXXFLAGS=$CXXFLAGS],
@@ -77,7 +78,8 @@ AX_SUBDIRS_CONFIGURE([external/mpg123xx],
                       [PATH=$PATH]])
 
 AX_SUBDIRS_CONFIGURE([external/sdl2xx],
-                     [[--enable-image],
+                     [[--disable-shared],
+                      [--enable-image],
                       [--disable-mixer],
                       [--disable-ttf],
                       [--disable-examples],
