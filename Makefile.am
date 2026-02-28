@@ -123,7 +123,7 @@ radiiu_elf_LDADD =  \
 	$(LDADD) \
 	external/curlxx/lib/libcurlxx.la \
 	external/libimgui.la \
-	external/mpg123xx/libmpg123xx.a \
+	external/mpg123xx/lib/libmpg123xx.la \
 	external/sdl2xx/lib/libsdl2xx_image.la \
 	external/sdl2xx/lib/libsdl2xx.la \
 	$(CURL_LIBS) \

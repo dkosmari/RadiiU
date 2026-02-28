@@ -60,49 +60,53 @@ using namespace sdl::literals;
 
 namespace App {
 
-    // RAII-managed resources are stored here.
-    struct Resources {
+    namespace {
 
-        sdl::init sdl_init{sdl::init::flag::video,
-                           sdl::init::flag::audio,
-                           sdl::init::flag::game_controller};
-        sdl::img::init img_init;
+        // RAII-managed resources are stored here.
+        struct Resources {
 
-        sdl::window window;
-        sdl::renderer renderer;
+            sdl::init sdl_init{sdl::init::flag::video,
+                               sdl::init::flag::audio,
+                               sdl::init::flag::game_controller};
+            sdl::img::init img_init;
 
-        sdl::vector<sdl::game_controller::device> controllers;
+            sdl::window window;
+            sdl::renderer renderer;
 
-    }; // struct Resources
+            sdl::vector<sdl::game_controller::device> controllers;
 
-    std::optional<Resources> res;
+        }; // struct Resources
+
+        std::optional<Resources> res;
 
 
-    bool running;
+        bool running;
 
-    const float default_font_size = 32;
-    const float ui_rounding = 8;
+        const float default_font_size = 32;
+        const float ui_rounding = 8;
 
-    std::optional<TabID> next_tab;
-    TabID current_tab;
+        std::optional<TabID> next_tab;
+        TabID current_tab;
 
 #ifdef __WIIU__
-    bool old_disable_swkbd;
+        bool old_disable_swkbd;
+        std::uint32_t old_dim_countdown;
 #endif
 
-    Uint64 last_activity;
-    Uint64 fade_start;
+        Uint64 last_activity;
+        Uint64 fade_start;
 
-    enum class State {
-        normal,
-        fading,
-        screen_saver,
-    };
+        enum class State {
+            normal,
+            fading,
+            screen_saver,
+        };
 
-    State state = State::normal;
+        State state = State::normal;
 
-    Uint64 fade_duration = 5'000;
+        Uint64 fade_duration_ms = 5'000;
 
+    } // namespace
 
     void
     quit();
@@ -553,7 +557,7 @@ namespace App {
             auto& style = ImGui::GetStyle();
             if (state == State::fading) {
                 Uint64 now = SDL_GetTicks64();
-                float ratio = 1.0f - (now - fade_start) / float(fade_duration);
+                float ratio = 1.0f - (now - fade_start) / float(fade_duration_ms);
                 if (ratio < 0)
                     ratio = 0;
                 style.Alpha = ratio;
@@ -679,36 +683,53 @@ namespace App {
             old_disable_swkbd = cfg::disable_swkbd;
         }
 
-        if (cfg::inactive_screen_off) {
-            // TODO: find out how to do it with TV also.
-            IMError e;
-            std::uint32_t dim_enabled = 0;
-            e = IMIsDimEnabled(&dim_enabled);
-            if (!e && dim_enabled) {
-                static bool screen_is_off = false;
-                std::uint32_t seconds_to_dim = 0;
-                e = IMGetTimeBeforeDimming(&seconds_to_dim);
-                if (!e) {
-                    if (seconds_to_dim == 0) {
-                        if (!screen_is_off) {
-                            cout << "Screen dimming started, putting DRC on standby." << endl;
-                            VPADSetLcdMode(VPAD_CHAN_0, VPAD_LCD_STANDBY);
-                            screen_is_off = true;
-                        }
-                    } else {
-                        if (screen_is_off) {
-                            cout << "Screen dimming ended, turning DRC back on." << endl;
-                            screen_is_off = false;
-                            VPADSetLcdMode(VPAD_CHAN_0, VPAD_LCD_ON);
+        std::uint32_t dim_enabled = 0;
+        IMError dim_error = IMIsDimEnabled(&dim_enabled);
+        VPADLcdMode current_vpad_mode;
+        VPADGetLcdMode(VPAD_CHAN_0, &current_vpad_mode);
+        if (!dim_error && dim_enabled) {
+            std::uint32_t dim_countdown = 0;
+            dim_error = IMGetTimeBeforeDimming(&dim_countdown);
+            if (!dim_error) {
+                if (cfg::inactive_screen_off) {
+                    // This is the logic to turn the gamepad LCD off when the system
+                    // enters the dimmed state (screen burn-in protection.)
+
+                    // TODO: find out how to do it with TV also.
+                    if (dim_countdown == 0) {
+                        if (current_vpad_mode != VPAD_LCD_STANDBY) {
+                            cout << "Screen dimming started, putting gamepad on standby." << endl;
+                            current_vpad_mode = VPAD_LCD_STANDBY;
+                            VPADSetLcdMode(VPAD_CHAN_0, current_vpad_mode);
                         }
                     }
-                } else {
-                    cout << "IMGetTimeBeforeDimming() returned " << e << endl;
-                    screen_is_off = false;
                 }
-            } // dim_enabled
+
+                // If we leave the dimmed state, it counts as user input, for detecting
+                // activity. Note that this event can be triggered by the gamepad's
+                // accelerometers.
+                if (dim_countdown > old_dim_countdown) {
+                    cout << "Detected activity from DIM" << endl;
+                    last_activity = SDL_GetTicks64();
+                    // Normally a standby gamepad only wakes up when using buttons or
+                    // sticks, this will wake on accelerometer and touch activity too.
+                    if (current_vpad_mode == VPAD_LCD_STANDBY) {
+                        cout << "Turning gamepad LCD backon." << endl;
+                        current_vpad_mode = VPAD_LCD_ON;
+                        VPADSetLcdMode(VPAD_CHAN_0, current_vpad_mode);
+                    }
+                }
+                if (dim_countdown == 0 && old_dim_countdown > 0) {
+                    cout << "Entered DIM state" << endl;
+                }
+
+                old_dim_countdown = dim_countdown;
+            } else {
+                cout << "IMGetTimeBeforeDimming() returned " << dim_error << endl;
+            }
+
         }
-#endif
+#endif // __WIIU__
 
         process_events();
         if (!running)
@@ -736,7 +757,7 @@ namespace App {
                 break;
             case State::fading:
                 // fading -> screen_saver
-                if ((now - fade_start) > fade_duration) {
+                if ((now - fade_start) > fade_duration_ms) {
                     cout << "Full screen saver" << endl;
                     state = State::screen_saver;
                 }

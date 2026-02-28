@@ -70,6 +70,7 @@ AX_SUBDIRS_CONFIGURE([external/curlxx],
 
 AX_SUBDIRS_CONFIGURE([external/mpg123xx],
                      [[--disable-examples],
+                      [--disable-shared],
                       [CPPFLAGS=$CPPFLAGS],
                       [CFLAGS=$CFLAGS],
                       [CXXFLAGS=$CXXFLAGS],
