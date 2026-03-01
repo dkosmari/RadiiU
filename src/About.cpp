@@ -29,6 +29,7 @@
 #include "IconsFontAwesome4.h"
 #include "IconManager.hpp"
 #include "imgui_extras.hpp"
+#include "string_utils.hpp"
 #include "ui.hpp"
 #include "utils.hpp"
 
@@ -124,6 +125,9 @@ namespace About {
         std::vector<RoleName>
         get_credits()
         {
+            using string_utils::split;
+            using string_utils::trimmed;
+
             std::vector<RoleName> result;
 
             try {
@@ -132,10 +136,10 @@ namespace About {
                 while (getline(input, line)) {
                     if (!line.empty() && line.front() == '#')
                         continue;
-                    line = utils::trimmed(line);
+                    line = trimmed(line);
                     if (line.empty())
                         continue;
-                    auto tokens = utils::split(line, ":", false, 2);
+                    auto tokens = split(line, ":", false, 2);
                     if (tokens.size() != 2) {
                         cout << "ERROR: get_credits(): wrong number of tokens ("
                              << tokens.size()
@@ -145,7 +149,7 @@ namespace About {
                         continue;
                     }
                     for (auto& t : tokens)
-                        t = utils::trimmed(t, ' ');
+                        t = trimmed(t, ' ');
 
                     tokens[1] = replace_brand_glyphs(tokens[1]);
                     result.emplace_back(std::move(tokens[0]), std::move(tokens[1]));

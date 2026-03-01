@@ -75,6 +75,8 @@ radiiu_elf_SOURCES = \
 	src/json.cpp \
 	src/json.hpp \
 	src/main.cpp \
+	src/mime_type.cpp \
+	src/mime_type.hpp \
 	src/Player.cpp \
 	src/Player.hpp \
 	src/radio_client.cpp \
@@ -87,6 +89,8 @@ radiiu_elf_SOURCES = \
 	src/Settings.hpp \
 	src/Station.cpp \
 	src/Station.hpp \
+	src/string_utils.cpp \
+	src/string_utils.hpp \
 	src/stdout-wiiu.cpp \
 	src/stream_metadata.cpp \
 	src/stream_metadata.hpp \

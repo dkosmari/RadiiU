@@ -10,7 +10,7 @@
 
 #include "Station.hpp"
 
-#include "utils.hpp"
+#include "string_utils.hpp"
 
 
 bool
@@ -63,10 +63,10 @@ Station::from_json(const json::object& obj)
     // Note: these fields we split into vectors.
 
     if (auto language = try_get<json::string>(obj, "language"))
-        result.languages = utils::split(*language, ",");
+        result.languages = string_utils::split(*language, ",");
 
     if (auto tags = try_get<json::string>(obj, "tags"))
-        result.tags = utils::split(*tags, ",");
+        result.tags = string_utils::split(*tags, ",");
 
     return result;
 }
@@ -93,8 +93,8 @@ Station::to_json()
     // - bitrate
     // - codec
 
-    obj["language"] = utils::join(languages, ",");
-    obj["tags"] = utils::join(tags, ",");
+    obj["language"] = string_utils::join(languages, ",");
+    obj["tags"] = string_utils::join(tags, ",");
 
     return obj;
 }
@@ -107,8 +107,8 @@ StationEx::StationEx()
 
 StationEx::StationEx(const Station& st) :
     Station{st},
-    languages_str{utils::join(languages, ", ")},
-    tags_str{utils::join(tags, ", ")}
+    languages_str{string_utils::join(languages, ", ")},
+    tags_str{string_utils::join(tags, ", ")}
 {}
 
 
@@ -120,15 +120,15 @@ StationEx::as_station()
     Station result = *this;
 
     // copy languages_str into the languages vector
-    result.languages = utils::split(languages_str, ",");
+    result.languages = string_utils::split(languages_str, ",");
     for (auto& lang : result.languages)
-        lang = utils::trimmed(lang, ' ');
+        lang = string_utils::trimmed(lang, ' ');
     std::erase(result.languages, "");
 
     // copy tags_str into the tags vector
-    result.tags = utils::split(tags_str, ",");
+    result.tags = string_utils::split(tags_str, ",");
     for (auto& tag : result.tags)
-        tag = utils::trimmed(tag, ' ');
+        tag = string_utils::trimmed(tag, ' ');
     std::erase(result.tags, "");
 
     return result;

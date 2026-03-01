@@ -12,6 +12,7 @@
 #include "http_client.hpp"
 
 #include "utils.hpp"
+#include "string_utils.hpp"
 
 
 using std::cout;
@@ -85,7 +86,7 @@ void
 http_client::process()
 {
     if (!requested) {
-        headers.push_back("Accept: " + utils::join(accepts, ","));
+        headers.push_back("Accept: " + string_utils::join(accepts, ","));
         easy.set_http_headers(headers);
         requested = true;
     }

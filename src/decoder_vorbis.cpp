@@ -13,6 +13,7 @@
 #include "decoder_vorbis.hpp"
 
 #include "utils.hpp"
+#include "string_utils.hpp"
 
 
 using std::cout;
@@ -166,7 +167,7 @@ namespace decoder {
             bitrate = current_bitrate;
 
         if (bitrate)
-            result.bitrate = utils::cpp_sprintf("%.1f Kbps", bitrate / 1000.0f);
+            result.bitrate = string_utils::cpp_sprintf("%.1f Kbps", bitrate / 1000.0f);
 
         return result;
     }
@@ -203,13 +204,13 @@ namespace decoder {
 
         auto comment_vec = to_vector(comment);
         for (auto entry : comment_vec) {
-            auto tokens = utils::split(entry, "="sv, false, 2);
+            auto tokens = string_utils::split(entry, "="sv, false, 2);
             if (tokens.size() != 2)
                 continue;
             auto key = tokens[0];
             auto val = tokens[1];
 
-            using utils::equal_case;
+            using string_utils::equal_case;
             if (equal_case(key, "TITLE"sv))
                 result.title = val;
             else if (equal_case(key, "ARTIST"sv))

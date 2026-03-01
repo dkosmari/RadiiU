@@ -24,7 +24,7 @@
 #include "Player.hpp"
 #include "rest.hpp"
 #include "Station.hpp"
-#include "utils.hpp"
+#include "string_utils.hpp"
 
 
 using std::cout;
@@ -122,7 +122,7 @@ namespace ui {
         // show_last_bounding_box();
 
         ImGui::TableNextColumn();
-        const std::string fmt = "%" + utils::format(value);
+        const std::string fmt = "%" + string_utils::format(value);
         ImGui::TextWrapped(fmt.data(), value);
         // show_last_bounding_box();
     }

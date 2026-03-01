@@ -10,8 +10,8 @@
 
 #include "icy_stream.hpp"
 
-#include "utils.hpp"
 #include "icy.hpp"
+#include "string_utils.hpp"
 
 
 using std::cout;
@@ -23,6 +23,8 @@ namespace icy {
     stream::stream(http_client& hc) :
         http(hc)
     {
+        using string_utils::trimmed;
+
         unsigned icy_num = 0;
 
         if (auto hdr = http.get_header("icy-metaint")) {
@@ -32,22 +34,22 @@ namespace icy {
         }
 
         if (auto hdr = http.get_header("icy-name")) {
-            initial_meta.station_name = utils::trimmed(*hdr);
+            initial_meta.station_name = trimmed(*hdr);
             ++icy_num;
         }
 
         if (auto hdr = http.get_header("icy-url")) {
-            initial_meta.station_url = utils::trimmed(*hdr);
+            initial_meta.station_url = trimmed(*hdr);
             ++icy_num;
         }
 
         if (auto hdr = http.get_header("icy-genre")) {
-            initial_meta.station_genre = utils::trimmed(*hdr);
+            initial_meta.station_genre = trimmed(*hdr);
             ++icy_num;
         }
 
         if (auto hdr = http.get_header("icy-description")) {
-            initial_meta.station_description = utils::trimmed(*hdr);
+            initial_meta.station_description = trimmed(*hdr);
             ++icy_num;
         }
 
@@ -119,10 +121,12 @@ namespace icy {
     void
     stream::process_metadata()
     {
+        using string_utils::trimmed;
+
         current_meta = initial_meta;
 
         // Note: icy metadata is padded with null bytes.
-        std::string meta_str = utils::trimmed(meta_stream.read_str(), '\0');
+        std::string meta_str = trimmed(meta_stream.read_str(), '\0');
 
         auto meta = icy::parse(meta_str);
 
@@ -134,11 +138,11 @@ namespace icy {
         for (const auto& [k, v] : meta) {
             // TODO: check if there are more special keys
             if (k == "StreamTitle") {
-                current_meta.title = utils::trimmed(v);
+                current_meta.title = trimmed(v);
             } else if (k == "StreamUrl") {
-                current_meta.cover_art = utils::trimmed(v);
+                current_meta.cover_art = trimmed(v);
             } else
-                current_meta.extra[k] = utils::trimmed(v);
+                current_meta.extra[k] = trimmed(v);
         }
 
     }

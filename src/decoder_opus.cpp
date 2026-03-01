@@ -14,6 +14,7 @@
 
 #include "decoder_opus.hpp"
 
+#include "string_utils.hpp"
 #include "utils.hpp"
 
 
@@ -139,7 +140,7 @@ namespace decoder {
             bitrate = br;
 
         if (bitrate)
-            result.bitrate = utils::cpp_sprintf("%.1f Kbps", bitrate / 1000.0f);
+            result.bitrate = string_utils::cpp_sprintf("%.1f Kbps", bitrate / 1000.0f);
 
         return result;
     }
@@ -176,13 +177,13 @@ namespace decoder {
 
         auto tags_vec = to_vector(tags);
         for (auto entry : tags_vec) {
-            auto tokens = utils::split(entry, "="sv, false, 2);
+            auto tokens = string_utils::split(entry, "="sv, false, 2);
             if (tokens.size() != 2)
                 continue;
             auto key = tokens[0];
             auto val = tokens[1];
 
-            using utils::equal_case;
+            using string_utils::equal_case;
             if (equal_case(key, "TITLE"sv))
                 result.title = val;
             else if (equal_case(key, "ARTIST"sv))

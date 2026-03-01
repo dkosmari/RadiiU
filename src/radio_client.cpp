@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -10,6 +10,7 @@
 #include "radio_client.hpp"
 
 #include "cfg.hpp"
+#include "mime_type.hpp"
 
 
 using std::cout;
@@ -107,17 +108,21 @@ radio_client::process_http_response()
         return;
     }
 
-    if (content_type->ends_with("mpegurl")) {
-        // TODO: use a mime matching function to allow more variations
-        /*
-         * Known mime types for m3u playlists:
-         * application/mpegurl
-         * application/x-mpegurl
-         * audio/mpegurl
-         */
+    // Known mime types for m3u playlists
+    const std::vector<std::string> m3u_types{
+        "audio/mpegurl",
+        "application/vnd.apple.mpegurl",
+        "application/mpegurl",
+        "application/x-mpegurl",
+    };
+    const std::vector<std::string> audio_types{
+        "audio/*",
+        "application/ogg",
+
+    };
+    if (mime_type::match(*content_type, m3u_types)) {
         current_state = state::handling_playlist;
-    } else if (content_type->starts_with("audio/") || content_type->starts_with("application/")) {
-        // TODO: audio streams can have mime audio/* or application/*
+    } else if (mime_type::match(*content_type, audio_types)) {
         current_state = state::handling_audio;
         try {
             cout << "Trying to create icy_stream" << endl;

@@ -19,7 +19,7 @@
 #include <imgui_internal.h>
 
 #include "imgui_extras.hpp"
-#include "utils.hpp"
+#include "string_utils.hpp"
 
 
 using std::cout;
@@ -697,7 +697,7 @@ namespace ImGui {
         std::va_list args;
         va_start(args, fmt);
         try {
-            text = utils::cpp_vsprintf(fmt, args);
+            text = string_utils::cpp_vsprintf(fmt, args);
             va_end(args);
         }
         catch (...) {
@@ -760,7 +760,7 @@ namespace ImGui {
 
     void
     TextRightColoredV(const ImVec4& color,
-                     const char* fmt,
+                      const char* fmt,
                       std::va_list args)
     {
         TextAlignedColoredV(1.0f, -FLT_MIN, color, fmt, args);
@@ -779,7 +779,7 @@ namespace ImGui {
     Value(const std::string& prefix,
           const T& value)
     {
-        const std::string fmt = "%s: %" + utils::format(value);
+        const std::string fmt = "%s: %" + string_utils::format(value);
         Text(fmt.data(),
              prefix.data(),
              value);
@@ -854,7 +854,7 @@ namespace ImGui {
     ValueWrapped(const std::string& prefix,
                  const T& value)
     {
-        const std::string fmt = "%s: %" + utils::format(value);
+        const std::string fmt = "%s: %" + string_utils::format(value);
         TextWrapped(fmt.data(), prefix.data(), value);
     }
 
