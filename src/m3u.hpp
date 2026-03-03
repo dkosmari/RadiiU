@@ -38,9 +38,6 @@ namespace m3u {
 
 
     playlist
-    parse(std::istream& input);
-
-    playlist
     parse(const std::string& input);
 
 } // namespace m3u

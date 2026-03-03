@@ -14,6 +14,8 @@
 #include <ranges>
 #include <tuple>
 
+#include <iostream> // DEBUG
+
 #include "string_utils.hpp"
 
 
@@ -285,6 +287,8 @@ namespace string_utils {
     trimmed(const std::string& input,
             char discard)
     {
+        if (input.empty())
+            return {};
         auto start = input.find_first_not_of(discard);
         if (start == std::string::npos)
             return {};
@@ -297,6 +301,8 @@ namespace string_utils {
     trimmed(const std::string& input,
             const std::string& discard)
     {
+        if (input.empty())
+            return {};
         auto start = input.find_first_not_of(discard);
         if (start == std::string::npos)
             return {};
@@ -309,7 +315,11 @@ namespace string_utils {
     trimmed(const std::string& input,
             const std::function<bool(std::string::value_type)>& predicate)
     {
+        if (input.empty())
+            return {};
         auto start = std::ranges::find_if_not(input, predicate);
+        if (start == input.end())
+            return {};
         auto finish = std::ranges::find_if_not(input | std::views::reverse, predicate).base();
         return std::string{start, finish};
     }

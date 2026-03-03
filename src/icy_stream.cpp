@@ -12,6 +12,7 @@
 
 #include "icy.hpp"
 #include "string_utils.hpp"
+#include "tracer.hpp"
 
 
 using std::cout;
@@ -23,6 +24,8 @@ namespace icy {
     stream::stream(http_client& hc) :
         http(hc)
     {
+        // TRACE_FUNC;
+
         using string_utils::trimmed;
 
         unsigned icy_num = 0;
@@ -137,6 +140,7 @@ namespace icy {
 
         for (const auto& [k, v] : meta) {
             // TODO: check if there are more special keys
+            // TODO: handle StreamArtwork
             if (k == "StreamTitle") {
                 current_meta.title = trimmed(v);
             } else if (k == "StreamUrl") {

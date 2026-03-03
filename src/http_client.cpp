@@ -25,7 +25,7 @@ using namespace std::placeholders;
 
 http_client::http_client(const std::string& url)
 {
-    multi.set_max_total_connections(1);
+    multi.set_max_total_connections(2);
     set_url(url);
 }
 
@@ -80,7 +80,7 @@ http_client::set_url(const std::string& url)
     easy.reset();
     easy.set_verbose(true); // DEBUG
     easy.set_user_agent(utils::get_user_agent());
-    easy.set_forbid_reuse(true);
+    easy.set_forbid_reuse(false);
     easy.set_follow_location(true);
     easy.set_ssl_verify_peer(false);
     easy.set_write_function(std::bind(&http_client::curl_write_callback, this, _1));
@@ -92,6 +92,8 @@ http_client::set_url(const std::string& url)
     response_started = false;
     pending_on_response_started = false;
     pending_on_recv = false;
+
+    data_stream.clear();
 }
 
 

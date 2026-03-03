@@ -5,12 +5,19 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <istream>
-#include <utility>
+#include <iostream>             // DEBUG
+#include <ranges>
+#include <utility>              // move()
 
 #include "m3u.hpp"
 
 #include "string_utils.hpp"
+
+
+using std::cout;
+using std::endl;
+
+using namespace std::literals;
 
 
 namespace m3u {
@@ -58,87 +65,65 @@ namespace m3u {
     }
 
 
-    namespace {
-
-        void
-        parse_extended(std::istream& input,
-                       playlist& result)
-        {
-            std::string line;
-            track current_track;
-
-            while (getline(input, line)) {
-                if (line.empty())
-                    continue;
-                if (line[0] == '#') {
-                    if (line.starts_with(ext_inf)) {
-                        try {
-                            auto tokens = string_utils::split(line.substr(ext_inf.size()),
-                                                              ",", false, 2);
-                            if (tokens.size() != 2)
-                                continue;
-                            long t = std::stol(tokens[0]);
-                            if (t != 0 && t != -1)
-                                current_track.duration = std::chrono::seconds(t);
-                            current_track.title = std::move(tokens[1]);
-                        }
-                        catch (...) {
-                            // TODO: report problem parsing M3U extended directive
-                            continue;
-                        }
-                    } else
-                        continue;
-
-                } else {
-                    current_track.url = line;
-                    result.push_back(std::move(current_track));
-                    current_track = {};
-                }
-            }
-        }
-
-
-        void
-        parse_normal(std::istream& input,
-                     playlist& result)
-        {
-            std::string line;
-            while (getline(input, line)) {
-                if (line.empty())
-                    continue;
-                result.emplace_back(line, std::nullopt, std::nullopt);
-            }
-        }
-
-    } // namespace
-
-
-    playlist
-    parse(std::istream& input)
-    {
-        playlist result;
-
-        std::string line;
-        // check if first line is #EXTM3U
-        if (!getline(input, line))
-            return result;
-
-        if (line == ext_m3u) {
-            parse_extended(input, result);
-        } else if (!line.empty() && line[0] != '#') {
-            result.emplace_back(std::move(line), std::nullopt, std::nullopt);
-            parse_normal(input, result);
-        }
-
-        return result;
-    }
-
-
     playlist
     parse(const std::string& input)
     {
-        std::istringstream stream{input};
-        return parse(stream);
+        playlist result;
+
+        auto lines = string_utils::split(input, {"\r"s, "\n"s}, true);
+        if (lines.empty())
+            return result;
+
+        // check if first line is #EXTM3U
+        if (lines.front() == ext_m3u) {
+            // handle extended playlist
+            std::optional<std::chrono::seconds> duration;
+            std::optional<std::string> title;
+            for (auto& line : lines | std::views::drop(1)) {
+                if (line.empty()) {
+                    duration.reset();
+                    title.reset();
+                    continue;
+                }
+                if (line[0] == '#') {
+                    // maybe ext directive, maybe comment
+                    if (line.starts_with(ext_inf)) {
+                        // #EXTINF:N,TITLE
+                        auto tokens = string_utils::split(line.substr(ext_inf.size()),
+                                                          ",", false, 2);
+                        if (tokens.size() != 2) {
+                            duration.reset();
+                            title.reset();
+                            continue;
+                        }
+                        long d = std::stol(tokens[0]);
+                        if (d != 0 && d != -1)
+                            duration = std::chrono::seconds(d);
+
+                        if (!tokens[1].empty())
+                            title = std::move(tokens[1]);
+                    } else {
+                        // non-standard directive, or comment, just skip it
+                        duration.reset();
+                        title.reset();
+                        continue;
+                    }
+                } else {
+                    result.emplace_back(std::move(line), duration, title);
+                    duration.reset();
+                    title.reset();
+                }
+            } // for (line : lines)
+        } else {
+            // handle simple playlist, no comments allowed
+            for (auto& line : lines) {
+                if (line.empty())
+                    continue;
+                result.emplace_back(std::move(line), std::nullopt, std::nullopt);
+            }
+        }
+
+        return result;
     }
 
 } // namespace m3u
@@ -153,11 +138,7 @@ namespace m3u {
 
 using std::cout;
 using std::endl;
-using std::istringstream;
-using std::stringstream;
 using std::string;
-
-using namespace std::literals;
 
 
 #define CHECK_EQUAL(x, y)                       \
@@ -170,9 +151,9 @@ using namespace std::literals;
             cout << "    PASSED" << endl;       \
         } else {                                \
             cout << "    FAILED: "              \
-                 << #x << "(" << x_val << ")"  \
+                 << #x << " (" << x_val << ")"  \
                  << " != "                      \
-                 << #y << "(" << y_val << ")"  \
+                 << #y << " (" << y_val << ")"  \
                  << endl;                       \
         }                                       \
     } while (false)
@@ -193,9 +174,11 @@ int main()
     int total = 0;
     int successes = 0;
 
+    const auto crlf = "\r\n"s;
+
     {
         cout << "Test: simple empty" << endl;
-        istringstream input{"\n"};
+        auto input = crlf;
         auto pl = parse(input);
         CHECK_EQUAL(pl.size(), 0);
         dump(pl);
@@ -204,8 +187,7 @@ int main()
     {
         cout << "Test: simple with one track" << endl;
         auto track_url = "http://www.example.com/stream"s;
-        stringstream input;
-        input << track_url << endl;
+        auto input = track_url;
         auto pl = parse(input);
         CHECK_EQUAL(pl.size(), 1);
         CHECK_EQUAL(pl.at(0).url, track_url);
@@ -214,8 +196,7 @@ int main()
 
     {
         cout << "Test: extended empty" << endl;
-        stringstream input;
-        input << "#EXTM3U\n";
+        auto input = "#EXTM3U"s + crlf;
         auto pl = parse(input);
         CHECK_EQUAL(pl.size(), 0);
         dump(pl);
@@ -226,10 +207,10 @@ int main()
         auto track_url = "http://www.example.com/stream"s;
         auto track_duration = 69s;
         auto track_title = "abc, def"s;
-        stringstream input;
-        input << "#EXTM3U\n\n"
-              << "#EXTINF:" << track_duration.count() << "," << track_title << "\n"
-              << track_url << "\n";
+        auto input =
+            "#EXTM3U"s + crlf
+            + "#EXTINF:"s + std::to_string(track_duration.count()) + ","s + track_title + crlf
+            + track_url + crlf;
         auto pl = parse(input);
         CHECK_EQUAL(pl.size(), 1);
         auto& t = pl.at(0);
@@ -237,6 +218,21 @@ int main()
         CHECK_EQUAL(*t.duration, track_duration);
         CHECK_EQUAL(t.title.has_value(), true);
         CHECK_EQUAL(*t.title, track_title);
+        dump(pl);
+    }
+
+    {
+        cout << "Test: 101 Smooth Jazz" << endl;
+        auto input = "#EXTM3U"s + crlf
+            + "#EXTINF:0, 101 Smooth Jazz"s + crlf
+            + "http://jking.cdnstream1.com/b22139_128mp3"s;
+        auto pl = parse(input);
+        CHECK_EQUAL(pl.size(), 1);
+        auto& t = pl.at(0);
+        CHECK_EQUAL(t.url, "http://jking.cdnstream1.com/b22139_128mp3"s);
+        CHECK_EQUAL(t.title.has_value(), true);
+        CHECK_EQUAL(*t.title, " 101 Smooth Jazz"s);
+        CHECK_EQUAL(t.duration.has_value(), false);
         dump(pl);
     }
 

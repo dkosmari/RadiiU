@@ -165,6 +165,7 @@ radio_client::process_playlist()
     resolved_url = pl[0].url;
     cout << "radio_client::resolved_url = " << resolved_url << endl;
 
+    icy_stream.reset();
     http.set_url(resolved_url);
     current_state = state::started;
 }

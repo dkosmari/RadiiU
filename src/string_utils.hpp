@@ -97,6 +97,7 @@ namespace string_utils {
           std::size_t max_tokens = 0);
 
 
+    // equivalent to trimmed(..., std::isspace)
     [[nodiscard]]
     std::string
     trimmed(const std::string& input);
