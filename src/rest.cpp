@@ -53,6 +53,8 @@ namespace rest {
                 easy.set_user_agent(user_agent);
             easy.set_follow_location(true);
             easy.set_ssl_verify_peer(false);
+            easy.set_accept_encoding("");
+            easy.set_transfer_encoding(true);
             easy.set_write_function(std::bind_front(&request::on_write, this));
         }
 
@@ -142,6 +144,8 @@ namespace rest {
             ez.set_user_agent(user_agent);
         ez.set_follow_location(true);
         ez.set_ssl_verify_peer(false);
+        ez.set_accept_encoding("");
+        ez.set_transfer_encoding(true);
         byte_stream stream;
         ez.set_write_function([&stream](std::span<const char> buf)
                               {
@@ -217,6 +221,8 @@ namespace rest {
             ez.set_user_agent(user_agent);
         ez.set_follow_location(true);
         ez.set_ssl_verify_peer(false);
+        ez.set_accept_encoding("");
+        ez.set_transfer_encoding(true);
         ez.set_http_headers({ "Accept: application/json" });
         byte_stream stream;
         ez.set_write_function([&stream](std::span<const char> buf)

@@ -447,13 +447,13 @@ namespace ImGui {
                     SetScrollY(window, scroll.y + state.velocity.y * io.DeltaTime);
             }
 
-            const float scroll_speed_decay = 1.0f / 16.0f;
+            const float scroll_speed_decay = 1.0f / 8.0f;
             if (lock_scroll)
                 state.velocity = {};
             else
                 state.velocity *= std::pow(scroll_speed_decay, io.DeltaTime);
 
-            const float stop_speed = 150.0f;
+            const float stop_speed = 200.0f;
 #ifdef KINETIC_AXIS
             if (std::abs(state.velocity.x) < stop_speed)
                 state.velocity.x = 0;
@@ -539,7 +539,7 @@ namespace ImGui {
 
             state.velocity = delta / GetIO().DeltaTime;
             // don't start kinetic scrolling before it's above the threshold
-            const float speed_threshold = 300.0f;
+            const float speed_threshold = 600.0f;
 #ifdef KINETIC_AXIS
             if (std::abs(state.velocity.x) < speed_threshold)
                 state.velocity.x = 0;

@@ -83,6 +83,8 @@ http_client::set_url(const std::string& url)
     easy.set_forbid_reuse(false);
     easy.set_follow_location(true);
     easy.set_ssl_verify_peer(false);
+    easy.set_accept_encoding("");
+    easy.set_transfer_encoding(true);
     easy.set_write_function(std::bind(&http_client::curl_write_callback, this, _1));
     easy.set_url(url);
 
