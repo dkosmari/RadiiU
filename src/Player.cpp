@@ -244,12 +244,12 @@ namespace Player {
         Recent::add(station);
 
         std::string url;
-        if (!station->url_resolved.empty())
-            url = station->url_resolved;
+        // if (!station->url_resolved.empty())
+        //     url = station->url_resolved;
 
         if (url.empty())
             if (!station->url.empty())
-                url = station->url; // TODO: implement parsing m3u playlist
+                url = station->url;
 
         if (url.empty()) {
             cout << "No usable URL found" << endl;

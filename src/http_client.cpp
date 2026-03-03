@@ -11,6 +11,7 @@
 
 #include "http_client.hpp"
 
+#include "tracer.hpp"
 #include "utils.hpp"
 #include "string_utils.hpp"
 
@@ -24,28 +25,15 @@ using namespace std::placeholders;
 
 http_client::http_client(const std::string& url)
 {
-    easy.set_verbose(false);
-    easy.set_user_agent(utils::get_user_agent());
-    easy.set_url(url);
-    easy.set_forbid_reuse(true);
-    easy.set_follow_location(true);
-    easy.set_ssl_verify_peer(false);
-
-    // easy.set_http_headers({
-    //         "Accept: "s + utils::join(mimes, ",")
-    //     });
-
-    easy.set_write_function(std::bind(&http_client::curl_write_callback, this, _1));
-
     multi.set_max_total_connections(1);
-    multi.add(easy);
+    set_url(url);
 }
 
 
 http_client::~http_client()
     noexcept
 {
-    multi.remove(easy);
+    multi.try_remove(easy);
 }
 
 
@@ -83,21 +71,67 @@ http_client::add_accept(const std::string& mime)
 
 
 void
+http_client::set_url(const std::string& url)
+{
+    // TRACE_FUNC;
+
+    multi.try_remove(easy);
+
+    easy.reset();
+    easy.set_verbose(true); // DEBUG
+    easy.set_user_agent(utils::get_user_agent());
+    easy.set_forbid_reuse(true);
+    easy.set_follow_location(true);
+    easy.set_ssl_verify_peer(false);
+    easy.set_write_function(std::bind(&http_client::curl_write_callback, this, _1));
+    easy.set_url(url);
+
+    multi.add(easy);
+
+    request_prepared = false;
+    response_started = false;
+    pending_on_response_started = false;
+    pending_on_recv = false;
+}
+
+
+void
 http_client::process()
 {
-    if (!requested) {
+    if (!request_prepared) {
+        if (!accepts.empty())
+            easy.set_http_headers({
+                    "Accept: "s + string_utils::join(accepts, ",")
+                });
+
         headers.push_back("Accept: " + string_utils::join(accepts, ","));
         easy.set_http_headers(headers);
-        requested = true;
+        request_prepared = true;
     }
 
     multi.perform();
+
+    // Note: we invoke them here, not inside the curl callback.
+    if  (pending_on_response_started) {
+        if (on_response_started)
+            on_response_started();
+        pending_on_response_started = false;
+    }
+
+    if (pending_on_recv) {
+        if (on_recv)
+            on_recv();
+        pending_on_recv = false;
+    }
+
+    // check for completion
     auto done = multi.get_done();
     for (const auto& msg : done)
         if (msg.handle == &easy) {
             if (msg.result != CURLE_OK)
-                throw std::runtime_error{"curl::multi::perform(): " + std::to_string(msg.result)};
-            finished = true;
+                throw std::runtime_error{"http_client::process(): " + std::to_string(msg.result)};
+            if (on_response_finished)
+                on_response_finished();
         }
 }
 
@@ -105,7 +139,7 @@ http_client::process()
 std::optional<std::string>
 http_client::get_header(const std::string& name)
 {
-    if (!responded)
+    if (!response_started)
         return {};
 
     auto result = easy.try_get_header(name);
@@ -123,35 +157,14 @@ http_client::curl_write_callback(std::span<const char> buf)
         return 0;
     }
 
-    responded = true;
-
     data_stream.write(buf);
 
-#if 0
-    if (!dec) {
-        if (data_stream.size() >= 256) {
-            std::vector<char> initial_data;
-            try {
-                // try to create a decoder
-                auto hdr_content_type = easy.try_get_header("content-type");
-                auto content_type = hdr_content_type ? hdr_content_type->value : ""s;
-                initial_data = data_stream.read_as<char>();
-                dec = decoder::create(content_type, initial_data);
-                // total_bytes_fed = initial_data.size();
-            }
-            catch (std::exception& e) {
-                cout << "Failed to create decoder: " << e.what() << endl;
-                data_stream.write(std::span{initial_data});
-            }
-        }
-    } else {
-        // decoder already created
-        if (!data_stream.empty()) {
-            // cout << "Feeding " << data_stream.size() << " bytes to decoder" << endl;
-            total_bytes_fed += dec->feed(data_stream.read_as<char>());
-        }
+    if (!response_started) {
+        response_started = true;
+        pending_on_response_started = true;
     }
-#endif
+
+    pending_on_recv = true;
 
     return buf.size();
 }

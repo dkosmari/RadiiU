@@ -25,14 +25,14 @@ struct radio_client {
 
     enum class state {
         stopped,
-        waiting_response,
-        handling_playlist,
-        handling_audio,
+        started,
+        receiving_playlist,
+        streaming_audio,
     };
 
     state current_state = state::stopped;
 
-    std::string base_url;
+    std::string initial_url;
     std::string resolved_url;
 
     std::optional<stream_metadata> metadata;
@@ -46,6 +46,10 @@ struct radio_client {
 
 
     radio_client(const std::string& url);
+
+    // disallow moving
+    radio_client(radio_client&&) = delete;
+
 
     void
     process();
@@ -72,7 +76,13 @@ struct radio_client {
 private:
 
     void
-    process_http_response();
+    process_http_response_started();
+
+    void
+    process_http_response_finished();
+
+    void
+    process_http_recv();
 
     void
     process_playlist();

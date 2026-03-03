@@ -8,6 +8,7 @@
 #ifndef HTTP_CLIENT_HPP
 #define HTTP_CLIENT_HPP
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -21,10 +22,14 @@ struct http_client {
 
     curl::multi multi;
     curl::easy easy;
-    bool requested = false;
-    bool responded = false;
-    bool finished = false;
+    bool request_prepared = false;
+    bool response_started = false;
     byte_stream data_stream;
+
+
+    std::function<void()> on_response_started;
+    std::function<void()> on_response_finished;
+    std::function<void()> on_recv;
 
 
     // disallow moving
@@ -45,6 +50,10 @@ struct http_client {
 
 
     void
+    set_url(const std::string& url);
+
+
+    void
     process();
 
 
@@ -59,6 +68,9 @@ private:
 
     std::size_t
     curl_write_callback(std::span<const char> buf);
+
+    bool pending_on_response_started = false;
+    bool pending_on_recv = false;
 
 }; // struct http_client
 

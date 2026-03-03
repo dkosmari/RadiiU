@@ -74,6 +74,8 @@ radiiu_elf_SOURCES = \
 	src/imgui_extras.hpp \
 	src/json.cpp \
 	src/json.hpp \
+	src/m3u.cpp \
+	src/m3u.hpp \
 	src/main.cpp \
 	src/mime_type.cpp \
 	src/mime_type.hpp \
