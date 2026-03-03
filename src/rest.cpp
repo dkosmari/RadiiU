@@ -52,6 +52,7 @@ namespace rest {
             if (!user_agent.empty())
                 easy.set_user_agent(user_agent);
             easy.set_follow_location(true);
+            easy.set_auto_referer(true);
             easy.set_ssl_verify_peer(false);
             easy.set_accept_encoding("");
             easy.set_transfer_encoding(true);
@@ -143,6 +144,7 @@ namespace rest {
         if (!user_agent.empty())
             ez.set_user_agent(user_agent);
         ez.set_follow_location(true);
+        ez.set_auto_referer(true);
         ez.set_ssl_verify_peer(false);
         ez.set_accept_encoding("");
         ez.set_transfer_encoding(true);
@@ -220,6 +222,7 @@ namespace rest {
         if (!user_agent.empty())
             ez.set_user_agent(user_agent);
         ez.set_follow_location(true);
+        ez.set_auto_referer(true);
         ez.set_ssl_verify_peer(false);
         ez.set_accept_encoding("");
         ez.set_transfer_encoding(true);

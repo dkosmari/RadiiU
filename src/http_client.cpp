@@ -82,6 +82,7 @@ http_client::set_url(const std::string& url)
     easy.set_user_agent(utils::get_user_agent());
     easy.set_forbid_reuse(false);
     easy.set_follow_location(true);
+    easy.set_auto_referer(true);
     easy.set_ssl_verify_peer(false);
     easy.set_accept_encoding("");
     easy.set_transfer_encoding(true);

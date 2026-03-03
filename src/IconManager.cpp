@@ -249,6 +249,7 @@ namespace IconManager {
                     ez.set_user_agent(user_agent);
                 ez.set_url(location);
                 ez.set_follow_location(true);
+                ez.set_auto_referer(true);
                 ez.set_accept_encoding("");
                 ez.set_transfer_encoding(true);
                 ez.set_http_headers({ "Accept: image/*" });
