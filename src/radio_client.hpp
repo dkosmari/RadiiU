@@ -32,8 +32,9 @@ struct radio_client {
 
     state current_state = state::stopped;
 
-    std::string initial_url;
-    std::string resolved_url;
+    std::string url;
+    std::string url_resolved;
+    std::string user_agent;
 
     std::optional<stream_metadata> metadata;
 
@@ -45,7 +46,9 @@ struct radio_client {
     std::unique_ptr<decoder::base> dec;
 
 
-    radio_client(const std::string& url);
+    radio_client(const std::string& url,
+                 const std::string& url_resolved,
+                 const std::string& user_agent);
 
     // disallow moving
     radio_client(radio_client&&) = delete;
@@ -74,6 +77,9 @@ struct radio_client {
 
 
 private:
+
+    void
+    set_next_url(const std::string& next_url);
 
     void
     process_http_response_started();

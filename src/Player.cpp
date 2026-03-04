@@ -27,6 +27,7 @@
 
 #include "Player.hpp"
 
+#include "App.hpp"
 #include "Browser.hpp"
 #include "cfg.hpp"
 #include "Favorites.hpp"
@@ -39,7 +40,6 @@
 #include "Recent.hpp"
 #include "Station.hpp"
 #include "ui.hpp"
-#include "utils.hpp"
 
 
 using std::cout;
@@ -88,8 +88,9 @@ namespace Player {
         radio_client radio;
         sdl::audio::device audio_dev;
 
-        Resources(const std::string& url) :
-            radio{url}
+        Resources(const std::string& url,
+                  const std::string& url_resolved) :
+            radio{url, url_resolved, App::get_user_agent()}
         {
             if (cfg::disable_apd) {
 #ifdef __WUT__
@@ -243,25 +244,16 @@ namespace Player {
 
         Recent::add(station);
 
-        std::string url;
-        // if (!station->url_resolved.empty())
-        //     url = station->url_resolved;
-
-        if (url.empty())
-            if (!station->url.empty())
-                url = station->url;
-
-        if (url.empty()) {
-            cout << "No usable URL found" << endl;
-            return;
-        }
-        cout << "Playing URL: " << url << endl;
+        cout << "Playing url=\"" << station->url
+             << "\", url_resolved=\"" << station->url_resolved
+             << endl;
 
         Browser::send_click(station);
 
-        state = State::playing;
+        // allocate and initialize resources here
+        res.emplace(station->url, station->url_resolved);
 
-        res.emplace(url); // allocate and initialize resources here
+        state = State::playing;
     }
 
 

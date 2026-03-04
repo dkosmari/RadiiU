@@ -1,24 +1,29 @@
+/*
+ * RadiiU - an internet radio player for the Wii U.
+ *
+ * Copyright (C) 2026  Daniel K. O. <dkosmari>
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 #ifndef TRACER_HPP
 #define TRACER_HPP
 
-#include <iostream>
 #include <string>
 
 
 struct Tracer {
+
+    unsigned level;
     const std::string name;
 
-    Tracer(const std::string& name) :
-        name{name}
-    {
-        std::cout << "started: " << name << std::endl;
-    }
+    Tracer(const std::string& name)
+        noexcept;
 
     ~Tracer()
-    {
-        std::cout << "finished: " << name << std::endl;
-    }
-};
+        noexcept;
+
+}; // struct tracer
+
 
 #define TRACE_MERGE(a, b) a##b
 

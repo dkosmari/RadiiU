@@ -26,12 +26,12 @@
 
 #include "About.hpp"
 
+#include "App.hpp"
 #include "IconsFontAwesome4.h"
 #include "IconManager.hpp"
 #include "imgui_extras.hpp"
 #include "string_utils.hpp"
 #include "ui.hpp"
-#include "utils.hpp"
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -131,7 +131,7 @@ namespace About {
             std::vector<RoleName> result;
 
             try {
-                std::ifstream input{ utils::get_content_path() / "CREDITS" };
+                std::ifstream input{ App::get_content_path() / "CREDITS" };
                 std::string line;
                 while (getline(input, line)) {
                     if (!line.empty() && line.front() == '#')
@@ -182,7 +182,7 @@ namespace About {
 
                 ui::show_link_row("Homepage", PACKAGE_URL);
                 ui::show_link_row("Bugs", PACKAGE_BUGREPORT);
-                ui::show_info_row("User Agent", utils::get_user_agent());
+                ui::show_info_row("User Agent", App::get_user_agent());
 
                 ImGui::EndTable();
             }

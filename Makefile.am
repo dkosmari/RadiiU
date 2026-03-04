@@ -99,11 +99,10 @@ radiiu_elf_SOURCES = \
 	src/TabID.cpp \
 	src/TabID.hpp \
 	src/thread_safe.hpp \
+	src/tracer.cpp \
 	src/tracer.hpp \
 	src/ui.cpp \
-	src/ui.hpp \
-	src/utils.cpp \
-	src/utils.hpp
+	src/ui.hpp
 
 
 radiiu_elf_CPPFLAGS = \

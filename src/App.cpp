@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -19,6 +19,8 @@
 #include <coreinit/memory.h>
 #include <vpad/input.h>
 #endif
+
+#include <curl/curl.h>
 
 #include <imgui.h>
 #include <backends/imgui_impl_sdl2.h>
@@ -43,7 +45,6 @@
 #include "Settings.hpp"
 #include "TabID.hpp"
 #include "tracer.hpp"
-#include "utils.hpp"
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -55,6 +56,7 @@ using std::endl;
 
 using std::filesystem::path;
 
+using namespace std::literals;
 using namespace sdl::literals;
 
 
@@ -125,6 +127,29 @@ namespace App {
 
     void
     process();
+
+
+    const std::string&
+    get_user_agent()
+    {
+        static const std::string user_agent = PACKAGE_NAME "/" PACKAGE_VERSION
+                                              + " ("s + SDL_GetPlatform() + ")"s;
+        return user_agent;
+    }
+
+
+    const std::filesystem::path&
+    get_content_path()
+    {
+        static const std::filesystem::path content_path =
+#ifdef __WIIU__
+            "/vol/content"
+#else
+            "assets/content"
+#endif
+            ;
+        return content_path;
+    }
 
 
 #ifdef __WIIU__
@@ -206,7 +231,7 @@ namespace App {
         // config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
         // config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
 
-        std::filesystem::path font_path = utils::get_content_path() / FONT_ICON_FILE_NAME_FA;
+        std::filesystem::path font_path = get_content_path() / FONT_ICON_FILE_NAME_FA;
         if (!io.Fonts->AddFontFromFileTTF(font_path.c_str(), default_font_size, &config))
             throw std::runtime_error{"could not load \"" + font_path.string() + "\""};
     }
@@ -369,6 +394,8 @@ namespace App {
     {
         TRACE_FUNC;
 
+        curl_global_init(CURL_GLOBAL_ALL);
+
         // Note: initialize cfg module early.
         cfg::initialize();
         next_tab = cfg::initial_tab;
@@ -411,7 +438,7 @@ namespace App {
 
         // Initialize modules.
         IconManager::initialize(res->renderer);
-        rest::initialize(utils::get_user_agent());
+        rest::initialize(get_user_agent());
 
         // Initialize tabs.
         Favorites::initialize();
@@ -447,6 +474,8 @@ namespace App {
         cfg::finalize();
 
         res.reset();
+
+        curl_global_cleanup();
     }
 
 

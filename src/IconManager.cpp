@@ -28,10 +28,10 @@
 
 #include "IconManager.hpp"
 
+#include "App.hpp"
 #include "async_queue.hpp"
 #include "thread_safe.hpp"
 #include "tracer.hpp"
-#include "utils.hpp"
 
 
 using std::cout;
@@ -101,8 +101,8 @@ namespace IconManager {
     {
         TRACE_FUNC;
 
-        user_agent = utils::get_user_agent();
-        content_prefix = utils::get_content_path();
+        user_agent = App::get_user_agent();
+        content_prefix = App::get_content_path();
 
         renderer = &rend;
 
@@ -252,6 +252,7 @@ namespace IconManager {
                 ez.set_auto_referer(true);
                 ez.set_accept_encoding("");
                 ez.set_transfer_encoding(true);
+                ez.set_buffer_size(65536);
                 ez.set_http_headers({ "Accept: image/*" });
                 ez.set_write_function([&entry](std::span<const char> buf) -> std::size_t
                 {
@@ -450,8 +451,6 @@ namespace IconManager {
     void
     worker_func(std::stop_token token)
     {
-        TRACE_FUNC;
-
         try {
             multi.emplace();
             multi->set_max_total_connections(10);

@@ -20,6 +20,8 @@
 
 struct http_client {
 
+    std::string user_agent;
+
     curl::multi multi;
     curl::easy easy;
     bool request_prepared = false;
@@ -36,7 +38,7 @@ struct http_client {
     http_client(http_client&&) = delete;
 
 
-    http_client(const std::string& url);
+    http_client(const std::string& user_agent);
 
     ~http_client()
         noexcept;
@@ -59,7 +61,6 @@ struct http_client {
 
     std::optional<std::string>
     get_header(const std::string& name);
-
 
 private:
 

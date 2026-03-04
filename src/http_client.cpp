@@ -11,9 +11,8 @@
 
 #include "http_client.hpp"
 
-#include "tracer.hpp"
-#include "utils.hpp"
 #include "string_utils.hpp"
+#include "tracer.hpp"
 
 
 using std::cout;
@@ -23,10 +22,10 @@ using namespace std::literals;
 using namespace std::placeholders;
 
 
-http_client::http_client(const std::string& url)
+http_client::http_client(const std::string& user_agent) :
+    user_agent{user_agent}
 {
     multi.set_max_total_connections(2);
-    set_url(url);
 }
 
 
@@ -79,13 +78,15 @@ http_client::set_url(const std::string& url)
 
     easy.reset();
     easy.set_verbose(true); // DEBUG
-    easy.set_user_agent(utils::get_user_agent());
+    if (!user_agent.empty())
+        easy.set_user_agent(user_agent);
     easy.set_forbid_reuse(false);
     easy.set_follow_location(true);
     easy.set_auto_referer(true);
     easy.set_ssl_verify_peer(false);
     easy.set_accept_encoding("");
     easy.set_transfer_encoding(true);
+    easy.set_buffer_size(2 * 1024 * 1024);
     easy.set_write_function(std::bind(&http_client::curl_write_callback, this, _1));
     easy.set_url(url);
 

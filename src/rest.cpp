@@ -29,6 +29,28 @@ namespace rest {
     curl::multi multi;
 
 
+    namespace {
+
+        curl::easy
+        make_easy(const std::string& url)
+        {
+            curl::easy easy;
+            easy.set_url(url);
+            easy.set_verbose(false);
+            if (!user_agent.empty())
+                easy.set_user_agent(user_agent);
+            easy.set_follow_location(true);
+            easy.set_auto_referer(true);
+            easy.set_ssl_verify_peer(true);
+            easy.set_accept_encoding("");
+            easy.set_transfer_encoding(true);
+            easy.set_buffer_size(65536);
+            return easy;
+        }
+
+    } // namespace
+
+
     struct request {
 
         byte_stream stream;
@@ -43,19 +65,11 @@ namespace rest {
         request(const std::string& url,
                 success_function_t on_success_arg,
                 error_function_t on_error_arg) :
+            easy{make_easy(url)},
             on_success{std::move(on_success_arg)},
             on_error{std::move(on_error_arg)}
         {
             cout << "preparing request for '" << url << "'" << endl;
-            easy.set_url(url);
-            easy.set_verbose(false);
-            if (!user_agent.empty())
-                easy.set_user_agent(user_agent);
-            easy.set_follow_location(true);
-            easy.set_auto_referer(true);
-            easy.set_ssl_verify_peer(false);
-            easy.set_accept_encoding("");
-            easy.set_transfer_encoding(true);
             easy.set_write_function(std::bind_front(&request::on_write, this));
         }
 
@@ -138,22 +152,13 @@ namespace rest {
     std::string
     get_sync(const std::string& url)
     {
-        curl::easy ez;
-        ez.set_url(url);
-        ez.set_verbose(false);
-        if (!user_agent.empty())
-            ez.set_user_agent(user_agent);
-        ez.set_follow_location(true);
-        ez.set_auto_referer(true);
-        ez.set_ssl_verify_peer(false);
-        ez.set_accept_encoding("");
-        ez.set_transfer_encoding(true);
+        curl::easy easy = make_easy(url);
         byte_stream stream;
-        ez.set_write_function([&stream](std::span<const char> buf)
-                              {
-                                  return stream.write(buf);
-                              });
-        ez.perform();
+        easy.set_write_function([&stream](std::span<const char> buf)
+                                {
+                                    return stream.write(buf);
+                                });
+        easy.perform();
         return stream.read_str();
     }
 
@@ -216,24 +221,15 @@ namespace rest {
     json::value
     get_json_sync(const std::string& url)
     {
-        curl::easy ez;
-        ez.set_url(url);
-        ez.set_verbose(false);
-        if (!user_agent.empty())
-            ez.set_user_agent(user_agent);
-        ez.set_follow_location(true);
-        ez.set_auto_referer(true);
-        ez.set_ssl_verify_peer(false);
-        ez.set_accept_encoding("");
-        ez.set_transfer_encoding(true);
-        ez.set_http_headers({ "Accept: application/json" });
+        curl::easy easy = make_easy(url);
+        easy.set_http_headers({ "Accept: application/json" });
         byte_stream stream;
-        ez.set_write_function([&stream](std::span<const char> buf)
+        easy.set_write_function([&stream](std::span<const char> buf)
                               {
                                   return stream.write(buf);
                               });
-        ez.perform();
-        auto content_type_header = ez.try_get_header("Content-Type");
+        easy.perform();
+        auto content_type_header = easy.try_get_header("Content-Type");
         if (content_type_header)
             if (!content_type_header->value.starts_with("application/json"))
                 throw std::runtime_error{"Content-Type should be application/json, but got "

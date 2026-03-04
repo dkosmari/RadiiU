@@ -38,6 +38,7 @@
 
 #include "Browser.hpp"
 
+#include "App.hpp"
 #include "cfg.hpp"
 #include "Favorites.hpp"
 #include "humanize.hpp"
@@ -52,7 +53,6 @@
 #include "thread_safe.hpp"
 #include "tracer.hpp"
 #include "ui.hpp"
-#include "utils.hpp"
 
 
 using std::cout;
@@ -480,7 +480,7 @@ namespace Browser {
     try {
         std::ifstream input;
         if (!try_open_file(input, cfg::base_dir / "tags.ignore"))
-            if (!try_open_file(input, utils::get_content_path() / "tags.ignore"))
+            if (!try_open_file(input, App::get_content_path() / "tags.ignore"))
                 throw std::runtime_error{"could not find tags.ignore"};
         std::string line;
         std::string full_regex;

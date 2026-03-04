@@ -21,21 +21,28 @@ using std::endl;
 using namespace std::literals;
 
 
-radio_client::radio_client(const std::string& url) :
-    initial_url{url},
-    http{initial_url},
+radio_client::radio_client(const std::string& url,
+                           const std::string& url_resolved,
+                           const std::string& user_agent) :
+    url{url},
+    url_resolved{url_resolved},
+    user_agent{user_agent},
+    http{user_agent},
     data_stream{&http.data_stream}
 {
     TRACE_FUNC;
 
     http.add_header("Icy-MetaData: 1");
 
-    current_state = state::started;
-
     // Note: these callbacks are invoked during http::process()
     http.on_response_started  = [this] { process_http_response_started();  };
     http.on_response_finished = [this] { process_http_response_finished(); };
     http.on_recv = [this] { process_http_recv(); };
+
+    if (!url_resolved.empty())
+        set_next_url(url_resolved);
+    else
+        set_next_url(url);
 }
 
 
@@ -80,6 +87,19 @@ radio_client::get_decoder_info()
     if (!dec)
         return {};
     return dec->get_info();
+}
+
+
+void
+radio_client::set_next_url(const std::string& next_url)
+{
+    icy_stream.reset();
+
+    http.set_url(next_url);
+    if (next_url.empty())
+        current_state = state::stopped;
+    else
+        current_state = state::started;
 }
 
 
@@ -162,12 +182,10 @@ radio_client::process_playlist()
         return;
     }
 
-    resolved_url = pl[0].url;
-    cout << "radio_client::resolved_url = " << resolved_url << endl;
+    url_resolved = pl[0].url;
+    cout << "radio_client::url_resolved = " << url_resolved << endl;
 
-    icy_stream.reset();
-    http.set_url(resolved_url);
-    current_state = state::started;
+    set_next_url(url_resolved);
 }
 
 
