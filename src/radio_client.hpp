@@ -32,6 +32,14 @@ struct radio_client {
 
     state current_state = state::stopped;
 
+    enum class playlist_type {
+        none,
+        m3u,
+        pls,
+    };
+
+    playlist_type current_playlist = playlist_type::none;
+
     std::string url;
     std::string url_resolved;
     std::string user_agent;

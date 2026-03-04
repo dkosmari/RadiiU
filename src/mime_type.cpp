@@ -64,7 +64,15 @@ namespace mime_type {
     {
         using string_utils::split;
 
-        auto input_v = split(input, "/", false, 2);
+        // ignore the paramter, if present
+        std::string no_param_input;
+        auto semicolon_pos = input.find(';');
+        if (semicolon_pos != std::string::npos)
+            no_param_input = input.substr(0, semicolon_pos);
+        else
+            no_param_input = input;
+
+        auto input_v = split(no_param_input, "/", false, 2);
         if (input_v.size() != 2) {
             //throw std::runtime_error{"invalid mime-type in input"};
             return false;

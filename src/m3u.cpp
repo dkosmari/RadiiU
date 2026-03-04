@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <iostream>             // DEBUG
+#include <ostream>
 #include <ranges>
 #include <utility>              // move()
 
@@ -13,9 +13,6 @@
 
 #include "string_utils.hpp"
 
-
-using std::cout;
-using std::endl;
 
 using namespace std::literals;
 
@@ -25,22 +22,23 @@ namespace m3u {
     const std::string ext_m3u = "#EXTM3U";
     const std::string ext_inf = "#EXTINF:";
 
-    std::ostream&
-    operator <<(std::ostream& out,
-                const track& t)
+    void
+    write(std::ostream& out,
+          const track& trk,
+          bool is_ext)
     {
-        if (t.duration || t.title) {
+        if (is_ext) {
             out << ext_inf;
-            if (t.duration)
-                out << t.duration->count();
+            if (trk.duration)
+                out << trk.duration->count();
             else
                 out << "-1";
             out << ',';
-            if (t.title)
-                out << *t.title;
+            if (trk.title)
+                out << *trk.title;
             out << '\n';
         }
-        return out << t.url;
+        out << trk.url << '\n';
     }
 
 
@@ -58,9 +56,9 @@ namespace m3u {
         if (is_ext)
             out << ext_m3u << '\n';
 
-        for (auto& t : pl) {
-            out << t << '\n';
-        }
+        for (auto& trk : pl)
+            write(out, trk, is_ext);
+
         return out;
     }
 
@@ -131,46 +129,23 @@ namespace m3u {
 
 #ifdef UNIT_TEST
 
-// g++ -std=c++23 -DUNIT_TEST m3u.cpp string_utils.cpp
+// compilation: g++ -std=c++23 -DUNIT_TEST m3u.cpp
 
-#include <iostream>
-#include <sstream>
+#include "string_utils.cpp"
 
-using std::cout;
-using std::endl;
-using std::string;
-
-
-#define CHECK_EQUAL(x, y)                       \
-    do {                                        \
-        const auto x_val = x;                   \
-        const auto y_val = y;                   \
-        ++total;                                \
-        if (x_val == y_val) {                   \
-            ++successes;                        \
-            cout << "    PASSED" << endl;       \
-        } else {                                \
-            cout << "    FAILED: "              \
-                 << #x << " (" << x_val << ")"  \
-                 << " != "                      \
-                 << #y << " (" << y_val << ")"  \
-                 << endl;                       \
-        }                                       \
-    } while (false)
+#include "unit_test.hpp"
 
 void
 dump(const m3u::playlist& pl)
 {
-    cout << "---- PL BEGIN ----\n"
+    cout << "<m3u>\n"
          << pl
-         << "---- PL END ----"
+         << "</m3u>"
          << endl;
 }
 
 int main()
 {
-    using namespace m3u;
-
     int total = 0;
     int successes = 0;
 
@@ -179,7 +154,7 @@ int main()
     {
         cout << "Test: simple empty" << endl;
         auto input = crlf;
-        auto pl = parse(input);
+        auto pl = m3u::parse(input);
         CHECK_EQUAL(pl.size(), 0);
         dump(pl);
     }
@@ -188,7 +163,7 @@ int main()
         cout << "Test: simple with one track" << endl;
         auto track_url = "http://www.example.com/stream"s;
         auto input = track_url;
-        auto pl = parse(input);
+        auto pl = m3u::parse(input);
         CHECK_EQUAL(pl.size(), 1);
         CHECK_EQUAL(pl.at(0).url, track_url);
         dump(pl);
@@ -197,7 +172,7 @@ int main()
     {
         cout << "Test: extended empty" << endl;
         auto input = "#EXTM3U"s + crlf;
-        auto pl = parse(input);
+        auto pl = m3u::parse(input);
         CHECK_EQUAL(pl.size(), 0);
         dump(pl);
     }
@@ -211,7 +186,7 @@ int main()
             "#EXTM3U"s + crlf
             + "#EXTINF:"s + std::to_string(track_duration.count()) + ","s + track_title + crlf
             + track_url + crlf;
-        auto pl = parse(input);
+        auto pl = m3u::parse(input);
         CHECK_EQUAL(pl.size(), 1);
         auto& t = pl.at(0);
         CHECK_EQUAL(t.duration.has_value(), true);
@@ -226,7 +201,7 @@ int main()
         auto input = "#EXTM3U"s + crlf
             + "#EXTINF:0, 101 Smooth Jazz"s + crlf
             + "http://jking.cdnstream1.com/b22139_128mp3"s;
-        auto pl = parse(input);
+        auto pl = m3u::parse(input);
         CHECK_EQUAL(pl.size(), 1);
         auto& t = pl.at(0);
         CHECK_EQUAL(t.url, "http://jking.cdnstream1.com/b22139_128mp3"s);

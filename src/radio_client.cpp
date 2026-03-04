@@ -12,6 +12,7 @@
 #include "cfg.hpp"
 #include "m3u.hpp"
 #include "mime_type.hpp"
+#include "pls.hpp"
 #include "tracer.hpp"
 
 
@@ -19,6 +20,32 @@ using std::cout;
 using std::endl;
 
 using namespace std::literals;
+
+
+namespace {
+
+    // Mime types for M3U playlists
+    const std::vector<std::string> m3u_mimes{
+        "audio/mpegurl",
+        "audio/x-mpegurl",
+        "application/vnd.apple.mpegurl",
+        "application/vnd.apple.mpegurl.audio",
+        "application/mpegurl",
+        "application/x-mpegurl",
+    };
+
+    // Mime types for PLS playlists
+    const std::vector<std::string> pls_mimes{
+        "audio/x-scpls",
+    };
+
+    // Mime types for audio streams
+    const std::vector<std::string> audio_mimes{
+        "audio/*",
+        "application/ogg",
+    };
+
+} // namespace
 
 
 radio_client::radio_client(const std::string& url,
@@ -115,24 +142,16 @@ radio_client::process_http_response_started()
         return;
     }
 
-    // Mime types for m3u playlists
-    const std::vector<std::string> m3u_types{
-        "audio/mpegurl",
-        "audio/x-mpegurl",
-        "application/vnd.apple.mpegurl",
-        "application/vnd.apple.mpegurl.audio",
-        "application/mpegurl",
-        "application/x-mpegurl",
-    };
-
-    // Mime types for audio streams
-    const std::vector<std::string> audio_types{
-        "audio/*",
-        "application/ogg",
-    };
-    if (mime_type::match(*content_type, m3u_types)) {
+    if (mime_type::match(*content_type, m3u_mimes)) {
+        cout << "Detected M3U mime: " << *content_type << endl;
         current_state = state::receiving_playlist;
-    } else if (mime_type::match(*content_type, audio_types)) {
+        current_playlist = playlist_type::m3u;
+    } else if (mime_type::match(*content_type, pls_mimes)) {
+        cout << "Detected PLS mime: " << *content_type << endl;
+        current_state = state::receiving_playlist;
+        current_playlist = playlist_type::pls;
+    } else if (mime_type::match(*content_type, audio_mimes)) {
+        cout << "Detected audio mime: " << *content_type << endl;
         current_state = state::streaming_audio;
         try {
             cout << "Trying to create ICY stream" << endl;
@@ -143,7 +162,8 @@ radio_client::process_http_response_started()
         catch (std::exception& e) {
             cout << "Could not create ICY stream: " << e.what() << endl;
         }
-    }
+    } else
+        cout << "ERROR: don't know how to handle mime-type: " << *content_type << endl;
 }
 
 
@@ -173,18 +193,40 @@ radio_client::process_playlist()
 {
     // TRACE_FUNC;
 
+    url_resolved.clear();
+
     std::string data = data_stream->read_str();
-    auto pl = m3u::parse(data);
-    if (pl.empty()) {
-        cout << "ERROR: playlis is empty!" << endl;
-        cout << "<m3u>\n" << data << "</m3u>" << endl;
-        current_state = state::stopped;
-        return;
-    }
 
-    url_resolved = pl[0].url;
-    cout << "radio_client::url_resolved = " << url_resolved << endl;
+    switch (current_playlist) {
+        case playlist_type::m3u: {
+            try {
+                auto pl = m3u::parse(data);
+                url_resolved = pl.at(0).url;
+            }
+            catch (std::exception& e) {
+                cout << "ERROR: " << e.what() << endl;
+                cout << "<m3u>\n" << data << "\n</m3u>" << endl;
+            }
+            break;
+        }
 
+        case playlist_type::pls: {
+            try {
+                auto pl = pls::parse(data);
+                url_resolved = pl.at(0).url;
+            }
+            catch (std::exception& e) {
+                cout << "ERROR: " << e.what() << endl;
+                cout << "<pls>\n" << data << "\n</pls>" << endl;
+            }
+            break;
+        }
+
+        default:
+            cout << "ERROR: should not invoke process_playlist() when no playlist" << endl;
+    } // switch (current_playlist)
+
+    cout << "radio_client::url_resolved = \"" << url_resolved << "\"" << endl;
     set_next_url(url_resolved);
 }
 

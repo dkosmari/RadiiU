@@ -242,19 +242,20 @@ namespace IconManager {
 
             if (location.starts_with("http://") || location.starts_with("https://")) {
                 // URL
-                auto& ez = entry.easy.emplace();
-                ez.set_verbose(false);
-                ez.set_ssl_verify_peer(false);
+                auto& easy = entry.easy.emplace();
+                easy.set_verbose(false);
+                easy.set_http_version(curl::easy::http_version::none);
+                easy.set_ssl_verify_peer(false);
                 if (!user_agent.empty())
-                    ez.set_user_agent(user_agent);
-                ez.set_url(location);
-                ez.set_follow_location(true);
-                ez.set_auto_referer(true);
-                ez.set_accept_encoding("");
-                ez.set_transfer_encoding(true);
-                ez.set_buffer_size(65536);
-                ez.set_http_headers({ "Accept: image/*" });
-                ez.set_write_function([&entry](std::span<const char> buf) -> std::size_t
+                    easy.set_user_agent(user_agent);
+                easy.set_url(location);
+                easy.set_follow_location(true);
+                easy.set_auto_referer(true);
+                easy.set_accept_encoding("");
+                easy.set_transfer_encoding(true);
+                easy.set_buffer_size(65536);
+                easy.set_http_headers({ "Accept: image/*" });
+                easy.set_write_function([&entry](std::span<const char> buf) -> std::size_t
                 {
                     auto content_type_header = entry.easy->try_get_header("Content-Type");
                     if (content_type_header) {
@@ -277,7 +278,7 @@ namespace IconManager {
 #endif
                     return buf.size();
                 });
-                multi->add(ez);
+                multi->add(easy);
             } else if (location.starts_with("ui/")) {
                 // local path
                 // cout << "Loading local image from " << location << endl;

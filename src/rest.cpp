@@ -35,13 +35,14 @@ namespace rest {
         make_easy(const std::string& url)
         {
             curl::easy easy;
+            easy.set_verbose(true);
+            easy.set_http_version(curl::easy::http_version::none);
             easy.set_url(url);
-            easy.set_verbose(false);
             if (!user_agent.empty())
                 easy.set_user_agent(user_agent);
             easy.set_follow_location(true);
             easy.set_auto_referer(true);
-            easy.set_ssl_verify_peer(true);
+            easy.set_ssl_verify_peer(false);
             easy.set_accept_encoding("");
             easy.set_transfer_encoding(true);
             easy.set_buffer_size(65536);

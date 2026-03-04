@@ -5,29 +5,38 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#ifndef M3U_HPP
-#define M3U_HPP
+#ifndef PLS_HPP
+#define PLS_HPP
 
 #include <chrono>
+#include <cstddef>
 #include <iosfwd>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
 
-namespace m3u {
+namespace pls {
+
+    struct error : std::runtime_error {
+
+        error(const std::string& msg);
+
+    }; // struct error
+
 
     struct track {
         std::string url;
-        std::optional<std::chrono::seconds> duration;
         std::optional<std::string> title;
-    };
+        std::optional<std::chrono::seconds> length;
+    }; // struct track
 
 
     void
     write(std::ostream& out,
           const track& trk,
-          bool is_ext);
+          std::size_t num);
 
 
     using playlist = std::vector<track>;
@@ -41,6 +50,6 @@ namespace m3u {
     playlist
     parse(const std::string& input);
 
-} // namespace m3u
+} // namespace pls
 
 #endif

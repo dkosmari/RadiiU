@@ -78,6 +78,7 @@ http_client::set_url(const std::string& url)
 
     easy.reset();
     easy.set_verbose(true); // DEBUG
+    easy.set_http_version(curl::easy::http_version::none);
     if (!user_agent.empty())
         easy.set_user_agent(user_agent);
     easy.set_forbid_reuse(false);

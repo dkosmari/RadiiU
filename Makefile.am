@@ -81,6 +81,8 @@ radiiu_elf_SOURCES = \
 	src/mime_type.hpp \
 	src/Player.cpp \
 	src/Player.hpp \
+	src/pls.cpp \
+	src/pls.hpp \
 	src/radio_client.cpp \
 	src/radio_client.hpp \
 	src/Recent.cpp \
@@ -102,7 +104,8 @@ radiiu_elf_SOURCES = \
 	src/tracer.cpp \
 	src/tracer.hpp \
 	src/ui.cpp \
-	src/ui.hpp
+	src/ui.hpp \
+	src/unit_test.hpp
 
 
 radiiu_elf_CPPFLAGS = \
