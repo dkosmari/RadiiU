@@ -35,7 +35,7 @@ namespace rest {
         make_easy(const std::string& url)
         {
             curl::easy easy;
-            easy.set_verbose(true);
+            easy.set_verbose(false);
             easy.set_http_version(curl::easy::http_version::none);
             easy.set_url(url);
             if (!user_agent.empty())
@@ -46,6 +46,7 @@ namespace rest {
             easy.set_accept_encoding("");
             easy.set_transfer_encoding(true);
             easy.set_buffer_size(65536);
+            easy.set_tcp_no_delay(false);
             return easy;
         }
 

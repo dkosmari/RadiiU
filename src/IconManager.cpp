@@ -254,6 +254,7 @@ namespace IconManager {
                 easy.set_accept_encoding("");
                 easy.set_transfer_encoding(true);
                 easy.set_buffer_size(65536);
+                easy.set_tcp_no_delay(false);
                 easy.set_http_headers({ "Accept: image/*" });
                 easy.set_write_function([&entry](std::span<const char> buf) -> std::size_t
                 {

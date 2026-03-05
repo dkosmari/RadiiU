@@ -87,7 +87,8 @@ http_client::set_url(const std::string& url)
     easy.set_ssl_verify_peer(false);
     easy.set_accept_encoding("");
     easy.set_transfer_encoding(true);
-    easy.set_buffer_size(2 * 1024 * 1024);
+    easy.set_buffer_size(1 * 1024 * 1024);
+    easy.set_tcp_no_delay(false);
     easy.set_write_function(std::bind(&http_client::curl_write_callback, this, _1));
     easy.set_url(url);
 

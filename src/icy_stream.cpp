@@ -105,7 +105,7 @@ namespace icy {
                     meta_left = *c * 16u;
                     if (meta_left == 0) { // no metadata for now
                         data_left = interval;
-                        return;
+                        continue;
                     }
                 }
 
