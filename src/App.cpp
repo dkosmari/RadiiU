@@ -20,7 +20,7 @@
 #include <vpad/input.h>
 #endif
 
-#include <curl/curl.h>
+#include <curlxx/global.hpp>
 
 #include <imgui.h>
 #include <backends/imgui_impl_sdl2.h>
@@ -66,6 +66,8 @@ namespace App {
 
         // RAII-managed resources are stored here.
         struct Resources {
+
+            curl::global::init curl_init;
 
             sdl::init sdl_init{sdl::init::flag::video,
                                sdl::init::flag::audio,
@@ -394,8 +396,6 @@ namespace App {
     {
         TRACE_FUNC;
 
-        curl_global_init(CURL_GLOBAL_ALL);
-
         // Note: initialize cfg module early.
         cfg::initialize();
         next_tab = cfg::initial_tab;
@@ -474,8 +474,6 @@ namespace App {
         cfg::finalize();
 
         res.reset();
-
-        curl_global_cleanup();
     }
 
 

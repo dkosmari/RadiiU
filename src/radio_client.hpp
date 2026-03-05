@@ -34,8 +34,13 @@ struct radio_client {
 
     enum class playlist_type {
         none,
+        asx,                    // TODO
+        cue,                    // TODO
+        jspf,                   // TODO text/json
         m3u,
         pls,
+        wpl,                    // TODO
+        xspf,                   // TODO application/xspf+xml
     };
 
     playlist_type current_playlist = playlist_type::none;
