@@ -62,6 +62,25 @@ using namespace sdl::literals;
 
 namespace App {
 
+    void
+    process_events();
+
+    void
+    process_ui();
+
+    void
+    process_screen_saver();
+
+    void
+    process();
+
+    void
+    quit();
+
+    void
+    draw();
+
+
     namespace {
 
         // RAII-managed resources are stored here.
@@ -111,24 +130,6 @@ namespace App {
         Uint64 fade_duration_ms = 5'000;
 
     } // namespace
-
-    void
-    quit();
-
-    void
-    draw();
-
-    void
-    process_events();
-
-    void
-    process_ui();
-
-    void
-    process_screen_saver();
-
-    void
-    process();
 
 
     const std::string&

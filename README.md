@@ -37,16 +37,15 @@ for free. You can donate to them to ensure the project continues running.
 
 - `ppc-vorbisfile`
 
-- libcurl
-  - Wii U curl package: https://github.com/dkosmari/wiiu-curl-package
-  - Wii U mbedtls package: https://github.com/dkosmari/wiiu-mbedtls-package
-
 - SDL2
-  - Wii U package: https://github.com/dkosmari/wiiu-sdl2-package
 
 - SDL2_image
 
 - SDL2_ttf
+
+- libcurl
+  - Wii U curl package: https://github.com/dkosmari/wiiu-curl-package
+  - Wii U mbedtls package: https://github.com/dkosmari/wiiu-mbedtls-package
 
 ### Obtaining the source
 
