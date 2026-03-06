@@ -46,6 +46,12 @@ PKG_CHECK_MODULES([FT], [freetype2])
 PKG_CHECK_MODULES_STATIC([OPUSFILE], [opusfile])
 PKG_CHECK_MODULES_STATIC([VORBISFILE], [vorbisfile])
 
+AS_VAR_IF([enable_wiiu], [yes],
+          [],
+          [
+          PKG_CHECK_MODULES([FONTCONFIG], [fontconfig])
+          ])
+
 AC_DEFINE_UNQUOTED([MPG123_VERSION],
                    ["`$PKG_CONFIG --modversion libmpg123`"],
                    [version of mpg123])

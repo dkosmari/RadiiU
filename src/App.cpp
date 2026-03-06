@@ -10,6 +10,7 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -18,6 +19,8 @@
 #include <coreinit/energysaver.h>
 #include <coreinit/memory.h>
 #include <vpad/input.h>
+#else // !__WIIU__
+#include <fontconfig/fontconfig.h>
 #endif
 
 #include <curlxx/global.hpp>
@@ -156,6 +159,7 @@ namespace App {
 
 
 #ifdef __WIIU__
+
     void
     load_system_fonts()
     {
@@ -195,8 +199,56 @@ namespace App {
                                            default_font_size, &config);
         }
     }
+
 #else // !__WIIU__
-    // native version
+
+    std::filesystem::path
+    find_font(const std::string& family,
+              const std::string& lang)
+    {
+        // TODO: these should use RAII, but fontconfig failing is rare
+
+        FcPattern* pattern = FcPatternCreate();
+        FcPatternAddString(pattern, FC_FAMILY,
+                           reinterpret_cast<const FcChar8*>(family.data()));
+        // Tell fontconfig the fallback font should be "sans"
+        FcPatternAddString(pattern, FC_FAMILY,
+                           reinterpret_cast<const FcChar8*>("sans"));
+
+        FcLangSet* lang_set = FcLangSetCreate();
+        FcLangSetAdd(lang_set, reinterpret_cast<const FcChar8*>(lang.data()));
+        FcPatternAddLangSet(pattern, FC_LANG, lang_set);
+
+        FcPatternAddDouble(pattern, FC_SIZE, default_font_size);
+
+        // cout << "DEBUG: pattern:" << endl;
+        // FcPatternPrint(pattern);
+
+        FcConfigSubstitute(nullptr, pattern, FcMatchPattern);
+        FcDefaultSubstitute(pattern);
+
+        FcResult fresult;
+        FcPattern* font_pattern = FcFontMatch(nullptr, pattern, &fresult);
+        if (fresult != FcResultMatch)
+            throw std::runtime_error{"fc match error"};
+
+        // cout << "DEBUG font_pattern:" << endl;
+        // FcPatternPrint(font_pattern);
+
+        FcChar8* file = nullptr;
+        if (FcPatternGetString(font_pattern, FC_FILE, 0, &file) != FcResultMatch)
+            throw std::logic_error{"font has no file!"};
+
+        std::filesystem::path result = reinterpret_cast<char*>(file);
+
+        FcPatternDestroy(font_pattern);
+        FcPatternDestroy(pattern);
+        FcLangSetDestroy(lang_set);
+
+        return result;
+    }
+
+
     void
     load_system_fonts()
     {
@@ -206,19 +258,44 @@ namespace App {
         config.EllipsisChar = U'…';
         config.Flags |= ImFontFlags_NoLoadError;
 
-        // TODO: use fontconfig to find a font
+        if (!FcInit())
+            throw std::runtime_error{"failed to initialize fontconfig"};
 
-#if 1
+        auto cafe_std_path = find_font("nintendo_NTLG-DB_002", "en");
+        auto cafe_cn_path = find_font("nintendo_HeiTiW5_002", "zh-cn");
+        auto cafe_ko_path = find_font("nintendo_Tae-Gothic_002", "ko");
+        auto cafe_tw_path = find_font("nintendo_HeiMedium-B5_002", "zh-tw");
+
+        std::set<std::filesystem::path> extra_fonts{
+            cafe_cn_path,
+            cafe_ko_path,
+            cafe_tw_path
+        };
+
+        // if fontconfig returned the same font for every case
+        if (extra_fonts.contains(cafe_std_path))
+            extra_fonts.clear();
+
         // Note: CafeStd seems to always be too low, about 1/8th of the font size
         config.GlyphOffset.y = - default_font_size * (4.0f / 32.0f);
-        if (!io.Fonts->AddFontFromFileTTF("CafeStd.ttf", default_font_size, &config))
-            throw std::runtime_error{"could not load CafeStd"};
-#else
-        if (!io.Fonts->AddFontFromFileTTF("Ubuntu-R.ttf", default_font_size, &config))
-            throw std::runtime_error{"could not load main font"};
-#endif
+        if (!io.Fonts->AddFontFromFileTTF(cafe_std_path.c_str(),
+                                          default_font_size,
+                                          &config))
+            throw std::runtime_error{"could not load \""s + cafe_std_path.string() + "\""s};
+
+        config.MergeMode = true;
+
+        for (const auto& font : extra_fonts)
+            if (!io.Fonts->AddFontFromFileTTF(font.c_str(),
+                                              default_font_size,
+                                              &config))
+            throw std::runtime_error{"could not load \""s + font.string() + "\""s};
+
+        FcFini();
     }
+
 #endif // __WIIU__
+
 
     void
     load_fonts()

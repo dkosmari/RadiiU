@@ -183,6 +183,11 @@ CLEANFILES = $(WUHB_FILE) radiiu.map
 
 else !ENABLE_WIIU
 
+radiiu_elf_CPPFLAGS = += $(FONTCONFIG_CFLAGS)
+
+radiiu_elf_LDADD += $(FONTCONFIG_LIBS)
+
+
 .PHONY: run
 
 run: radiiu.elf

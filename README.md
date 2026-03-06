@@ -47,6 +47,9 @@ for free. You can donate to them to ensure the project continues running.
   - Wii U curl package: https://github.com/dkosmari/wiiu-curl-package
   - Wii U mbedtls package: https://github.com/dkosmari/wiiu-mbedtls-package
 
+- fontconfig (only for native build)
+
+
 ### Obtaining the source
 
 - Via mercurial:
@@ -92,5 +95,10 @@ make
 make run
 ```
 
-Note that the native build is meant to be run from the source code directory. It requires
-a file named `CafeStd.ttf`, to be used as the main font.
+Note that the native build is meant to be run from the top level source code directory,
+where it can find `assets/content`. The `make run` command will `cd` into the correct
+directory before executing the program, so the app works properly even when building
+outside the source tree.
+ 
+It's recommended to have the Wii U's `Cafe*.ttf` fonts installed where fontconfig can find
+them (`~/.local/share/fonts/` or `/usr/share/fonts`) to match the Wii U's appearance.
