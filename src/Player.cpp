@@ -208,9 +208,10 @@ namespace Player {
     load()
     try {
 
-        const auto root = json::load(cfg::base_dir / "player.json").as<json::object>();
-        try_get(root, "details_expanded", details_expanded);
-        try_get(root, "history_expanded", history_expanded);
+        const auto root = json::load(App::get_config_path() / "player.json");
+        const auto& obj = root.as<json::object>();
+        try_get(obj, "details_expanded", details_expanded);
+        try_get(obj, "history_expanded", history_expanded);
     }
     catch (std::exception& e) {
         cout << "ERROR: Player::load(): " << e.what() << endl;
@@ -224,7 +225,7 @@ namespace Player {
         root["details_expanded"] = details_expanded;
         root["history_expanded"] = history_expanded;
 
-        json::save(std::move(root), cfg::base_dir / "player.json");
+        json::save(std::move(root), App::get_config_path() / "player.json");
     }
     catch (std::exception& e) {
         cout << "ERROR: Player::save(): " << e.what() << endl;

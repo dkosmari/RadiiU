@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -12,20 +12,10 @@
 #include <iostream>
 #include <optional>
 
-#ifdef __WIIU__
-#include <nn/act.h>
-#include <nn/save.h>
-#else
-#include <wordexp.h>
-#endif
-
 #include "json.hpp"
 
+#include "App.hpp"
 #include "cfg.hpp"
-
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
 
 
 using std::cout;
@@ -33,8 +23,6 @@ using std::endl;
 using std::string;
 
 namespace cfg {
-
-    std::filesystem::path base_dir;
 
     unsigned browser_page_limit;
     bool     disable_apd;
@@ -48,26 +36,7 @@ namespace cfg {
     unsigned screen_saver_timeout;
     bool     send_clicks;
     string   server;
-
-
-    std::filesystem::path
-    get_user_config_path()
-    {
-#ifdef __WIIU__
-            char buf[256];
-            std::snprintf(buf, sizeof buf, "/vol/save/%08x", nn::act::GetPersistentId());
-            return buf;
-#else
-            wordexp_t expanded{};
-            if (wordexp("${XDG_CONFIG_HOME:-~/.config}", &expanded, WRDE_NOCMD)) {
-                wordfree(&expanded);
-                return ".";
-            }
-            std::filesystem::path config_dir = expanded.we_wordv[0];
-            wordfree(&expanded);
-            return config_dir / PACKAGE;
-#endif
-    }
+    string   style;
 
 
     void
@@ -85,6 +54,7 @@ namespace cfg {
         screen_saver_timeout = 120;
         send_clicks          = false;
         server.clear();
+        style                = "";
     }
 
 
@@ -92,28 +62,6 @@ namespace cfg {
     initialize()
     {
         load_defaults();
-
-#ifdef __WIIU__
-        nn::act::Initialize();
-        base_dir = get_user_config_path();
-        SAVEInit();
-        if (!exists(base_dir)) {
-            cout << "Creating save dir..." << endl;
-            auto status = SAVEInitSaveDir(nn::act::GetSlotNo());
-            if (status)
-                cout << "SAVEInitSaveDir() returned " << int(status) << endl;
-            else
-                cout << "Save dir created." << endl;
-        }
-#else
-        base_dir = get_user_config_path();
-        if (!exists(base_dir)) {
-            cout << "Creating " << base_dir << endl;
-            if (!create_directory(base_dir))
-                cout << "Could not create " << base_dir << endl;
-        }
-#endif
-
         load();
     }
 
@@ -122,10 +70,6 @@ namespace cfg {
     finalize()
     {
         save();
-#ifdef __WIIU__
-        SAVEShutdown();
-        nn::act::Finalize();
-#endif
     }
 
 
@@ -133,7 +77,7 @@ namespace cfg {
     load()
     {
         try {
-            auto root = json::load(base_dir / "settings.json").as<json::object>();
+            auto root = json::load(App::get_config_path() / "settings.json").as<json::object>();
 
             try_get(root, "browser_page_limit",   browser_page_limit);
             try_get(root, "disable_apd",          disable_apd);
@@ -148,6 +92,7 @@ namespace cfg {
             try_get(root, "screen_saver_timeout", screen_saver_timeout);
             try_get(root, "send_clicks",          send_clicks);
             try_get(root, "server",               server);
+            try_get(root, "style",                style);
 
             // TODO: remove after 0.2
             if (player_buffer_size > 64)
@@ -177,8 +122,10 @@ namespace cfg {
             root["screen_saver_timeout"] = screen_saver_timeout;
             root["send_clicks"]          = send_clicks;
             root["server"]               = server;
+            if (!style.empty())
+                root["style"]            = style;
 
-            json::save(std::move(root), base_dir / "settings.json");
+            json::save(std::move(root), App::get_config_path() / "settings.json");
         }
         catch (std::exception& e) {
             cout << "Error saving settings: " << e.what() << endl;

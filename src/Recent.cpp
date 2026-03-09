@@ -15,6 +15,7 @@
 
 #include "Recent.hpp"
 
+#include "App.hpp"
 #include "cfg.hpp"
 #include "Favorites.hpp"
 #include "IconManager.hpp"
@@ -49,7 +50,7 @@ namespace Recent {
     void
     load()
     try {
-        auto root = json::load(cfg::base_dir / "recent.json");
+        auto root = json::load(App::get_config_path() / "recent.json");
         const auto& list = root.as<json::array>();
         stations.clear();
         for (auto& elem : list) {
@@ -69,7 +70,7 @@ namespace Recent {
         json::array list;
         for (const auto& station : stations)
             list.push_back(station->to_json());
-        json::save(std::move(list), cfg::base_dir / "recent.json");
+        json::save(std::move(list), App::get_config_path() / "recent.json");
     }
     catch (std::exception& e) {
         cout << "ERROR: Recent::save(): " << e.what() << endl;

@@ -98,6 +98,8 @@ radiiu_elf_SOURCES = \
 	src/stdout-wiiu.cpp \
 	src/stream_metadata.cpp \
 	src/stream_metadata.hpp \
+	src/Styles.cpp \
+	src/Styles.hpp \
 	src/TabID.cpp \
 	src/TabID.hpp \
 	src/thread_safe.hpp \

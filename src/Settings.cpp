@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -15,11 +15,14 @@
 #include "cfg.hpp"
 #include "IconsFontAwesome4.h"
 #include "imgui_extras.hpp"
+#include "Styles.hpp"
 #include "ui.hpp"
 
 
 using std::cout;
 using std::endl;
+using namespace std::literals;
+
 
 namespace Settings {
 
@@ -268,6 +271,35 @@ namespace Settings {
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::Checkbox("##send_clicks", &cfg::send_clicks);
+
+
+                /*********
+                 * Style *
+                 *********/
+
+                ImGui::TableNextRow();
+
+                ImGui::TableNextColumn();
+
+                ImGui::AlignTextToFramePadding();
+                ui::show_label("UI style");
+                ImGui::SetItemTooltip("Select color style for user interface");
+
+                ImGui::TableNextColumn();
+
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                if (ImGui::BeginCombo("##style", cfg::style)) {
+                    auto& styles = Styles::get_styles();
+                    for (const auto& [type, name] : styles) {
+                        std::string label = "("s + to_string(type) + ") "s + name;
+                        if (ImGui::Selectable(label, cfg::style == name)) {
+                            cfg::style = name;
+                            Styles::load();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+
 
                 /*******************
                  * End of settings *

@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -17,8 +17,6 @@
 
 namespace cfg {
 
-    extern std::filesystem::path base_dir;
-
     extern unsigned    browser_page_limit;
     extern bool        disable_apd;
     extern bool        disable_swkbd;
@@ -31,6 +29,7 @@ namespace cfg {
     extern unsigned    screen_saver_timeout;
     extern bool        send_clicks;
     extern std::string server;
+    extern std::string style;
 
 
     void

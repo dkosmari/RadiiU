@@ -20,6 +20,7 @@
 
 #include "Favorites.hpp"
 
+#include "App.hpp"
 #include "cfg.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
@@ -67,7 +68,7 @@ namespace Favorites {
     void
     load()
     try {
-        auto root = json::load(cfg::base_dir / "favorites.json");
+        auto root = json::load(App::get_config_path() / "favorites.json");
         const auto& list = root.as<json::array>();
         stations.clear();
         uuids.clear();
@@ -91,7 +92,7 @@ namespace Favorites {
         json::array list;
         for (const auto& station : stations)
             list.push_back(station->to_json());
-        json::save(std::move(list), cfg::base_dir / "favorites.json");
+        json::save(std::move(list), App::get_config_path() / "favorites.json");
     }
     catch (std::exception& e) {
         cout << "ERROR: Favorites::save(): " << e.what() << endl;

@@ -479,7 +479,7 @@ namespace Browser {
     load_tags_regex()
     try {
         std::ifstream input;
-        if (!try_open_file(input, cfg::base_dir / "tags.ignore"))
+        if (!try_open_file(input, App::get_config_path() / "tags.ignore"))
             if (!try_open_file(input, App::get_content_path() / "tags.ignore"))
                 throw std::runtime_error{"could not find tags.ignore"};
         std::string line;
@@ -525,7 +525,7 @@ namespace Browser {
     void
     load()
     try {
-        const auto root = json::load(cfg::base_dir / "browser.json").as<json::object>();
+        const auto root = json::load(App::get_config_path() / "browser.json").as<json::object>();
         if (root.contains("filter")) {
             const auto& filter = root.at("filter").as<json::object>();
             try_get(filter, "name", filter_name);
@@ -551,22 +551,22 @@ namespace Browser {
     try {
         json::object filter;
         if (!filter_name.empty())
-            filter["name"] = filter_name;
+            filter["name"]    = filter_name;
         if (!filter_tag.empty())
-            filter["tag"] = filter_tag;
+            filter["tag"]     = filter_tag;
         if (!filter_country.empty())
             filter["country"] = filter_country;
         if (filter_codec != Codec::all)
-            filter["codec"] = to_string(filter_codec);
+            filter["codec"]   = to_string(filter_codec);
 
         json::object root;
         if (!filter.empty())
             root["filter"] = std::move(filter);
 
         root["order"] = to_string(order);
-        root["page"] = page_index + 1;
+        root["page"]  = page_index + 1;
 
-        json::save(std::move(root), cfg::base_dir / "browser.json");
+        json::save(std::move(root), App::get_config_path() / "browser.json");
     }
     catch (std::exception& e) {
         cout << "ERROR: Browser::save(): " << e.what() << endl;

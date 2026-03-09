@@ -24,8 +24,14 @@ namespace App {
     get_content_path();
 
 
+    [[nodiscard]]
+    const std::filesystem::path&
+    get_config_path();
+
+
     void
     initialize();
+
 
     void
     finalize();

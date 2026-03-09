@@ -1,7 +1,6 @@
 syntax: glob
 
 *.elf
-*.json
 *.o
 *.rpx
 *.wuhb

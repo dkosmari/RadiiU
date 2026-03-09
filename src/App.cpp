@@ -18,9 +18,12 @@
 #ifdef __WIIU__
 #include <coreinit/energysaver.h>
 #include <coreinit/memory.h>
+#include <nn/act.h>
+#include <nn/save.h>
 #include <vpad/input.h>
 #else // !__WIIU__
 #include <fontconfig/fontconfig.h>
+#include <wordexp.h>
 #endif
 
 #include <curlxx/global.hpp>
@@ -46,6 +49,7 @@
 #include "Recent.hpp"
 #include "rest.hpp"
 #include "Settings.hpp"
+#include "Styles.hpp"
 #include "TabID.hpp"
 #include "tracer.hpp"
 
@@ -132,6 +136,8 @@ namespace App {
 
         Uint64 fade_duration_ms = 5'000;
 
+        std::filesystem::path config_path;
+
     } // namespace
 
 
@@ -155,6 +161,62 @@ namespace App {
 #endif
             ;
         return content_path;
+    }
+
+
+    void
+    initialize_config_dir()
+    {
+#ifdef __WIIU__
+        nn::act::Initialize();
+        char buf[256];
+        std::snprintf(buf, sizeof buf, "/vol/save/%08x", nn::act::GetPersistentId());
+        config_path = buf;
+        SAVEInit();
+        if (!exists(config_path)) {
+            cout << "Creating save dir..." << endl;
+            auto status = SAVEInitSaveDir(nn::act::GetSlotNo());
+            if (status)
+                cout << "SAVEInitSaveDir() returned " << int(status) << endl;
+            else
+                cout << "Save dir created." << endl;
+        }
+#else
+        std::filesystem::path config_home;
+        wordexp_t expanded{};
+        if (wordexp("${XDG_CONFIG_HOME:-~/.config}", &expanded, WRDE_NOCMD)) {
+            // env variables not set properly, just use the "current" directory and hope
+            // it works
+            config_home = ".";
+        } else {
+            config_home = expanded.we_wordv[0];
+            config_path = config_home / PACKAGE;
+        }
+        wordfree(&expanded);
+
+        if (!exists(config_path)) {
+            cout << "Creating " << config_path << endl;
+            if (!create_directory(config_path))
+                cout << "Could not create " << config_path << endl;
+        }
+#endif
+    }
+
+
+    void
+    finalize_config_dir()
+    {
+#ifdef __WIIU__
+        SAVEShutdown();
+        nn::act::Finalize();
+#endif
+    }
+
+
+    const std::filesystem::path&
+    get_config_path()
+    {
+        return config_path;
     }
 
 
@@ -474,6 +536,7 @@ namespace App {
     {
         TRACE_FUNC;
 
+        initialize_config_dir();
         // Note: initialize cfg module early.
         cfg::initialize();
         next_tab = cfg::initial_tab;
@@ -515,6 +578,7 @@ namespace App {
         initialize_imgui();
 
         // Initialize modules.
+        Styles::initialize();
         IconManager::initialize(res->renderer);
         rest::initialize(get_user_agent());
 
@@ -540,6 +604,7 @@ namespace App {
         // Finalize modules.
         rest::finalize();
         IconManager::finalize();
+        Styles::finalize();
 
         ImGui_ImplSDLRenderer2_Shutdown();
         ImGui_ImplSDL2_Shutdown();
@@ -550,6 +615,7 @@ namespace App {
         if (cfg::remember_tab)
             cfg::initial_tab = current_tab;
         cfg::finalize();
+        finalize_config_dir();
 
         res.reset();
     }
@@ -761,7 +827,9 @@ namespace App {
 
             ImGui::End();
 
-            // ImGui::ShowStyleEditor();
+            Styles::process_ui();
+
+            ImGui::ShowStyleEditor();
 
         }
 
