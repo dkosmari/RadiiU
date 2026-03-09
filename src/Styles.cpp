@@ -393,10 +393,12 @@ namespace Styles {
         }
 
         const std::string filename = cfg::style + ".json";
-        if (load_file(App::get_content_path() / "styles" / filename))
+
+        // Prioritize user theme, in case of name clash.
+        if (load_file(App::get_config_path() / "styles" / filename))
             return;
 
-        load_file(App::get_config_path() / "styles" / filename);
+        load_file(App::get_content_path() / "styles" / filename);
     }
     catch (std::exception& e) {
         cout << "ERROR: Styles::load(): " << e.what() << endl;
