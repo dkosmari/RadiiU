@@ -32,6 +32,166 @@ using namespace std::literals;
 
 namespace Styles {
 
+
+    std::string
+    to_string(Group g)
+    {
+        switch (g) {
+            case Group::imgui:
+                return "ImGui";
+            case Group::builtin:
+                return "built-in";
+            case Group::user:
+                return "user";
+            default:
+                throw std::logic_error{"invalid group"};
+        }
+    }
+
+
+    std::string
+    to_string(ImGuiCol_ col)
+    {
+        switch (col) {
+            case ImGuiCol_Text:
+                return "Text";
+            case ImGuiCol_TextDisabled:
+                return "TextDisabled";
+            case ImGuiCol_WindowBg:
+                return "WindowBg";
+            case ImGuiCol_ChildBg:
+                return "ChildBg";
+            case ImGuiCol_PopupBg:
+                return "PopupBg";
+            case ImGuiCol_Border:
+                return "Border";
+            case ImGuiCol_BorderShadow:
+                return "BorderShadow";
+            case ImGuiCol_FrameBg:
+                return "FrameBg";
+            case ImGuiCol_FrameBgHovered:
+                return "FrameBgHovered";
+            case ImGuiCol_FrameBgActive:
+                return "FrameBgActive";
+            case ImGuiCol_TitleBg:
+                return "TitleBg";
+            case ImGuiCol_TitleBgActive:
+                return "TitleBgActive";
+            case ImGuiCol_TitleBgCollapsed:
+                return "TitleBgCollapsed";
+            case ImGuiCol_MenuBarBg:
+                return "MenuBarBg";
+            case ImGuiCol_ScrollbarBg:
+                return "ScrollbarBg";
+            case ImGuiCol_ScrollbarGrab:
+                return "ScrollbarGrab";
+            case ImGuiCol_ScrollbarGrabHovered:
+                return "ScrollbarGrabHovered";
+            case ImGuiCol_ScrollbarGrabActive:
+                return "ScrollbarGrabActive";
+            case ImGuiCol_CheckMark:
+                return "CheckMark";
+            case ImGuiCol_SliderGrab:
+                return "SliderGrab";
+            case ImGuiCol_SliderGrabActive:
+                return "SliderGrabActive";
+            case ImGuiCol_Button:
+                return "Button";
+            case ImGuiCol_ButtonHovered:
+                return "ButtonHovered";
+            case ImGuiCol_ButtonActive:
+                return "ButtonActive";
+            case ImGuiCol_Header:
+                return "Header";
+            case ImGuiCol_HeaderHovered:
+                return "HeaderHovered";
+            case ImGuiCol_HeaderActive:
+                return "HeaderActive";
+            case ImGuiCol_Separator:
+                return "Separator";
+            case ImGuiCol_SeparatorHovered:
+                return "SeparatorHovered";
+            case ImGuiCol_SeparatorActive:
+                return "SeparatorActive";
+            case ImGuiCol_ResizeGrip:
+                return "ResizeGrip";
+            case ImGuiCol_ResizeGripHovered:
+                return "ResizeGripHovered";
+            case ImGuiCol_ResizeGripActive:
+                return "ResizeGripActive";
+            case ImGuiCol_InputTextCursor:
+                return "InputTextCursor";
+            case ImGuiCol_TabHovered:
+                return "TabHovered";
+            case ImGuiCol_Tab:
+                return "Tab";
+            case ImGuiCol_TabSelected:
+                return "TabSelected";
+            case ImGuiCol_TabSelectedOverline:
+                return "TabSelectedOverline";
+            case ImGuiCol_TabDimmed:
+                return "TabDimmed";
+            case ImGuiCol_TabDimmedSelected:
+                return "TabDimmedSelected";
+            case ImGuiCol_TabDimmedSelectedOverline:
+                return "TabDimmedSelectedOverline";
+            case ImGuiCol_PlotLines:
+                return "PlotLines";
+            case ImGuiCol_PlotLinesHovered:
+                return "PlotLinesHovered";
+            case ImGuiCol_PlotHistogram:
+                return "PlotHistogram";
+            case ImGuiCol_PlotHistogramHovered:
+                return "PlotHistogramHovered";
+            case ImGuiCol_TableHeaderBg:
+                return "TableHeaderBg";
+            case ImGuiCol_TableBorderStrong:
+                return "TableBorderStrong";
+            case ImGuiCol_TableBorderLight:
+                return "TableBorderLight";
+            case ImGuiCol_TableRowBg:
+                return "TableRowBg";
+            case ImGuiCol_TableRowBgAlt:
+                return "TableRowBgAlt";
+            case ImGuiCol_TextLink:
+                return "TextLink";
+            case ImGuiCol_TextSelectedBg:
+                return "TextSelectedBg";
+            case ImGuiCol_TreeLines:
+                return "TreeLines";
+            case ImGuiCol_DragDropTarget:
+                return "DragDropTarget";
+            case ImGuiCol_DragDropTargetBg:
+                return "DragDropTargetBg";
+            case ImGuiCol_UnsavedMarker:
+                return "UnsavedMarker";
+            case ImGuiCol_NavCursor:
+                return "NavCursor";
+            case ImGuiCol_NavWindowingHighlight:
+                return "NavWindowingHighlight";
+            case ImGuiCol_NavWindowingDimBg:
+                return "NavWindowingDimBg";
+            case ImGuiCol_ModalWindowDimBg:
+                return "ModalWindowDimBg";
+            case ImGuiCol_COUNT:
+                return "COUNT";
+            default:
+                throw std::logic_error{"invalid ImGuiCol_"};
+        }
+    }
+
+
+    // ImVec4
+    // to_imvec4(const json::value& val)
+    // {
+    //     auto& c = val.as<json::array>();
+    //     return ImVec4{c.at(0).to_real(),
+    //                   c.at(1).to_real(),
+    //                   c.at(2).to_real(),
+    //                   c.at(3).to_real()};
+    // }
+
+
     struct Style {
 
         std::string name;
@@ -48,12 +208,15 @@ namespace Styles {
 
             name = obj.at("name").as<json::string>();
 
-            auto& j_colors = obj.at("colors").as<json::array>();
+            auto& j_colors = obj.at("colors").as<json::object>();
             for (std::size_t i = 0; i < colors.size(); ++i) {
-                if (i >= j_colors.size())
-                    break;
                 auto& color = colors[i];
-                auto& j_color = j_colors[i].as<json::array>();
+                auto label = to_string(static_cast<ImGuiCol_>(i));
+                if (!j_colors.contains(label)) {
+                    cout << "Warning: missing color for " << label << endl;
+                    continue;
+                }
+                auto& j_color = j_colors.at(label).as<json::array>();
                 if (j_color.size() == 3) {
                     color.x = j_color[0].to_real();
                     color.y = j_color[1].to_real();
@@ -67,7 +230,6 @@ namespace Styles {
                 } else
                     throw std::runtime_error{"invalid color array size"};
             }
-
         }
 
 
@@ -158,22 +320,6 @@ namespace Styles {
     {}
 
 
-    std::string
-    to_string(Type t)
-    {
-        switch (t) {
-            case Type::imgui:
-                return "ImGui";
-            case Type::builtin:
-                return "built-in";
-            case Type::user:
-                return "user";
-            default:
-                return "ERROR";
-        }
-    }
-
-
     const std::vector<Info>&
     get_styles()
         noexcept
@@ -189,7 +335,7 @@ namespace Styles {
 
         style_list.clear();
 
-        style_list.emplace_back(Type::imgui, imgui_dark.name);
+        style_list.emplace_back(Group::imgui, imgui_dark.name);
 
         for (auto& entry :
                  std::filesystem::directory_iterator{App::get_content_path() / "styles"}) {
@@ -199,7 +345,7 @@ namespace Styles {
             if (path.extension() != ".json")
                 continue;
 
-            style_list.emplace_back(Type::builtin, path.stem().string());
+            style_list.emplace_back(Group::builtin, path.stem().string());
         }
 
 
@@ -211,7 +357,7 @@ namespace Styles {
             if (path.extension() != ".json")
                 continue;
 
-            style_list.emplace_back(Type::user, path.stem().string());
+            style_list.emplace_back(Group::user, path.stem().string());
         }
 
         std::ranges::sort(style_list);

@@ -199,7 +199,7 @@ namespace About {
 
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                ImGui::TextRightColored(ui::label_color, "Stations list");
+                ImGui::TextRightColored(ui::get_label_color(), "Stations list");
                 ImGui::TableNextColumn();
                 auto rb_url = "https://www.radio-browser.info";
                 ImGui::TextLinkOpenURL(rb_url, rb_url);

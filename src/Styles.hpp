@@ -15,6 +15,28 @@
 
 namespace Styles {
 
+    enum class Group {
+        imgui,
+        builtin,
+        user,
+    };
+
+    std::string
+    to_string(Group g);
+
+
+    struct Info {
+
+        Group group;
+        std::string name;
+
+        std::strong_ordering
+        operator <=>(const Info& other)
+            const noexcept = default;
+
+    }; // struct Info
+
+
     void
     initialize();
 
@@ -25,28 +47,6 @@ namespace Styles {
     process_ui();
 
 
-    enum class Type {
-        imgui,
-        builtin,
-        user,
-    };
-
-
-    std::string
-    to_string(Type t);
-
-
-    struct Info {
-
-        Type type;
-        std::string name;
-
-
-        std::strong_ordering
-        operator <=>(const Info& other)
-            const noexcept = default;
-
-    }; // struct Info
 
 
     const std::vector<Info>&

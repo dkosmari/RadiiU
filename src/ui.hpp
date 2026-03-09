@@ -21,7 +21,9 @@ struct Station;
 
 namespace ui {
 
-    extern const ImVec4 label_color;
+    const ImVec4&
+    get_label_color()
+        noexcept;
 
     void
     show_details_button(const Station& station);

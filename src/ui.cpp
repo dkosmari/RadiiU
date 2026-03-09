@@ -35,19 +35,26 @@ using namespace std::literals;
 
 namespace ui {
 
-    const ImVec4 label_color = {1.0, 1.0, 0.25, 1.0};
-
     const std::string station_details_popup_id = "details";
     std::string station_details_uuid;
     std::optional<StationEx> station_details_result;
     std::string station_details_error;
-
 
     void
     open_station_details_popup(const std::string& uuid);
 
     void
     process_station_details_popup(const std::string& uuid);
+
+
+
+    const ImVec4&
+    get_label_color()
+        noexcept
+    {
+        const ImVec4* colors = ImGui::GetStyle().Colors;
+        return colors[ImGuiCol_SeparatorActive];
+    }
 
 
     void
@@ -101,7 +108,7 @@ namespace ui {
         ImGui::TableNextRow();
 
         ImGui::TableNextColumn();
-        ImGui::TextRightColored(label_color, "%s", label.data());
+        ImGui::TextRightColored(get_label_color(), "%s", label.data());
         // show_last_bounding_box();
 
         ImGui::TableNextColumn();
@@ -118,7 +125,7 @@ namespace ui {
         ImGui::TableNextRow();
 
         ImGui::TableNextColumn();
-        ImGui::TextRightColored(label_color, "%s", label.data());
+        ImGui::TextRightColored(get_label_color(), "%s", label.data());
         // show_last_bounding_box();
 
         ImGui::TableNextColumn();
@@ -156,7 +163,7 @@ namespace ui {
     {
         std::va_list args;
         va_start(args, fmt);
-        ImGui::TextRightColoredV(label_color, fmt, args);
+        ImGui::TextRightColoredV(get_label_color(), fmt, args);
         va_end(args);
     }
 
@@ -170,7 +177,7 @@ namespace ui {
         ImGui::PushID(label);
 
         ImGui::TableNextColumn();
-        ImGui::TextRightColored(label_color, "%s", label.data());
+        ImGui::TextRightColored(get_label_color(), "%s", label.data());
 
         ImGui::TableNextColumn();
         if (ImGui::TextLinkOpenURL(/*ICON_FA_LINK " " +*/ url, url)) {
