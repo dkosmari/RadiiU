@@ -156,6 +156,7 @@ radio_client::process_http_response_started()
         try {
             cout << "Trying to create ICY stream" << endl;
             icy_stream = std::make_unique<icy::stream>(http);
+            cout << "ICY stream created. " << endl;
             data_stream = &icy_stream->data_stream;
             metadata = icy_stream->get_metadata();
         }

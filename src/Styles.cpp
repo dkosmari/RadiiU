@@ -32,7 +32,6 @@ using namespace std::literals;
 
 namespace Styles {
 
-
     std::string
     to_string(Group g)
     {
@@ -181,15 +180,23 @@ namespace Styles {
     }
 
 
-    // ImVec4
-    // to_imvec4(const json::value& val)
-    // {
-    //     auto& c = val.as<json::array>();
-    //     return ImVec4{c.at(0).to_real(),
-    //                   c.at(1).to_real(),
-    //                   c.at(2).to_real(),
-    //                   c.at(3).to_real()};
-    // }
+    ImVec4
+    to_imvec4(const json::value& val)
+    {
+        auto& c = val.as<json::array>();
+        if (c.size() == 3) {
+            return ImVec4(c.at(0).to_real(),
+                          c.at(1).to_real(),
+                          c.at(2).to_real(),
+                          1.0f);
+        } else if (c.size() == 4) {
+            return ImVec4(c.at(0).to_real(),
+                          c.at(1).to_real(),
+                          c.at(2).to_real(),
+                          c.at(3).to_real());
+        } else
+            throw std::runtime_error{"invalid color array size"};
+    }
 
 
     struct Style {
@@ -216,19 +223,7 @@ namespace Styles {
                     cout << "Warning: missing color for " << label << endl;
                     continue;
                 }
-                auto& j_color = j_colors.at(label).as<json::array>();
-                if (j_color.size() == 3) {
-                    color.x = j_color[0].to_real();
-                    color.y = j_color[1].to_real();
-                    color.z = j_color[2].to_real();
-                    color.w = 1.0f;
-                } else if (j_color.size() == 4) {
-                    color.x = j_color[0].to_real();
-                    color.y = j_color[1].to_real();
-                    color.z = j_color[2].to_real();
-                    color.w = j_color[3].to_real();
-                } else
-                    throw std::runtime_error{"invalid color array size"};
+                color = to_imvec4(j_colors.at(label));
             }
         }
 
@@ -283,7 +278,9 @@ namespace Styles {
     }; // struct Style
 
 
-    Style imgui_dark;
+    // dark, light, classic styles
+    std::array<Style, 3> imgui_styles;
+
 
     // Cache all style names for rendering.
     std::vector<Info> style_list;
@@ -300,8 +297,14 @@ namespace Styles {
     {
         TRACE_FUNC;
 
+        ImGui::StyleColorsLight();
+        imgui_styles[1] = Style::from_imgui("ImGui Light");
+
+        ImGui::StyleColorsClassic();
+        imgui_styles[2] = Style::from_imgui("ImGui Classic");
+
         ImGui::StyleColorsDark();
-        imgui_dark = Style::from_imgui("ImGui Dark");
+        imgui_styles[0] = Style::from_imgui("ImGui Dark");
 
         find_styles();
         load();
@@ -335,7 +338,8 @@ namespace Styles {
 
         style_list.clear();
 
-        style_list.emplace_back(Group::imgui, imgui_dark.name);
+        for (auto& st : imgui_styles)
+            style_list.emplace_back(Group::imgui, st.name);
 
         for (auto& entry :
                  std::filesystem::directory_iterator{App::get_content_path() / "styles"}) {
@@ -349,15 +353,23 @@ namespace Styles {
         }
 
 
-        for (auto& entry :
-                 std::filesystem::directory_iterator{App::get_config_path() / "styles"}) {
-            if (!entry.is_regular_file())
-                continue;
-            auto& path = entry.path();
-            if (path.extension() != ".json")
-                continue;
+        auto user_styles_path = App::get_config_path() / "styles";
+        if (exists(user_styles_path)) {
+            try {
+                for (auto& entry :
+                         std::filesystem::directory_iterator{}) {
+                    if (!entry.is_regular_file())
+                        continue;
+                    auto& path = entry.path();
+                    if (path.extension() != ".json")
+                        continue;
 
-            style_list.emplace_back(Group::user, path.stem().string());
+                    style_list.emplace_back(Group::user, path.stem().string());
+                }
+            }
+            catch (std::exception& e) {
+                cout << "ERROR: trying to list user styles: " << e.what() << endl;
+            }
         }
 
         std::ranges::sort(style_list);
@@ -386,10 +398,18 @@ namespace Styles {
     load()
     try {
 
-        if (cfg::style.empty() || cfg::style == imgui_dark.name) {
-            cout << "Loading ImGui Dark style" << endl;
-            imgui_dark.apply();
+        if (cfg::style.empty()) {
+            cout << "Loading " << imgui_styles.front().name << " style" << endl;
+            imgui_styles.front().apply();
             return;
+        }
+
+        for (auto& st : imgui_styles) {
+            if (st.name == cfg::style) {
+                cout << "Loading " << st.name << " style" << endl;
+                st.apply();
+                return;
+            }
         }
 
         const std::string filename = cfg::style + ".json";

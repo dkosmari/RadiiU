@@ -756,7 +756,7 @@ namespace App {
 
             Styles::process_ui();
 
-            ImGui::ShowStyleEditor();
+            // ImGui::ShowStyleEditor();
 
         }
 

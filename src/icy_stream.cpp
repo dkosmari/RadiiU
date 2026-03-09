@@ -24,7 +24,7 @@ namespace icy {
     stream::stream(http_client& hc) :
         http(hc)
     {
-        // TRACE_FUNC;
+        TRACE_FUNC;
 
         using string_utils::trimmed;
 
@@ -133,10 +133,12 @@ namespace icy {
 
         auto meta = icy::parse(meta_str);
 
+#if 0
         cout << "Icy Metadata:\n";
         for (auto [key, val] : meta)
             cout << "    " << key << "=\"" << val << "\"\n";
         cout << endl;
+#endif
 
         for (const auto& [k, v] : meta) {
             // TODO: check if there are more special keys
