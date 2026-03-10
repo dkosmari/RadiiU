@@ -78,7 +78,7 @@ This style of header inclusion is used:
 // interface header
 #include "foo.hpp"
 
-// local headers needed for the implementation, sorted
+// local headers needed for the implementation (sorted)
 #include "bar.hpp"
 #include "baz.hpp"
 #include "meh.hpp"
