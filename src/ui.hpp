@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -61,23 +61,19 @@ namespace ui {
 
 
     void
-    show_station_basic_info(const Station& station,
-                            ImGuiID scroll_target);
+    show_station_basic_info(const Station& station);
 
 
     void
-    show_tags(const std::vector<std::string>& tags,
-              ImGuiID scroll_target);
+    show_tags(const std::vector<std::string>& tags);
 
 
     void
     show_boxed(const std::string& text,
-               const std::string& tooltip,
-               ImGuiID scroll_target);
+               const std::string& tooltip);
 
     void
-    show_boxed(const std::string& text,
-               ImGuiID scroll_target);
+    show_boxed(const std::string& text);
 
 
     void

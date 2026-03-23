@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -32,7 +32,6 @@
 #include <SDL_stdinc.h>
 
 #include <imgui.h>
-#include <imgui_internal.h>
 #include <imgui_stdlib.h>
 #include <curlxx/easy.hpp>
 
@@ -735,8 +734,8 @@ namespace Browser {
     process_server_details_popup()
     {
         // ImGui::SetNextWindowSize({550, 0}, ImGuiCond_Always);
-        if (ImGui::BeginPopup(server_details_popup_id,
-                              ImGuiWindowFlags_NoSavedSettings)) {
+        if (ImGui::PopupGuard server_details{server_details_popup_id,
+                                             ImGuiWindowFlags_NoSavedSettings}) {
 
             auto server = safe_server.load();
             ImGui::SeparatorText("Server status for " + server);
@@ -750,8 +749,8 @@ namespace Browser {
 
             } else {
 
-                if (ImGui::BeginTable("fields", 2,
-                                      ImGuiTableFlags_None)) {
+                if (ImGui::TableGuard fields_table{"fields", 2,
+                                                   ImGuiTableFlags_None}) {
                     ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
                     ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
@@ -765,12 +764,9 @@ namespace Browser {
                     show_info_row("languages",        server_details_result->languages);
                     show_info_row("countries",        server_details_result->countries);
 
-                    ImGui::EndTable();
                 }
             }
 
-            ImGui::HandleDragScroll();
-            ImGui::EndPopup();
         }
     }
 
@@ -778,10 +774,10 @@ namespace Browser {
     void
     show_status()
     {
-        if (ImGui::BeginChild("status",
-                              {0, 0},
-                              ImGuiChildFlags_AutoResizeY |
-                              ImGuiChildFlags_NavFlattened)) {
+        if (ImGui::ChildGuard status_child{"status",
+                                           {0, 0},
+                                           ImGuiChildFlags_AutoResizeY |
+                                           ImGuiChildFlags_NavFlattened}) {
 
             if (ImGui::Button(ICON_FA_REFRESH))
                 connect();
@@ -806,18 +802,17 @@ namespace Browser {
             }
 
         }
-        ImGui::EndChild();
     }
 
 
     void
     show_options()
     {
-        if (ImGui::BeginChild("options",
-                              {0, 0},
-                              ImGuiChildFlags_AutoResizeY |
-                              ImGuiChildFlags_FrameStyle |
-                              ImGuiChildFlags_NavFlattened)) {
+        if (ImGui::ChildGuard options_child{"options",
+                                            {0, 0},
+                                            ImGuiChildFlags_AutoResizeY |
+                                            ImGuiChildFlags_FrameStyle |
+                                            ImGuiChildFlags_NavFlattened}) {
 
             ImGui::SetNextItemOpen(options_visible);
             if (ImGui::CollapsingHeader("Options")) {
@@ -826,32 +821,30 @@ namespace Browser {
 
                 ImGui::Indent();
 
-                if (ImGui::BeginChild("filters",
-                                      {0, 0},
-                                      ImGuiChildFlags_AutoResizeX |
-                                      ImGuiChildFlags_AutoResizeY |
-                                      ImGuiChildFlags_FrameStyle |
-                                      ImGuiChildFlags_NavFlattened)) {
+                if (ImGui::ChildGuard filters_guard{"filters",
+                                                    {0, 0},
+                                                    ImGuiChildFlags_AutoResizeX |
+                                                    ImGuiChildFlags_AutoResizeY |
+                                                    ImGuiChildFlags_FrameStyle |
+                                                    ImGuiChildFlags_NavFlattened}) {
 
-                    const float filters_width = 500;
+                    ImGui::ItemWidthGuard filters_width{500};
 
                     ImGui::TextUnformatted(ICON_FA_FILTER " Filters");
 
                     /*******************
                      * Filter by name. *
                      *******************/
-                    ImGui::SetNextItemWidth(filters_width);
                     ImGui::InputText("Name", &filter_name);
 
                     /******************
                      * Filter by tag. *
                      ******************/
-                    ImGui::SetNextItemWidth(filters_width);
                     ImGui::SetNextWindowSizeConstraints({0.0f, 0.0f},
                                                         {1200.0f, FLT_MAX});
-                    if (ImGui::BeginCombo("Tag",
-                                          filter_tag,
-                                          ImGuiComboFlags_HeightLargest)) {
+                    if (ImGui::ComboGuard tag_combo{"Tag",
+                                                    filter_tag,
+                                                    ImGuiComboFlags_HeightLargest}) {
                         static ImGuiTextFilter filter{filter_tag.data()};
                         if (ImGui::IsWindowAppearing()) {
                             ImGui::SetKeyboardFocusHere();
@@ -869,13 +862,11 @@ namespace Browser {
                                 if (ImGui::Selectable(tag, is_selected))
                                     filter_tag = tag;
                         }
-                        ImGui::EndCombo();
                     }
 
                     /**********************
                      * Filter by country. *
                      **********************/
-                    ImGui::SetNextItemWidth(filters_width);
                     std::string display_country;
                     if (!filter_country.empty()) {
                         display_country = filter_country;
@@ -883,9 +874,9 @@ namespace Browser {
                         if (country_name)
                             display_country += " - " + *country_name;
                     }
-                    if (ImGui::BeginCombo("Country",
-                                          display_country,
-                                          ImGuiComboFlags_HeightLargest)) {
+                    if (ImGui::ComboGuard country_combo{"Country",
+                                                        display_country,
+                                                        ImGuiComboFlags_HeightLargest}) {
                         static ImGuiTextFilter filter{display_country.data()};
                         if (ImGui::IsWindowAppearing()) {
                             ImGui::SetKeyboardFocusHere();
@@ -904,7 +895,6 @@ namespace Browser {
                                 if (ImGui::Selectable(entry_name, is_selected))
                                     filter_country = country.code;
                         }
-                        ImGui::EndCombo();
                     }
 
                     // TODO: add language filter
@@ -912,29 +902,26 @@ namespace Browser {
                     /********************
                      * Filter by codec. *
                      ********************/
-                    ImGui::SetNextItemWidth(filters_width);
-                    if (ImGui::BeginCombo("Codec",
-                                          to_string(filter_codec),
-                                          ImGuiComboFlags_HeightLargest)) {
+                    if (ImGui::ComboGuard codec_combo{"Codec",
+                                                      to_string(filter_codec),
+                                                      ImGuiComboFlags_HeightLargest}) {
                         for (unsigned i = 0; i < codec_strings.size(); ++i) {
                             auto c = Codec{i};
                             if (ImGui::Selectable(to_string(c), filter_codec == c))
                                 filter_codec = c;
                         }
-                        ImGui::EndCombo();
                     }
 
-                } // filters
-                ImGui::EndChild();
+                } // filters_child
 
                 ImGui::SameLine();
 
-                if (ImGui::BeginChild("sorting",
-                                      {0, 0},
-                                      ImGuiChildFlags_AutoResizeX |
-                                      ImGuiChildFlags_AutoResizeY |
-                                      ImGuiChildFlags_FrameStyle |
-                                      ImGuiChildFlags_NavFlattened)) {
+                if (ImGui::ChildGuard sorting_child{"sorting",
+                                                    {0, 0},
+                                                    ImGuiChildFlags_AutoResizeX |
+                                                    ImGuiChildFlags_AutoResizeY |
+                                                    ImGuiChildFlags_FrameStyle |
+                                                    ImGuiChildFlags_NavFlattened}) {
 
                     ImGui::TextUnformatted(ICON_FA_SORT " Order");
 
@@ -950,16 +937,15 @@ namespace Browser {
                         ImGui::EndCombo();
                     }
 
-                } // sorting
-                ImGui::EndChild();
+                } // sorting_child
 
                 ImGui::SameLine();
 
-                if (ImGui::BeginChild("buttons",
-                                      {0, 0},
-                                      ImGuiChildFlags_AutoResizeX |
-                                      ImGuiChildFlags_AutoResizeY |
-                                      ImGuiChildFlags_NavFlattened)) {
+                if (ImGui::ChildGuard buttons_child{"buttons",
+                                                    {0, 0},
+                                                    ImGuiChildFlags_AutoResizeX |
+                                                    ImGuiChildFlags_AutoResizeY |
+                                                    ImGuiChildFlags_NavFlattened}) {
 
                     if (ImGui::Button("Reset"))
                         reset_options();
@@ -971,17 +957,14 @@ namespace Browser {
                     }
                     ImGui::SetItemTooltip("Apply the current browser options.");
 
-                } // buttons
-                ImGui::EndChild();
+                } // buttons_child
 
                 ImGui::Unindent();
 
             } else
                 options_visible = false;
 
-        } // options
-        ImGui::EndChild();
-
+        } // options_child
     }
 
 
@@ -993,50 +976,50 @@ namespace Browser {
         ImGui::SetNextWindowPos({global_pos.x + parent_width / 2.0f, global_pos.y + 0.0f},
                                 ImGuiCond_Always,
                                 {0.5f, 0.0f});
-        if (ImGui::BeginChild("navigation",
-                              {0, 0},
-                              ImGuiChildFlags_AutoResizeX |
-                              ImGuiChildFlags_AutoResizeY |
-                              ImGuiChildFlags_NavFlattened)) {
+        if (ImGui::ChildGuard navigation_child{"navigation",
+                                               {0, 0},
+                                               ImGuiChildFlags_AutoResizeX |
+                                               ImGuiChildFlags_AutoResizeY |
+                                               ImGuiChildFlags_NavFlattened}) {
 
             const bool first_page = page_index == 0;
             const bool last_page = stations.size() < cfg::browser_page_limit;
 
-            ImGui::BeginDisabled(first_page);
+            {
+                ImGui::DisabledGuard disable_first_page{first_page};
 
-            // 100⏪
-            if (ImGui::Button("100" ICON_FA_ANGLE_DOUBLE_LEFT) && !busy) {
-                if (page_index >= 100)
-                    page_index -= 100;
-                else
-                    page_index = 0;
-                queue_refresh_stations();
+                // 100⏪
+                if (ImGui::Button("100" ICON_FA_ANGLE_DOUBLE_LEFT) && !busy) {
+                    if (page_index >= 100)
+                        page_index -= 100;
+                    else
+                        page_index = 0;
+                    queue_refresh_stations();
+                }
+                ImGui::SetItemTooltip("Go back 100 pages.");
+
+                ImGui::SameLine();
+
+                // 10⏪
+                if (ImGui::Button("10" ICON_FA_ANGLE_DOUBLE_LEFT) && !busy) {
+                    if (page_index >= 10)
+                        page_index -= 10;
+                    else
+                        page_index = 0;
+                    queue_refresh_stations();
+                }
+                ImGui::SetItemTooltip("Go back 10 pages.");
+
+                ImGui::SameLine();
+
+                // ⏴
+                if (ImGui::Button(" " ICON_FA_ANGLE_LEFT " ") && !busy) {
+                    if (page_index > 0)
+                        --page_index;
+                    queue_refresh_stations();
+                }
+                ImGui::SetItemTooltip("Go back one page.");
             }
-            ImGui::SetItemTooltip("Go back 100 pages.");
-
-            ImGui::SameLine();
-
-            // 10⏪
-            if (ImGui::Button("10" ICON_FA_ANGLE_DOUBLE_LEFT) && !busy) {
-                if (page_index >= 10)
-                    page_index -= 10;
-                else
-                    page_index = 0;
-                queue_refresh_stations();
-            }
-            ImGui::SetItemTooltip("Go back 10 pages.");
-
-            ImGui::SameLine();
-
-            // ⏴
-            if (ImGui::Button(" " ICON_FA_ANGLE_LEFT " ") && !busy) {
-                if (page_index > 0)
-                    --page_index;
-                queue_refresh_stations();
-            }
-            ImGui::SetItemTooltip("Go back one page.");
-
-            ImGui::EndDisabled();
 
             ImGui::SameLine();
 
@@ -1054,56 +1037,56 @@ namespace Browser {
 
             ImGui::SameLine();
 
-            ImGui::BeginDisabled(last_page);
+            {
+                ImGui::DisabledGuard disable_last_page{last_page};
 
-            // ⏵
-            if (ImGui::Button(" " ICON_FA_ANGLE_RIGHT " ") && !busy) {
-                ++page_index;
-                queue_refresh_stations();
+                // ⏵
+                if (ImGui::Button(" " ICON_FA_ANGLE_RIGHT " ") && !busy) {
+                    ++page_index;
+                    queue_refresh_stations();
+                }
+                ImGui::SetItemTooltip("Advance one page.");
+
+                ImGui::SameLine();
+
+                // ⏩10
+                if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "10") && !busy) {
+                    page_index += 10;
+                    queue_refresh_stations();
+                }
+                ImGui::SetItemTooltip("Advance 10 pages.");
+
+                ImGui::SameLine();
+
+                // ⏩100
+                if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "100") && !busy) {
+                    page_index += 100;
+                    queue_refresh_stations();
+                }
+                ImGui::SetItemTooltip("Advance 100 pages.");
             }
-            ImGui::SetItemTooltip("Advance one page.");
 
-            ImGui::SameLine();
-
-            // ⏩10
-            if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "10") && !busy) {
-                page_index += 10;
-                queue_refresh_stations();
-            }
-            ImGui::SetItemTooltip("Advance 10 pages.");
-
-            ImGui::SameLine();
-
-            // ⏩100
-            if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "100") && !busy) {
-                page_index += 100;
-                queue_refresh_stations();
-            }
-            ImGui::SetItemTooltip("Advance 100 pages.");
-
-            ImGui::EndDisabled();
         }
-        ImGui::EndChild();
-    }
+
+    } // navigation_child
 
 
     void
-    show_station(std::shared_ptr<Station>& station,
-                 ImGuiID scroll_target)
+    show_station(std::shared_ptr<Station>& station)
     {
-        ImGui::PushID(station.get());
+        ImGui::IDGuard station_id{station.get()};
 
-        if (ImGui::BeginChild("station",
-                              {0, 0},
-                              ImGuiChildFlags_AutoResizeY |
-                              ImGuiChildFlags_FrameStyle |
-                              ImGuiChildFlags_NavFlattened)) {
+        if (ImGui::ChildGuard station_child{"station",
+                                            {0, 0},
+                                            ImGuiChildFlags_AutoResizeY |
+                                            ImGuiChildFlags_FrameStyle |
+                                            ImGuiChildFlags_NavFlattened}) {
 
-            if (ImGui::BeginChild("actions",
-                                  {0, 0},
-                                  ImGuiChildFlags_AutoResizeX |
-                                  ImGuiChildFlags_AutoResizeY |
-                                  ImGuiChildFlags_NavFlattened)) {
+            if (ImGui::ChildGuard actions_child{"actions",
+                                                {0, 0},
+                                                ImGuiChildFlags_AutoResizeX |
+                                                ImGuiChildFlags_AutoResizeY |
+                                                ImGuiChildFlags_NavFlattened}) {
 
                 ui::show_play_button(station);
 
@@ -1120,36 +1103,36 @@ namespace Browser {
                                           ? ICON_FA_THUMBS_UP " "
                                           : ICON_FA_THUMBS_O_UP " ")
                                          + humanize::value(station->votes);
-                ImGui::BeginDisabled(voted || !cfg::send_clicks);
-                if (ImGui::Button(vote_label))
-                    send_vote(station);
-                if (voted)
-                    ImGui::SetItemTooltip("%s", vote_record->second.message.data());
-                else
-                    ImGui::SetItemTooltip("Vote for this station.");
-                ImGui::EndDisabled();
 
-            } // actions
-            ImGui::HandleDragScroll(scroll_target);
-            ImGui::EndChild();
+                {
+                    ImGui::DisabledGuard disable_voting{voted || !cfg::send_clicks};
+                    if (ImGui::Button(vote_label))
+                        send_vote(station);
+                    if (voted)
+                        ImGui::SetItemTooltip("%s", vote_record->second.message.data());
+                    else
+                        ImGui::SetItemTooltip("Vote for this station.");
+                }
+
+            } // actions_child
 
             ImGui::SameLine();
 
-            if (ImGui::BeginChild("details",
-                                  {0, 0},
-                                  ImGuiChildFlags_AutoResizeY |
-                                  ImGuiChildFlags_NavFlattened)) {
+            if (ImGui::ChildGuard details_child{"details",
+                                                {0, 0},
+                                                ImGuiChildFlags_AutoResizeY |
+                                                ImGuiChildFlags_NavFlattened}) {
 
                 ui::show_favicon(*station);
 
                 ImGui::SameLine();
 
-                ui::show_station_basic_info(*station, scroll_target);
+                ui::show_station_basic_info(*station);
 
-                if (ImGui::BeginChild("extra_info",
-                                      {0, 0},
-                                      ImGuiChildFlags_AutoResizeY |
-                                      ImGuiChildFlags_NavFlattened)) {
+                if (ImGui::ChildGuard extra_info_child{"extra_info",
+                                                       {0, 0},
+                                                       ImGuiChildFlags_AutoResizeY |
+                                                       ImGuiChildFlags_NavFlattened}) {
 
                     char click_text[32];
                     std::snprintf(click_text, sizeof click_text,
@@ -1157,42 +1140,34 @@ namespace Browser {
                                   station->click_count,
                                   station->click_trend);
                     ui::show_boxed(click_text,
-                                   "Daily total clicks and trend.",
-                                   scroll_target);
+                                   "Daily total clicks and trend.");
 
                     if (station->bitrate) {
                         ImGui::SameLine();
                         ui::show_boxed(ICON_FA_HEADPHONES " "
                                        + std::to_string(station->bitrate) + " kbps",
-                                       "The advertised stream quality.",
-                                       scroll_target);
+                                       "The advertised stream quality.");
                     }
 
                     ImGui::SameLine();
 
                     ui::show_boxed(ICON_FA_FLASK " " + station->codec,
-                                   "The codec used in this broadcast.",
-                                   scroll_target);
+                                   "The codec used in this broadcast.");
 
-                    ui::show_tags(station->tags, scroll_target);
-                }
-                ImGui::HandleDragScroll(scroll_target);
-                ImGui::EndChild();
-            } // extra_info
-            ImGui::HandleDragScroll(scroll_target);
-            ImGui::EndChild();
-        } // station
-        ImGui::HandleDragScroll(scroll_target);
-        ImGui::EndChild();
+                    ui::show_tags(station->tags);
 
-        ImGui::PopID();
+                } // extra_info_child
+
+            } // details_child
+
+        } // station_child
     }
 
 
     void
     process_ui()
     {
-        ImGui::BeginDisabled(busy);
+        ImGui::DisabledGuard disable_busy{busy};
 
         show_status();
 
@@ -1201,8 +1176,8 @@ namespace Browser {
         show_navigation();
 
         // Note: flat navigation doesn't work well on child windows that scroll.
-        if (ImGui::BeginChild("stations")) {
-            auto scroll_target = ImGui::GetCurrentWindow()->ID;
+        if (ImGui::ChildGuard stations_child{"stations"}) {
+
             if (scroll_to_top) {
                 ImGui::SetScrollY(0);
                 scroll_to_top = false;
@@ -1220,7 +1195,7 @@ namespace Browser {
 #endif
 
             for (auto& station_ptr : stations)
-                show_station(station_ptr, scroll_target);
+                show_station(station_ptr);
 
 #if 0
             // Disabled until ImGui fixes navigation.
@@ -1231,11 +1206,8 @@ namespace Browser {
                     queue_refresh_stations();
                 }
 #endif
-        }
-        ImGui::HandleDragScroll();
-        ImGui::EndChild(); // stations
+        } // stations_child
 
-        ImGui::EndDisabled();
     }
 
 

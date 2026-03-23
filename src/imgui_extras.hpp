@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -12,6 +12,7 @@
 #include <cstdarg>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <type_traits>
 
 #include <imgui.h>
@@ -34,8 +35,25 @@ namespace ImGui {
         template<typename T>
         concept arithmetic = std::is_arithmetic_v<T>;
 
+
+        template<typename T>
+        concept vec2 = std::convertible_to<decltype(T::x), float> &&
+                       std::convertible_to<decltype(T::y), float>;
+
     } // namespace concepts
 
+
+    bool
+    Begin(const std::string& name,
+          bool* p_open = nullptr,
+          ImGuiWindowFlags flags = 0);
+
+
+    bool
+    BeginChild(const std::string& str_id,
+               const ImVec2& size = ImVec2(0, 0),
+               ImGuiChildFlags child_flags = 0,
+               ImGuiWindowFlags window_flags = 0);
 
     bool
     BeginCombo(const std::string& label,
@@ -55,9 +73,22 @@ namespace ImGui {
 
 
     bool
+    BeginTabBar(const std::string& id,
+                ImGuiTabBarFlags flags = 0);
+
+
+    bool
     BeginTabItem(const std::string& label,
                  bool* p_open = nullptr,
                  ImGuiTabItemFlags flags = 0);
+
+
+    bool
+    BeginTable(const std::string& id,
+               int columns,
+               ImGuiTableFlags flags = 0,
+               const ImVec2& outer_size = {},
+               float inner_width = 0);
 
 
     bool
@@ -80,13 +111,6 @@ namespace ImGui {
          float speed = 1.0f,
          const char* format = nullptr,
          ImGuiSliderFlags flags = 0);
-
-
-    void
-    HandleDragScroll();
-
-    void
-    HandleDragScroll(ImGuiID target_id);
 
 
     void
@@ -149,8 +173,18 @@ namespace ImGui {
               void* ctx = nullptr);
 
 
-    void
-    KineticScrollFrameEnd();
+    bool
+    InputTextWithHint(const std::string& label,
+                      const std::string& hint,
+                      std::string& value,
+                      ImGuiInputTextFlags flags = 0,
+                      ImGuiInputTextCallback callback = nullptr,
+                      void* ctx = nullptr);
+
+
+    bool
+    IsPopupOpen(const std::string& str_id,
+                ImGuiPopupFlags flags = 0);
 
 
     void
@@ -159,7 +193,11 @@ namespace ImGui {
 
 
     void
-    PushID(const std::string& str);
+    PushID(const std::string& id);
+
+
+    void
+    PushID(std::string_view id);
 
 
     bool
@@ -178,6 +216,14 @@ namespace ImGui {
                          const std::string& label);
 
 
+    void
+    SetItemTooltip(const std::string& text);
+
+
+    void
+    SetTooltip(const std::string& text);
+
+
     template<concepts::arithmetic T>
     bool
     Slider(const std::string& label,
@@ -186,6 +232,10 @@ namespace ImGui {
            T v_max,
            const char* format = nullptr,
            ImGuiSliderFlags flags = 0);
+
+
+    void
+    Text(const std::string& text);
 
 
     void
@@ -231,10 +281,19 @@ namespace ImGui {
 
 
     void
+    TextRight(const std::string& text);
+
+
+    void
     TextRightColored(const ImVec4& color,
                      const char* fmt,
                      ...)
         IM_FMTARGS(2);
+
+    void
+    TextRightColored(const ImVec4& color,
+                     const std::string& text);
+
 
     void
     TextRightColoredV(const ImVec4& color,
@@ -247,11 +306,13 @@ namespace ImGui {
     TextUnformatted(const std::string& text);
 
 
-    template<typename T>
-    requires std::convertible_to<decltype(T::x), float> &&
-             std::convertible_to<decltype(T::y), float>
+    void
+    TextWrapped(const std::string& text);
+
+
+    template<concepts::vec2 V>
     ImVec2
-    ToVec2(const T& v)
+    ToVec2(const V& v)
     {
         return ImVec2(v.x, v.y);
     }
@@ -279,6 +340,424 @@ namespace ImGui {
     void
     ValueWrapped(const std::string& prefix,
                  const T& value);
+
+
+    struct ChildGuard {
+
+        ChildGuard(const char* str_id,
+                   const ImVec2& size = ImVec2(0, 0),
+                   ImGuiChildFlags child_flags = 0,
+                   ImGuiWindowFlags window_flags = 0)
+            noexcept;
+
+        ChildGuard(const std::string& str_id,
+                   const ImVec2& size = ImVec2(0, 0),
+                   ImGuiChildFlags child_flags = 0,
+                   ImGuiWindowFlags window_flags = 0)
+            noexcept;
+
+        // forbid moving
+        ChildGuard(ChildGuard&&) = delete;
+
+        ~ChildGuard()
+            noexcept;
+
+        explicit
+        operator bool()
+            const noexcept;
+
+    private:
+
+        const bool status;
+
+    }; // struct ChildGuard
+
+
+    struct ComboGuard {
+
+        ComboGuard(const char* label,
+                   const char* preview_value,
+                   ImGuiComboFlags flags = 0)
+            noexcept;
+
+        ComboGuard(const std::string& label,
+                   const std::string& preview_value,
+                   ImGuiComboFlags flags = 0)
+            noexcept;
+
+        // forbid moving
+        ComboGuard(ComboGuard&&) = delete;
+
+        ~ComboGuard()
+            noexcept;
+
+        explicit
+        operator bool()
+            const noexcept;
+
+    private:
+
+        const bool status;
+
+    }; // struct ComboGuard
+
+
+    struct DisabledGuard {
+
+        DisabledGuard(bool disabled)
+            noexcept;
+
+        // forbid moving
+        DisabledGuard(DisabledGuard&&) = delete;
+
+        ~DisabledGuard()
+            noexcept;
+
+    }; // struct DisabledGuard
+
+
+    struct FontGuard {
+
+        FontGuard(ImFont* font,
+                  float size)
+            noexcept;
+
+        // forbid moving
+        FontGuard(FontGuard&&) = delete;
+
+        ~FontGuard()
+            noexcept;
+
+    }; // struct FontGuard
+
+
+    struct GroupGuard {
+
+        GroupGuard()
+            noexcept;
+
+        // forbid moving
+        GroupGuard(GroupGuard&&) = delete;
+
+        ~GroupGuard()
+            noexcept;
+
+    }; // struct GroupGuard
+
+
+    struct IDGuard {
+
+        IDGuard(const char* id)
+            noexcept;
+
+        IDGuard(const std::string& id)
+            noexcept;
+
+        IDGuard(const char* id_begin,
+                const char* id_end)
+            noexcept;
+
+        IDGuard(std::string_view id)
+            noexcept;
+
+        explicit
+        IDGuard(const void* id)
+            noexcept;
+
+        explicit
+        IDGuard(int id)
+            noexcept;
+
+        // forbid moving
+        IDGuard(IDGuard&&) = delete;
+
+        ~IDGuard()
+            noexcept;
+
+    }; // struct IDGuard
+
+
+    struct IndentGuard {
+
+        IndentGuard(float amount = 0)
+            noexcept;
+
+        // forbid movign
+        IndentGuard(IndentGuard&&) = delete;
+
+        ~IndentGuard()
+            noexcept;
+
+    private:
+
+        const float width;
+
+    }; // struct IndentGuard
+
+
+    struct ItemTooltipGuard {
+
+        ItemTooltipGuard()
+            noexcept;
+
+        // forbid moving
+        ItemTooltipGuard(ItemTooltipGuard&&) = delete;
+
+        ~ItemTooltipGuard()
+            noexcept;
+
+        explicit
+        operator bool()
+            const noexcept;
+
+    private:
+
+        const bool status;
+
+    }; // struct ItemTooltipGuard
+
+
+    struct ItemWidthGuard
+    {
+
+        ItemWidthGuard(float w)
+            noexcept;
+
+        // forbid moving
+        ItemWidthGuard(ItemWidthGuard&&) = delete;
+
+        ~ItemWidthGuard()
+            noexcept;
+
+    }; // struct ItemWidthGuard
+
+
+    struct PopupGuard {
+
+        PopupGuard(const char* str_id,
+                   ImGuiWindowFlags flags = 0)
+            noexcept;
+
+        PopupGuard(const std::string& str_id,
+                   ImGuiWindowFlags flags = 0)
+            noexcept;
+
+        // forbid moving
+        PopupGuard(PopupGuard&&) = delete;
+
+        ~PopupGuard()
+            noexcept;
+
+        explicit
+        operator bool()
+            const noexcept;
+
+    private:
+
+        const bool status;
+
+    }; // struct PopupGuard
+
+
+    struct PopupModalGuard {
+
+        PopupModalGuard(const char* name,
+                        bool* p_open = nullptr,
+                        ImGuiWindowFlags flags = 0)
+            noexcept;
+
+        PopupModalGuard(const std::string& name,
+                        bool* p_open = nullptr,
+                        ImGuiWindowFlags flags = 0)
+            noexcept;
+
+        // forbid moving
+        PopupModalGuard(PopupModalGuard&&) = delete;
+
+        ~PopupModalGuard()
+            noexcept;
+
+        explicit
+        operator bool()
+            const noexcept;
+
+    private:
+
+        const bool status;
+
+    }; // struct PopupModalGuard
+
+
+    struct StyleVarGuard {
+
+        StyleVarGuard(ImGuiStyleVar idx,
+                      float val)
+            noexcept;
+
+        StyleVarGuard(ImGuiStyleVar idx,
+                      const ImVec2& val)
+            noexcept;
+
+        StyleVarGuard(ImGuiStyleVar idx,
+                      float x,
+                      float y)
+            noexcept;
+
+        template<concepts::vec2 V>
+        StyleVarGuard(ImGuiStyleVar idx,
+                      const V& val)
+            noexcept :
+            StyleVarGuard{idx, ToVec2(val)}
+        {}
+
+        // forbid moving
+        StyleVarGuard(StyleVarGuard&&) = delete;
+
+        ~StyleVarGuard()
+            noexcept;
+
+    }; // struct StyleVarGuard
+
+
+    struct TabBarGuard {
+
+        TabBarGuard(const char* id,
+                    ImGuiTabBarFlags flags = 0)
+            noexcept;
+
+        TabBarGuard(const std::string& id,
+                    ImGuiTabBarFlags flags = 0)
+            noexcept;
+
+        // forbid moving
+        TabBarGuard(TabBarGuard&&) = delete;
+
+        ~TabBarGuard()
+            noexcept;
+
+        explicit
+        operator bool()
+            const noexcept;
+
+    private:
+
+        const bool status;
+
+    }; // struct TabBarGuard
+
+
+    struct TabItemGuard {
+
+        TabItemGuard(const char* label,
+                     bool* p_open = nullptr,
+                     ImGuiTabItemFlags flags = 0)
+            noexcept;
+
+        TabItemGuard(const std::string& label,
+                     bool* p_open = nullptr,
+                     ImGuiTabItemFlags flags = 0)
+            noexcept;
+
+        // forbid moving
+        TabItemGuard(TabItemGuard&& other) = delete;
+
+        ~TabItemGuard()
+            noexcept;
+
+        explicit
+        operator bool()
+            const noexcept;
+
+    private:
+
+        const bool status;
+
+    }; // struct TabItemGuard
+
+
+    struct TableGuard {
+
+        TableGuard(const char* id,
+                   int columns,
+                   ImGuiTableFlags flags = 0,
+                   const ImVec2& outer_size = {0, 0},
+                   float inner_width = 0)
+            noexcept;
+
+        TableGuard(const std::string& id,
+                   int columns,
+                   ImGuiTableFlags flags = 0,
+                   const ImVec2& outer_size = {0, 0},
+                   float inner_width = 0)
+            noexcept;
+
+
+        // forbid moving
+        TableGuard(TableGuard&&) = delete;
+
+        ~TableGuard()
+            noexcept;
+
+        explicit
+        operator bool()
+            const noexcept;
+
+    private:
+
+        const bool status;
+
+    }; // struct TableGuard
+
+
+    struct TooltipGuard {
+
+        TooltipGuard()
+            noexcept;
+
+        // forbid moving
+        TooltipGuard(TooltipGuard&&) = delete;
+
+        ~TooltipGuard()
+            noexcept;
+
+        explicit
+        operator bool()
+            const noexcept;
+
+    private:
+
+        const bool status;
+
+    }; // struct TooltipGuard
+
+
+    struct WindowGuard {
+
+        WindowGuard(const char* name,
+                    bool* p_open = nullptr,
+                    ImGuiWindowFlags flags = 0)
+            noexcept;
+
+        WindowGuard(const std::string& name,
+                    bool* p_open = nullptr,
+                    ImGuiWindowFlags flags = 0)
+            noexcept;
+
+        // forbid moving
+        WindowGuard(WindowGuard&&) = delete;
+
+        ~WindowGuard()
+            noexcept;
+
+        explicit
+        operator bool()
+            const noexcept;
+
+    private:
+
+        const bool status;
+
+    }; // struct WindowGuard
 
 } // namespace ImGui
 

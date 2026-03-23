@@ -32,13 +32,12 @@ namespace Settings {
         const ImGuiStyle& style = ImGui::GetStyle();
 
         // Note: flat navigation doesn't work well on child windows that scroll.
-        if (ImGui::BeginChild("settings")) {
+        if (ImGui::ChildGuard settings_child{"settings"}) {
 
-            if (ImGui::BeginTable("settings", 2)) {
+            if (ImGui::TableGuard settings_table{"settings", 2}) {
 
                 ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
-
 
                 /*********
                  * Style *
@@ -55,7 +54,7 @@ namespace Settings {
                 ImGui::TableNextColumn();
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                if (ImGui::BeginCombo("##style", cfg::style)) {
+                if (ImGui::ComboGuard styles_combo{"##style", cfg::style}) {
                     auto& styles = Styles::get_styles();
                     for (const auto& [type, name] : styles) {
                         std::string label = "("s + to_string(type) + ") "s + name;
@@ -64,9 +63,7 @@ namespace Settings {
                             Styles::load();
                         }
                     }
-                    ImGui::EndCombo();
-                }
-
+                } // styles_combo
 
                 /***************
                  * Initial tab *
@@ -82,15 +79,15 @@ namespace Settings {
                 ImGui::TableNextColumn();
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                if (ImGui::BeginCombo("##initial_tab", to_ui_string(cfg::initial_tab))) {
+                if (ImGui::ComboGuard initial_combo{"##initial_tab",
+                                                    to_ui_string(cfg::initial_tab)}) {
                     for (unsigned i = 0; i < TabID::count(); ++i) {
                         TabID tab{i};
                         if (ImGui::Selectable(to_ui_string(tab),
                                               cfg::initial_tab == tab))
                             cfg::initial_tab = tab;
                     }
-                    ImGui::EndCombo();
-                }
+                } // initial_combo
 
                 /********************
                  * Preferred server *
@@ -112,10 +109,10 @@ namespace Settings {
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x
                                         - style.ItemSpacing.x
                                         - refresh_width);
-                if (ImGui::BeginCombo("##server",
-                                      cfg::server.empty()
-                                      ? "(random)"
-                                      : cfg::server.data())) {
+                if (ImGui::ComboGuard server_combo{"##server",
+                                                   cfg::server.empty()
+                                                   ? "(random)"
+                                                   : cfg::server.data()}) {
                     if (ImGui::Selectable("(random)", cfg::server.empty())) {
                         cfg::server.clear();
                         Browser::connect();
@@ -126,8 +123,7 @@ namespace Settings {
                             cfg::server = name;
                             Browser::connect();
                         }
-                    ImGui::EndCombo();
-                }
+                } // server_combo
 
                 ImGui::SameLine();
 
@@ -154,7 +150,6 @@ namespace Settings {
                               10u, 50u);
                 if (ImGui::IsItemDeactivatedAfterEdit())
                     Browser::queue_refresh_stations();
-
 
                 /*************************
                  * Recent stations limit *
@@ -320,12 +315,10 @@ namespace Settings {
                 }
 
                 /////////////////
-                ImGui::EndTable();
-            }
 
-        } // settings
-        ImGui::HandleDragScroll();
-        ImGui::EndChild();
+            } // settings_table
+
+        } // settings_child
     }
 
 } // namespace Settings

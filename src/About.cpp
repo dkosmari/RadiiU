@@ -15,7 +15,6 @@
 
 #include <curl/curl.h>
 #include <imgui.h>
-#include <imgui_internal.h>
 #include <jansson.h>
 #include <neaacdec.h>
 #include <opus/opus_defines.h>
@@ -169,13 +168,13 @@ namespace About {
     process_ui()
     {
         // Note: flat navigation doesn't work well on child windows that scroll.
-        if (ImGui::BeginChild("about")) {
+        if (ImGui::ChildGuard about{"about"}) {
 
             auto radiiu_icon_tex = IconManager::get("ui/radiiu-icon.png");
             ImGui::Image(*radiiu_icon_tex, sdl::vec2{128, 128});
             ImGui::SameLine();
 
-            if (ImGui::BeginTable("app-details", 2)) {
+            if (ImGui::TableGuard app_table{"app-details", 2}) {
 
                 ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
@@ -184,12 +183,11 @@ namespace About {
                 ui::show_link_row("Bugs", PACKAGE_BUGREPORT);
                 ui::show_info_row("User Agent", App::get_user_agent());
 
-                ImGui::EndTable();
             }
 
             ImGui::SeparatorText("Credits");
             static const auto credits = get_credits();
-            if (ImGui::BeginTable("credits", 2)) {
+            if (ImGui::TableGuard credits_table{"credits", 2}) {
 
                 ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
@@ -207,11 +205,10 @@ namespace About {
                 // auto rb_icon_tex = IconManager::get("https://www.radio-browser.info/favicon.ico");
                 // ImGui::Image(*rb_icon_tex, sdl::vec2{64, 64});
 
-                ImGui::EndTable();
             }
 
             ImGui::SeparatorText("Components");
-            if (ImGui::BeginTable("components", 2)) {
+            if (ImGui::TableGuard componets_table{"components", 2}) {
 
                 ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
@@ -243,12 +240,8 @@ namespace About {
                 NeAACDecGetVersion(&faad_id, nullptr);
                 ui::show_info_row("FAAD2", faad_id);
 
-                ImGui::EndTable();
             }
         }
-
-        ImGui::HandleDragScroll();
-        ImGui::EndChild();
     }
 
 } // namespace About

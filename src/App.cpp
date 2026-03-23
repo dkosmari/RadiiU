@@ -441,12 +441,15 @@ namespace App {
         ImGuiIO& io = ImGui::GetIO();
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+        io.ConfigFlags |= ImGuiConfigFlags_DragScroll;
 
         io.Fonts->FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
         io.Fonts->FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
 
         io.LogFilename = nullptr; // don't save log
         io.IniFilename = nullptr; // don't save ini
+
+        io.MouseDragThreshold = 25;
 
         load_fonts();
 
@@ -571,8 +574,6 @@ namespace App {
     void
     process_events()
     {
-        // TRACE_FUNC;
-
         Uint64 now = SDL_GetTicks64();
 
         sdl::events::event event;
@@ -664,22 +665,26 @@ namespace App {
             }
 
             ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Always);
-            ImGui::SetNextWindowSize(ImGui::ToVec2(res->window.get_size()), ImGuiCond_Always);
-            if (ImGui::Begin(PACKAGE_STRING,
-                             nullptr,
-                             ImGuiWindowFlags_NoTitleBar |
-                             ImGuiWindowFlags_NoMove |
-                             ImGuiWindowFlags_NoSavedSettings |
-                             ImGuiWindowFlags_NoResize)) {
+            ImGui::SetNextWindowSize(ImGui::GetMainViewport()->WorkSize, ImGuiCond_Always);
+            if (ImGui::WindowGuard main_window{PACKAGE_STRING,
+                                               nullptr,
+                                               ImGuiWindowFlags_NoTitleBar |
+                                               ImGuiWindowFlags_NoMove |
+                                               ImGuiWindowFlags_NoSavedSettings |
+                                               ImGuiWindowFlags_NoResize}) {
 
-                ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
-                ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, ui_rounding);
+                ImGui::StyleVarGuard window_border_size{ImGuiStyleVar_WindowBorderSize,
+                                                        1.0f};
+                ImGui::StyleVarGuard window_rounding{ImGuiStyleVar_WindowRounding,
+                                                     ui_rounding};
 
                 {
                     // App name, centered
-                    ImGui::PushFont(nullptr, 48);
-                    ImGui::TextCentered("%s", PACKAGE_STRING);
-                    ImGui::PopFont();
+                    {
+                        ImGui::FontGuard title_font{nullptr, 48};
+                        ImGui::TextCentered("%s", PACKAGE_STRING);
+                    }
+
                     ImGui::SameLine();
                     // Put a close button on the top right
                     auto tex = IconManager::get("ui/close-button.svg");
@@ -693,66 +698,55 @@ namespace App {
                         quit();
                 }
 
-                if (ImGui::BeginTabBar("main_tabs")) {
+                if (ImGui::TabBarGuard tab_bar{"main_tabs"}) {
 
-                    if (ImGui::BeginTabItem(to_ui_string(TabID::favorites),
-                                            nullptr,
-                                            get_tab_item_flags_for(TabID::favorites))) {
+                    if (ImGui::TabItemGuard fav_tab{to_ui_string(TabID::favorites),
+                                                    nullptr,
+                                                    get_tab_item_flags_for(TabID::favorites)}) {
                         current_tab = TabID::favorites;
                         Favorites::process_ui();
-                        ImGui::EndTabItem();
                     }
 
-                    if (ImGui::BeginTabItem(to_ui_string(TabID::browser),
-                                            nullptr,
-                                            get_tab_item_flags_for(TabID::browser))) {
+                    if (ImGui::TabItemGuard browser_tab{to_ui_string(TabID::browser),
+                                                        nullptr,
+                                                        get_tab_item_flags_for(TabID::browser)}) {
                         current_tab = TabID::browser;
                         Browser::process_ui();
-                        ImGui::EndTabItem();
                     }
 
-                    if (ImGui::BeginTabItem(to_ui_string(TabID::recent),
-                                            nullptr,
-                                            get_tab_item_flags_for(TabID::recent))) {
+                    if (ImGui::TabItemGuard recent_tab{to_ui_string(TabID::recent),
+                                                       nullptr,
+                                                       get_tab_item_flags_for(TabID::recent)}) {
                         current_tab = TabID::recent;
                         Recent::process_ui();
-                        ImGui::EndTabItem();
                     }
 
-                    if (ImGui::BeginTabItem(to_ui_string(TabID::player),
-                                            nullptr,
-                                            get_tab_item_flags_for(TabID::player))) {
+                    if (ImGui::TabItemGuard player_tab{to_ui_string(TabID::player),
+                                                       nullptr,
+                                                       get_tab_item_flags_for(TabID::player)}) {
                         current_tab = TabID::player;
                         Player::process_ui();
-                        ImGui::EndTabItem();
-
                     }
 
-                    if (ImGui::BeginTabItem(to_ui_string(TabID::settings),
-                                            nullptr,
-                                            get_tab_item_flags_for(TabID::settings))) {
+                    if (ImGui::TabItemGuard settings_tab{to_ui_string(TabID::settings),
+                                                         nullptr,
+                                                         get_tab_item_flags_for(TabID::settings)}) {
                         current_tab = TabID::settings;
                         Settings::process_ui();
-                        ImGui::EndTabItem();
                     }
 
-                    if (ImGui::BeginTabItem(to_ui_string(TabID::about),
-                                            nullptr,
-                                            get_tab_item_flags_for(TabID::about))) {
+                    if (ImGui::TabItemGuard about_tab{to_ui_string(TabID::about),
+                                                      nullptr,
+                                                      get_tab_item_flags_for(TabID::about)}) {
                         current_tab = TabID::about;
                         About::process_ui();
-                        ImGui::EndTabItem();
                     }
 
                     next_tab.reset();
 
-                    ImGui::EndTabBar();
-                }
+                } // tab_bar
 
-                ImGui::PopStyleVar(2);
-            }
-
-            ImGui::End();
+            } // main_window
 
             Styles::process_ui();
 
@@ -762,8 +756,6 @@ namespace App {
 
         ImGui::EndFrame();
         ImGui::Render();
-
-        ImGui::KineticScrollFrameEnd();
     }
 
 

@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -11,7 +11,6 @@
 #include <utility>
 
 #include <imgui.h>
-#include <imgui_internal.h>
 
 #include "Recent.hpp"
 
@@ -93,22 +92,21 @@ namespace Recent {
 
     void
     show_station(std::shared_ptr<Station>& station,
-                 std::size_t index,
-                 ImGuiID scroll_target)
+                 std::size_t index)
     {
-        ImGui::PushID(index);
+        ImGui::IDGuard station_id{static_cast<int>(index)};
 
-        if (ImGui::BeginChild("station",
-                              {0, 0},
-                              ImGuiChildFlags_AutoResizeY |
-                              ImGuiChildFlags_FrameStyle |
-                              ImGuiChildFlags_NavFlattened)) {
+        if (ImGui::ChildGuard station_child{"station",
+                                            {0, 0},
+                                            ImGuiChildFlags_AutoResizeY |
+                                            ImGuiChildFlags_FrameStyle |
+                                            ImGuiChildFlags_NavFlattened}) {
 
-            if (ImGui::BeginChild("actions",
-                                  {0, 0},
-                                  ImGuiChildFlags_AutoResizeX |
-                                  ImGuiChildFlags_AutoResizeY |
-                                  ImGuiChildFlags_NavFlattened)) {
+            if (ImGui::ChildGuard actions_child{"actions",
+                                                {0, 0},
+                                                ImGuiChildFlags_AutoResizeX |
+                                                ImGuiChildFlags_AutoResizeY |
+                                                ImGuiChildFlags_NavFlattened}) {
 
                 ui::show_play_button(station);
 
@@ -118,58 +116,47 @@ namespace Recent {
 
                 ui::show_details_button(*station);
 
-                // 🗑
-                if (ImGui::Button(ICON_FA_TRASH_O))
+                if (ImGui::Button(ICON_FA_TRASH_O)) // 🗑
                     pending_remove = index;
                 ImGui::SetItemTooltip("Remove station from recent history.");
 
-            } // actions
-            ImGui::HandleDragScroll(scroll_target);
-            ImGui::EndChild();
+            } // actions_child
 
             ImGui::SameLine();
 
-            if (ImGui::BeginChild("details",
-                                  {0, 0},
-                                  ImGuiChildFlags_AutoResizeY |
-                                  ImGuiChildFlags_NavFlattened)) {
+            if (ImGui::ChildGuard details_child{"details",
+                                                {0, 0},
+                                                ImGuiChildFlags_AutoResizeY |
+                                                ImGuiChildFlags_NavFlattened}) {
 
                 ui::show_favicon(*station);
 
                 ImGui::SameLine();
 
-                ui::show_station_basic_info(*station, scroll_target);
+                ui::show_station_basic_info(*station);
 
-                if (ImGui::BeginChild("extra_info",
-                                      {0, 0},
-                                      ImGuiChildFlags_AutoResizeY |
-                                      ImGuiChildFlags_NavFlattened)) {
+                if (ImGui::ChildGuard extra_info_child{"extra_info",
+                                                       {0, 0},
+                                                       ImGuiChildFlags_AutoResizeY |
+                                                       ImGuiChildFlags_NavFlattened}) {
 
-                    ui::show_tags(station->tags, scroll_target);
+                    ui::show_tags(station->tags);
 
-                } // extra_info
-                ImGui::HandleDragScroll(scroll_target);
-                ImGui::EndChild();
+                } // extra_info_child
 
-            } // details
-            ImGui::HandleDragScroll(scroll_target);
-            ImGui::EndChild();
+            } // details_child
 
-        } // station
-        ImGui::HandleDragScroll(scroll_target);
-        ImGui::EndChild();
-
-        ImGui::PopID();
+        } // station_child
     }
 
 
     void
     process_ui()
     {
-        if (ImGui::BeginChild("toolbar",
-                              {0, 0},
-                              ImGuiChildFlags_AutoResizeY |
-                              ImGuiChildFlags_NavFlattened)) {
+        if (ImGui::ChildGuard toolbar_child{"toolbar",
+                                            {0, 0},
+                                            ImGuiChildFlags_AutoResizeY |
+                                            ImGuiChildFlags_NavFlattened}) {
 
             if (ImGui::Button("Clear"))
                 stations.clear();
@@ -180,19 +167,15 @@ namespace Recent {
             ImGui::AlignTextToFramePadding();
             ImGui::TextRight("%zu stations", stations.size());
 
-        } // toolbar
-        ImGui::EndChild();
+        } // toolbar_child
 
         // Note: flat navigation doesn't work well on child windows that scroll.
-        if (ImGui::BeginChild("recent")) {
+        if (ImGui::ChildGuard recent_child{"recent"}) {
 
-            auto scroll_target = ImGui::GetCurrentWindow()->ID;
             for (std::size_t index = stations.size() - 1; index + 1 > 0; --index)
-                show_station(stations[index], index, scroll_target);
+                show_station(stations[index], index);
 
-        } // recent
-        ImGui::HandleDragScroll();
-        ImGui::EndChild();
+        } // recent_child
     }
 
 

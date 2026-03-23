@@ -152,11 +152,11 @@ radiiu_elf_LDFLAGS = \
 	$(AM_LDFLAGS) \
 	-Wl,-Map,radiiu.map
 
-RPX_TARGET = radiiu.rpx
+RPX_FILE = radiiu.rpx
 
 WUHB_FILE = radiiu.wuhb
 
-$(WUHB_FILE): $(RPX_TARGET) $(srcdir)/assets/meta/icon.png
+$(WUHB_FILE): $(RPX_FILE) $(srcdir)/assets/meta/icon.png
 	$(WUHBTOOL) \
 		$< $@ \
 		--content=$(srcdir)/assets/content \
@@ -169,12 +169,12 @@ $(WUHB_FILE): $(RPX_TARGET) $(srcdir)/assets/meta/icon.png
 all-local: $(WUHB_FILE)
 
 .PHONY: run
-run: $(WUHB_FILE)
-	WIILOAD=tcp:wiiu wiiload $<
+run: all
+	WIILOAD=tcp:wiiu wiiload $(WUHB_FILE)
 
 
-wiiu-install: $(WUHB_FILE)
-	curl --upload-file $< "ftp://wiiu:/fs/vol/external01/wiiu/apps/"
+wiiu-install: all
+	curl --upload-file $(WUHB_FILE) "ftp://wiiu:/fs/vol/external01/wiiu/apps/"
 
 
 wiiu-uninstall:
@@ -192,8 +192,8 @@ radiiu_elf_LDADD += $(FONTCONFIG_LIBS)
 
 .PHONY: run
 
-run: radiiu.elf
-	cd $(top_srcdir) && $(abs_top_builddir)/$<
+run: all
+	cd $(top_srcdir) && $(abs_top_builddir)/radiiu.elf
 
 endif !ENABLE_WIIU
 

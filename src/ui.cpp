@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -11,8 +11,6 @@
 #include <stdexcept>
 
 #include <sdl2xx/vec2.hpp>
-
-#include <imgui_internal.h>
 
 #include "ui.hpp"
 
@@ -60,13 +58,14 @@ namespace ui {
     void
     show_details_button(const Station& station)
     {
-        // 🛈
-        ImGui::BeginDisabled(station.uuid.empty());
-        if (ImGui::Button(ICON_FA_INFO_CIRCLE))
-            open_station_details_popup(station.uuid);
-        if (!station.uuid.empty())
-            ImGui::SetItemTooltip("Show station details.");
-        ImGui::EndDisabled();
+
+        {
+            ImGui::DisabledGuard disable_no_uuid{station.uuid.empty()};
+            if (ImGui::Button(ICON_FA_INFO_CIRCLE)) // 🛈
+                open_station_details_popup(station.uuid);
+            if (!station.uuid.empty())
+                ImGui::SetItemTooltip("Show station details.");
+        }
         process_station_details_popup(station.uuid);
     }
 
@@ -82,7 +81,7 @@ namespace ui {
         sdl::vec2 size = {128, 128};
         size.x = icon_size.x * size.y / icon_size.y;
         ImGui::Image(*IconManager::get(station.favicon), size);
-        ImGui::SetItemTooltip("%s", station.favicon.data());
+        ImGui::SetItemTooltip(station.favicon);
     }
 
 
@@ -90,12 +89,10 @@ namespace ui {
     show_favorite_button(const Station& station)
     {
         if (Favorites::contains(station)) {
-            // ♥
-            if (ImGui::Button(ICON_FA_HEART))
+            if (ImGui::Button(ICON_FA_HEART)) // ♥
                 Favorites::remove(station);
         } else {
-            // ♡
-            if (ImGui::Button(ICON_FA_HEART_O))
+            if (ImGui::Button(ICON_FA_HEART_O)) // ♡
                 Favorites::add(station);
         }
     }
@@ -108,11 +105,11 @@ namespace ui {
         ImGui::TableNextRow();
 
         ImGui::TableNextColumn();
-        ImGui::TextRightColored(get_label_color(), "%s", label.data());
+        ImGui::TextRightColored(get_label_color(), label);
         // show_last_bounding_box();
 
         ImGui::TableNextColumn();
-        ImGui::TextWrapped("%s", value.data());
+        ImGui::TextWrapped(value);
         // show_last_bounding_box();
     }
 
@@ -125,7 +122,7 @@ namespace ui {
         ImGui::TableNextRow();
 
         ImGui::TableNextColumn();
-        ImGui::TextRightColored(get_label_color(), "%s", label.data());
+        ImGui::TextRightColored(get_label_color(), label);
         // show_last_bounding_box();
 
         ImGui::TableNextColumn();
@@ -174,10 +171,10 @@ namespace ui {
     {
         ImGui::TableNextRow();
 
-        ImGui::PushID(label);
+        ImGui::IDGuard label_id{label};
 
         ImGui::TableNextColumn();
-        ImGui::TextRightColored(get_label_color(), "%s", label.data());
+        ImGui::TextRightColored(get_label_color(), label);
 
         ImGui::TableNextColumn();
         if (ImGui::TextLinkOpenURL(/*ICON_FA_LINK " " +*/ url, url)) {
@@ -185,8 +182,6 @@ namespace ui {
             // TODO: show QR code
 #endif
         }
-
-        ImGui::PopID();
     }
 
 
@@ -209,15 +204,14 @@ namespace ui {
 
 
     void
-    show_station_basic_info(const Station& station,
-                            ImGuiID scroll_target)
+    show_station_basic_info(const Station& station)
     {
-        if (ImGui::BeginChild("basic_info",
-                              {0, 0},
-                              ImGuiChildFlags_AutoResizeY |
-                              ImGuiChildFlags_NavFlattened)) {
+        if (ImGui::ChildGuard basic_info_child{"basic_info",
+                                               {0, 0},
+                                               ImGuiChildFlags_AutoResizeY |
+                                               ImGuiChildFlags_NavFlattened}) {
 
-            ImGui::TextWrapped("%s", station.name.data());
+            ImGui::TextWrapped(station.name);
 
             if (!station.homepage.empty()) {
                 if (ImGui::TextLinkOpenURL(station.homepage, station.homepage)) {
@@ -232,8 +226,7 @@ namespace ui {
                 has_country = true;
                 auto name = Browser::get_country_name(station.country_code);
                 show_boxed(ICON_FA_FLAG_O " " + station.country_code,
-                           name ? *name : ""s,
-                           scroll_target);
+                           name ? *name : ""s);
             }
 
             if (!station.languages.empty()) {
@@ -241,28 +234,24 @@ namespace ui {
                     ImGui::SameLine();
                 for (auto& lang : station.languages) {
                     show_boxed(ICON_FA_LANGUAGE " " + lang,
-                               "Language spoken in this broadcast.",
-                               scroll_target);
+                               "Language spoken in this broadcast.");
                     ImGui::SameLine();
                 }
                 ImGui::NewLine();
             }
 
-        } // basic_info
-        ImGui::HandleDragScroll(scroll_target);
-        ImGui::EndChild();
+        } // basic_info_child
     }
 
 
     void
-    show_tags(const std::vector<std::string>& tags,
-              ImGuiID scroll_target)
+    show_tags(const std::vector<std::string>& tags)
     {
         if (tags.empty())
             return;
 
         for (const auto& tag : tags) {
-            show_boxed(ICON_FA_TAG " " + tag, {}, scroll_target);
+            show_boxed(ICON_FA_TAG " " + tag, {});
             ImGui::SameLine();
         }
         ImGui::NewLine();
@@ -346,17 +335,17 @@ namespace ui {
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(),
                                 ImGuiCond_Always,
                                 {0.5f, 0.5f});
-        if (ImGui::BeginPopup(station_details_popup_id,
-                              ImGuiWindowFlags_NoSavedSettings)) {
+        if (ImGui::PopupGuard station_details_popup{station_details_popup_id,
+                                                    ImGuiWindowFlags_NoSavedSettings}) {
 
             if (!station_details_error.empty()) {
 
-                ImGui::Text("Error: %s", station_details_error.data());
+                ImGui::Text("Error: " + station_details_error);
 
             } else if (station_details_result) {
 
-                if (ImGui::BeginTable("fields", 2,
-                                      ImGuiTableFlags_None)) {
+                if (ImGui::TableGuard fields_table{"fields", 2,
+                                                   ImGuiTableFlags_None}) {
 
                     ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
                     ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
@@ -377,8 +366,7 @@ namespace ui {
                     show_info_row("bitrate",      station_details_result->bitrate);
                     show_info_row("codec",        station_details_result->codec);
 
-                    ImGui::EndTable();
-                }
+                } // fields_table
 
             } else {
 
@@ -386,22 +374,21 @@ namespace ui {
 
             }
 
-            ImGui::HandleDragScroll();
-            ImGui::EndPopup();
         } else {
+
             station_details_uuid.clear();
             station_details_result.reset();
             station_details_error.clear();
+
         }
     }
 
 
     void
     show_boxed(const std::string& text,
-               const std::string& tooltip,
-               ImGuiID scroll_target)
+               const std::string& tooltip)
     {
-        ImGui::PushID(text);
+        ImGui::IDGuard text_id{text};
 
         const ImGuiStyle& style = ImGui::GetStyle();
         const ImVec2 size = ImGui::CalcTextSize(text)
@@ -413,25 +400,22 @@ namespace ui {
         if (size.x > available.x)
             ImGui::NewLine();
 
-        if (ImGui::BeginChild("boxed",
-                              size,
-                              ImGuiChildFlags_FrameStyle)) {
-            ImGui::Text("%s", text.data());
-            if (!tooltip.empty())
-                ImGui::SetItemTooltip("%s", tooltip.data());
-        }
-        ImGui::HandleDragScroll(scroll_target);
-        ImGui::EndChild();
+        if (ImGui::ChildGuard boxed_child{"boxed",
+                                          size,
+                                          ImGuiChildFlags_FrameStyle}) {
 
-        ImGui::PopID();
+            ImGui::Text(text);
+            if (!tooltip.empty())
+                ImGui::SetItemTooltip(tooltip);
+
+        } // boxed_child
     }
 
 
     void
-    show_boxed(const std::string& text,
-               ImGuiID scroll_target)
+    show_boxed(const std::string& text)
     {
-        show_boxed(text, {}, scroll_target);
+        show_boxed(text, {});
     }
 
 

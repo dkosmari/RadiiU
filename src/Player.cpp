@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -21,7 +21,6 @@
 #include <curlxx/curl.hpp>
 
 #include <imgui.h>
-#include <imgui_internal.h>
 
 #include <sdl2xx/audio.hpp>
 
@@ -294,31 +293,33 @@ namespace Player {
 
 
     void
-    show_station(ImGuiID scroll_target)
+    show_station()
     {
         if (!station) {
-            if (ImGui::BeginChild("no_station",
-                                  {0, 0},
-                                  ImGuiChildFlags_AutoResizeY |
-                                  ImGuiChildFlags_FrameStyle |
-                                  ImGuiChildFlags_NavFlattened)) {
+            if (ImGui::ChildGuard no_station_child{"no_station",
+                                                   {0, 0},
+                                                   ImGuiChildFlags_AutoResizeY |
+                                                   ImGuiChildFlags_FrameStyle |
+                                                   ImGuiChildFlags_NavFlattened}) {
+
                 ImGui::TextDisabled("No station set");
-            } // no_station
-            ImGui::EndChild();
+
+            } // no_station_child
+
             return;
         }
 
-        if (ImGui::BeginChild("station",
-                              {0, 0},
-                              ImGuiChildFlags_AutoResizeY |
-                              ImGuiChildFlags_FrameStyle |
-                              ImGuiChildFlags_NavFlattened)) {
+        if (ImGui::ChildGuard station_child{"station",
+                                            {0, 0},
+                                            ImGuiChildFlags_AutoResizeY |
+                                            ImGuiChildFlags_FrameStyle |
+                                            ImGuiChildFlags_NavFlattened}) {
 
-            if (ImGui::BeginChild("actions",
-                                  {0, 0},
-                                  ImGuiChildFlags_AutoResizeX |
-                                  ImGuiChildFlags_AutoResizeY |
-                                  ImGuiChildFlags_NavFlattened)) {
+            if (ImGui::ChildGuard actions_child{"actions",
+                                                {0, 0},
+                                                ImGuiChildFlags_AutoResizeX |
+                                                ImGuiChildFlags_AutoResizeY |
+                                                ImGuiChildFlags_NavFlattened}) {
 
                 ui::show_play_button(station);
 
@@ -328,50 +329,48 @@ namespace Player {
 
                 ui::show_details_button(*station);
 
-            } // actions
-            ImGui::EndChild();
+            } // actions_child
 
             ImGui::SameLine();
 
-            if (ImGui::BeginChild("details",
-                                  {0, 0},
-                                  ImGuiChildFlags_AutoResizeY |
-                                  ImGuiChildFlags_NavFlattened)) {
+            if (ImGui::ChildGuard details_child{"details",
+                                                {0, 0},
+                                                ImGuiChildFlags_AutoResizeY |
+                                                ImGuiChildFlags_NavFlattened}) {
 
                 ui::show_favicon(*station);
 
                 ImGui::SameLine();
 
-                ui::show_station_basic_info(*station, scroll_target);
+                ui::show_station_basic_info(*station);
 
-            } // details
-            ImGui::HandleDragScroll(scroll_target);
-            ImGui::EndChild();
+            } // details_child
 
-        } // station
-        ImGui::HandleDragScroll(scroll_target);
-        ImGui::EndChild();
+        } // station_child
+
     }
 
 
     void
-    show_stream(ImGuiID scroll_target)
+    show_stream()
     {
 
-        if (ImGui::BeginChild("stream",
-                              {0, 0},
-                              ImGuiChildFlags_AutoResizeY |
-                              ImGuiChildFlags_FrameStyle |
-                              ImGuiChildFlags_NavFlattened)) {
+        if (ImGui::ChildGuard stream_child{"stream",
+                                           {0, 0},
+                                           ImGuiChildFlags_AutoResizeY |
+                                           ImGuiChildFlags_FrameStyle |
+                                           ImGuiChildFlags_NavFlattened}) {
 
             ImGui::SetNextItemOpen(details_expanded);
             if (ImGui::CollapsingHeader("Stream details")) {
 
                 details_expanded = true;
 
-                ImGui::Indent();
+                if (!res)
+                    return;
 
-                if (res && ImGui::BeginTable("metadata", 2)) {
+                ImGui::IndentGuard indenter;
+                if (ImGui::TableGuard metadata_table{"metadata", 2}) {
 
                     ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
                     ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
@@ -414,42 +413,37 @@ namespace Player {
                             ui::show_info_row("Bitrate", info->bitrate);
                     }
 
-                    ImGui::EndTable();
-
-                    ImGui::Unindent();
-
                 }
 
             } else
                 details_expanded = false;
 
-        } // stream
-        ImGui::HandleDragScroll(scroll_target);
-        ImGui::EndChild();
+        } // stream_child
+
     }
 
 
     void
-    show_history(ImGuiID scroll_target)
+    show_history()
     {
         auto now = system_clock::now();
 
-        if (ImGui::BeginChild("history",
-                              {0, 0},
-                              ImGuiChildFlags_AutoResizeY |
-                              ImGuiChildFlags_FrameStyle |
-                              ImGuiChildFlags_NavFlattened)) {
+        if (ImGui::ChildGuard history_child{"history",
+                                            {0, 0},
+                                            ImGuiChildFlags_AutoResizeY |
+                                            ImGuiChildFlags_FrameStyle |
+                                            ImGuiChildFlags_NavFlattened}) {
 
             ImGui::SetNextItemOpen(history_expanded);
             if (ImGui::CollapsingHeader("Track history")) {
 
                 history_expanded = true;
 
-                ImGui::Indent();
+                ImGui::IndentGuard indenter;
 
-                if (ImGui::BeginTable("table",
-                                      2,
-                                      ImGuiTableFlags_BordersInnerH)) {
+                if (ImGui::TableGuard table{"table",
+                                            2,
+                                            ImGuiTableFlags_BordersInnerH}) {
 
                     ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
                     ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
@@ -466,33 +460,27 @@ namespace Player {
 
                     }
 
-                    ImGui::EndTable();
-                }
-
-                ImGui::Unindent();
+                } // table
 
             } else
                 history_expanded = false;
 
-        } // history
-        ImGui::HandleDragScroll(scroll_target);
-        ImGui::EndChild();
+        } // history_child
     }
 
 
     void
     process_ui()
     {
-        if (ImGui::BeginChild("player",
-                              {0, 0},
-                              ImGuiChildFlags_NavFlattened)) {
-            auto scroll_target = ImGui::GetCurrentWindow()->ID;
-            show_station(scroll_target);
-            show_stream(scroll_target);
-            show_history(scroll_target);
-        } // player
-        ImGui::HandleDragScroll();
-        ImGui::EndChild();
+        if (ImGui::ChildGuard player_child{"player",
+                                           {0, 0},
+                                           ImGuiChildFlags_NavFlattened}) {
+
+            show_station();
+            show_stream();
+            show_history();
+
+        } // player_child
     }
 
 

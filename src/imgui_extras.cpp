@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -26,20 +26,7 @@ using std::cout;
 using std::endl;
 
 
-// Define this to handle kinetic scrolling for each axis independently.
-#define KINETIC_AXIS
-
-
 namespace ImGui {
-
-    void
-    ScrollWhenDraggingOnVoid(const ImVec2& delta,
-                             ImGuiMouseButton mouse_button);
-
-    void
-    ScrollWhenDraggingOnVoid(ImGuiID scroll_target,
-                             const ImVec2& delta,
-                             ImGuiMouseButton mouse_button);
 
 
     namespace {
@@ -78,16 +65,6 @@ namespace ImGui {
         constexpr ImGuiDataType imgui_data_type_v<double> = ImGuiDataType_Double;
 
 
-        struct ScrollState {
-            ImVec2 velocity;
-            bool dragging = false;
-        };
-        std::unordered_map<ImGuiID, ScrollState> scroll_states;
-
-
-        unsigned pinning_down_frames = 0;
-
-
         [[maybe_unused]]
         float
         length(const ImVec2& v)
@@ -96,6 +73,26 @@ namespace ImGui {
         }
 
     } // namespace
+
+
+
+    bool
+    Begin(const std::string& name,
+          bool* p_open,
+          ImGuiWindowFlags flags)
+    {
+        return Begin(name.data(), p_open, flags);
+    }
+
+
+    bool
+    BeginChild(const std::string& str_id,
+               const ImVec2& size,
+               ImGuiChildFlags child_flags,
+               ImGuiWindowFlags window_flags)
+    {
+        return BeginChild(str_id.data(), size, child_flags, window_flags);
+    }
 
 
     bool
@@ -127,11 +124,30 @@ namespace ImGui {
 
 
     bool
+    BeginTabBar(const std::string& id,
+                ImGuiTabBarFlags flags)
+    {
+        return BeginTabBar(id.data(), flags);
+    }
+
+
+    bool
     BeginTabItem(const std::string& label,
                  bool* p_open,
                  ImGuiTabItemFlags flags)
     {
         return BeginTabItem(label.data(), p_open, flags);
+    }
+
+
+    bool
+    BeginTable(const std::string& id,
+               int columns,
+               ImGuiTableFlags flags,
+               const ImVec2& outer_size,
+               float inner_width)
+    {
+        return BeginTable(id.data(), columns, flags, outer_size, inner_width);
     }
 
 
@@ -233,22 +249,6 @@ namespace ImGui {
     Drag<double>(const std::string&,
                  double&, double, double,
                  float, const char*, ImGuiSliderFlags);
-
-
-    void
-    HandleDragScroll()
-    {
-        ScrollWhenDraggingOnVoid(-GetIO().MouseDelta, ImGuiMouseButton_Left);
-    }
-
-
-    void
-    HandleDragScroll(ImGuiID target_id)
-    {
-        ScrollWhenDraggingOnVoid(target_id,
-                                 -GetIO().MouseDelta,
-                                 ImGuiMouseButton_Left);
-    }
 
 
     void
@@ -420,57 +420,23 @@ namespace ImGui {
     }
 
 
-    void
-    KineticScrollFrameEnd()
+    bool
+    InputTextWithHint(const std::string& label,
+                      const std::string& hint,
+                      std::string& value,
+                      ImGuiInputTextFlags flags,
+                      ImGuiInputTextCallback callback,
+                      void* ctx)
     {
-        // Try to detect the user touched and is holding in place.
-        // check if user wants to stop scrolling
-        ImGuiIO& io = GetIO();
-        if (io.MouseDown[0] &&
-            //length(io.MouseDelta) < io.MouseDragThreshold
-            io.MouseDelta.x == 0 && io.MouseDelta.y == 0
-            ) {
-            ++pinning_down_frames;
-            // cout << "pinning down frames: " << pinning_down_frames << endl;
-        } else
-            pinning_down_frames = 0;
+        return InputTextWithHint(label.data(), hint.data(), &value, flags, callback, ctx);
+    }
 
-        const bool lock_scroll = pinning_down_frames >= 2;
 
-        for (auto& [id, state] : scroll_states) {
-            if (!state.dragging && !lock_scroll) {
-                ImGuiWindow* window = FindWindowByID(id);
-                auto& scroll = window->Scroll;
-                if (state.velocity.x != 0.0f)
-                    SetScrollX(window, scroll.x + state.velocity.x * io.DeltaTime);
-                if (state.velocity.y != 0.0f)
-                    SetScrollY(window, scroll.y + state.velocity.y * io.DeltaTime);
-            }
-
-            const float scroll_speed_decay = 1.0f / 8.0f;
-            if (lock_scroll)
-                state.velocity = {};
-            else
-                state.velocity *= std::pow(scroll_speed_decay, io.DeltaTime);
-
-            const float stop_speed = 200.0f;
-#ifdef KINETIC_AXIS
-            if (std::abs(state.velocity.x) < stop_speed)
-                state.velocity.x = 0;
-            if (std::abs(state.velocity.y) < stop_speed)
-                state.velocity.y = 0;
-#else
-            if (length(state.velocity) < stop_speed)
-                state.velocity = {};
-#endif
-
-            state.dragging = false;
-        }
-        std::erase_if(scroll_states,
-                      [](const auto& elem)
-                      {
-                          return elem.second.velocity == ImVec2{};
-                      });
+    bool
+    IsPopupOpen(const std::string& str_id,
+                ImGuiPopupFlags flags)
+    {
+        return IsPopupOpen(str_id.data(), flags);
     }
 
 
@@ -483,80 +449,16 @@ namespace ImGui {
 
 
     void
-    PushID(const std::string& str)
+    PushID(const std::string& id)
     {
-        PushID(str.data(), str.data() + str.size());
+        PushID(id.data(), id.data() + id.size());
     }
 
 
     void
-    ScrollWhenDraggingOnVoid(const ImVec2& delta,
-                             ImGuiMouseButton mouse_button)
+    PushID(std::string_view id)
     {
-        ImGuiWindow* current_window = GetCurrentContext()->CurrentWindow;
-        ScrollWhenDraggingOnVoid(current_window->ID, delta, mouse_button);
-    }
-
-
-    // Based on https://github.com/ocornut/imgui/issues/3379#issuecomment-1678718752
-    void
-    ScrollWhenDraggingOnVoid(ImGuiID target_id,
-                             const ImVec2& delta,
-                             ImGuiMouseButton mouse_button)
-    {
-        auto& g = *GetCurrentContext();
-        ImGuiWindow* target_window = FindWindowByID(target_id);
-        if (!target_window)
-            return;
-        bool hovered = false;
-        bool held = false;
-        ImGuiWindow* current_window = g.CurrentWindow;
-        ImGuiID overlay_id = current_window->GetID("##scrolldraggingoverlay");
-        KeepAliveID(overlay_id);
-        ImGuiButtonFlags button_flags = (mouse_button == 0)
-            ? ImGuiButtonFlags_MouseButtonLeft
-            : (mouse_button == 1)
-                ? ImGuiButtonFlags_MouseButtonRight
-                : ImGuiButtonFlags_MouseButtonMiddle;
-
-        // If nothing hovered so far in the frame (not same as IsAnyItemHovered()!)
-        if (g.HoveredId == 0)
-            ButtonBehavior(current_window->Rect(),
-                           overlay_id,
-                           &hovered,
-                           &held,
-                           button_flags);
-
-        auto& target_scroll = target_window->Scroll;
-        auto& state = scroll_states[target_id];
-        state.dragging = held;
-
-        if (held) {
-            if (delta.x != 0)
-                SetScrollX(target_window, target_scroll.x + delta.x);
-            if (delta.y != 0)
-                SetScrollY(target_window, target_scroll.y + delta.y);
-
-            state.velocity = delta / GetIO().DeltaTime;
-            // don't start kinetic scrolling before it's above the threshold
-            const float speed_threshold = 600.0f;
-#ifdef KINETIC_AXIS
-            if (std::abs(state.velocity.x) < speed_threshold)
-                state.velocity.x = 0;
-            if (std::abs(state.velocity.y) < speed_threshold)
-                state.velocity.y = 0;
-#else
-            if (length(state.velocity) < speed_threshold)
-                state.velocity = {};
-#endif
-            // Don't scroll when not scrollable in that axis.
-            if (target_window->ScrollMax.x == 0)
-                state.velocity.x = 0;
-            if (target_window->ScrollMax.y == 0)
-                state.velocity.y = 0;
-
-
-        }
+        PushID(id.data(), id.data() + id.size());
     }
 
 
@@ -587,6 +489,20 @@ namespace ImGui {
     }
 
 
+    void
+    SetItemTooltip(const std::string& text)
+    {
+        SetItemTooltip("%s", text.data());
+    }
+
+
+    void
+    SetTooltip(const std::string& text)
+    {
+        SetTooltip("%s", text.data());
+    }
+
+
     template<concepts::arithmetic T>
     bool
     Slider(const std::string& label,
@@ -601,6 +517,7 @@ namespace ImGui {
                             &v, &v_min, &v_max,
                             format, flags);
     }
+
 
     /* --------------------------------------- */
     /* Explicit instantiations for Slider<T>() */
@@ -660,6 +577,13 @@ namespace ImGui {
     Slider<double>(const std::string&,
                    double&, double, double,
                    const char*, ImGuiSliderFlags);
+
+
+    void
+    Text(const std::string& text)
+    {
+        return Text("%s", text.data());
+    }
 
 
     void
@@ -747,6 +671,13 @@ namespace ImGui {
 
 
     void
+    TextRight(const std::string& text)
+    {
+        TextRight("%s", text.data());
+    }
+
+
+    void
     TextRightColored(const ImVec4& color,
                      const char* fmt,
                      ...)
@@ -755,6 +686,14 @@ namespace ImGui {
         va_start(args, fmt);
         TextRightColoredV(color, fmt, args);
         va_end(args);
+    }
+
+
+    void
+    TextRightColored(const ImVec4& color,
+                     const std::string& text)
+    {
+        TextRightColored(color, "%s", text.data());
     }
 
 
@@ -771,6 +710,13 @@ namespace ImGui {
     TextUnformatted(const std::string& text)
     {
         TextUnformatted(text.data(), text.data() + text.size());
+    }
+
+
+    void
+    TextWrapped(const std::string& text)
+    {
+        TextWrapped("%s", text.data());
     }
 
 
@@ -915,6 +861,449 @@ namespace ImGui {
                               const std::string& value)
     {
         ValueWrapped<const char*>(prefix, value.data());
+    }
+
+
+    ChildGuard::ChildGuard(const char* str_id,
+                           const ImVec2& size,
+                           ImGuiChildFlags child_flags,
+                           ImGuiWindowFlags window_flags)
+        noexcept :
+        status{BeginChild(str_id, size, child_flags, window_flags)}
+    {}
+
+
+    ChildGuard::ChildGuard(const std::string& str_id,
+                           const ImVec2& size,
+                           ImGuiChildFlags child_flags,
+                           ImGuiWindowFlags window_flags)
+        noexcept :
+        status{BeginChild(str_id, size, child_flags, window_flags)}
+    {}
+
+
+    ChildGuard::~ChildGuard()
+        noexcept
+    {
+        // Note: ImGui::EndChild() is unconditional
+        EndChild();
+    }
+
+
+    ChildGuard::operator bool()
+        const noexcept
+    {
+        return status;
+    }
+
+
+    ComboGuard::ComboGuard(const char* label,
+                           const char* preview_value,
+                           ImGuiComboFlags flags)
+        noexcept :
+        status{BeginCombo(label, preview_value, flags)}
+    {}
+
+
+    ComboGuard::ComboGuard(const std::string& label,
+                           const std::string& preview_value,
+                           ImGuiComboFlags flags)
+        noexcept :
+        status{BeginCombo(label, preview_value, flags)}
+    {}
+
+
+    ComboGuard::~ComboGuard()
+        noexcept
+    {
+        if (status)
+            EndCombo();
+    }
+
+
+    ComboGuard::operator bool()
+        const noexcept
+    {
+        return status;
+    }
+
+
+    DisabledGuard::DisabledGuard(bool disabled)
+        noexcept
+    {
+        BeginDisabled(disabled);
+    }
+
+
+    DisabledGuard::~DisabledGuard()
+        noexcept
+    {
+        EndDisabled();
+    }
+
+
+    FontGuard::FontGuard(ImFont* font,
+                         float size)
+        noexcept
+    {
+        PushFont(font, size);
+    }
+
+
+    FontGuard::~FontGuard()
+        noexcept
+    {
+        PopFont();
+    }
+
+
+    GroupGuard::GroupGuard()
+        noexcept
+    {
+        BeginGroup();
+    }
+
+
+    GroupGuard::~GroupGuard()
+        noexcept
+    {
+        EndGroup();
+    }
+
+
+    IDGuard::IDGuard(const char* id)
+        noexcept
+    {
+        PushID(id);
+    }
+
+
+    IDGuard::IDGuard(const std::string& id)
+        noexcept
+    {
+        PushID(id);
+    }
+
+
+    IDGuard::IDGuard(const char* id_begin,
+                     const char* id_end)
+        noexcept
+    {
+        PushID(id_begin, id_end);
+    }
+
+
+    IDGuard::IDGuard(std::string_view id)
+        noexcept
+    {
+        PushID(id);
+    }
+
+
+    IDGuard::IDGuard(const void* id)
+        noexcept
+    {
+        PushID(id);
+    }
+
+
+    IDGuard::IDGuard(int id)
+        noexcept
+    {
+        PushID(id);
+    }
+
+
+    IDGuard::~IDGuard()
+        noexcept
+    {
+        PopID();
+    }
+
+
+    IndentGuard::IndentGuard(float amount)
+        noexcept:
+        width{amount}
+    {
+        Indent(width);
+    }
+
+
+    IndentGuard::~IndentGuard()
+        noexcept
+    {
+        Unindent(width);
+    }
+
+
+    ItemTooltipGuard::ItemTooltipGuard()
+        noexcept :
+        status{BeginItemTooltip()}
+    {}
+
+
+    ItemTooltipGuard::~ItemTooltipGuard()
+        noexcept
+    {
+        if (status)
+            EndTooltip();
+    }
+
+
+    ItemTooltipGuard::operator bool()
+        const noexcept
+    {
+        return status;
+    }
+
+
+    ItemWidthGuard::ItemWidthGuard(float w)
+        noexcept
+    {
+        PushItemWidth(w);
+    }
+
+
+    ItemWidthGuard::~ItemWidthGuard()
+        noexcept
+    {
+        PopItemWidth();
+    }
+
+
+    PopupGuard::PopupGuard(const char* str_id,
+                           ImGuiWindowFlags flags)
+        noexcept :
+        status{BeginPopup(str_id, flags)}
+    {}
+
+
+    PopupGuard::PopupGuard(const std::string& str_id,
+                           ImGuiWindowFlags flags)
+        noexcept :
+        status{BeginPopup(str_id, flags)}
+    {}
+
+
+    PopupGuard::~PopupGuard()
+        noexcept
+    {
+        if (status)
+            EndPopup();
+    }
+
+
+    PopupGuard::operator bool()
+        const noexcept
+    {
+        return status;
+    }
+
+
+    PopupModalGuard::PopupModalGuard(const char* name,
+                                     bool* p_open,
+                                     ImGuiWindowFlags flags)
+        noexcept :
+        status{BeginPopupModal(name, p_open, flags)}
+    {}
+
+    PopupModalGuard::PopupModalGuard(const std::string& name,
+                                     bool* p_open,
+                                     ImGuiWindowFlags flags)
+        noexcept :
+        status{BeginPopupModal(name, p_open, flags)}
+    {}
+
+
+    PopupModalGuard::~PopupModalGuard()
+        noexcept
+    {
+        if (status)
+            EndPopup();
+    }
+
+
+    PopupModalGuard::operator bool()
+        const noexcept
+    {
+        return status;
+    }
+
+
+    StyleVarGuard::StyleVarGuard(ImGuiStyleVar idx,
+                                 float val)
+        noexcept
+    {
+        PushStyleVar(idx, val);
+    }
+
+
+    StyleVarGuard::StyleVarGuard(ImGuiStyleVar idx,
+                                 float x, float y)
+        noexcept :
+        StyleVarGuard{idx, ImVec2{x, y}}
+    {}
+
+
+    StyleVarGuard::StyleVarGuard(ImGuiStyleVar idx,
+                                 const ImVec2& val)
+        noexcept
+    {
+        PushStyleVar(idx, val);
+    }
+
+
+    StyleVarGuard::~StyleVarGuard()
+        noexcept
+    {
+        PopStyleVar();
+    }
+
+
+    TabBarGuard::TabBarGuard(const char* id,
+                    ImGuiTabBarFlags flags)
+        noexcept :
+        status{BeginTabBar(id, flags)}
+    {}
+
+
+    TabBarGuard::TabBarGuard(const std::string& id,
+                    ImGuiTabBarFlags flags)
+        noexcept :
+        status{BeginTabBar(id, flags)}
+    {}
+
+
+    TabBarGuard::~TabBarGuard()
+        noexcept
+    {
+        if (status)
+            EndTabBar();
+    }
+
+
+    TabBarGuard::operator bool()
+        const noexcept
+    {
+        return status;
+    }
+
+
+    TabItemGuard::TabItemGuard(const char* label,
+                     bool* p_open,
+                     ImGuiTabItemFlags flags)
+        noexcept :
+        status{BeginTabItem(label, p_open, flags)}
+    {}
+
+
+    TabItemGuard::TabItemGuard(const std::string& label,
+                               bool* p_open,
+                               ImGuiTabItemFlags flags)
+        noexcept :
+        status{BeginTabItem(label, p_open, flags)}
+    {}
+
+
+    TabItemGuard::~TabItemGuard()
+        noexcept
+    {
+        if (status)
+            EndTabItem();
+    }
+
+
+    TabItemGuard::operator bool()
+        const noexcept
+    {
+        return status;
+    }
+
+
+    TableGuard::TableGuard(const char* id,
+                   int columns,
+                   ImGuiTableFlags flags,
+                   const ImVec2& outer_size,
+                   float inner_width)
+        noexcept :
+        status{BeginTable(id, columns, flags, outer_size, inner_width)}
+    {}
+
+
+    TableGuard::TableGuard(const std::string& id,
+                           int columns,
+                           ImGuiTableFlags flags,
+                           const ImVec2& outer_size,
+                           float inner_width)
+        noexcept :
+        status{BeginTable(id, columns, flags, outer_size, inner_width)}
+    {}
+
+
+    TableGuard::~TableGuard()
+        noexcept
+    {
+        if (status)
+            EndTable();
+    }
+
+
+    TableGuard::operator bool()
+        const noexcept
+    {
+        return status;
+    }
+
+
+    TooltipGuard::TooltipGuard()
+        noexcept :
+        status{BeginTooltip()}
+    {}
+
+
+    TooltipGuard::~TooltipGuard()
+        noexcept
+    {
+        if (status)
+            EndTooltip();
+    }
+
+
+    TooltipGuard::operator bool()
+        const noexcept
+    {
+        return status;
+    }
+
+
+    WindowGuard::WindowGuard(const char* name,
+                             bool* p_open,
+                             ImGuiWindowFlags flags)
+        noexcept :
+        status{Begin(name, p_open, flags)}
+    {}
+
+
+    WindowGuard::WindowGuard(const std::string& name,
+                             bool* p_open,
+                             ImGuiWindowFlags flags)
+        noexcept :
+        status{Begin(name, p_open, flags)}
+    {}
+
+
+    WindowGuard::~WindowGuard()
+        noexcept
+    {
+        // Note: ImGui::End() is unconditional
+        End();
+    }
+
+
+    WindowGuard::operator bool()
+        const noexcept
+    {
+        return status;
     }
 
 } // namespace ImGui
