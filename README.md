@@ -27,8 +27,6 @@ for free. You can donate to them to ensure the project continues running.
 
 - `ppc-freetype`
 
-- `ppc-jansson`
-
 - `ppc-faad2`
 
 - `ppc-mpg123`
