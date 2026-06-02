@@ -20,7 +20,12 @@
 
 #include <curlxx/curl.hpp>
 
+#include <glaze/json.hpp>
+#include <glaze/exceptions/json_exceptions.hpp>
+
 #include <imgui.h>
+#include <imgui_raii.h>
+#include <imgui_stdlib.h>
 
 #include <sdl2xx/audio.hpp>
 
@@ -33,12 +38,11 @@
 #include "humanize.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
-#include "imgui_extras.hpp"
-#include "json.hpp"
 #include "radio_client.hpp"
 #include "Recent.hpp"
 #include "Station.hpp"
-#include "ui.hpp"
+#include "StationDetailsPopup.hpp"
+#include "UI.hpp"
 
 
 using std::cout;
@@ -53,26 +57,29 @@ using sdl::vec2;
 
 namespace Player {
 
-    enum class State {
+    struct TrackInfo {
+        system_clock::time_point when{};
+        std::string title{};
+    };
+
+    struct State {
+        bool details_expanded{};
+        bool history_expanded{};
+        std::deque<TrackInfo> history{};
+    };
+
+    State state;
+
+    // TODO: the radio client keeps track of the state.
+    enum class PlaybackState {
         stopped,
         playing,
         stopping,
     };
 
-    State state = State::stopped;
+    PlaybackState playback_state = PlaybackState::stopped;
 
     std::shared_ptr<Station> station;
-
-
-    struct TrackInfo {
-        system_clock::time_point when;
-        std::string title;
-    };
-    std::deque<TrackInfo> history;
-
-    bool details_expanded;
-    bool history_expanded;
-
 
     void
     history_add(const std::string& title);
@@ -91,7 +98,7 @@ namespace Player {
                   const std::string& url_resolved) :
             radio{url, url_resolved, App::get_user_agent()}
         {
-            if (cfg::disable_apd) {
+            if (cfg::state.disable_apd) {
 #ifdef __WUT__
                 IMDisableAPD();
 #else
@@ -117,10 +124,10 @@ namespace Player {
         bool
         is_buffer_too_empty()
         {
-            // if (cfg::player_buffer_size == 0)
+            // if (cfg::state.player_buffer_size == 0)
             //     return false;
 
-            // return total_bytes_fed < cfg::player_buffer_size * 1024u;
+            // return total_bytes_fed < cfg::state.player_buffer_size * 1024u;
             return false;
         }
 
@@ -206,11 +213,8 @@ namespace Player {
     void
     load()
     try {
-
-        const auto root = json::load(App::get_config_path() / "player.json");
-        const auto& obj = root.as<json::object>();
-        try_get(obj, "details_expanded", details_expanded);
-        try_get(obj, "history_expanded", history_expanded);
+        auto filename = App::get_config_path() / "player.json";
+        glz::ex::read_file_json(state, filename.c_str(), std::string{});
     }
     catch (std::exception& e) {
         cout << "ERROR: Player::load(): " << e.what() << endl;
@@ -220,11 +224,8 @@ namespace Player {
     void
     save()
     try {
-        json::object root;
-        root["details_expanded"] = details_expanded;
-        root["history_expanded"] = history_expanded;
-
-        json::save(std::move(root), App::get_config_path() / "player.json");
+        auto filename = App::get_config_path() / "player.json";
+        glz::ex::write_file_json(state, filename.c_str(), std::string{});
     }
     catch (std::exception& e) {
         cout << "ERROR: Player::save(): " << e.what() << endl;
@@ -237,12 +238,12 @@ namespace Player {
         if (!station)
             return;
 
-        if (state == State::playing)
+        if (playback_state == PlaybackState::playing)
             stop();
 
         cout << "Starting playback of station \"" << station->name << "\"" << endl;
 
-        Recent::add(station);
+        Recent::queue_add(station);
 
         cout << "Playing url=\"" << station->url
              << "\", url_resolved=\"" << station->url_resolved
@@ -253,7 +254,7 @@ namespace Player {
         // allocate and initialize resources here
         res.emplace(station->url, station->url_resolved);
 
-        state = State::playing;
+        playback_state = PlaybackState::playing;
     }
 
 
@@ -268,9 +269,9 @@ namespace Player {
     void
     stop()
     {
-        if (state == State::stopped)
+        if (playback_state == PlaybackState::stopped)
             return;
-        state = State::stopped;
+        playback_state = PlaybackState::stopped;
 
         res.reset();
     }
@@ -279,10 +280,10 @@ namespace Player {
     void
     process_logic()
     {
-        if (state == State::stopped)
+        if (playback_state == PlaybackState::stopped)
             return;
 
-        if (state == State::stopping) {
+        if (playback_state == PlaybackState::stopping) {
             stop();
             return;
         }
@@ -296,11 +297,13 @@ namespace Player {
     show_station()
     {
         if (!station) {
-            if (ImGui::ChildGuard no_station_child{"no_station",
-                                                   {0, 0},
-                                                   ImGuiChildFlags_AutoResizeY |
-                                                   ImGuiChildFlags_FrameStyle |
-                                                   ImGuiChildFlags_NavFlattened}) {
+            if (ImGui::RAII::Child no_station_child{
+                    "no_station",
+                    {0, 0},
+                    ImGuiChildFlags_AutoResizeY |
+                    ImGuiChildFlags_FrameStyle |
+                    ImGuiChildFlags_NavFlattened
+                }) {
 
                 ImGui::TextDisabled("No station set");
 
@@ -309,40 +312,47 @@ namespace Player {
             return;
         }
 
-        if (ImGui::ChildGuard station_child{"station",
-                                            {0, 0},
-                                            ImGuiChildFlags_AutoResizeY |
-                                            ImGuiChildFlags_FrameStyle |
-                                            ImGuiChildFlags_NavFlattened}) {
+        if (ImGui::RAII::Child station_child{
+                "station",
+                {0, 0},
+                ImGuiChildFlags_AutoResizeY |
+                ImGuiChildFlags_FrameStyle |
+                ImGuiChildFlags_NavFlattened
+            }) {
 
-            if (ImGui::ChildGuard actions_child{"actions",
-                                                {0, 0},
-                                                ImGuiChildFlags_AutoResizeX |
-                                                ImGuiChildFlags_AutoResizeY |
-                                                ImGuiChildFlags_NavFlattened}) {
+            if (ImGui::RAII::Child actions_child{
+                    "actions",
+                    {0, 0},
+                    ImGuiChildFlags_AutoResizeX |
+                    ImGuiChildFlags_AutoResizeY |
+                    ImGuiChildFlags_NavFlattened
+                }) {
 
-                ui::show_play_button(station);
+                UI::show_play_button(station);
 
-                ui::show_favorite_button(*station);
+                UI::show_favorite_button(*station);
 
                 ImGui::SameLine();
 
-                ui::show_details_button(*station);
+                if (StationDetailsPopup::show_button(station->stationuuid))
+                    StationDetailsPopup::open(station->stationuuid);
 
             } // actions_child
 
             ImGui::SameLine();
 
-            if (ImGui::ChildGuard details_child{"details",
-                                                {0, 0},
-                                                ImGuiChildFlags_AutoResizeY |
-                                                ImGuiChildFlags_NavFlattened}) {
+            if (ImGui::RAII::Child details_child{
+                    "details",
+                    {0, 0},
+                    ImGuiChildFlags_AutoResizeY |
+                    ImGuiChildFlags_NavFlattened
+                }) {
 
-                ui::show_favicon(*station);
+                UI::show_favicon(*station);
 
                 ImGui::SameLine();
 
-                ui::show_station_basic_info(*station);
+                UI::show_station_basic_info(*station);
 
             } // details_child
 
@@ -354,69 +364,67 @@ namespace Player {
     void
     show_stream()
     {
+        if (ImGui::RAII::Child stream_child{
+                "stream",
+                {0, 0},
+                ImGuiChildFlags_AutoResizeY |
+                ImGuiChildFlags_FrameStyle |
+                ImGuiChildFlags_NavFlattened
+            }) {
 
-        if (ImGui::ChildGuard stream_child{"stream",
-                                           {0, 0},
-                                           ImGuiChildFlags_AutoResizeY |
-                                           ImGuiChildFlags_FrameStyle |
-                                           ImGuiChildFlags_NavFlattened}) {
-
-            ImGui::SetNextItemOpen(details_expanded);
-            if (ImGui::CollapsingHeader("Stream details")) {
-
-                details_expanded = true;
+            ImGui::SetNextItemOpen(state.details_expanded);
+            if ((state.details_expanded = ImGui::CollapsingHeader("Stream details"))) {
 
                 if (!res)
                     return;
 
-                ImGui::IndentGuard indenter;
-                if (ImGui::TableGuard metadata_table{"metadata", 2}) {
+                ImGui::RAII::Indent indenter;
+                if (ImGui::RAII::Table metadata_table{"metadata", 2}) {
 
                     ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
                     ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
 
                     if (const auto meta = res->radio.get_metadata()) {
                         if (meta->title)
-                            ui::show_info_row("Title", *meta->title);
+                            UI::show_info_row("Title", *meta->title);
                         if (meta->artist)
-                            ui::show_info_row("Artist", *meta->artist);
+                            UI::show_info_row("Artist", *meta->artist);
                         if (meta->album)
-                            ui::show_info_row("Album", *meta->album);
+                            UI::show_info_row("Album", *meta->album);
                         if (meta->genre)
-                            ui::show_info_row("Genre", *meta->genre);
+                            UI::show_info_row("Genre", *meta->genre);
                         if (meta->cover_art && !meta->cover_art->empty()) {
                             auto art = IconManager::get(*meta->cover_art);
                             ImGui::TableNextRow();
                             ImGui::TableNextColumn();
-                            ui::show_label("Cover art");
+                            UI::show_label("Cover art");
                             ImGui::TableNextColumn();
-                            ImGui::Image(*art);
+                            UI::show_image(*art);
                             ImGui::SetItemTooltip("%s", meta->cover_art->data());
                         }
                         for (auto& [k, v] : meta->extra)
-                            ui::show_info_row(k, v);
+                            UI::show_info_row(k, v);
                         // station metadata
                         if (meta->station_name && !meta->station_name->empty())
-                            ui::show_info_row("Name", *meta->station_name);
+                            UI::show_info_row("Name", *meta->station_name);
                         if (meta->station_genre && !meta->station_genre->empty())
-                            ui::show_info_row("Genre", *meta->station_genre);
+                            UI::show_info_row("Genre", *meta->station_genre);
                         if (meta->station_description && !meta->station_description->empty())
-                            ui::show_info_row("Description", *meta->station_description);
+                            UI::show_info_row("Description", *meta->station_description);
                         if (meta->station_url && !meta->station_url->empty())
-                            ui::show_link_row("URL", *meta->station_url);
+                            UI::show_link_row("URL", *meta->station_url);
                     }
 
                     if (const auto info = res->radio.get_decoder_info()) {
                         if (!info->codec.empty())
-                            ui::show_info_row("Codec", info->codec);
+                            UI::show_info_row("Codec", info->codec);
                         if (!info->bitrate.empty())
-                            ui::show_info_row("Bitrate", info->bitrate);
+                            UI::show_info_row("Bitrate", info->bitrate);
                     }
 
                 }
 
-            } else
-                details_expanded = false;
+            }
 
         } // stream_child
 
@@ -428,27 +436,27 @@ namespace Player {
     {
         auto now = system_clock::now();
 
-        if (ImGui::ChildGuard history_child{"history",
-                                            {0, 0},
-                                            ImGuiChildFlags_AutoResizeY |
-                                            ImGuiChildFlags_FrameStyle |
-                                            ImGuiChildFlags_NavFlattened}) {
+        if (ImGui::RAII::Child history_child{
+                "history",
+                {0, 0},
+                ImGuiChildFlags_AutoResizeY |
+                ImGuiChildFlags_FrameStyle |
+                ImGuiChildFlags_NavFlattened
+            }) {
 
-            ImGui::SetNextItemOpen(history_expanded);
-            if (ImGui::CollapsingHeader("Track history")) {
+            ImGui::SetNextItemOpen(state.history_expanded);
+            if ((state.history_expanded = ImGui::CollapsingHeader("Track history"))) {
 
-                history_expanded = true;
+                ImGui::RAII::Indent indenter;
 
-                ImGui::IndentGuard indenter;
-
-                if (ImGui::TableGuard table{"table",
+                if (ImGui::RAII::Table table{"table",
                                             2,
                                             ImGuiTableFlags_BordersInnerH}) {
 
                     ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
                     ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-                    for (const auto& [when, title] : history | std::views::reverse) {
+                    for (const auto& [when, title] : state.history | std::views::reverse) {
 
                         auto t = duration_cast<std::chrono::seconds>(now - when);
 #if 0
@@ -456,14 +464,13 @@ namespace Player {
 #else
                         std::string label = humanize::duration_brief(t);
 #endif
-                        ui::show_info_row(label, title);
+                        UI::show_info_row(label, title);
 
                     }
 
                 } // table
 
-            } else
-                history_expanded = false;
+            }
 
         } // history_child
     }
@@ -472,22 +479,26 @@ namespace Player {
     void
     process_ui()
     {
-        if (ImGui::ChildGuard player_child{"player",
-                                           {0, 0},
-                                           ImGuiChildFlags_NavFlattened}) {
+        if (ImGui::RAII::Child player_child{
+                "player",
+                {0, 0},
+                ImGuiChildFlags_NavFlattened
+            }) {
 
             show_station();
             show_stream();
             show_history();
 
         } // player_child
+
+        StationDetailsPopup::process_ui();
     }
 
 
     bool
     is_playing(const Station& st)
     {
-        if (state != State::playing || !station)
+        if (playback_state != PlaybackState::playing || !station)
             return false;
         return st == *station;
     }
@@ -505,13 +516,14 @@ namespace Player {
     void
     history_add(const std::string& title)
     {
-        if (!history.empty() && history.back().title == title)
+        if (!state.history.empty() && state.history.back().title == title)
             return;
 
-        history.emplace_back(system_clock::now(), title);
+        state.history.emplace_back(system_clock::now(), title);
 
-        if (history.size() > cfg::player_history_limit)
-            history.erase(history.begin(), history.begin() + cfg::player_history_limit);
+        if (state.history.size() > cfg::state.player_history_limit)
+            state.history.erase(state.history.begin(),
+                                state.history.begin() + cfg::state.player_history_limit);
     }
 
 } // namespace Player

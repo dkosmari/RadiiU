@@ -29,9 +29,11 @@
 #include <curlxx/global.hpp>
 
 #include <imgui.h>
-#include <backends/imgui_impl_sdl2.h>
-#include <backends/imgui_impl_sdlrenderer2.h>
-#include <misc/freetype/imgui_freetype.h>
+#include <imgui_raii.h>
+#include <imgui_stdlib.h>
+#include <imgui_impl_sdl2.h>
+#include <imgui_impl_sdlrenderer2.h>
+#include <imgui_freetype.h>
 
 #include <sdl2xx/sdl.hpp>
 #include <sdl2xx/img.hpp>
@@ -42,16 +44,16 @@
 #include "Browser.hpp"
 #include "cfg.hpp"
 #include "Favorites.hpp"
-#include "IconsFontAwesome4.h"
 #include "IconManager.hpp"
-#include "imgui_extras.hpp"
+#include "IconsFontAwesome4.h"
 #include "Player.hpp"
+#include "RadioBrowserAPI.hpp"
 #include "Recent.hpp"
-#include "rest.hpp"
 #include "Settings.hpp"
 #include "Styles.hpp"
 #include "TabID.hpp"
 #include "tracer.hpp"
+#include "UI.hpp"
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -230,7 +232,9 @@ namespace App {
         ImFontConfig config;
         config.Flags |= ImFontFlags_NoLoadError;
         config.EllipsisChar = U'…';
+#ifdef IMGUI_ENABLE_FREETYPE
         config.GlyphOffset.y = - default_font_size * (4.0f / 32.0f);
+#endif
         config.FontDataOwnedByAtlas = false;
 
         void* font_data = nullptr;
@@ -339,7 +343,9 @@ namespace App {
             extra_fonts.clear();
 
         // Note: CafeStd seems to always be too low, about 1/8th of the font size
+#ifdef IMGUI_ENABLE_FREETYPE
         config.GlyphOffset.y = - default_font_size * (4.0f / 32.0f);
+#endif
         if (!io.Fonts->AddFontFromFileTTF(cafe_std_path.c_str(),
                                           default_font_size,
                                           &config))
@@ -367,7 +373,9 @@ namespace App {
         auto& io = ImGui::GetIO();
         // Load FontAwesome
         ImFontConfig config;
+#ifdef IMGUI_ENABLE_FREETYPE
         config.GlyphOffset.y = - default_font_size * (4.0f / 32.0f);
+#endif
         config.Flags |= ImFontFlags_NoLoadError;
         config.MergeMode = true;
         // config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
@@ -441,15 +449,16 @@ namespace App {
         ImGuiIO& io = ImGui::GetIO();
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-        io.ConfigFlags |= ImGuiConfigFlags_DragScroll;
+
+        io.ConfigDragScroll = true;
+        io.ConfigWindowsMoveFromTitleBarOnly = true;
+        io.MouseDragThreshold = 25;
 
         io.Fonts->FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
         io.Fonts->FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
 
         io.LogFilename = nullptr; // don't save log
         io.IniFilename = nullptr; // don't save ini
-
-        io.MouseDragThreshold = 25;
 
         load_fonts();
 
@@ -469,9 +478,9 @@ namespace App {
         initialize_config_dir();
         // Note: initialize cfg module early.
         cfg::initialize();
-        next_tab = cfg::initial_tab;
-        if (cfg::remember_tab)
-            cfg::initial_tab = TabID::last_active;
+        next_tab = cfg::state.initial_tab;
+        if (cfg::state.remember_tab)
+            cfg::state.initial_tab = TabID::last_active;
 
 #ifdef __WIIU__
         old_disable_swkbd = cfg::disable_swkbd;
@@ -510,7 +519,9 @@ namespace App {
         // Initialize modules.
         Styles::initialize();
         IconManager::initialize(res->renderer);
-        rest::initialize(get_user_agent());
+        RadioBrowserAPI::initialize(get_user_agent());
+        RadioBrowserAPI::set_server(cfg::state.server);
+        RadioBrowserAPI::connect();
 
         // Initialize tabs.
         Favorites::initialize();
@@ -532,7 +543,7 @@ namespace App {
         Favorites::finalize();
 
         // Finalize modules.
-        rest::finalize();
+        RadioBrowserAPI::finalize();
         IconManager::finalize();
         Styles::finalize();
 
@@ -541,9 +552,9 @@ namespace App {
         ImGui::DestroyContext();
 
         // Finalize cfg module last.
-        cfg::remember_tab = cfg::initial_tab == TabID::last_active;
-        if (cfg::remember_tab)
-            cfg::initial_tab = current_tab;
+        cfg::state.remember_tab = cfg::state.initial_tab == TabID::last_active;
+        if (cfg::state.remember_tab)
+            cfg::state.initial_tab = current_tab;
         cfg::finalize();
         finalize_config_dir();
 
@@ -583,11 +594,13 @@ namespace App {
 
             switch (sdl::events::type{event.type}) {
 
-                case sdl::events::type::quit:
-                    quit();
+                using enum sdl::events::type;
+
+                case quit:
+                    App::quit();
                     break;
 
-                case sdl::events::type::controller_device_added: {
+                case controller_device_added: {
                     auto gc = sdl::game_controller::device(event.cdevice.which);
                     cout << "Added controller: " << gc.get_name() << endl;
                     res->controllers.push_back(std::move(gc));
@@ -595,7 +608,7 @@ namespace App {
                     break;
                 }
 
-                case sdl::events::type::controller_device_removed: {
+                case controller_device_removed: {
                     std::erase_if(res->controllers,
                                   [id=event.cdevice.which](sdl::game_controller::device& gc)
                                   {
@@ -605,23 +618,23 @@ namespace App {
                     break;
                 }
 
-                case sdl::events::type::controller_axis:
-                case sdl::events::type::controller_down:
-                case sdl::events::type::controller_up:
-                case sdl::events::type::key_down:
-                case sdl::events::type::key_up:
-                case sdl::events::type::mouse_down:
-                case sdl::events::type::mouse_motion:
-                case sdl::events::type::mouse_up:
-                case sdl::events::type::mouse_wheel:
-                case sdl::events::type::text_editing:
-                case sdl::events::type::text_editing_ext:
-                case sdl::events::type::text_input:
-                case sdl::events::type::will_enter_foreground:
+                case controller_axis:
+                case controller_down:
+                case controller_up:
+                case key_down:
+                case key_up:
+                case mouse_down:
+                case mouse_motion:
+                case mouse_up:
+                case mouse_wheel:
+                case text_editing:
+                case text_editing_ext:
+                case text_input:
+                case will_enter_foreground:
                     last_activity = now;
                     break;
 
-                case sdl::events::type::window:
+                case window:
                     switch (event.window.event) {
                         case SDL_WINDOWEVENT_SHOWN:
                         case SDL_WINDOWEVENT_EXPOSED:
@@ -666,23 +679,23 @@ namespace App {
 
             ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Always);
             ImGui::SetNextWindowSize(ImGui::GetMainViewport()->WorkSize, ImGuiCond_Always);
-            if (ImGui::WindowGuard main_window{PACKAGE_STRING,
-                                               nullptr,
-                                               ImGuiWindowFlags_NoTitleBar |
-                                               ImGuiWindowFlags_NoMove |
-                                               ImGuiWindowFlags_NoSavedSettings |
-                                               ImGuiWindowFlags_NoResize}) {
+            if (ImGui::RAII::Window main_window{PACKAGE_STRING,
+                                                nullptr,
+                                                ImGuiWindowFlags_NoTitleBar |
+                                                ImGuiWindowFlags_NoMove |
+                                                ImGuiWindowFlags_NoSavedSettings |
+                                                ImGuiWindowFlags_NoResize}) {
 
-                ImGui::StyleVarGuard window_border_size{ImGuiStyleVar_WindowBorderSize,
-                                                        1.0f};
-                ImGui::StyleVarGuard window_rounding{ImGuiStyleVar_WindowRounding,
-                                                     ui_rounding};
+                ImGui::RAII::StyleVar window_border_size{ImGuiStyleVar_WindowBorderSize,
+                                                         1.0f};
+                ImGui::RAII::StyleVar window_rounding{ImGuiStyleVar_WindowRounding,
+                                                      ui_rounding};
 
                 {
                     // App name, centered
                     {
-                        ImGui::FontGuard title_font{nullptr, 48};
-                        ImGui::TextCentered("%s", PACKAGE_STRING);
+                        ImGui::RAII::Font title_font{nullptr, 48};
+                        UI::show_text_centered("%s", PACKAGE_STRING);
                     }
 
                     ImGui::SameLine();
@@ -694,50 +707,50 @@ namespace App {
                     ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x
                                          - close_button_size.x);
 
-                    if (ImGui::ImageButton("close_button", *tex))
+                    if (UI::show_image_button("close_button", *tex))
                         quit();
                 }
 
-                if (ImGui::TabBarGuard tab_bar{"main_tabs"}) {
+                if (ImGui::RAII::TabBar tab_bar{"main_tabs"}) {
 
-                    if (ImGui::TabItemGuard fav_tab{to_ui_string(TabID::favorites),
-                                                    nullptr,
-                                                    get_tab_item_flags_for(TabID::favorites)}) {
+                    if (ImGui::RAII::TabItem fav_tab{to_label(TabID::favorites),
+                                                     nullptr,
+                                                     get_tab_item_flags_for(TabID::favorites)}) {
                         current_tab = TabID::favorites;
                         Favorites::process_ui();
                     }
 
-                    if (ImGui::TabItemGuard browser_tab{to_ui_string(TabID::browser),
-                                                        nullptr,
-                                                        get_tab_item_flags_for(TabID::browser)}) {
+                    if (ImGui::RAII::TabItem browser_tab{to_label(TabID::browser),
+                                                         nullptr,
+                                                         get_tab_item_flags_for(TabID::browser)}) {
                         current_tab = TabID::browser;
                         Browser::process_ui();
                     }
 
-                    if (ImGui::TabItemGuard recent_tab{to_ui_string(TabID::recent),
-                                                       nullptr,
-                                                       get_tab_item_flags_for(TabID::recent)}) {
+                    if (ImGui::RAII::TabItem recent_tab{to_label(TabID::recent),
+                                                        nullptr,
+                                                        get_tab_item_flags_for(TabID::recent)}) {
                         current_tab = TabID::recent;
                         Recent::process_ui();
                     }
 
-                    if (ImGui::TabItemGuard player_tab{to_ui_string(TabID::player),
-                                                       nullptr,
-                                                       get_tab_item_flags_for(TabID::player)}) {
+                    if (ImGui::RAII::TabItem player_tab{to_label(TabID::player),
+                                                        nullptr,
+                                                        get_tab_item_flags_for(TabID::player)}) {
                         current_tab = TabID::player;
                         Player::process_ui();
                     }
 
-                    if (ImGui::TabItemGuard settings_tab{to_ui_string(TabID::settings),
-                                                         nullptr,
-                                                         get_tab_item_flags_for(TabID::settings)}) {
+                    if (ImGui::RAII::TabItem settings_tab{to_label(TabID::settings),
+                                                          nullptr,
+                                                          get_tab_item_flags_for(TabID::settings)}) {
                         current_tab = TabID::settings;
                         Settings::process_ui();
                     }
 
-                    if (ImGui::TabItemGuard about_tab{to_ui_string(TabID::about),
-                                                      nullptr,
-                                                      get_tab_item_flags_for(TabID::about)}) {
+                    if (ImGui::RAII::TabItem about_tab{to_label(TabID::about),
+                                                       nullptr,
+                                                       get_tab_item_flags_for(TabID::about)}) {
                         current_tab = TabID::about;
                         About::process_ui();
                     }
@@ -827,10 +840,9 @@ namespace App {
         if (!running)
             return;
 
-        rest::process();
+        RadioBrowserAPI::process();
 
         Favorites::process_logic();
-        Browser::process_logic();
         Recent::process_logic();
         Player::process_logic();
 
@@ -840,8 +852,8 @@ namespace App {
         switch (state) {
             case State::normal:
                 // normal -> fading
-                if (cfg::screen_saver_timeout
-                    && (now - last_activity) > cfg::screen_saver_timeout * 1000) {
+                if (cfg::state.screen_saver_timeout
+                    && (now - last_activity) > cfg::state.screen_saver_timeout * 1000) {
                     cout << "Fading out..." << endl;
                     state = State::fading;
                     fade_start = now;
@@ -859,7 +871,7 @@ namespace App {
         }
         // any user activity forces it back to normal state
         if (state != State::normal)
-            if ((now - last_activity) <= cfg::screen_saver_timeout * 1000) {
+            if ((now - last_activity) <= cfg::state.screen_saver_timeout * 1000) {
                 cout << "Returning to normal" << endl;
                 state = State::normal;
             }

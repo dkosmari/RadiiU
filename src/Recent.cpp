@@ -10,7 +10,12 @@
 #include <optional>
 #include <utility>
 
+#include <glaze/json.hpp>
+#include <glaze/exceptions/json_exceptions.hpp>
+
 #include <imgui.h>
+#include <imgui_raii.h>
+#include <imgui_stdlib.h>
 
 #include "Recent.hpp"
 
@@ -19,11 +24,11 @@
 #include "Favorites.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
-#include "imgui_extras.hpp"
 #include "json.hpp"
 #include "Player.hpp"
 #include "Station.hpp"
-#include "ui.hpp"
+#include "StationDetailsPopup.hpp"
+#include "UI.hpp"
 
 
 using std::cout;
@@ -32,9 +37,10 @@ using std::endl;
 
 namespace Recent {
 
-    namespace {
+    std::deque<std::shared_ptr<Station>> stations;
 
-        std::deque<std::shared_ptr<Station>> stations;
+
+    namespace {
 
         std::shared_ptr<Station> pending_add;
         std::optional<std::size_t> pending_remove;
@@ -42,21 +48,13 @@ namespace Recent {
     } // namespace
 
 
-    void
-    real_add(Station&& station);
-
 
     void
     load()
     try {
-        auto root = json::load(App::get_config_path() / "recent.json");
-        const auto& list = root.as<json::array>();
+        auto filename = App::get_config_path() / "recent.json";
         stations.clear();
-        for (auto& elem : list) {
-            auto& obj = elem.as<json::object>();
-            auto st = std::make_shared<Station>(Station::from_json(obj));
-            stations.push_back(std::move(st));
-        }
+        glz::ex::read_file_json(stations, filename.c_str(), std::string{});
     }
     catch (std::exception& e) {
         cout << "ERROR: Recent::load(): " << e.what() << endl;
@@ -66,10 +64,8 @@ namespace Recent {
     void
     save()
     try {
-        json::array list;
-        for (const auto& station : stations)
-            list.push_back(station->to_json());
-        json::save(std::move(list), App::get_config_path() / "recent.json");
+        auto filename = App::get_config_path() / "recent.json";
+        glz::ex::write_file_json(stations, filename.c_str(), std::string{});
     }
     catch (std::exception& e) {
         cout << "ERROR: Recent::save(): " << e.what() << endl;
@@ -94,27 +90,32 @@ namespace Recent {
     show_station(std::shared_ptr<Station>& station,
                  std::size_t index)
     {
-        ImGui::IDGuard station_id{static_cast<int>(index)};
+        ImGui::RAII::ID station_id{static_cast<int>(index)};
 
-        if (ImGui::ChildGuard station_child{"station",
-                                            {0, 0},
-                                            ImGuiChildFlags_AutoResizeY |
-                                            ImGuiChildFlags_FrameStyle |
-                                            ImGuiChildFlags_NavFlattened}) {
+        if (ImGui::RAII::Child station_child{
+                "station",
+                {0, 0},
+                ImGuiChildFlags_AutoResizeY |
+                ImGuiChildFlags_FrameStyle |
+                ImGuiChildFlags_NavFlattened
+            }) {
 
-            if (ImGui::ChildGuard actions_child{"actions",
-                                                {0, 0},
-                                                ImGuiChildFlags_AutoResizeX |
-                                                ImGuiChildFlags_AutoResizeY |
-                                                ImGuiChildFlags_NavFlattened}) {
+            if (ImGui::RAII::Child actions_child{
+                    "actions",
+                    {0, 0},
+                    ImGuiChildFlags_AutoResizeX |
+                    ImGuiChildFlags_AutoResizeY |
+                    ImGuiChildFlags_NavFlattened
+                }) {
 
-                ui::show_play_button(station);
+                UI::show_play_button(station);
 
-                ui::show_favorite_button(*station);
+                UI::show_favorite_button(*station);
 
                 ImGui::SameLine();
 
-                ui::show_details_button(*station);
+                if (StationDetailsPopup::show_button(station->stationuuid))
+                    StationDetailsPopup::open(station->stationuuid);
 
                 if (ImGui::Button(ICON_FA_TRASH_O)) // 🗑
                     pending_remove = index;
@@ -124,23 +125,27 @@ namespace Recent {
 
             ImGui::SameLine();
 
-            if (ImGui::ChildGuard details_child{"details",
-                                                {0, 0},
-                                                ImGuiChildFlags_AutoResizeY |
-                                                ImGuiChildFlags_NavFlattened}) {
+            if (ImGui::RAII::Child details_child{
+                    "details",
+                    {0, 0},
+                    ImGuiChildFlags_AutoResizeY |
+                    ImGuiChildFlags_NavFlattened
+                }) {
 
-                ui::show_favicon(*station);
+                UI::show_favicon(*station);
 
                 ImGui::SameLine();
 
-                ui::show_station_basic_info(*station);
+                UI::show_station_basic_info(*station);
 
-                if (ImGui::ChildGuard extra_info_child{"extra_info",
-                                                       {0, 0},
-                                                       ImGuiChildFlags_AutoResizeY |
-                                                       ImGuiChildFlags_NavFlattened}) {
+                if (ImGui::RAII::Child extra_info_child{
+                        "extra_info",
+                        {0, 0},
+                        ImGuiChildFlags_AutoResizeY |
+                        ImGuiChildFlags_NavFlattened
+                    }) {
 
-                    ui::show_tags(station->tags);
+                    UI::show_tags(station->tags);
 
                 } // extra_info_child
 
@@ -153,10 +158,12 @@ namespace Recent {
     void
     process_ui()
     {
-        if (ImGui::ChildGuard toolbar_child{"toolbar",
-                                            {0, 0},
-                                            ImGuiChildFlags_AutoResizeY |
-                                            ImGuiChildFlags_NavFlattened}) {
+        if (ImGui::RAII::Child toolbar_child{
+                "toolbar",
+                {0, 0},
+                ImGuiChildFlags_AutoResizeY |
+                ImGuiChildFlags_NavFlattened
+            }) {
 
             if (ImGui::Button("Clear"))
                 stations.clear();
@@ -165,22 +172,24 @@ namespace Recent {
             ImGui::SameLine();
 
             ImGui::AlignTextToFramePadding();
-            ImGui::TextRight("%zu stations", stations.size());
+            UI::show_text_right("%zu stations", stations.size());
 
         } // toolbar_child
 
         // Note: flat navigation doesn't work well on child windows that scroll.
-        if (ImGui::ChildGuard recent_child{"recent"}) {
+        if (ImGui::RAII::Child recent_child{"recent"}) {
 
             for (std::size_t index = stations.size() - 1; index + 1 > 0; --index)
                 show_station(stations[index], index);
 
         } // recent_child
+
+        StationDetailsPopup::process_ui();
     }
 
 
     void
-    process_pending_add()
+    process_add()
     {
         if (!pending_add)
             return;
@@ -191,7 +200,7 @@ namespace Recent {
 
 
     void
-    process_pending_remove()
+    process_remove()
     {
         // Handle any pending removal
         if (!pending_remove)
@@ -205,11 +214,12 @@ namespace Recent {
 
 
     void
-    prune()
+    remove_excess()
     {
-        if (stations.size() > cfg::recent_limit) {
-            std::size_t pending_remove = stations.size() - cfg::recent_limit;
-            stations.erase(stations.begin(), stations.begin() + pending_remove);
+        if (stations.size() > cfg::state.recent_limit) {
+            std::size_t pending_remove = stations.size() - cfg::state.recent_limit;
+            stations.erase(stations.begin(),
+                           stations.begin() + pending_remove);
         }
     }
 
@@ -217,14 +227,14 @@ namespace Recent {
     void
     process_logic()
     {
-        process_pending_add();
-        process_pending_remove();
-        prune();
+        process_add();
+        process_remove();
+        remove_excess();
     }
 
 
     void
-    add(std::shared_ptr<Station>& station)
+    queue_add(std::shared_ptr<Station>& station)
     {
         pending_add = station;
     }

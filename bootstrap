@@ -1,5 +1,14 @@
-#!/bin/sh -x
-(cd external/curlxx && ./bootstrap) || exit 1
+#!/bin/bash
+
+GREEN=$(tput setaf 10)
+YELLOW=$(tput setaf 11)
+NONE=$(tput sgr0)
+
+echo "[${GREEN}${PWD}${NONE}] Running '${YELLOW}./bootstrap${NONE}' in external dependencies"
+
+(cd external/curlxx && ./bootstrap)   || exit 1
 (cd external/mpg123xx && ./bootstrap) || exit 2
-(cd external/sdl2xx && ./bootstrap) || exit 3
+(cd external/sdl2xx && ./bootstrap)   || exit 3
+
+echo "[${GREEN}${PWD}${NONE}] Running '${YELLOW}autoreconf --install $@${NONE}'"
 exec autoreconf --install "$@"

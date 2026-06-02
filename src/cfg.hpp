@@ -17,19 +17,23 @@
 
 namespace cfg {
 
-    extern unsigned    browser_page_limit;
-    extern bool        disable_apd;
-    extern bool        disable_swkbd;
-    extern bool        inactive_screen_off;
-    extern TabID       initial_tab;
-    extern unsigned    player_buffer_size;
-    extern unsigned    player_history_limit;
-    extern bool        remember_tab;
-    extern unsigned    recent_limit;
-    extern unsigned    screen_saver_timeout;
-    extern bool        send_clicks;
-    extern std::string server;
-    extern std::string style;
+    struct State {
+        unsigned    browser_page_limit   = 20;
+        bool        disable_apd          = true;
+        bool        disable_swkbd        = false;
+        bool        inactive_screen_off  = false;
+        TabID       initial_tab          = TabID::browser;
+        unsigned    player_buffer_size   = 8;
+        unsigned    player_history_limit = 20;
+        bool        remember_tab         = true;
+        unsigned    recent_limit         = 10;
+        unsigned    screen_saver_timeout = 120;
+        bool        send_clicks          = false;
+        std::string server               = {};
+        std::string style                = {};
+    };
+
+    extern State state;
 
 
     void

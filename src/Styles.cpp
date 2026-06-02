@@ -10,10 +10,14 @@
 #include <cstdio>
 #include <filesystem>
 #include <iostream>
+#include <unordered_map>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include <optional>
+
+#include <glaze/json.hpp>
+#include <glaze/exceptions/json_exceptions.hpp>
 
 #include <imgui.h>
 
@@ -21,13 +25,20 @@
 
 #include "App.hpp"
 #include "cfg.hpp"
-#include "json.hpp"
 #include "tracer.hpp"
 
 
 using std::cout;
 using std::endl;
 using namespace std::literals;
+
+
+template<>
+struct glz::meta<ImVec4> {
+    using T = ImVec4;
+    static constexpr
+    auto value = array(&T::x, &T::y, &T::z, &T::w);
+};
 
 
 namespace Styles {
@@ -55,87 +66,39 @@ namespace Styles {
     }
 
 
-    ImVec4
-    to_imvec4(const json::value& val)
+    std::optional<unsigned>
+    color_name_to_index(const std::string& name)
     {
-        auto& c = val.as<json::array>();
-        if (c.size() == 3) {
-            return ImVec4(c.at(0).to_real(),
-                          c.at(1).to_real(),
-                          c.at(2).to_real(),
-                          1.0f);
-        } else if (c.size() == 4) {
-            return ImVec4(c.at(0).to_real(),
-                          c.at(1).to_real(),
-                          c.at(2).to_real(),
-                          c.at(3).to_real());
-        } else
-            throw std::runtime_error{"invalid color array size"};
+        for (unsigned i = 0; i < ImGuiCol_COUNT; ++i)
+            if (to_string(static_cast<ImGuiCol_>(i)) == name)
+                return i;
+        return {};
     }
+
+
+    using Colors = std::unordered_map<std::string, ImVec4>;
 
 
     struct Style {
 
         std::string name;
-        std::array<ImVec4, ImGuiCol_COUNT> colors;
-
-
-        constexpr
-        Style()
-            noexcept = default;
-
-        Style(const json::value& val)
-        {
-            auto& obj = val.as<json::object>();
-
-            name = obj.at("name").as<json::string>();
-
-            auto& j_colors = obj.at("colors").as<json::object>();
-            for (std::size_t i = 0; i < colors.size(); ++i) {
-                auto& color = colors[i];
-                auto label = to_string(static_cast<ImGuiCol_>(i));
-                if (!j_colors.contains(label)) {
-                    cout << "Warning: missing color for " << label << endl;
-                    continue;
-                }
-                color = to_imvec4(j_colors.at(label));
-            }
-        }
-
-
-        json::value
-        to_json()
-            const
-        {
-            json::object result;
-
-            result["name"] = name;
-
-            json::array j_colors;
-            for (std::size_t i = 0; i < colors.size(); ++i) {
-                j_colors.push_back(json::array{
-                        colors[i].x,
-                        colors[i].y,
-                        colors[i].z,
-                        colors[i].w,
-                    });
-            }
-            result["colors"] = std::move(j_colors);
-
-            return result;
-        }
+        Colors colors;
 
 
         static
         Style
-        from_imgui(const std::string& name)
+        from_current_style(const std::string& name)
         {
             Style result;
             result.name = name;
 
             ImVec4* im_colors = ImGui::GetStyle().Colors;
-            for (unsigned i = 0; i < ImGuiCol_COUNT; ++i)
-                result.colors[i] = im_colors[i];
+            for (unsigned i = 0; i < ImGuiCol_COUNT; ++i) {
+                auto ic = static_cast<ImGuiCol_>(i);
+                auto key = to_string(ic);
+                auto value = im_colors[i];
+                result.colors.emplace(key, value);
+            }
 
             return result;
         }
@@ -146,8 +109,13 @@ namespace Styles {
             const noexcept
         {
             ImVec4* im_colors = ImGui::GetStyle().Colors;
-            for (unsigned i = 0; i < ImGuiCol_COUNT; ++i)
-                im_colors[i] = colors[i];
+            for (auto [key, value] : colors) {
+                if (auto idx = color_name_to_index(key)) {
+                    im_colors[*idx] = value;
+                } else {
+                    cout << "WARNING: style color for \"" << key << "\" is invalid" << endl;
+                }
+            }
         }
 
     }; // struct Style
@@ -173,13 +141,13 @@ namespace Styles {
         TRACE_FUNC;
 
         ImGui::StyleColorsLight();
-        imgui_styles[1] = Style::from_imgui("ImGui Light");
+        imgui_styles[1] = Style::from_current_style("ImGui Light");
 
         ImGui::StyleColorsClassic();
-        imgui_styles[2] = Style::from_imgui("ImGui Classic");
+        imgui_styles[2] = Style::from_current_style("ImGui Classic");
 
         ImGui::StyleColorsDark();
-        imgui_styles[0] = Style::from_imgui("ImGui Dark");
+        imgui_styles[0] = Style::from_current_style("ImGui Dark");
 
         find_styles();
         load();
@@ -258,12 +226,14 @@ namespace Styles {
 
 
     bool
-    load_file(const std::filesystem::path& filename)
+    load_style_file(const std::filesystem::path& filename)
     {
         if (!exists(filename))
             return false;
-        auto root = json::load(filename);
-        current_style.emplace(root);
+        // auto root = json::load(filename);
+        Style st;
+        glz::ex::read_file_json(st, filename.c_str(), std::string{});
+        current_style.emplace(st);
         current_style->apply();
         return true;
     }
@@ -273,27 +243,27 @@ namespace Styles {
     load()
     try {
 
-        if (cfg::style.empty()) {
+        if (cfg::state.style.empty()) {
             cout << "Loading " << imgui_styles.front().name << " style" << endl;
             imgui_styles.front().apply();
             return;
         }
 
         for (auto& st : imgui_styles) {
-            if (st.name == cfg::style) {
+            if (st.name == cfg::state.style) {
                 cout << "Loading " << st.name << " style" << endl;
                 st.apply();
                 return;
             }
         }
 
-        const std::string filename = cfg::style + ".json";
+        const std::string filename = "styles/" + cfg::state.style + ".json";
 
         // Prioritize user theme, in case of name clash.
-        if (load_file(App::get_config_path() / "styles" / filename))
+        if (load_style_file(App::get_config_path() / filename))
             return;
 
-        load_file(App::get_content_path() / "styles" / filename);
+        load_style_file(App::get_content_path() / filename);
     }
     catch (std::exception& e) {
         cout << "ERROR: Styles::load(): " << e.what() << endl;

@@ -32,7 +32,7 @@ namespace Recent {
 
 
     void
-    add(std::shared_ptr<Station>& station);
+    queue_add(std::shared_ptr<Station>& station);
 
 } // namespace Recent
 

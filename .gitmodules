@@ -1,6 +1,9 @@
 [submodule "external/curlxx"]
 	path = external/curlxx
 	url = https://github.com/dkosmari/curlxx.git
+[submodule "external/glaze"]
+	path = external/glaze
+	url = https://github.com/stephenberry/glaze.git
 [submodule "external/imgui"]
 	path = external/imgui
 	url = https://github.com/dkosmari/imgui.git

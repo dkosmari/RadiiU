@@ -242,7 +242,7 @@ radio_client::process_audio()
         metadata = icy_stream->get_metadata();
 
     if (!dec) {
-        if (data_stream->size() < cfg::player_buffer_size * 1024)
+        if (data_stream->size() < cfg::state.player_buffer_size * 1024)
             return; // don't bother creating a decoder when too little data
         try {
             // try to create a decoder

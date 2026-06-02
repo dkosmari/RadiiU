@@ -8,15 +8,17 @@
 #include <iostream>
 
 #include <imgui.h>
+#include <imgui_raii.h>
+#include <imgui_stdlib.h>
 
 #include "Settings.hpp"
 
 #include "Browser.hpp"
 #include "cfg.hpp"
 #include "IconsFontAwesome4.h"
-#include "imgui_extras.hpp"
+#include "RadioBrowserAPI.hpp"
 #include "Styles.hpp"
-#include "ui.hpp"
+#include "UI.hpp"
 
 
 using std::cout;
@@ -32,9 +34,9 @@ namespace Settings {
         const ImGuiStyle& style = ImGui::GetStyle();
 
         // Note: flat navigation doesn't work well on child windows that scroll.
-        if (ImGui::ChildGuard settings_child{"settings"}) {
+        if (ImGui::RAII::Child settings_child{"settings"}) {
 
-            if (ImGui::TableGuard settings_table{"settings", 2}) {
+            if (ImGui::RAII::Table settings_table{"settings", 2}) {
 
                 ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
@@ -48,18 +50,18 @@ namespace Settings {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                ui::show_label("UI color style");
+                UI::show_label("UI color style");
                 ImGui::SetItemTooltip("Select color style for user interface");
 
                 ImGui::TableNextColumn();
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                if (ImGui::ComboGuard styles_combo{"##style", cfg::style}) {
+                if (ImGui::RAII::Combo styles_combo{"##style", cfg::state.style}) {
                     auto& styles = Styles::get_styles();
                     for (const auto& [type, name] : styles) {
                         std::string label = "("s + to_string(type) + ") "s + name;
-                        if (ImGui::Selectable(label, cfg::style == name)) {
-                            cfg::style = name;
+                        if (ImGui::Selectable(label, cfg::state.style == name)) {
+                            cfg::state.style = name;
                             Styles::load();
                         }
                     }
@@ -74,18 +76,20 @@ namespace Settings {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                ui::show_label("Initial tab");
+                UI::show_label("Initial tab");
 
                 ImGui::TableNextColumn();
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                if (ImGui::ComboGuard initial_combo{"##initial_tab",
-                                                    to_ui_string(cfg::initial_tab)}) {
-                    for (unsigned i = 0; i < TabID::count(); ++i) {
+                if (ImGui::RAII::Combo initial_combo{
+                        "##initial_tab",
+                        to_label(cfg::state.initial_tab)
+                    }) {
+                    for (unsigned i = 0; i < static_cast<unsigned>(TabID::num_tabs); ++i) {
                         TabID tab{i};
-                        if (ImGui::Selectable(to_ui_string(tab),
-                                              cfg::initial_tab == tab))
-                            cfg::initial_tab = tab;
+                        if (ImGui::Selectable(to_label(tab),
+                                              cfg::state.initial_tab == tab))
+                            cfg::state.initial_tab = tab;
                     }
                 } // initial_combo
 
@@ -98,37 +102,41 @@ namespace Settings {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                ui::show_label("Preferred server");
+                UI::show_label("Preferred server");
 
                 ImGui::TableNextColumn();
 
                 const char* refresh_label = ICON_FA_REFRESH;
-                float refresh_width = 2 * style.FramePadding.x
-                                    + 2 * style.FrameBorderSize
-                                    + ImGui::CalcTextSize(refresh_label).x;
+                float refresh_btn_width = 2 * style.FramePadding.x
+                                        + 2 * style.FrameBorderSize
+                                        + ImGui::CalcTextSize(refresh_label).x;
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x
                                         - style.ItemSpacing.x
-                                        - refresh_width);
-                if (ImGui::ComboGuard server_combo{"##server",
-                                                   cfg::server.empty()
-                                                   ? "(random)"
-                                                   : cfg::server.data()}) {
-                    if (ImGui::Selectable("(random)", cfg::server.empty())) {
-                        cfg::server.clear();
-                        Browser::connect();
+                                        - refresh_btn_width);
+                if (ImGui::RAII::Combo server_combo{
+                        "##server",
+                        cfg::state.server.empty()
+                        ? "(random)"
+                        : cfg::state.server.data()
+                    }) {
+                    if (ImGui::Selectable("(random)", cfg::state.server.empty())) {
+                        cfg::state.server.clear();
+                        RadioBrowserAPI::set_server("");
+                        RadioBrowserAPI::connect();
                     }
-                    auto mirrors = Browser::get_mirrors();
+                    auto mirrors = RadioBrowserAPI::current_mirrors();
                     for (const auto& name : mirrors)
-                        if (ImGui::Selectable(name, cfg::server == name)) {
-                            cfg::server = name;
-                            Browser::connect();
+                        if (ImGui::Selectable(name, cfg::state.server == name)) {
+                            cfg::state.server = name;
+                            RadioBrowserAPI::set_server(name);
+                            RadioBrowserAPI::connect();
                         }
                 } // server_combo
 
                 ImGui::SameLine();
 
                 if (ImGui::Button(refresh_label))
-                    Browser::refresh_mirrors();
+                    RadioBrowserAPI::get_mirrors();
 
                 /*********************
                  * Browser page size *
@@ -139,17 +147,17 @@ namespace Settings {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                ui::show_label("Browser page size");
+                UI::show_label("Browser page size");
                 ImGui::SetItemTooltip("How many stations to show per page.");
 
                 ImGui::TableNextColumn();
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::Slider("##browser_page_limit",
-                              cfg::browser_page_limit,
+                              cfg::state.browser_page_limit,
                               10u, 50u);
                 if (ImGui::IsItemDeactivatedAfterEdit())
-                    Browser::queue_refresh_stations();
+                    Browser::search_stations();
 
                 /*************************
                  * Recent stations limit *
@@ -160,13 +168,13 @@ namespace Settings {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                ui::show_label("Recent stations limit");
+                UI::show_label("Recent stations limit");
 
                 ImGui::TableNextColumn();
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::Slider("##recent_limit",
-                              cfg::recent_limit,
+                              cfg::state.recent_limit,
                               10u, 50u);
 
                 /**********************
@@ -178,16 +186,17 @@ namespace Settings {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                ui::show_label("Player buffer size (KiB)");
+                UI::show_label("Player buffer size (KiB)");
                 ImGui::SetItemTooltip("Playback will only start after this many bytes are received.");
 
                 ImGui::TableNextColumn();
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::Slider("##player_buffer_size",
-                              cfg::player_buffer_size,
+                              cfg::state.player_buffer_size,
                               4u, 64u,
-                              nullptr, ImGuiSliderFlags_Logarithmic);
+                              "",
+                              ImGuiSliderFlags_Logarithmic);
 
                 /***********************
                  * Player history limit *
@@ -198,13 +207,13 @@ namespace Settings {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                ui::show_label("Player track history limit");
+                UI::show_label("Player track history limit");
 
                 ImGui::TableNextColumn();
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::Slider("##player_history_limit",
-                              cfg::player_history_limit,
+                              cfg::state.player_history_limit,
                               0u, 50u);
 
                 /***************
@@ -216,13 +225,13 @@ namespace Settings {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                ui::show_label("Disable Auto Power-Down");
+                UI::show_label("Disable Auto Power-Down");
                 ImGui::SetItemTooltip("APD is only disabled while playing.");
 
                 ImGui::TableNextColumn();
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::Checkbox("##disable_apd", &cfg::disable_apd);
+                ImGui::Checkbox("##disable_apd", &cfg::state.disable_apd);
 
                 /***********************
                  * Inactive Screen Off *
@@ -233,13 +242,13 @@ namespace Settings {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                ui::show_label("Turn gamepad screen off on inactivity");
+                UI::show_label("Turn gamepad screen off on inactivity");
                 ImGui::SetItemTooltip("When the gamepad screen turns off, it also stops playing sounds.");
 
                 ImGui::TableNextColumn();
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::Checkbox("##inactive_screen_off", &cfg::inactive_screen_off);
+                ImGui::Checkbox("##inactive_screen_off", &cfg::state.inactive_screen_off);
 
                 /************************
                  * Screen Saver Timeout *
@@ -250,17 +259,16 @@ namespace Settings {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                ui::show_label("Screen saver timeout");
+                UI::show_label("Screen saver timeout");
                 ImGui::SetItemTooltip("Time to wait to activate the screen saver, in seconds (0 = disable screen saver.");
 
                 ImGui::TableNextColumn();
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::Drag("##screen_saver_timeout",
-                            cfg::screen_saver_timeout,
-                            0u, 600u,
+                ImGui::Drag("##screen_saver_timeout"s,
+                            cfg::state.screen_saver_timeout,
                             1.0f / 8.0f,
-                            nullptr);
+                            {0u}, {600u});
 
                 /*****************
                  * Disable swkbd *
@@ -271,13 +279,13 @@ namespace Settings {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                ui::show_label("Disable SWKBD");
+                UI::show_label("Disable SWKBD");
                 ImGui::SetItemTooltip("Use only USB keyboard for text input.");
 
                 ImGui::TableNextColumn();
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::Checkbox("##disable_swkbd", &cfg::disable_swkbd);
+                ImGui::Checkbox("##disable_swkbd", &cfg::state.disable_swkbd);
 
                 /*************************
                  * Send clicks and votes *
@@ -288,13 +296,13 @@ namespace Settings {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                ui::show_label("Send clicks and votes");
+                UI::show_label("Send clicks and votes");
                 ImGui::SetItemTooltip("Enable to send clicks and votes to radio-browser.info.");
 
                 ImGui::TableNextColumn();
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::Checkbox("##send_clicks", &cfg::send_clicks);
+                ImGui::Checkbox("##send_clicks", &cfg::state.send_clicks);
 
 
                 /*******************
@@ -305,7 +313,7 @@ namespace Settings {
 
                 ImGui::TableNextColumn();
                 ImGui::AlignTextToFramePadding();
-                ui::show_label("Reset everything to default");
+                UI::show_label("Reset everything to default");
 
                 ImGui::TableNextColumn();
 

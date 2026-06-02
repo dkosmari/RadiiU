@@ -14,23 +14,27 @@
 #include <vector>
 
 #include <curl/curl.h>
+#include <glaze/version.hpp>
 #include <imgui.h>
-#include <jansson.h>
+#include <imgui_raii.h>
+#include <imgui_stdlib.h>
 #include <neaacdec.h>
 #include <opus/opus_defines.h>
-#include <vorbis/codec.h>
-#include <freetype/freetype.h>
-#include <SDL_version.h>
 #include <SDL_image.h>
+#include <SDL_version.h>
+#include <vorbis/codec.h>
+
+#ifdef IMGUI_ENABLE_FREETYPE
+#include <freetype/freetype.h>
+#endif
 
 #include "About.hpp"
 
 #include "App.hpp"
 #include "IconsFontAwesome4.h"
 #include "IconManager.hpp"
-#include "imgui_extras.hpp"
 #include "string_utils.hpp"
-#include "ui.hpp"
+#include "UI.hpp"
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -76,6 +80,7 @@ namespace About {
         }
 
 
+#ifdef IMGUI_ENABLE_FREETYPE
         std::string
         get_ft_version_str()
         {
@@ -94,7 +99,7 @@ namespace About {
             }
             return "";
         }
-
+#endif
 
         std::string
         replace_brand_glyphs(const std::string& input)
@@ -168,39 +173,41 @@ namespace About {
     process_ui()
     {
         // Note: flat navigation doesn't work well on child windows that scroll.
-        if (ImGui::ChildGuard about{"about"}) {
+        if (ImGui::RAII::Child about{"about"}) {
 
             auto radiiu_icon_tex = IconManager::get("ui/radiiu-icon.png");
-            ImGui::Image(*radiiu_icon_tex, sdl::vec2{128, 128});
+            UI::show_image(*radiiu_icon_tex, sdl::vec2{128, 128});
             ImGui::SameLine();
 
-            if (ImGui::TableGuard app_table{"app-details", 2}) {
+            if (ImGui::RAII::Table app_table{"app-details", 2}) {
 
                 ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
 
-                ui::show_link_row("Homepage", PACKAGE_URL);
-                ui::show_link_row("Bugs", PACKAGE_BUGREPORT);
-                ui::show_info_row("User Agent", App::get_user_agent());
+                UI::show_link_row("Homepage", PACKAGE_URL);
+                UI::show_link_row("Bugs", PACKAGE_BUGREPORT);
+                UI::show_info_row("User Agent", App::get_user_agent());
 
             }
 
             ImGui::SeparatorText("Credits");
             static const auto credits = get_credits();
-            if (ImGui::TableGuard credits_table{"credits", 2}) {
+            if (ImGui::RAII::Table credits_table{"credits", 2}) {
 
                 ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
 
                 for (const auto& [role, name] : credits)
-                    ui::show_info_row(role, name);
+                    UI::show_info_row(role, name);
 
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                ImGui::TextRightColored(ui::get_label_color(), "Stations list");
+                UI::show_label("Stations list");
                 ImGui::TableNextColumn();
                 auto rb_url = "https://www.radio-browser.info";
-                ImGui::TextLinkOpenURL(rb_url, rb_url);
+                if (UI::show_link(rb_url)) {
+                    // TODO
+                }
                 // ImGui::SameLine();
                 // auto rb_icon_tex = IconManager::get("https://www.radio-browser.info/favicon.ico");
                 // ImGui::Image(*rb_icon_tex, sdl::vec2{64, 64});
@@ -208,37 +215,43 @@ namespace About {
             }
 
             ImGui::SeparatorText("Components");
-            if (ImGui::TableGuard componets_table{"components", 2}) {
+            if (ImGui::RAII::Table componets_table{"components", 2}) {
 
                 ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
 
                 static const std::string sdl_version = get_sdl_version_str();
-                ui::show_info_row("SDL", sdl_version);
+                UI::show_info_row("SDL", sdl_version);
 
                 static const std::string sdl_img_version = get_sdl_img_version_str();
-                ui::show_info_row("SDL_image", sdl_img_version);
+                UI::show_info_row("SDL_image", sdl_img_version);
                 // TODO: show versions for all image libraries
 
-                ui::show_info_row("ImGui", IMGUI_VERSION);
+                UI::show_info_row("ImGui", IMGUI_VERSION);
 
+#ifdef IMGUI_ENABLE_FREETYPE
                 static const std::string ft_version = get_ft_version_str();
                 if (!ft_version.empty())
-                    ui::show_info_row("FreeType", ft_version);
+                    UI::show_info_row("FreeType", ft_version);
+#endif
 
-                ui::show_info_row("libcurl", curl_version());
+                UI::show_info_row("libcurl", curl_version());
 
-                ui::show_info_row("JANSSON", jansson_version_str());
+                static const std::string glaze_version =
+                    std::to_string(glz::version.major) + "." +
+                    std::to_string(glz::version.minor) + "." +
+                    std::to_string(glz::version.patch);
+                UI::show_info_row("glaze", glaze_version);
 
-                ui::show_info_row("mpg123", MPG123_VERSION);
+                UI::show_info_row("mpg123", MPG123_VERSION);
 
-                ui::show_info_row("Opus", opus_get_version_string());
+                UI::show_info_row("Opus", opus_get_version_string());
 
-                ui::show_info_row("Vorbis", vorbis_version_string());
+                UI::show_info_row("Vorbis", vorbis_version_string());
 
                 char* faad_id = nullptr;
                 NeAACDecGetVersion(&faad_id, nullptr);
-                ui::show_info_row("FAAD2", faad_id);
+                UI::show_info_row("FAAD2", faad_id);
 
             }
         }

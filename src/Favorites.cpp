@@ -14,7 +14,11 @@
 #include <vector>
 #include <unordered_set>
 
+#include <glaze/json.hpp>
+#include <glaze/exceptions/json_exceptions.hpp>
+
 #include <imgui.h>
+#include <imgui_raii.h>
 #include <imgui_stdlib.h>
 
 #include "Favorites.hpp"
@@ -23,11 +27,11 @@
 #include "cfg.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
-#include "imgui_extras.hpp"
-#include "json.hpp"
 #include "Player.hpp"
 #include "Station.hpp"
-#include "ui.hpp"
+#include "string_utils.hpp"
+#include "tracer.hpp"
+#include "UI.hpp"
 
 
 using std::cout;
@@ -39,6 +43,7 @@ namespace Favorites {
     namespace {
 
         std::vector<std::shared_ptr<Station>> stations;
+
         std::unordered_multiset<std::string> uuids;
 
 
@@ -56,10 +61,42 @@ namespace Favorites {
         std::optional<std::size_t> station_index_to_remove;
 
         const std::string popup_edit_title = "Edit station";
-        std::optional<StationEx> edited_station;
-
         const std::string popup_create_title = "Create station";
-        std::optional<StationEx> created_station;
+
+        // When editing we need a string, not a vector of strings.
+        struct EditFields {
+            std::string old_uuid;
+            std::string language;
+            std::string tags;
+        };
+
+        std::optional<EditFields > edit_fields;
+
+        std::optional<Station> created_station;
+
+
+        csv_strings
+        string_to_csv(const std::string& input)
+        {
+            csv_strings result;
+            auto input_trimmed = string_utils::trimmed(input);
+            if (input_trimmed.empty())
+                return result;
+            auto tokens = string_utils::split(input_trimmed, ",", false);
+            for (auto& token : tokens) {
+                auto token_trimmed = string_utils::trimmed(token);
+                if (!token_trimmed.empty())
+                    result.push_back(std::move(token_trimmed));
+            }
+            return result;
+        }
+
+
+        std::string
+        csv_to_string(const csv_strings& input)
+        {
+            return string_utils::join(input, ",");
+        }
 
     } // namespace
 
@@ -67,17 +104,18 @@ namespace Favorites {
     void
     load()
     try {
-        auto root = json::load(App::get_config_path() / "favorites.json");
-        const auto& list = root.as<json::array>();
+        TRACE_FUNC;
+
+        auto filename = App::get_config_path() / "favorites.json";
         stations.clear();
+        glz::ex::read_file_json(stations, filename.c_str(), std::string{});
+
         uuids.clear();
-        for (auto& elem : list) {
-            auto& obj = elem.as<json::object>();
-            auto st = std::make_shared<Station>(Station::from_json(obj));
-            if (!st->uuid.empty())
-                uuids.insert(st->uuid);
-            stations.push_back(std::move(st));
+        for (auto& st : stations) {
+            if (!st->stationuuid.empty())
+                uuids.insert(st->stationuuid);
         }
+
         cout << "Loaded " << stations.size() << " favorites" << endl;
     }
     catch (std::exception& e) {
@@ -88,10 +126,10 @@ namespace Favorites {
     void
     save()
     try {
-        json::array list;
-        for (const auto& station : stations)
-            list.push_back(station->to_json());
-        json::save(std::move(list), App::get_config_path() / "favorites.json");
+        TRACE_FUNC;
+
+        auto filename = App::get_config_path() / "favorites.json";
+        glz::ex::write_file_json(stations, filename.c_str(), std::string{});
     }
     catch (std::exception& e) {
         cout << "ERROR: Favorites::save(): " << e.what() << endl;
@@ -119,15 +157,15 @@ namespace Favorites {
         ImGui::SetNextWindowSize({800, 300}, ImGuiCond_Appearing);
         ImGui::SetNextWindowSizeConstraints({ 400, 250 },
                                             { FLT_MAX, FLT_MAX });
-        if (ImGui::PopupModalGuard popup_delete{popup_delete_title,
-                                                nullptr,
-                                                ImGuiWindowFlags_NoSavedSettings}) {
+        if (ImGui::RAII::PopupModal popup_delete{popup_delete_title,
+                                                 nullptr,
+                                                 ImGuiWindowFlags_NoSavedSettings}) {
 
             auto window_size = ImGui::GetContentRegionAvail();
 
             // Note: we use a helper child window to push the response buttons to the bottom.
-            if (ImGui::ChildGuard content_child{"content",
-                                                {0, -ImGui::GetFrameHeightWithSpacing()}})
+            if (ImGui::RAII::Child content_child{"content",
+                                                 {0, -ImGui::GetFrameHeightWithSpacing()}})
                 ImGui::TextWrapped(station.name);
 
             // Cancel button
@@ -168,7 +206,7 @@ namespace Favorites {
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
         ImGui::AlignTextToFramePadding();
-        ui::show_label("%s", label.data());
+        UI::show_label(label);
         ImGui::TableNextColumn();
         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
         ImGui::InputText("##" + label, value);
@@ -176,22 +214,25 @@ namespace Favorites {
 
 
     void
-    show_station_fields(StationEx& se)
+    show_station_fields(Station& st)
     {
-        if (ImGui::TableGuard fields_table{"fields", 2}) {
+        if (!edit_fields)
+            return;
+
+        if (ImGui::RAII::Table fields_table{"fields", 2}) {
 
             ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
             ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-            show_row_for("name",         se.name);
-            show_row_for("url",          se.url);
-            show_row_for("url_resolved", se.url_resolved);
-            show_row_for("homepage",     se.homepage);
-            show_row_for("favicon",      se.favicon);
-            show_row_for("tags",         se.tags_str);
-            show_row_for("country_code", se.country_code);
-            show_row_for("language",     se.languages_str);
-            show_row_for("uuid",         se.uuid);
+            show_row_for("name",         st.name);
+            show_row_for("url",          st.url);
+            show_row_for("url_resolved", st.url_resolved);
+            show_row_for("homepage",     st.homepage);
+            show_row_for("favicon",      st.favicon);
+            show_row_for("tags",         edit_fields->tags);
+            show_row_for("countrycode",  st.countrycode);
+            show_row_for("language",     edit_fields->language);
+            show_row_for("stationuuid",  st.stationuuid);
 
         } // fields_table
     }
@@ -202,21 +243,25 @@ namespace Favorites {
     {
         // TODO: add button for updating from Browser, if uuid is present
 
-        if (!edited_station)
-            return;
-
         ImGui::SetNextWindowSize({1100, 700}, ImGuiCond_Appearing);
         ImGui::SetNextWindowSizeConstraints({ 400, 400 },
                                             { FLT_MAX, FLT_MAX });
-        if (ImGui::PopupModalGuard popup_edit{popup_edit_title,
-                                              nullptr,
-                                              ImGuiWindowFlags_NoSavedSettings}) {
+        if (ImGui::RAII::PopupModal popup_edit{popup_edit_title,
+                                               nullptr,
+                                               ImGuiWindowFlags_NoSavedSettings}) {
+
+            if (!edit_fields) {
+                edit_fields.emplace();
+                edit_fields->old_uuid = station.stationuuid;
+                edit_fields->language = csv_to_string(station.language);
+                edit_fields->tags = csv_to_string(station.tags);
+            }
 
             // Note: use a helper child window to push the response buttons to the bottom.
-            if (ImGui::ChildGuard content_child{"content",
-                                                {0, -ImGui::GetFrameHeightWithSpacing()},
-                                                ImGuiChildFlags_NavFlattened})
-                show_station_fields(*edited_station);
+            if (ImGui::RAII::Child content_child{"content",
+                                                 {0, -ImGui::GetFrameHeightWithSpacing()},
+                                                 ImGuiChildFlags_NavFlattened})
+                show_station_fields(station);
 
             auto content_size = ImGui::GetContentRegionAvail();
 
@@ -224,7 +269,7 @@ namespace Favorites {
             {
                 if (ImGui::Button(ICON_FA_TIMES " Cancel")) {
                     ImGui::CloseCurrentPopup();
-                    edited_station.reset();
+                    edit_fields.reset();
                 }
                 ImGui::SetItemTooltip("Cancel editing this station.");
                 ImGui::SetItemDefaultFocus();
@@ -244,16 +289,19 @@ namespace Favorites {
                     ImGui::SetCursorPosX(new_x);
                 if (ImGui::Button(label)) {
                     ImGui::CloseCurrentPopup();
-                    if (edited_station) {
-                        auto it = uuids.find(station.uuid);
-                        if (it != uuids.end())
-                            uuids.erase(it);
-
-                        station = edited_station->as_station();
-                        if (!station.uuid.empty())
-                            uuids.insert(station.uuid);
+                    if (edit_fields) {
+                        // If user changed UUID, update uuids set.
+                        if (edit_fields->old_uuid != station.stationuuid) {
+                            auto it = uuids.find(edit_fields->old_uuid);
+                            if (it != uuids.end())
+                                uuids.erase(it);
+                            if (!station.stationuuid.empty())
+                                uuids.insert(station.stationuuid);
+                        }
+                        station.language = string_to_csv(edit_fields->language);
+                        station.tags = string_to_csv(edit_fields->tags);
+                        edit_fields.reset();
                     }
-                    edited_station.reset();
                 }
                 ImGui::SetItemTooltip("Confirm editing this station.");
             }
@@ -265,20 +313,24 @@ namespace Favorites {
     void
     process_popup_create()
     {
-        if (!created_station)
-            return;
-
         ImGui::SetNextWindowSize({1100, 700}, ImGuiCond_Appearing);
         ImGui::SetNextWindowSizeConstraints({ 400, 400 },
                                             { FLT_MAX, FLT_MAX });
-        if (ImGui::PopupModalGuard popup_create{popup_create_title,
-                                                nullptr,
-                                                ImGuiWindowFlags_NoSavedSettings}) {
+        if (ImGui::RAII::PopupModal popup_create{popup_create_title,
+                                                 nullptr,
+                                                 ImGuiWindowFlags_NoSavedSettings}) {
+
+            if (!created_station)
+                created_station.emplace();
+
+            if (!edit_fields) {
+                edit_fields.emplace();
+            }
 
             // Note: use a helper child window to push the response buttons to the bottom.
-            if (ImGui::ChildGuard content_child{"content",
-                                                {0, -ImGui::GetFrameHeightWithSpacing()},
-                                                ImGuiChildFlags_NavFlattened})
+            if (ImGui::RAII::Child content_child{"content",
+                                                 {0, -ImGui::GetFrameHeightWithSpacing()},
+                                                 ImGuiChildFlags_NavFlattened})
                 show_station_fields(*created_station);
 
             auto content_size = ImGui::GetContentRegionAvail();
@@ -287,6 +339,7 @@ namespace Favorites {
             {
                 if (ImGui::Button(ICON_FA_TIMES " Cancel")) {
                     ImGui::CloseCurrentPopup();
+                    edit_fields.reset();
                     created_station.reset();
                 }
                 ImGui::SetItemTooltip("Cancel creating a new station.");
@@ -307,9 +360,13 @@ namespace Favorites {
                     ImGui::SetCursorPosX(new_x);
                 if (ImGui::Button(label)) {
                     ImGui::CloseCurrentPopup();
-                    if (created_station)
-                        add(created_station->as_station());
-                    created_station.reset();
+                    if (edit_fields) {
+                        created_station->language = string_to_csv(edit_fields->language);
+                        created_station->tags = string_to_csv(edit_fields->tags);
+                        edit_fields.reset();
+                        add(*created_station);
+                        created_station.reset();
+                    }
                 }
                 ImGui::SetItemTooltip("Confirm creating a new station.");
             }
@@ -322,24 +379,24 @@ namespace Favorites {
     show_station(std::shared_ptr<Station>& station,
                  std::size_t index)
     {
-        ImGui::IDGuard station_id{std::to_string(index) + ":" + station->uuid};
+        ImGui::RAII::ID station_id{std::to_string(index) + ":" + station->stationuuid};
 
-        if (ImGui::ChildGuard station_child{"station",
-                                            {0, 0},
-                                            ImGuiChildFlags_AutoResizeY |
-                                            ImGuiChildFlags_FrameStyle |
-                                            ImGuiChildFlags_NavFlattened}) {
+        if (ImGui::RAII::Child station_child{"station",
+                                             {0, 0},
+                                             ImGuiChildFlags_AutoResizeY |
+                                             ImGuiChildFlags_FrameStyle |
+                                             ImGuiChildFlags_NavFlattened}) {
 
-            if (ImGui::ChildGuard actions_child{"actions",
-                                                {0, 0},
-                                                ImGuiChildFlags_AutoResizeX |
-                                                ImGuiChildFlags_AutoResizeY |
-                                                ImGuiChildFlags_NavFlattened}) {
+            if (ImGui::RAII::Child actions_child{"actions",
+                                                 {0, 0},
+                                                 ImGuiChildFlags_AutoResizeX |
+                                                 ImGuiChildFlags_AutoResizeY |
+                                                 ImGuiChildFlags_NavFlattened}) {
 
-                ui::show_play_button(station);
+                UI::show_play_button(station);
 
                 {
-                    ImGui::DisabledGuard disable_first_index{index == 0};
+                    ImGui::RAII::Disabled disable_first_index{index == 0};
                     // ▲
                     if (ImGui::Button(ICON_FA_CHEVRON_UP)) {
                         move_operation.emplace();
@@ -352,7 +409,7 @@ namespace Favorites {
                 ImGui::SameLine();
 
                 {
-                    ImGui::DisabledGuard disable_last_index{index + 1 >= stations.size()};
+                    ImGui::RAII::Disabled disable_last_index{index + 1 >= stations.size()};
                     // ▼
                     if (ImGui::Button(ICON_FA_CHEVRON_DOWN)) {
                         move_operation.emplace();
@@ -363,10 +420,8 @@ namespace Favorites {
                 }
 
                 // ✎
-                if (ImGui::Button(ICON_FA_PENCIL)) {
-                    edited_station.emplace(*station);
+                if (ImGui::Button(ICON_FA_PENCIL))
                     ImGui::OpenPopup(popup_edit_title);
-                }
                 ImGui::SetItemTooltip("Edit this station.");
                 process_popup_edit(*station);
 
@@ -382,23 +437,23 @@ namespace Favorites {
 
             ImGui::SameLine();
 
-            if (ImGui::ChildGuard details_child{"details",
-                                                {0, 0},
-                                                ImGuiChildFlags_AutoResizeY |
-                                                ImGuiChildFlags_NavFlattened}) {
+            if (ImGui::RAII::Child details_child{"details",
+                                                 {0, 0},
+                                                 ImGuiChildFlags_AutoResizeY |
+                                                 ImGuiChildFlags_NavFlattened}) {
 
-                ui::show_favicon(*station);
+                UI::show_favicon(*station);
 
                 ImGui::SameLine();
 
-                ui::show_station_basic_info(*station);
+                UI::show_station_basic_info(*station);
 
-                if (ImGui::ChildGuard extra_info_child{"extra_info",
-                                                       {0, 0},
-                                                       ImGuiChildFlags_AutoResizeY |
-                                                       ImGuiChildFlags_NavFlattened}) {
+                if (ImGui::RAII::Child extra_info_child{"extra_info",
+                                                        {0, 0},
+                                                        ImGuiChildFlags_AutoResizeY |
+                                                        ImGuiChildFlags_NavFlattened}) {
 
-                    ui::show_tags(station->tags);
+                    UI::show_tags(station->tags);
 
                 } // extra_info_child
 
@@ -412,27 +467,26 @@ namespace Favorites {
     void
     process_ui()
     {
-        if (ImGui::ChildGuard toolbar_child{"toolbar",
-                                            {0, 0},
-                                            ImGuiChildFlags_AutoResizeY |
-                                            ImGuiChildFlags_NavFlattened}) {
+        if (ImGui::RAII::Child toolbar_child{"toolbar",
+                                             {0, 0},
+                                             ImGuiChildFlags_AutoResizeY |
+                                             ImGuiChildFlags_NavFlattened}) {
 
-            if (ImGui::Button(ICON_FA_PLUS " Add")) { // ➕
+            // ➕
+            if (ImGui::Button(ICON_FA_PLUS " Add"))
                 ImGui::OpenPopup(popup_create_title);
-                created_station.emplace();
-            }
             ImGui::SetItemTooltip("Add a new station to favorites.");
             process_popup_create();
 
             ImGui::SameLine();
 
             ImGui::AlignTextToFramePadding();
-            ImGui::TextRight("%zu stations", stations.size());
+            UI::show_text_right("%zu stations", stations.size());
 
         } // toolbar_child
 
         // Note: flat navigation doesn't work well on child windows that scroll.
-        if (ImGui::ChildGuard favorites_child{"favorites"}) {
+        if (ImGui::RAII::Child favorites_child{"favorites"}) {
 
             for (std::size_t index = 0; index < stations.size(); ++index) {
                 show_station(stations[index], index);
@@ -481,8 +535,8 @@ namespace Favorites {
     bool
     contains(const Station& station)
     {
-        if (!station.uuid.empty())
-            return contains(station.uuid);
+        if (!station.stationuuid.empty())
+            return contains(station.stationuuid);
 
         for (const auto& st : stations)
             if (station == *st)
@@ -495,8 +549,8 @@ namespace Favorites {
     add(const Station& st)
     {
         stations.push_back(std::make_shared<Station>(st));
-        if (!st.uuid.empty())
-            uuids.insert(st.uuid);
+        if (!st.stationuuid.empty())
+            uuids.insert(st.stationuuid);
     }
 
 
@@ -505,7 +559,7 @@ namespace Favorites {
         const std::string&
         by_id(const std::shared_ptr<Station>& st)
         {
-            return st->uuid;
+            return st->stationuuid;
         }
 
     } // namespace
@@ -537,7 +591,7 @@ namespace Favorites {
         if (index >= stations.size())
             return;
         {
-            auto it = uuids.find(stations[index]->uuid);
+            auto it = uuids.find(stations[index]->stationuuid);
             if (it != uuids.end())
                 uuids.erase(it);
         }
@@ -549,13 +603,13 @@ namespace Favorites {
     void
     remove(const Station& station)
     {
-        if (!station.uuid.empty())
-            return remove(station.uuid);
+        if (!station.stationuuid.empty())
+            return remove(station.stationuuid);
 
         std::erase_if(stations,
                       [&station](const std::shared_ptr<Station>& st)
                       {
-                          return station.uuid == st->uuid;
+                          return station.stationuuid == st->stationuuid;
                       });
     }
 

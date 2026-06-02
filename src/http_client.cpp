@@ -58,7 +58,7 @@ http_client::~http_client()
 void
 http_client::add_header(const std::string& hdr)
 {
-    headers.push_back(hdr);
+    easy.append_http_header(hdr);
 }
 
 
@@ -108,12 +108,7 @@ http_client::process()
 {
     if (!request_prepared) {
         if (!accepts.empty())
-            easy.set_http_headers({
-                    "Accept: "s + string_utils::join(accepts, ",")
-                });
-
-        headers.push_back("Accept: " + string_utils::join(accepts, ","));
-        easy.set_http_headers(headers);
+            easy.append_http_header("Accept: "s + string_utils::join(accepts, ","));
         request_prepared = true;
     }
 

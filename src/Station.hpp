@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -10,68 +10,67 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
-#include "json.hpp"
+#include <glaze/core/meta.hpp>
+
+#include "csv_strings.hpp"
+#include "RadioBrowserAPI.hpp"
 
 
 struct Station {
 
-    // int order = 0;
+    std::string stationuuid;
     std::string name;
     std::string url;
     std::string url_resolved;
     std::string homepage;
     std::string favicon;
-    std::string country_code;
-    std::string uuid;
+    std::string countrycode;
 
-    // Volatile values, never stored.
+    csv_strings language;
+    csv_strings tags;
+
+    // Volatile fields, never stored.
     std::uint64_t votes = 0;
     std::uint64_t click_count = 0;
-    std::int64_t click_trend = 0;
+    int click_trend = 0;
     unsigned bitrate = 0;
     std::string codec;
-
-    std::vector<std::string> languages;
-    std::vector<std::string> tags;
 
 
     static
     Station
-    from_json(const json::object& obj);
-
-
-    json::object
-    to_json()
-        const;
+    from_radio_browser(const RadioBrowserAPI::Station& st);
 
 }; // struct Station
 
 
+// Comparison ignores volatile fields.
 bool
 operator ==(const Station& a,
             const Station& b)
     noexcept;
 
 
-// This version keeps language and tags list as a linear string.
-
-struct StationEx : Station {
-
-    std::string languages_str;
-    std::string tags_str;
-
-    StationEx()
-        noexcept;
-
-    StationEx(const Station& st);
-
-    Station
-    as_station()
-        const;
-
-}; // struct StationEx
-
+template<>
+struct glz::meta<Station> {
+    static
+    constexpr
+    bool
+    skip(const std::string_view key,
+         const meta_context&) {
+        using namespace std::literals;
+        if (key == "votes"sv ||
+            key == "click_count"sv ||
+            key == "click_trend"sv ||
+            key == "bitrate"sv ||
+            key == "codec"sv)
+            return true;
+        return false;
+    }
+};
 
 #endif

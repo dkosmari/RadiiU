@@ -1,16 +1,41 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include <concepts>
 #include <utility>
 
+#include <glaze/json.hpp>
+#include <glaze/exceptions/json_exceptions.hpp>
+
 #include "Station.hpp"
 
-#include "string_utils.hpp"
+
+Station
+Station::from_radio_browser(const RadioBrowserAPI::Station& st)
+{
+    return Station{
+        .stationuuid  = st.stationuuid,
+        .name         = st.name,
+        .url          = st.url,
+        .url_resolved = st.url_resolved,
+        .homepage     = st.homepage,
+        .favicon      = st.favicon,
+        .countrycode  = st.countrycode,
+
+        .language = csv_strings(std::optional<std::string>{st.language}),
+        .tags     = csv_strings(std::optional<std::string>{st.tags}),
+
+        .votes       = st.votes,
+        .click_count = st.clickcount,
+        .click_trend = st.clicktrend,
+        .bitrate     = st.bitrate,
+        .codec       = st.codec,
+    };
+}
 
 
 bool
@@ -19,8 +44,8 @@ operator ==(const Station& a,
     noexcept
 {
     // If both have uuid, skip all other comparisons.
-    if (!a.uuid.empty() && !b.uuid.empty())
-        return a.uuid == b.uuid;
+    if (!a.stationuuid.empty() && !b.stationuuid.empty())
+        return a.stationuuid == b.stationuuid;
 
     if (a.name != b.name)
         return false;
@@ -32,104 +57,11 @@ operator ==(const Station& a,
         return false;
     if (a.favicon != b.favicon)
         return false;
-    if (a.country_code != b.country_code)
+    if (a.countrycode != b.countrycode)
         return false;
     if (a.tags != b.tags)
         return false;
-    if (a.languages != b.languages)
+    if (a.language != b.language)
         return false;
     return true;
-}
-
-
-Station
-Station::from_json(const json::object& obj)
-{
-    Station result;
-
-    try_get(obj, "name",         result.name);
-    try_get(obj, "url",          result.url);
-    try_get(obj, "url_resolved", result.url_resolved);
-    try_get(obj, "homepage",     result.homepage);
-    try_get(obj, "favicon",      result.favicon);
-    try_get(obj, "countrycode",  result.country_code);
-    try_get(obj, "stationuuid",  result.uuid);
-    try_get(obj, "votes",        result.votes);
-    try_get(obj, "clickcount",   result.click_count);
-    try_get(obj, "clicktrend",   result.click_trend);
-    try_get(obj, "bitrate",      result.bitrate);
-    try_get(obj, "codec",        result.codec);
-
-    // Note: these fields we split into vectors.
-
-    if (auto language = try_get<json::string>(obj, "language"))
-        result.languages = string_utils::split(*language, ",");
-
-    if (auto tags = try_get<json::string>(obj, "tags"))
-        result.tags = string_utils::split(*tags, ",");
-
-    return result;
-}
-
-
-json::object
-Station::to_json()
-    const
-{
-    json::object obj;
-
-    obj["name"]         = name;
-    obj["url"]          = url;
-    obj["url_resolved"] = url_resolved;
-    obj["homepage"]     = homepage;
-    obj["favicon"]      = favicon;
-    obj["countrycode"]  = country_code;
-    obj["stationuuid"]  = uuid;
-
-    // Note: these fields are volatile, no point in serializing them.
-    // - votes
-    // - click_count
-    // - click_trend
-    // - bitrate
-    // - codec
-
-    obj["language"] = string_utils::join(languages, ",");
-    obj["tags"] = string_utils::join(tags, ",");
-
-    return obj;
-}
-
-
-StationEx::StationEx()
-        noexcept
-{}
-
-
-StationEx::StationEx(const Station& st) :
-    Station{st},
-    languages_str{string_utils::join(languages, ", ")},
-    tags_str{string_utils::join(tags, ", ")}
-{}
-
-
-Station
-StationEx::as_station()
-    const
-{
-    // Note: slicing is okay here.
-    Station result = *this;
-
-    // copy languages_str into the languages vector
-    result.languages = string_utils::split(languages_str, ",");
-    for (auto& lang : result.languages)
-        lang = string_utils::trimmed(lang, ' ');
-    std::erase(result.languages, "");
-
-    // copy tags_str into the tags vector
-    result.tags = string_utils::split(tags_str, ",");
-    for (auto& tag : result.tags)
-        tag = string_utils::trimmed(tag, ' ');
-    std::erase(result.tags, "");
-
-    return result;
 }

@@ -64,7 +64,6 @@ struct http_client {
 
 private:
 
-    std::vector<std::string> headers;
     std::vector<std::string> accepts;
 
     std::size_t

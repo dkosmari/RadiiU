@@ -16,7 +16,7 @@ AC_CANONICAL_HOST
 
 DEVKITPRO_WUT_OPT_INIT
 
-AM_INIT_AUTOMAKE([foreign subdir-objects])
+AM_INIT_AUTOMAKE([foreign subdir-objects tar-pax])
 
 LT_INIT
 
@@ -39,7 +39,6 @@ AX_PTHREAD([
 
 PKG_CHECK_MODULES([FAAD2], [faad2])
 PKG_CHECK_MODULES_STATIC([CURL], [libcurl])
-PKG_CHECK_MODULES([JANSSON], [jansson])
 PKG_CHECK_MODULES([MPG123], [libmpg123])
 PKG_CHECK_MODULES([SDL], [sdl2 SDL2_image])
 PKG_CHECK_MODULES([FT], [freetype2])
@@ -48,9 +47,7 @@ PKG_CHECK_MODULES_STATIC([VORBISFILE], [vorbisfile])
 
 AS_VAR_IF([enable_wiiu], [yes],
           [],
-          [
-          PKG_CHECK_MODULES([FONTCONFIG], [fontconfig])
-          ])
+          [PKG_CHECK_MODULES([FONTCONFIG], [fontconfig])])
 
 AC_DEFINE_UNQUOTED([MPG123_VERSION],
                    ["`$PKG_CONFIG --modversion libmpg123`"],

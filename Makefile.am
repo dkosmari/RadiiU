@@ -47,6 +47,8 @@ radiiu_elf_SOURCES = \
 	src/byte_stream.hpp \
 	src/cfg.cpp \
 	src/cfg.hpp \
+	src/csv_strings.cpp \
+	src/csv_strings.hpp \
 	src/decoder.cpp \
 	src/decoder.hpp \
 	src/decoder_aac.cpp \
@@ -70,10 +72,6 @@ radiiu_elf_SOURCES = \
 	src/icy.hpp \
 	src/icy_stream.cpp \
 	src/icy_stream.hpp \
-	src/imgui_extras.cpp \
-	src/imgui_extras.hpp \
-	src/json.cpp \
-	src/json.hpp \
 	src/m3u.cpp \
 	src/m3u.hpp \
 	src/main.cpp \
@@ -85,6 +83,8 @@ radiiu_elf_SOURCES = \
 	src/pls.hpp \
 	src/radio_client.cpp \
 	src/radio_client.hpp \
+	src/RadioBrowserAPI.cpp \
+	src/RadioBrowserAPI.hpp \
 	src/Recent.cpp \
 	src/Recent.hpp \
 	src/rest.cpp \
@@ -93,11 +93,13 @@ radiiu_elf_SOURCES = \
 	src/Settings.hpp \
 	src/Station.cpp \
 	src/Station.hpp \
-	src/string_utils.cpp \
-	src/string_utils.hpp \
+	src/StationDetailsPopup.cpp \
+	src/StationDetailsPopup.hpp \
 	src/stdout-wiiu.cpp \
 	src/stream_metadata.cpp \
 	src/stream_metadata.hpp \
+	src/string_utils.cpp \
+	src/string_utils.hpp \
 	src/Styles.cpp \
 	src/Styles.hpp \
 	src/TabID.cpp \
@@ -105,15 +107,14 @@ radiiu_elf_SOURCES = \
 	src/thread_safe.hpp \
 	src/tracer.cpp \
 	src/tracer.hpp \
-	src/ui.cpp \
-	src/ui.hpp \
+	src/UI.cpp \
+	src/UI.hpp \
 	src/unit_test.hpp
 
 
 radiiu_elf_CPPFLAGS = \
 	$(AM_CPPFLAGS) \
 	$(CURL_CFLAGS) \
-	$(JANSSON_CFLAGS) \
 	$(MPG123_CFLAGS) \
 	$(SDL_CFLAGS) \
 	$(FAAD2_CFLAGS) \
@@ -122,8 +123,12 @@ radiiu_elf_CPPFLAGS = \
 	$(VORBISFILE_CFLAGS) \
 	-I$(srcdir)/external/curlxx/include \
 	-DIMGUI_USER_CONFIG='"$(srcdir)/external/custom_imconfig.h"' \
+	-I$(srcdir)/external/glaze/include \
+	-DGLZ_DISABLE_ALWAYS_INLINE \
 	-I$(srcdir)/external/imgui \
+	-I$(srcdir)/external/imgui/backends \
 	-I$(srcdir)/external/imgui/misc/cpp \
+	-I$(srcdir)/external/imgui/misc/freetype \
 	-I$(srcdir)/external/mpg123xx/include \
 	-I$(srcdir)/external/sdl2xx/include
 
@@ -138,7 +143,6 @@ radiiu_elf_LDADD =  \
 	external/sdl2xx/lib/libsdl2xx.la \
 	$(CURL_LIBS) \
 	$(FAAD2_LIBS) \
-	$(JANSSON_LIBS) \
 	$(MPG123_LIBS) \
 	$(OPUSFILE_LIBS) \
 	$(VORBISFILE_LIBS) \
@@ -156,7 +160,7 @@ RPX_FILE = radiiu.rpx
 
 WUHB_FILE = radiiu.wuhb
 
-$(WUHB_FILE): $(RPX_FILE) $(srcdir)/assets/meta/icon.png
+$(WUHB_FILE): $(RPX_FILE) Makefile $(srcdir)/assets/meta/icon.png
 	$(WUHBTOOL) \
 		$< $@ \
 		--content=$(srcdir)/assets/content \
@@ -164,7 +168,8 @@ $(WUHB_FILE): $(RPX_FILE) $(srcdir)/assets/meta/icon.png
 		--tv-image=$(srcdir)/assets/meta/splash-tv.png \
 		--drc-image=$(srcdir)/assets/meta/splash-drc.png \
 		--name="$(PACKAGE_STRING)" \
-		--short-name="$(PACKAGE_TARNAME)"
+		--short-name="$(PACKAGE_TARNAME)" \
+		--author="Daniel K. O."
 
 all-local: $(WUHB_FILE)
 
@@ -172,6 +177,8 @@ all-local: $(WUHB_FILE)
 run: all
 	WIILOAD=tcp:wiiu wiiload $(WUHB_FILE)
 
+
+.PHONY: wiiu-install wiiu-uninstall
 
 wiiu-install: all
 	curl --upload-file $(WUHB_FILE) "ftp://wiiu:/fs/vol/external01/wiiu/apps/"
@@ -185,7 +192,7 @@ CLEANFILES = $(WUHB_FILE) radiiu.map
 
 else !ENABLE_WIIU
 
-radiiu_elf_CPPFLAGS = += $(FONTCONFIG_CFLAGS)
+radiiu_elf_CPPFLAGS += $(FONTCONFIG_CFLAGS)
 
 radiiu_elf_LDADD += $(FONTCONFIG_LIBS)
 
