@@ -84,6 +84,12 @@ libglaze_la_SOURCES = \
 	glaze/include/glaze/beve/skip.hpp \
 	glaze/include/glaze/beve/wrappers.hpp \
 	glaze/include/glaze/beve/write.hpp \
+	glaze/include/glaze/bson.hpp \
+	glaze/include/glaze/bson/bson_to_json.hpp \
+	glaze/include/glaze/bson/header.hpp \
+	glaze/include/glaze/bson/read.hpp \
+	glaze/include/glaze/bson/skip.hpp \
+	glaze/include/glaze/bson/write.hpp \
 	glaze/include/glaze/cbor.hpp \
 	glaze/include/glaze/cbor/cbor_to_json.hpp \
 	glaze/include/glaze/cbor/header.hpp \
@@ -137,6 +143,7 @@ libglaze_la_SOURCES = \
 	glaze/include/glaze/eetf.hpp \
 	glaze/include/glaze/eetf/cmp.hpp \
 	glaze/include/glaze/eetf/defs.hpp \
+	glaze/include/glaze/eetf/eetf_to_json.hpp \
 	glaze/include/glaze/eetf/ei.hpp \
 	glaze/include/glaze/eetf/opts.hpp \
 	glaze/include/glaze/eetf/read.hpp \
@@ -149,6 +156,7 @@ libglaze_la_SOURCES = \
 	glaze/include/glaze/exceptions/csv_exceptions.hpp \
 	glaze/include/glaze/exceptions/json_exceptions.hpp \
 	glaze/include/glaze/exceptions/json_schema_exceptions.hpp \
+	glaze/include/glaze/exceptions/jsonb_exceptions.hpp \
 	glaze/include/glaze/exceptions/msgpack_exceptions.hpp \
 	glaze/include/glaze/ext/cli_menu.hpp \
 	glaze/include/glaze/ext/eigen.hpp \
@@ -161,14 +169,17 @@ libglaze_la_SOURCES = \
 	glaze/include/glaze/file/read_directory.hpp \
 	glaze/include/glaze/file/write_directory.hpp \
 	glaze/include/glaze/format/format_to.hpp \
+	glaze/include/glaze/forward.hpp \
 	glaze/include/glaze/glaze.hpp \
 	glaze/include/glaze/glaze_exceptions.hpp \
 	glaze/include/glaze/hardware/volatile_array.hpp \
 	glaze/include/glaze/hash/sweethash.hpp \
 	glaze/include/glaze/json.hpp \
 	glaze/include/glaze/json/escape_unicode.hpp \
+	glaze/include/glaze/json/flatten_map.hpp \
 	glaze/include/glaze/json/float_format.hpp \
 	glaze/include/glaze/json/generic.hpp \
+	glaze/include/glaze/json/generic_fwd.hpp \
 	glaze/include/glaze/json/invoke.hpp \
 	glaze/include/glaze/json/jmespath.hpp \
 	glaze/include/glaze/json/json_concepts.hpp \
@@ -189,6 +200,13 @@ libglaze_la_SOURCES = \
 	glaze/include/glaze/json/study.hpp \
 	glaze/include/glaze/json/wrappers.hpp \
 	glaze/include/glaze/json/write.hpp \
+	glaze/include/glaze/jsonb.hpp \
+	glaze/include/glaze/jsonb/header.hpp \
+	glaze/include/glaze/jsonb/jsonb_to_json.hpp \
+	glaze/include/glaze/jsonb/read.hpp \
+	glaze/include/glaze/jsonb/skip.hpp \
+	glaze/include/glaze/jsonb/text_decode.hpp \
+	glaze/include/glaze/jsonb/write.hpp \
 	glaze/include/glaze/msgpack.hpp \
 	glaze/include/glaze/msgpack/common.hpp \
 	glaze/include/glaze/msgpack/read.hpp \
@@ -245,8 +263,6 @@ libglaze_la_SOURCES = \
 	glaze/include/glaze/util/buffer_pool.hpp \
 	glaze/include/glaze/util/compare.hpp \
 	glaze/include/glaze/util/convert.hpp \
-	glaze/include/glaze/util/dragonbox.hpp \
-	glaze/include/glaze/util/dtoa.hpp \
 	glaze/include/glaze/util/dump.hpp \
 	glaze/include/glaze/util/env.hpp \
 	glaze/include/glaze/util/expected.hpp \
@@ -260,6 +276,7 @@ libglaze_la_SOURCES = \
 	glaze/include/glaze/util/key_transformers.hpp \
 	glaze/include/glaze/util/memory_pool.hpp \
 	glaze/include/glaze/util/murmur.hpp \
+	glaze/include/glaze/util/nullable_traits.hpp \
 	glaze/include/glaze/util/parse.hpp \
 	glaze/include/glaze/util/primes_64.hpp \
 	glaze/include/glaze/util/progress_bar.hpp \
@@ -267,8 +284,10 @@ libglaze_la_SOURCES = \
 	glaze/include/glaze/util/string_literal.hpp \
 	glaze/include/glaze/util/tuple.hpp \
 	glaze/include/glaze/util/type_traits.hpp \
+	glaze/include/glaze/util/uuid.hpp \
 	glaze/include/glaze/util/validate.hpp \
 	glaze/include/glaze/util/variant.hpp \
+	glaze/include/glaze/util/zmij.hpp \
 	glaze/include/glaze/version.hpp \
 	glaze/include/glaze/yaml.hpp \
 	glaze/include/glaze/yaml/common.hpp \
@@ -276,7 +295,6 @@ libglaze_la_SOURCES = \
 	glaze/include/glaze/yaml/read.hpp \
 	glaze/include/glaze/yaml/skip.hpp \
 	glaze/include/glaze/yaml/write.hpp
-
 
 
 .PHONY: company

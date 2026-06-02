@@ -34,7 +34,7 @@ namespace Browser {
     send_vote(std::shared_ptr<Station>& station_ptr);
 
     void
-    get_station(std::shared_ptr<Station> station_ptr);
+    update_station(std::shared_ptr<Station> station_ptr);
 
     void
     search_stations();

@@ -15,7 +15,7 @@
 
 #include <curlxx/easy.hpp>
 
-#include <glaze/json/generic.hpp>
+#include <glaze/json/generic_fwd.hpp>
 
 #include "mime_type.hpp"
 

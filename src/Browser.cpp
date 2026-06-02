@@ -933,7 +933,7 @@ namespace Browser {
             station_ptr->stationuuid,
             [station_ptr](ClickResult /*result*/)
             {
-                get_station(station_ptr);
+                update_station(station_ptr);
             },
             common_error_handler);
     }
@@ -947,11 +947,13 @@ namespace Browser {
         if (!station_ptr || station_ptr->stationuuid.empty())
             return;
 
+        // TODO: this is causing errors, investigate why
+
         RadioBrowserAPI::send_vote(
             station_ptr->stationuuid,
             [station_ptr](VoteResult /*result*/)
             {
-                get_station(station_ptr);
+                update_station(station_ptr);
             },
             common_error_handler);
     }
@@ -1081,7 +1083,7 @@ namespace Browser {
 
 
     void
-    get_station(std::shared_ptr<Station> station_ptr)
+    update_station(std::shared_ptr<Station> station_ptr)
     {
         TRACE_FUNC;
 

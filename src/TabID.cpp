@@ -11,26 +11,6 @@
 
 #include "IconsFontAwesome4.h"
 
-// TabID
-// TabID::from_string(const std::string& str)
-// {
-//     if (str == "favorites")
-//         return TabID::favorites;
-//     if (str == "browser")
-//         return TabID::browser;
-//     if (str == "recent")
-//         return TabID::recent;
-//     if (str == "player")
-//         return TabID::player;
-//     if (str == "settings")
-//         return TabID::settings;
-//     if (str == "about")
-//         return TabID::about;
-//     if (str == "last_active")
-//         return TabID::last_active;
-//     throw std::runtime_error{"invalid TabID string: " + str};
-// }
-
 
 std::string
 to_string(TabID tab)

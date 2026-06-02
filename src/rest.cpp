@@ -16,6 +16,7 @@
 #include <curlxx/curl.hpp>
 
 #include <glaze/json.hpp>
+#include <glaze/json/generic.hpp>
 #include <glaze/exceptions/json_exceptions.hpp>
 
 #include "rest.hpp"
@@ -673,7 +674,7 @@ namespace rest {
     make_easy(const std::string& url)
     {
         curl::easy easy;
-        easy.set_verbose(true);
+        easy.set_verbose(false);
         easy.set_http_version(curl::easy::http_version::none);
         easy.set_url(url);
         if (!user_agent.empty())

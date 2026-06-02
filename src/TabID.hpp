@@ -10,8 +10,8 @@
 
 #include <string>
 
-#include <glaze/core/meta.hpp>
 #include <glaze/core/common.hpp>
+#include <glaze/forward.hpp>
 
 
 enum class TabID : unsigned {
@@ -41,14 +41,14 @@ struct glz::meta<TabID> {
     using enum TabID;
     static
     constexpr
-    auto value = glz::enumerate(favorites,
-                                browser,
-                                recent,
-                                player,
-                                settings,
-                                about,
-                                last_active,
-                                num_tabs);
+    auto value = enumerate(favorites,
+                           browser,
+                           recent,
+                           player,
+                           settings,
+                           about,
+                           last_active,
+                           num_tabs);
 }; // struct glz::meta<TabID>
 
 #endif

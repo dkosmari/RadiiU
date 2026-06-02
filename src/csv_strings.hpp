@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include <glaze/core/reflect.hpp>
 #include <glaze/json/read.hpp>
 #include <glaze/json/write.hpp>
 
@@ -69,40 +70,38 @@ struct csv_strings : std::vector<std::string> {
 }; // struct csv_strings
 
 
-namespace glz {
 
-    template<>
-    struct from<JSON, csv_strings> {
-        template<auto Opts>
-        static
-        void
-        op(csv_strings& value,
-           is_context auto&& ctx,
-           auto&& it,
-           auto&& end)
-        {
-            std::optional<std::string> joined;
-            parse<JSON>::op<Opts>(joined, ctx, it, end);
-            value = static_cast<csv_strings>(joined);
-        }
-    };
+template<>
+struct glz::from<glz::JSON, csv_strings> {
+    template<auto Opts>
+    static
+    void
+    op(csv_strings& value,
+       is_context auto&& ctx,
+       auto&& it,
+       auto&& end)
+    {
+        std::optional<std::string> joined;
+        parse<JSON>::op<Opts>(joined, ctx, it, end);
+        value = static_cast<csv_strings>(joined);
+    }
+};
 
-    template<>
-    struct to<JSON, csv_strings> {
-        template<auto Opts>
-        static
-        void
-        op(csv_strings& value,
-           is_context auto&& ctx,
-           auto&& b,
-           auto&& ix)
-            noexcept
-        {
-            auto joined = static_cast<std::optional<std::string>>(value);
-            serialize<JSON>::op<Opts>(joined, ctx, b, ix);
-        }
-    };
 
-} // namespace glz
+template<>
+struct glz::to<glz::JSON, csv_strings> {
+    template<auto Opts>
+    static
+    void
+    op(csv_strings& value,
+       is_context auto&& ctx,
+       auto&& b,
+       auto&& ix)
+        noexcept
+    {
+        auto joined = static_cast<std::optional<std::string>>(value);
+        serialize<JSON>::op<Opts>(joined, ctx, b, ix);
+    }
+};
 
 #endif
