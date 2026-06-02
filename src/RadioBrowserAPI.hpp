@@ -108,8 +108,6 @@ namespace RadioBrowserAPI {
     }; // struct ServerStats
 
 
-
-
     struct SearchStationParams {
         enum class Order {
             name,
@@ -161,6 +159,43 @@ namespace RadioBrowserAPI {
         opt_uint    limit             = {};
         opt_bool    hidebroken        = {};
     }; // struct SearchStationParams
+
+
+    struct StationParams {
+        enum class Order {
+            name,
+            url,
+            homepage,
+            favicon,
+            tags,
+            country,
+            state,
+            language,
+            votes,
+            codec,
+            bitrate,
+            lastcheckok,
+            lastchecktime,
+            clicktimestamp,
+            clickcount,
+            clicktrend,
+            changetimestamp,
+            random,
+        };
+
+        using opt_order = std::optional<Order>;
+
+        opt_order order = {};
+        opt_bool reverse = {};
+        opt_uint offset = {};
+        opt_uint limit = {};
+        opt_bool hidebroken = {};
+    }; // struct StationParams
+
+
+    struct StationUUIDParams {
+        string uuids;
+    }; // struct StationUUIDParams
 
 
     struct Station {
@@ -246,7 +281,8 @@ namespace RadioBrowserAPI {
     template<typename... Args>
     using result_function_t = std::move_only_function<result_function_sig<Args...>>;
 
-    using error_function_sig = void (const std::exception& error);
+    using error_function_sig = void (const std::exception& err,
+                                     const std::string& response);
     using error_function_t = std::move_only_function<error_function_sig>;
 
 

@@ -36,6 +36,10 @@ noinst_PROGRAMS = radiiu.elf
 
 
 radiiu_elf_SOURCES = \
+	src/rest.cpp \
+	src/rest.hpp \
+	src/RadioBrowserAPI.cpp \
+	src/RadioBrowserAPI.hpp \
 	src/About.cpp \
 	src/About.hpp \
 	src/App.cpp \
@@ -83,12 +87,8 @@ radiiu_elf_SOURCES = \
 	src/pls.hpp \
 	src/radio_client.cpp \
 	src/radio_client.hpp \
-	src/RadioBrowserAPI.cpp \
-	src/RadioBrowserAPI.hpp \
 	src/Recent.cpp \
 	src/Recent.hpp \
-	src/rest.cpp \
-	src/rest.hpp \
 	src/Settings.cpp \
 	src/Settings.hpp \
 	src/Station.cpp \

@@ -96,9 +96,12 @@ namespace StationDetailsPopup {
                 result = Station::from_radio_browser(rb_station);
                 state = State::done;
             },
-            [](const std::exception& e)
+            [](const std::exception& e,
+               const std::string& response)
             {
                 error_msg = e.what();
+                if (!response.empty())
+                    error_msg += "\n" + response;
             });
     }
 

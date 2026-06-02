@@ -186,7 +186,8 @@ namespace Browser {
     by_name(const Country& c);
 
     void
-    common_error_handler(const std::exception& e);
+    common_error_handler(const std::exception& e,
+                         const std::string& response);
 
     void
     fetch_server_stats();
@@ -961,10 +962,12 @@ namespace Browser {
 
     // TODO: should display errors to the user
     void
-    common_error_handler(const std::exception& e)
+    common_error_handler(const std::exception& e,
+                         const std::string& response)
     {
         // TODO: should show a notification-like message, that goes away after a while.
         cout << "Browser ERROR: " << e.what() << endl;
+        cout << "<response>\n" << response << "\n</response>" << endl;
     }
 
 
@@ -1037,7 +1040,8 @@ namespace Browser {
             {
                 server_stats_result = std::move(stats);
             },
-            [](const std::exception& e)
+            [](const std::exception& e,
+               const std::string& /*response*/)
             {
                 server_stats_error = e.what();
             });

@@ -14,6 +14,7 @@
 #include <glaze/json.hpp>
 #include <glaze/json/generic.hpp>
 #include <glaze/exceptions/core_exceptions.hpp>
+#include <glaze/exceptions/json_exceptions.hpp>
 
 #include "RadioBrowserAPI.hpp"
 
@@ -72,6 +73,31 @@ struct glz::meta<RadioBrowserAPI::SearchStationParams::Order> {
 
 
 template<>
+struct glz::meta<RadioBrowserAPI::StationParams::Order> {
+    using enum RadioBrowserAPI::StationParams::Order;
+    static constexpr
+    auto value = enumerate(name,
+                           url,
+                           homepage,
+                           favicon,
+                           tags,
+                           country,
+                           state,
+                           language,
+                           votes,
+                           codec,
+                           bitrate,
+                           lastcheckok,
+                           lastchecktime,
+                           clicktimestamp,
+                           clickcount,
+                           clicktrend,
+                           changetimestamp,
+                           random);
+};
+
+
+template<>
 struct glz::meta<RadioBrowserAPI::TagParams::Order> {
     using enum RadioBrowserAPI::TagParams::Order;
     static constexpr
@@ -81,7 +107,7 @@ struct glz::meta<RadioBrowserAPI::TagParams::Order> {
 
 namespace RadioBrowserAPI {
 
-    constexpr const glz::opts glz_opts{
+    constexpr const glz::opts custom_glz_options{
         .error_on_unknown_keys = false,
         .prettify = true,
     };
@@ -108,6 +134,7 @@ namespace RadioBrowserAPI {
         std::minstd_rand random_engine;
         result_function_t<> result_func = {};
         error_function_t error_func = {};
+        std::string response = {};
         std::string error_msg = {};
 
         void
@@ -140,34 +167,6 @@ namespace RadioBrowserAPI {
 
     namespace {
 
-        [[noreturn]]
-        void
-        throw_error(const string& msg,
-                    glz::error_ctx ctx)
-        {
-            throw error{msg + ": "s + glz::format_error(ctx)};
-        }
-
-
-        template<typename Buffer>
-        [[noreturn]]
-        void
-        throw_error(const string& msg,
-                    glz::error_ctx ctx,
-                    Buffer&& buffer)
-        {
-            throw error{msg + ": "s + glz::format_error(ctx, buffer)};
-        }
-
-
-        [[noreturn]]
-        void
-        throw_error(const string& msg)
-        {
-            throw error{msg};
-        }
-
-
         string
         make_url(const string& endpoint)
         {
@@ -175,7 +174,7 @@ namespace RadioBrowserAPI {
             if (current_server.empty()) {
                 auto m = mirrors.lock();
                 if (m->empty())
-                    throw_error("no server, no mirrors to build URL");
+                    throw error{"no server, no mirrors to build URL"};
                 current_server = m->front();
             }
             return "http://"s + current_server + endpoint;
@@ -201,12 +200,6 @@ namespace RadioBrowserAPI {
             return std::minstd_rand{seeder};
         }
 
-        // string
-        // to_string(bool b)
-        // {
-        //     return b ? "true" : "false";
-        // }
-
 
         MirrorsVec
         get_mirrors_sync(std::stop_token stopper)
@@ -222,13 +215,13 @@ namespace RadioBrowserAPI {
                 ar.process(address);
 
                 if (stopper.stop_requested())
-                    throw_error("stop requested");
+                    throw error{"stop requested"};
 
                 if (ar.error.message)
-                    throw_error("failed resolving \""
+                    throw error{"failed resolving \""
                                 + address
                                 + "\": "
-                                + *ar.error.message);
+                                + *ar.error.message};
                 for (const auto& entry : ar.result.entries)
                     addresses.push_back(entry.addr);
             }
@@ -243,11 +236,11 @@ namespace RadioBrowserAPI {
                         nr.process(addr);
 
                         if (stopper.stop_requested())
-                            throw_error("stop requested");
+                            throw error{"stop requested"};
 
                         if (nr.error.message)
-                            throw_error("failed to look up name for \""
-                                        + to_string(addr) + "\"");
+                            throw error{"failed to look up name for \""
+                                        + to_string(addr) + "\""};
                         if (nr.result.name)
                             mirrors_set.insert(std::move(*nr.result.name));
                     }
@@ -258,7 +251,7 @@ namespace RadioBrowserAPI {
             }
 
             if (stopper.stop_requested())
-                throw_error("stop requested");
+                throw error{"stop requested"};
 
             MirrorsVec result;
             result.reserve(mirrors_set.size());
@@ -273,21 +266,25 @@ namespace RadioBrowserAPI {
         }
 
 
-        bool
+        struct StatusResponse {
+            bool result;
+            std::string response;
+        };
+
+        StatusResponse
         test_server(const std::string& srv)
         {
+            std::string result;
             try {
-                auto result = rest::get_json_sync("https://" + srv + "/json/stats");
-                // std::string pretty;
-                // glz::ex::write<glz_opts>(result, pretty);
+                result = rest::get_json_sync("https://" + srv + "/json/stats");
                 // cout << "connect() thread obtained server stats:\n"
-                //      << pretty
+                //      << glz::prettify_json(result)
                 //      << endl;
-                return true;
+                return {true, std::move(result)};
             }
             catch (std::exception& e) {
                 cout << "Failed to connect to " << srv << ": " << e.what() << endl;
-                return false;
+                return {false, std::move(result)};
             }
         }
 
@@ -296,106 +293,11 @@ namespace RadioBrowserAPI {
         ensure_not_busy()
         {
             if (busy)
-                throw_error("RadioBrowserAPI is busy");
+                throw error{"RadioBrowserAPI is busy"};
         }
 
     } // namespace
 
-
-#if 0
-    string
-    to_string(CodecParams::Order order)
-    {
-        switch (order) {
-            using enum CodecParams::Order;
-            case name:
-                return "name";
-            case stationcount:
-                return "stationcount";
-            default:
-                throw std::logic_error{"invalid CodecParams::Order value"};
-        }
-    }
-
-
-    string
-    to_string(CountryParams::Order order)
-    {
-        switch (order) {
-            using enum CountryParams::Order;
-            case name:
-                return "name";
-            case stationcount:
-                return "stationcount";
-            default:
-                throw std::logic_error{"invalid CountryParams::Order value"};
-        }
-    }
-
-
-    string
-    to_string(SearchStationParams::Order order)
-    {
-        switch (order) {
-            using enum SearchStationParams::Order;
-
-            case name:
-                return "name";
-            case url:
-                return "url";
-            case homepage:
-                return "homepage";
-            case favicon:
-                return "favicon";
-            case tags:
-                return "tags";
-            case country:
-                return "country";
-            case state:
-                return "state";
-            case language:
-                return "language";
-            case votes:
-                return "votes";
-            case codec:
-                return "codec";
-            case bitrate:
-                return "bitrate";
-            case lastcheckok:
-                return "lastcheckok";
-            case lastchecktime:
-                return "lastchecktime";
-            case clicktimestamp:
-                return "clicktimestamp";
-            case clickcount:
-                return "clickcount";
-            case clicktrend:
-                return "clicktrend";
-            case changetimestamp:
-                return "changetimestamp";
-            case random:
-                return "random";
-            default:
-                throw std::logic_error{"invalid SearchStationParams::Order value"};
-        }
-    }
-
-
-    string
-    to_string(TagParams::Order order)
-    {
-        switch (order) {
-            using enum TagParams::Order;
-            case name:
-                return "name";
-            case stationcount:
-                return "stationcount";
-            default:
-                throw std::logic_error{"invalid TagParams::Order value"};
-        }
-    }
-
-#endif
 
     string
     to_string(WorkerState::Task t)
@@ -433,6 +335,7 @@ namespace RadioBrowserAPI {
         result_func = std::move(rf);
         error_func = std::move(ef);
         error_msg.clear();
+        response.clear();
         pending_complete = false;
         task = t;
     }
@@ -449,6 +352,7 @@ namespace RadioBrowserAPI {
         else
             call_error_func(std::runtime_error{error_msg});
         error_msg.clear();
+        response.clear();
         // thread = {};
         task = Task::none;
         pending_complete = false;
@@ -474,7 +378,7 @@ namespace RadioBrowserAPI {
         noexcept
     {
         if (error_func)
-            error_func(e);
+            error_func(e, response);
     }
 
 
@@ -559,7 +463,7 @@ namespace RadioBrowserAPI {
         catch (error& e) {
             cout << "ERROR: " << e.what() << endl;
             if (error_func)
-                error_func(e);
+                error_func(e, {});
             return;
         }
 
@@ -605,7 +509,7 @@ namespace RadioBrowserAPI {
         catch (error& e) {
             cout << "ERROR: " << e.what() << endl;
             if (error_func)
-                error_func(e);
+                error_func(e, {});
             return;
         }
 
@@ -629,21 +533,25 @@ namespace RadioBrowserAPI {
                         bool success = false;
                         for (auto name : mir) {
                             if (stopper.stop_requested())
-                                throw_error("stop requested");
-                            if (test_server(name)) {
+                                throw error{"stop requested"};
+                            auto [test_result, test_response] = test_server(name);
+                            worker_state.lock()->response = std::move(test_response);
+                            if (test_result) {
                                 server.store(name);
                                 success = true;
                                 break;
                             }
                         }
                         if (!success)
-                            throw_error("no working mirror found");
+                            throw error{"no working mirror found"};
                     } else {
                         // We have a preferred server.
-                        if (test_server(srv))
+                        auto [test_result, test_response] = test_server(srv);
+                        worker_state.lock()->response = std::move(test_response);
+                        if (test_result)
                             server.store(srv);
                         else
-                            throw_error("server "s + srv + " did not respond"s);
+                            throw error{"server "s + srv + " did not respond"s};
                     }
                 }
                 catch (std::exception& e) {
@@ -662,29 +570,17 @@ namespace RadioBrowserAPI {
                result_function_t<CodecVec> result_func,
                error_function_t error_func)
     {
-        TRACE_FUNC;
-
-        glz::raw_json params_json;
-        if (auto e = glz::write_json(params, params_json.str))
-            throw_error("glz::write_json() failed", e);
+        std::string params_json;
+        glz::ex::write_json(params, params_json);
 
         rest::post_json_async(
             make_url("/json/codecs"),
             params_json,
-            [result_func = std::move(result_func)](const glz::generic_u64& json,
-                                                   const std::string& raw_json)
+            [result_func = std::move(result_func)](const std::string& response)
                 mutable
             {
                 CodecVec result;
-
-                auto& json_vec = json.get<glz::generic_u64::array_t>();
-                for (auto& elem : json_vec) {
-                    Codec c;
-                    if (auto e = glz::read<glz_opts>(c, elem))
-                        throw_error("glz::read() failed", e, raw_json);
-                    result.push_back(std::move(c));
-                }
-
+                glz::ex::read<custom_glz_options>(result, response);
                 if (result_func)
                     result_func(std::move(result));
             },
@@ -696,27 +592,17 @@ namespace RadioBrowserAPI {
                   result_function_t<CountryVec> result_func,
                   error_function_t error_func)
     {
-        glz::raw_json params_json;
-        if (auto e = glz::write_json(params, params_json.str))
-            throw_error("glz::write_json() failed", e);
+        std::string params_json;
+        glz::ex::write_json(params, params_json);
 
         rest::post_json_async(
             make_url("/json/countries"),
             params_json,
-            [result_func = std::move(result_func)](const glz::generic_u64& json,
-                                                   const std::string& raw_json)
+            [result_func = std::move(result_func)](const std::string& response)
                 mutable
             {
                 CountryVec result;
-
-                auto& json_vec = json.get<glz::generic_u64::array_t>();
-                for (auto& elem : json_vec) {
-                    Country c;
-                    if (auto e = glz::read<glz_opts>(c, elem))
-                        throw_error("glz::read() failed", e, raw_json);
-                    result.push_back(std::move(c));
-                }
-
+                glz::ex::read<custom_glz_options>(result, response);
                 if (result_func)
                     result_func(std::move(result));
             },
@@ -730,13 +616,12 @@ namespace RadioBrowserAPI {
     {
         rest::get_json_async(
             make_url("/json/stats"),
-            [result_func = std::move(result_func)](const glz::generic_u64& json,
-                                                   const std::string& raw_json)
+            {},
+            [result_func = std::move(result_func)](const std::string& response)
                 mutable
             {
                 ServerStats result;
-                if (auto e = glz::read<glz_opts>(result, json))
-                    throw_error("get_server_stats(): glz::read() failed", e, raw_json);
+                glz::ex::read<custom_glz_options>(result, response);
                 if (result_func)
                     result_func(std::move(result));
             },
@@ -749,36 +634,22 @@ namespace RadioBrowserAPI {
                 result_function_t<Station> result_func,
                 error_function_t error_func)
     {
-        glz::generic_u64 args;
-        args["uuids"] = uuid;
+        StationUUIDParams params { .uuids = uuid };
+        std::string params_json;
+        glz::ex::write_json(params, params_json);
+
         rest::post_json_async(
             make_url("/json/stations/byuuid"),
-            args,
-            [result_func = std::move(result_func)](const glz::generic_u64& json,
-                                                   const std::string& raw_json)
+            params_json,
+            [result_func = std::move(result_func)](const std::string& response)
                 mutable
             {
-#if 0
-                StationVec sv;
-                if (auto e = glz::read<glz_opts>(sv, json))
-                    throw_error("get_station(): glz::read() failed", e, raw_json);
-                if (sv.size() != 1)
-                    throw_error("incorrect array size: " + std::to_string(sv.size()));
-
+                StationVec result;
+                glz::ex::read<custom_glz_options>(result, response);
+                if (result.size() != 1)
+                    throw error{"incorrect array size: " + std::to_string(result.size())};
                 if (result_func)
-                    result_func(std::move(sv[0]));
-#else
-                if (!json.is_array())
-                    throw_error("json data must be array");
-                if (json.size() != 1)
-                    throw_error("incorrect array size: " + std::to_string(json.size()));
-                Station st;
-                if (auto e = glz::read<glz_opts>(st,
-                                                 json.get<glz::generic_u64::array_t>().at(0)))
-                    throw_error("get_station(): glz::read() failed", e, raw_json);
-                if (result_func)
-                    result_func(std::move(st));
-#endif
+                    result_func(std::move(result[0]));
             },
             std::move(error_func));
     }
@@ -789,29 +660,17 @@ namespace RadioBrowserAPI {
              result_function_t<TagVec> result_func,
              error_function_t error_func)
     {
-        TRACE_FUNC;
-
-        glz::raw_json params_json;
-        if (auto e = glz::write_json(params, params_json.str))
-            throw_error("glz::write_json() failed", e);
+        std::string params_json;
+        glz::ex::write_json(params, params_json);
 
         rest::post_json_async(
             make_url("/json/tags"),
             params_json,
-            [result_func = std::move(result_func)](const glz::generic_u64& json,
-                                                   const std::string& raw_json)
+            [result_func=std::move(result_func)](const std::string& response)
                 mutable
             {
                 TagVec result;
-
-                auto& json_vec = json.get<glz::generic_u64::array_t>();
-                for (auto& elem : json_vec) {
-                    Tag t;
-                    if (auto e = glz::read<glz_opts>(t, elem))
-                        throw_error("glz::read() failed", e, raw_json);
-                    result.push_back(std::move(t));
-                }
-
+                glz::ex::read<custom_glz_options>(result, response);
                 if (result_func)
                     result_func(std::move(result));
             },
@@ -826,51 +685,29 @@ namespace RadioBrowserAPI {
     {
         ensure_not_busy();
 
-        glz::raw_json params_json;
-        if (auto e = glz::write_json(params, params_json.str))
-            throw_error("glz::write_json() failed", e);
+        std::string params_json;
+        glz::ex::write_json(params, params_json);
 
         busy = true;
         rest::post_json_async(
             make_url("/json/stations/search"),
             params_json,
-            [result_func=std::move(result_func)](const glz::generic_u64& /*json*/,
-                                                 const std::string& raw_json)
+            [result_func=std::move(result_func)](const std::string& response)
                 mutable
             {
                 busy = false;
-                // std::string pretty_json;
-                // glz::ex::write<glz_opts>(json, pretty_json);
-                // cout << "DEBUG:\n"
-                //      << pretty_json
-                //      << endl;
-
                 StationVec result;
-#if 0
-                auto& json_vec = json.get<glz::generic_u64::array_t>();
-                for (auto [idx, elem] : json_vec | std::views::enumerate) {
-                    Station st;
-                    if (auto e = glz::read<glz_opts>(st, elem))
-                        throw_error("search_stations(): glz::read() failed at index " + std::to_string(idx),
-                                    e,
-                                    raw_json);
-                    result.push_back(std::move(st));
-                }
-#else
-                // TODO: check why this generates a linker error
-                if (auto e = glz::read<glz_opts>(result, raw_json))
-                    throw_error("search_stations(): glz::read() failed", e, raw_json);
-#endif
+                glz::ex::read<custom_glz_options>(result, response);
                 if (result_func)
                     result_func(std::move(result));
-
             },
-            [error_func=std::move(error_func)](const std::exception& e)
+            [error_func=std::move(error_func)](const std::exception& e,
+                                               const std::string& response)
                 mutable
             {
                 busy = false;
                 if (error_func)
-                    error_func(e);
+                    error_func(e, response);
             });
     }
 
@@ -884,20 +721,17 @@ namespace RadioBrowserAPI {
             return;
 
         ClickParams params{ .stationuuid = uuid };
-        glz::raw_json params_json;
-        if (auto e = glz::write_json(params, params_json.str))
-            throw_error("glz::write_json() failed", e);
+        std::string params_json;
+        glz::ex::write_json(params, params_json);
 
         rest::post_json_async(
             make_url("/json/url"),
             params_json,
-            [result_func=std::move(result_func)](const glz::generic_u64& json,
-                                                 const std::string& raw_json)
+            [result_func=std::move(result_func)](const std::string& response)
                 mutable
             {
                 ClickResult result;
-                if (auto e = glz::read<glz_opts>(result, json))
-                    throw_error("glz::read() failed", e, raw_json);
+                glz::ex::read<custom_glz_options>(result, response);
                 if (result_func)
                     result_func(std::move(result));
             },
@@ -914,20 +748,17 @@ namespace RadioBrowserAPI {
             return;
 
         VoteParams params{ .stationuuid = uuid };
-        glz::raw_json params_json;
-        if (auto e = glz::write_json(params, params_json.str))
-            throw_error("glz::write_json() failed", e);
+        std::string params_json;
+        glz::ex::write_json(params, params_json);
 
         rest::post_json_async(
             make_url("/json/vote"),
             params_json,
-            [result_func=std::move(result_func)](const glz::generic_u64& json,
-                                                 const std::string& raw_json)
+            [result_func=std::move(result_func)](const std::string& response)
                 mutable
             {
                 VoteResult result;
-                if (auto e = glz::read<glz_opts>(result, json))
-                    throw_error("glz::read() failed", e, raw_json);
+                glz::ex::read<custom_glz_options>(result, response);
                 if (result_func)
                     result_func(std::move(result));
             },

@@ -11,34 +11,40 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
 #include <curlxx/easy.hpp>
-
-#include <glaze/json/generic_fwd.hpp>
 
 #include "mime_type.hpp"
 
 
 namespace rest {
 
+    struct error : std::runtime_error {
+
+        using std::runtime_error::runtime_error;
+
+    }; // struct error
+
+
     using success_function_sig = void (const std::string& response,
                                        const std::string& content_type);
     using success_function_t = std::move_only_function<success_function_sig>;
 
-    using error_function_sig = void (const std::exception& error);
+    using error_function_sig = void (const std::exception& error,
+                                     const std::string& response);
     using error_function_t = std::move_only_function<error_function_sig>;
 
 
-    using json_success_function_sig = void (const glz::generic_u64& response,
-                                            const std::string& response_raw);
+    using json_success_function_sig = void (const std::string& json_response);
     using json_success_function_t = std::move_only_function<json_success_function_sig>;
 
 
-    using params_t = std::map<std::string, std::string>;
+    using get_params_t = std::map<std::string, std::string>;
 
 
-    struct request;
+    struct request_base;
 
     enum class status {
         invalid,
@@ -50,7 +56,7 @@ namespace rest {
 
     class token {
 
-        std::shared_ptr<request> req;
+        std::shared_ptr<request_base> req;
 
     public:
 
@@ -59,7 +65,7 @@ namespace rest {
         noexcept = default;
 
         explicit
-        token(std::shared_ptr<request> req)
+        token(std::shared_ptr<request_base> req)
             noexcept;
 
         ~token()
@@ -96,16 +102,17 @@ namespace rest {
 
 
     token
-    get_async(const std::string& url,
+    get_async(const std::string& base_url,
+              const get_params_t& params,
               success_function_t success_func,
               error_function_t error_func = {});
 
 
     token
-    get_async(const std::string& base_url,
-              const params_t& params,
-              success_function_t success_func,
-              error_function_t error_func = {});
+    post_async(const std::string& url,
+               const std::string& body,
+               success_function_t success_func,
+               error_function_t error_func = {});
 
 
     struct response_and_type_t {
@@ -114,62 +121,36 @@ namespace rest {
     };
 
     response_and_type_t
-    get_sync(const std::string& url);
-
-
-    response_and_type_t
     get_sync(const std::string& base_url,
-             const params_t& params);
+             const get_params_t& params = {});
 
 
     response_and_type_t
     post_sync(const std::string& url,
-              const glz::generic_u64& params);
+              const std::string& body);
 
-    response_and_type_t
-    post_sync(const std::string& url,
-              const glz::raw_json& params);
-
-
-    token
-    get_json_async(const std::string& url,
-                   json_success_function_t success_func,
-                   error_function_t error_func = {});
-
+    // JSON versions
 
     token
     get_json_async(const std::string& base_url,
-                   const params_t& params,
+                   const get_params_t& params,
                    json_success_function_t success_func,
                    error_function_t error_func = {});
 
     token
     post_json_async(const std::string& url,
-                    const glz::generic_u64& params,
-                    json_success_function_t success_func,
-                    error_function_t error_func = {});
-
-    token
-    post_json_async(const std::string& url,
-                    const glz::raw_json& params,
+                    const std::string& params,
                     json_success_function_t success_func,
                     error_function_t error_func = {});
 
 
-    glz::generic_u64
-    get_json_sync(const std::string& url);
+    std::string
+    get_json_sync(const std::string& base_url,
+                  const get_params_t& params = {});
 
-    glz::generic_u64
-    get_json_sync(const std::string& url,
-                  const params_t& params);
-
-    glz::generic_u64
+    std::string
     post_json_sync(const std::string& url,
-                   const glz::generic_u64& params);
-
-    glz::generic_u64
-    post_json_sync(const std::string& url,
-                   const glz::raw_json& params);
+                   const std::string& body);
 
 } // namespace rest
 
