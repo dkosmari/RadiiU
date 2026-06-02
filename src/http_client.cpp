@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -32,7 +32,9 @@ http_client::http_client(const std::string& user_agent) :
 http_client::~http_client()
     noexcept
 {
-    multi.try_remove(easy);
+    auto e = multi.try_remove(easy);
+    if (!e)
+        cout << "BUG: removing easy handle failed: " << e.error().what() << endl;
 }
 
 
@@ -74,7 +76,7 @@ http_client::set_url(const std::string& url)
 {
     // TRACE_FUNC;
 
-    multi.try_remove(easy);
+    multi.remove(easy);
 
     easy.reset();
     easy.set_verbose(true); // DEBUG

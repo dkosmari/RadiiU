@@ -483,8 +483,8 @@ namespace App {
             cfg::state.initial_tab = TabID::last_active;
 
 #ifdef __WIIU__
-        old_disable_swkbd = cfg::disable_swkbd;
-        if (cfg::disable_swkbd) {
+        old_disable_swkbd = cfg::state.disable_swkbd;
+        if (cfg::state.disable_swkbd) {
             SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "0");
             // SDL_StartTextInput();
         }
@@ -783,9 +783,9 @@ namespace App {
     process()
     {
 #ifdef __WIIU__
-        if (old_disable_swkbd != cfg::disable_swkbd) {
-            SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, cfg::disable_swkbd ? "0" : "1");
-            old_disable_swkbd = cfg::disable_swkbd;
+        if (old_disable_swkbd != cfg::state.disable_swkbd) {
+            SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, cfg::state.disable_swkbd ? "0" : "1");
+            old_disable_swkbd = cfg::state.disable_swkbd;
         }
 
         std::uint32_t dim_enabled = 0;
@@ -796,7 +796,7 @@ namespace App {
             std::uint32_t dim_countdown = 0;
             dim_error = IMGetTimeBeforeDimming(&dim_countdown);
             if (!dim_error) {
-                if (cfg::inactive_screen_off) {
+                if (cfg::state.inactive_screen_off) {
                     // This is the logic to turn the gamepad LCD off when the system
                     // enters the dimmed state (screen burn-in protection.)
 

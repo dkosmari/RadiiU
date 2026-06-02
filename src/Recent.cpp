@@ -24,7 +24,6 @@
 #include "Favorites.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
-#include "json.hpp"
 #include "Player.hpp"
 #include "Station.hpp"
 #include "StationDetailsPopup.hpp"
@@ -46,7 +45,6 @@ namespace Recent {
         std::optional<std::size_t> pending_remove;
 
     } // namespace
-
 
 
     void
