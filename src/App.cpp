@@ -677,12 +677,14 @@ namespace App {
 
             ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Always);
             ImGui::SetNextWindowSize(ImGui::GetMainViewport()->WorkSize, ImGuiCond_Always);
-            if (ImGui::RAII::Window main_window{PACKAGE_STRING,
-                                                nullptr,
-                                                ImGuiWindowFlags_NoTitleBar |
-                                                ImGuiWindowFlags_NoMove |
-                                                ImGuiWindowFlags_NoSavedSettings |
-                                                ImGuiWindowFlags_NoResize}) {
+            if (ImGui::RAII::Window main_window{
+                    PACKAGE_STRING,
+                    nullptr,
+                    ImGuiWindowFlags_NoTitleBar |
+                    ImGuiWindowFlags_NoMove |
+                    ImGuiWindowFlags_NoSavedSettings |
+                    ImGuiWindowFlags_NoResize
+                }) {
 
                 ImGui::RAII::StyleVar window_border_size{ImGuiStyleVar_WindowBorderSize,
                                                          1.0f};
@@ -711,49 +713,51 @@ namespace App {
 
                 if (ImGui::RAII::TabBar tab_bar{"main_tabs"}) {
 
-                    if (ImGui::RAII::TabItem fav_tab{to_label(TabID::favorites),
-                                                     nullptr,
-                                                     get_tab_item_flags_for(TabID::favorites)}) {
-                        current_tab = TabID::favorites;
+                    if (ImGui::RAII::TabItem fav_tab{
+                            to_label(TabID::favorites),
+                            nullptr,
+                            get_tab_item_flags_for(TabID::favorites)
+                        })
                         Favorites::process_ui();
-                    }
 
-                    if (ImGui::RAII::TabItem browser_tab{to_label(TabID::browser),
-                                                         nullptr,
-                                                         get_tab_item_flags_for(TabID::browser)}) {
-                        current_tab = TabID::browser;
+                    if (ImGui::RAII::TabItem browser_tab{
+                            to_label(TabID::browser),
+                            nullptr,
+                            get_tab_item_flags_for(TabID::browser)})
                         Browser::process_ui();
-                    }
 
-                    if (ImGui::RAII::TabItem recent_tab{to_label(TabID::recent),
-                                                        nullptr,
-                                                        get_tab_item_flags_for(TabID::recent)}) {
-                        current_tab = TabID::recent;
+                    if (ImGui::RAII::TabItem recent_tab{
+                            to_label(TabID::recent),
+                            nullptr,
+                            get_tab_item_flags_for(TabID::recent)
+                        })
                         Recent::process_ui();
-                    }
 
-                    if (ImGui::RAII::TabItem player_tab{to_label(TabID::player),
-                                                        nullptr,
-                                                        get_tab_item_flags_for(TabID::player)}) {
-                        current_tab = TabID::player;
+                    if (ImGui::RAII::TabItem player_tab{
+                            to_label(TabID::player),
+                            nullptr,
+                            get_tab_item_flags_for(TabID::player)
+                        })
                         Player::process_ui();
-                    }
 
-                    if (ImGui::RAII::TabItem settings_tab{to_label(TabID::settings),
-                                                          nullptr,
-                                                          get_tab_item_flags_for(TabID::settings)}) {
-                        current_tab = TabID::settings;
+                    if (ImGui::RAII::TabItem settings_tab{
+                            to_label(TabID::settings),
+                            nullptr,
+                            get_tab_item_flags_for(TabID::settings)
+                        })
                         Settings::process_ui();
-                    }
 
-                    if (ImGui::RAII::TabItem about_tab{to_label(TabID::about),
-                                                       nullptr,
-                                                       get_tab_item_flags_for(TabID::about)}) {
-                        current_tab = TabID::about;
+                    if (ImGui::RAII::TabItem about_tab{
+                            to_label(TabID::about),
+                            nullptr,
+                            get_tab_item_flags_for(TabID::about)
+                        })
                         About::process_ui();
-                    }
 
-                    next_tab.reset();
+                    if (next_tab) {
+                        current_tab = *next_tab;
+                        next_tab.reset();
+                    }
 
                 } // tab_bar
 
@@ -912,6 +916,5 @@ namespace App {
     {
         next_tab = id;
     }
-
 
 } // namespace App
