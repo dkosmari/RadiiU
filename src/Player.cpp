@@ -70,15 +70,6 @@ namespace Player {
 
     State state;
 
-    // TODO: the radio client keeps track of the state.
-    enum class PlaybackState {
-        stopped,
-        playing,
-        stopping,
-    };
-
-    PlaybackState playback_state = PlaybackState::stopped;
-
     std::shared_ptr<Station> station;
 
     void
@@ -235,7 +226,7 @@ namespace Player {
         if (!station)
             return;
 
-        if (playback_state == PlaybackState::playing)
+        if (res && res->radio.current_state != radio_client::state::stopped)
             stop();
 
         cout << "Starting playback of station \"" << station->name << "\"" << endl;
@@ -251,8 +242,6 @@ namespace Player {
 
         // allocate and initialize resources here
         res.emplace(station->url, station->url_resolved);
-
-        playback_state = PlaybackState::playing;
     }
 
 
@@ -267,10 +256,6 @@ namespace Player {
     void
     stop()
     {
-        if (playback_state == PlaybackState::stopped)
-            return;
-        playback_state = PlaybackState::stopped;
-
         res.reset();
     }
 
@@ -278,14 +263,6 @@ namespace Player {
     void
     process_logic()
     {
-        if (playback_state == PlaybackState::stopped)
-            return;
-
-        if (playback_state == PlaybackState::stopping) {
-            stop();
-            return;
-        }
-
         if (res)
             res->process();
     }
@@ -496,7 +473,11 @@ namespace Player {
     bool
     is_playing(const Station& st)
     {
-        if (playback_state != PlaybackState::playing || !station)
+        if (!res)
+            return false;
+        if (!station)
+            return false;
+        if (res->radio.current_state == radio_client::state::stopped)
             return false;
         return st == *station;
     }

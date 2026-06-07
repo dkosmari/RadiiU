@@ -76,7 +76,12 @@ radio_client::radio_client(const std::string& url,
 void
 radio_client::process()
 {
-    http.process();
+    try {
+        http.process();
+    }
+    catch (std::exception& e) {
+        current_state = state::stopped;
+    }
 }
 
 
