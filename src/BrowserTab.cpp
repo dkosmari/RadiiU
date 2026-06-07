@@ -932,8 +932,14 @@ namespace BrowserTab {
 
         RadioBrowserAPI::send_click(
             station_ptr->stationuuid,
-            [station_ptr](RadioBrowserAPI::ClickResult /*result*/)
+            [station_ptr](RadioBrowserAPI::ClickResult result)
             {
+                cout << "Result of click: "
+                     << (result.ok ? "success" : "failure")
+                     << endl;
+                if (!result.message.empty())
+                    cout << result.message << endl;
+
                 update_station(station_ptr);
             },
             common_error_handler);
@@ -948,12 +954,16 @@ namespace BrowserTab {
         if (!station_ptr || station_ptr->stationuuid.empty())
             return;
 
-        // TODO: this is causing errors, investigate why
-
         RadioBrowserAPI::send_vote(
             station_ptr->stationuuid,
-            [station_ptr](RadioBrowserAPI::VoteResult /*result*/)
+            [station_ptr](RadioBrowserAPI::VoteResult result)
             {
+                cout << "Result of vote: "
+                     << (result.ok ? "success" : "failure")
+                     << endl;
+                if (!result.message.empty())
+                    cout << result.message << endl;
+
                 update_station(station_ptr);
             },
             common_error_handler);
@@ -1043,10 +1053,12 @@ namespace BrowserTab {
         RadioBrowserAPI::get_server_stats(
             [](RadioBrowserAPI::ServerStats stats)
             {
+                cout << "Got server stats" << endl;
                 server_stats_result = std::move(stats);
             },
             [](const std::exception& e)
             {
+                cout << "Got server stats error" << endl;
                 server_stats_error = e.what();
             });
     }
@@ -1101,9 +1113,7 @@ namespace BrowserTab {
 
         RadioBrowserAPI::get_station(
             station_ptr->stationuuid,
-            [station_ptr = std::move(station_ptr)]
-            (RadioBrowserAPI::Station rb_station)
-            mutable
+            [station_ptr](RadioBrowserAPI::Station rb_station)
             {
                 *station_ptr = Station::from_radio_browser(rb_station);
             },

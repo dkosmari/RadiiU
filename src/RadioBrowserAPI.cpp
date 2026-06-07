@@ -241,8 +241,8 @@ namespace RadioBrowserAPI {
                 result.push_back(name);
 
             // Make sure the result is randomized.
-            auto random_engine = make_random_engine();
-            std::ranges::shuffle(result, random_engine);
+            auto re = random_engine.lock();
+            std::ranges::shuffle(result, *re);
 
             return result;
         }
@@ -292,6 +292,7 @@ namespace RadioBrowserAPI {
             }
             for (auto& item : local_pending_calls)
                 try {
+                    cout << "making deferred call" << endl;
                     item.get(); // make the pending calls
                 }
                 catch (std::exception& e) {
@@ -507,20 +508,20 @@ namespace RadioBrowserAPI {
                 try {
                     auto srv = server.load();
                     if (srv.empty()) {
-                        // No preferred server, use a random one.
-                        auto mir = mirrors.load();
-                        if (mir.empty()) {
+                        // No server set, use a random one from the mirrors list.
+                        auto local_mirrors = mirrors.load();
+                        if (local_mirrors.empty()) {
                             // If no mirrors list yet, fetch it.
-                            mir = get_mirrors_sync(stopper);
-                            mirrors.store(mir);
+                            local_mirrors = get_mirrors_sync(stopper);
+                            mirrors.store(local_mirrors);
                         }
                         bool success = false;
-                        for (auto name : mir) {
+                        for (const auto& mirror : local_mirrors) {
                             if (stopper.stop_requested())
                                 throw error{"stop requested"};
-                            auto [test_result, test_response] = test_server(name);
-                            if (test_result) {
-                                server.store(name);
+                            auto [test_success, test_response] = test_server(mirror);
+                            if (test_success) {
+                                server.store(mirror);
                                 success = true;
                                 break;
                             }
@@ -531,6 +532,7 @@ namespace RadioBrowserAPI {
                         defer_call(
                             [](result_function_t<> result_func)
                             {
+                                cout << "DEBUG: connection succeeded [1]!" << endl;
                                 state = State::connected;
                                 cout << "state = " << to_string(state) << endl;
                                 if (result_func)
@@ -538,15 +540,23 @@ namespace RadioBrowserAPI {
                             },
                             std::move(result_func));
                     } else {
-                        // We have a preferred server.
-                        auto [test_result, test_response] = test_server(srv);
-                        if (test_result)
-                            server.store(srv);
-                        else
-                            throw error{"server "s
-                                        + srv
-                                        + " failed with:\n"s
-                                        + test_response};
+                        // We have a server.
+                        auto [test_success, test_response] = test_server(srv);
+                        if (!test_success)
+                            throw error{"mirror "s + srv + " failed with:\n"s + test_response};
+
+                        server.store(srv);
+                        // Defer the result_func call, after updating the connection state.
+                        defer_call(
+                            [](result_function_t<> result_func)
+                            {
+                                cout << "DEBUG: connection succeeded [2]!" << endl;
+                                state = State::connected;
+                                cout << "state = " << to_string(state) << endl;
+                                if (result_func)
+                                    std::invoke(result_func);
+                            },
+                            std::move(result_func));
                     }
                 }
                 catch (std::exception& e) {
@@ -753,6 +763,7 @@ namespace RadioBrowserAPI {
                      error_function_t error_func)
     {
         if (state != State::connected) {
+            cout << "DEBUG: calling get_server_stats() after connection" << endl;
             when_connected(get_server_stats,
                            std::move(result_func),
                            std::move(error_func));
@@ -909,13 +920,10 @@ namespace RadioBrowserAPI {
             return;
         }
 
-        ClickParams params{ .stationuuid = uuid };
-        std::string params_json;
-        glz::ex::write_json(params, params_json);
-
-        rest::post_json_async(
-            make_url("/json/url"),
-            params_json,
+        // Note: clicking does not support GET/POST parameters.
+        rest::get_json_async(
+            make_url("/json/url/" + uuid),
+            {},
             [result_func=std::move(result_func)](const std::string& response)
                 mutable
             {
@@ -944,13 +952,10 @@ namespace RadioBrowserAPI {
             return;
         }
 
-        VoteParams params{ .stationuuid = uuid };
-        std::string params_json;
-        glz::ex::write_json(params, params_json);
-
-        rest::post_json_async(
-            make_url("/json/vote"),
-            params_json,
+        // NOTE: voting does not support GET/POST parameters.
+        rest::get_json_async(
+            make_url("/json/vote/" + uuid),
+            {},
             [result_func=std::move(result_func)](const std::string& response)
                 mutable
             {

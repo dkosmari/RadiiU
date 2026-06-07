@@ -717,42 +717,54 @@ namespace App {
                             to_label(TabID::favorites),
                             nullptr,
                             get_tab_item_flags_for(TabID::favorites)
-                        })
+                        }) {
+                        current_tab = TabID::favorites;
                         FavoritesTab::process_ui();
+                    }
 
                     if (ImGui::RAII::TabItem browser_tab{
                             to_label(TabID::browser),
                             nullptr,
-                            get_tab_item_flags_for(TabID::browser)})
+                            get_tab_item_flags_for(TabID::browser)}) {
+                        current_tab = TabID::browser;
                         BrowserTab::process_ui();
+                    }
 
                     if (ImGui::RAII::TabItem recent_tab{
                             to_label(TabID::recent),
                             nullptr,
                             get_tab_item_flags_for(TabID::recent)
-                        })
+                        }) {
+                        current_tab = TabID::recent;
                         RecentTab::process_ui();
+                    }
 
                     if (ImGui::RAII::TabItem player_tab{
                             to_label(TabID::player),
                             nullptr,
                             get_tab_item_flags_for(TabID::player)
-                        })
+                        }) {
+                        current_tab = TabID::player;
                         PlayerTab::process_ui();
+                    }
 
                     if (ImGui::RAII::TabItem settings_tab{
                             to_label(TabID::settings),
                             nullptr,
                             get_tab_item_flags_for(TabID::settings)
-                        })
+                        }) {
+                        current_tab = TabID::settings;
                         SettingsTab::process_ui();
+                    }
 
                     if (ImGui::RAII::TabItem about_tab{
                             to_label(TabID::about),
                             nullptr,
                             get_tab_item_flags_for(TabID::about)
-                        })
+                        }) {
+                        current_tab = TabID::about;
                         AboutTab::process_ui();
+                    }
 
                     if (next_tab) {
                         current_tab = *next_tab;
@@ -914,6 +926,8 @@ namespace App {
     void
     set_tab(TabID id)
     {
+        if (id == TabID::last_active)
+            id = TabID::browser;
         next_tab = id;
     }
 

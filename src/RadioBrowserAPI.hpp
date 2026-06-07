@@ -33,11 +33,6 @@ namespace RadioBrowserAPI {
     }; // struct error
 
 
-    struct ClickParams {
-        string stationuuid;
-    }; // stuct ClickParams
-
-
     struct ClickResult {
         bool ok;
         string message;
@@ -269,10 +264,6 @@ namespace RadioBrowserAPI {
 
     using TagVec = std::vector<Tag>;
 
-
-    struct VoteParams {
-        string stationuuid;
-    }; // struct VoteParams
 
     struct VoteResult {
         bool   ok;

@@ -373,6 +373,10 @@ namespace rest {
         request_post{url, body},
         json_request_base{std::move(json_success_func)}
     {
+        cout << "DEBUG: making json post request\n"
+             << "    URL: " << url << "\n"
+             << "    body: " << body
+             << endl;
         easy.append_http_header("Content-Type: application/json");
     }
 
