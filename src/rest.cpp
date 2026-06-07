@@ -85,8 +85,7 @@ namespace rest {
             noexcept;
 
         void
-        handle_error(const std::exception& e,
-                     const std::string& response = {})
+        handle_error(const std::exception& e)
             noexcept;
 
     }; // struct request
@@ -180,6 +179,19 @@ namespace rest {
     unsigned init_counter;
 
 
+    /* ------------- */
+    /* error methods */
+    /* ------------- */
+
+    error::error(const std::string& msg,
+                 const std::string& response,
+                 const std::string& content_type) :
+        std::runtime_error{msg},
+        response{std::move(response)},
+        content_type{std::move(content_type)}
+    {}
+
+
     /* -------------------- */
     /* request_base methods */
     /* -------------------- */
@@ -226,7 +238,7 @@ namespace rest {
             handle_success(response, content_type);
         }
         catch (std::exception& e) {
-            handle_error(e, response);
+            handle_error(error{e.what(), response, content_type});
         }
     }
 
@@ -242,24 +254,22 @@ namespace rest {
     catch (std::exception& e) {
         TRACE_FUNC;
         cout << "ERROR: " << e.what() << endl;
-        cout << "response was:\n<response>\n" << response << "\n</response>" << endl;
-        handle_error(e, response);
+        handle_error(error{e.what(), response, content_type});
     }
     catch (...) {
         TRACE_FUNC;
         cout << "ERROR: caught unknown exception!" << endl;
         cout << "response was:\n<response>\n" << response << "\n</response>" << endl;
-        handle_error(std::logic_error{"unknown exception"}, response);
+        handle_error(error{"unknown exception", response, content_type});
     }
 
 
     void
-    request_base::handle_error(const std::exception& e,
-                               const std::string& response)
+    request_base::handle_error(const std::exception& e)
         noexcept
     try {
         if (error_func)
-            error_func(e, response);
+            error_func(e);
     }
     catch (std::exception& ee) {
         TRACE_FUNC;
@@ -271,9 +281,9 @@ namespace rest {
     }
 
 
-    /*
-     * request_get methods
-     */
+    /* ------------------- */
+    /* request_get methods */
+    /* ------------------- */
 
     request_get::request_get(const std::string& url,
                              const get_params_t& params,
@@ -285,9 +295,9 @@ namespace rest {
     }
 
 
-    /*
-     * request_post methods
-     */
+    /* -------------------- */
+    /* request_post methods */
+    /* -------------------- */
 
     request_post::request_post(const std::string& url,
                                const std::string& body,
@@ -301,9 +311,9 @@ namespace rest {
     }
 
 
-    /*
-     * json_request_base methods
-     */
+    /* ------------------------- */
+    /* json_request_base methods */
+    /* ------------------------- */
 
     json_request_base::json_request_base(json_success_function_t json_success_func) :
         request_base{},
@@ -318,22 +328,28 @@ namespace rest {
                                       const std::string& content_type)
         noexcept
     try {
-        if (!mime_type::match(content_type, "application/json"))
-            throw error("Invalid content type response: "s + content_type);
+        if (!mime_type::match(content_type, "application/json")) {
+            handle_error(error{
+                    "invalid content type",
+                    response,
+                    content_type
+                });
+            return;
+        }
         if (json_success_func)
             json_success_func(response);
     }
     catch (std::exception& e) {
-        handle_error(e, response);
+        handle_error(error{e.what(), response, content_type});
     }
     catch (...) {
-        handle_error(std::logic_error{"unknown exception"}, response);
+        handle_error(error{"unknown exception", response, content_type});
     }
 
 
-    /* -------------------- */
+    /*--------------------------*/
     /* json_request_get methods */
-    /* -------------------- */
+    /*--------------------------*/
 
     json_request_get::json_request_get(const std::string& base_url,
                                        const get_params_t& params,
@@ -345,9 +361,9 @@ namespace rest {
     {}
 
 
-    /*
-     * json_request_post methods
-     */
+    /* ------------------------- */
+    /* json_request_post methods */
+    /* ------------------------- */
 
     json_request_post::json_request_post(const std::string& url,
                                          const std::string& body,
@@ -547,8 +563,6 @@ namespace rest {
     get_sync(const std::string& base_url,
              const get_params_t& params)
     {
-        TRACE_FUNC;
-
         std::string url = make_url(base_url, params);
         curl::easy easy = make_easy(url);
         byte_stream response_stream;
@@ -558,14 +572,11 @@ namespace rest {
                 return response_stream.write(buf);
             });
         easy.perform();
-        // TODO: throw exception when HTTP error
+        std::string response = response_stream.read_str();
         std::string content_type;
         if (auto h = easy.try_get_header("Content-Type"))
             content_type = h->value;
-        return {
-            response_stream.read_str(),
-            content_type
-        };
+        return {std::move(response), std::move(content_type)};
     }
 
 
@@ -573,10 +584,7 @@ namespace rest {
     post_sync(const std::string& url,
               const std::string& body)
     {
-        TRACE_FUNC;
-
         curl::easy easy = make_easy(url);
-
         easy.set_post(true);
         easy.set_copy_post_fields(body);
 
@@ -587,14 +595,11 @@ namespace rest {
                 return response_stream.write(buf);
             });
         easy.perform();
-        // TODO: throw exception when HTTP error
+        std::string response = response_stream.read_str();
         std::string content_type;
         if (auto h = easy.try_get_header("Content-Type"))
             content_type = h->value;
-        return {
-            response_stream.read_str(),
-            content_type
-        };
+        return {std::move(response), std::move(content_type)};
     }
 
 
@@ -642,10 +647,10 @@ namespace rest {
                 return response_stream.write(buf);
             });
         easy.perform();
+        std::string response = response_stream.read_str();
         std::string content_type = easy.get_header("Content-Type").value;
         if (!mime_type::match(content_type, "application/json"))
-            throw error{"Invalid content type response: "s + content_type};
-        std::string response = response_stream.read_str();
+            throw error{"Invalid content type", response, content_type};
         return response;
     }
 
@@ -668,10 +673,10 @@ namespace rest {
                 return response_stream.write(buf);
             });
         easy.perform();
+        std::string response = response_stream.read_str();
         std::string content_type = easy.get_header("Content-Type").value;
         if (!mime_type::match(content_type, "application/json"))
-            throw error{"Invalid content type response: "s + content_type};
-        std::string response = response_stream.read_str();
+            throw error{"Invalid content type", response, content_type};
         return response;
     }
 
@@ -685,17 +690,18 @@ namespace rest {
     {
         curl::easy easy;
         easy.set_verbose(true);
-        easy.set_http_version(curl::easy::http_version::none);
-        easy.set_url(url);
         if (!user_agent.empty())
             easy.set_user_agent(user_agent);
-        easy.set_follow_location(true);
-        easy.set_auto_referer(true);
-        easy.set_ssl_verify_peer(false);
         easy.set_accept_encoding("");
-        easy.set_transfer_encoding(true);
+        easy.set_auto_referer(true);
         easy.set_buffer_size(65536);
+        easy.set_fail_on_error(true);
+        easy.set_follow_location(true);
+        easy.set_http_version(curl::easy::http_version::none);
+        easy.set_ssl_verify_peer(false);
         easy.set_tcp_no_delay(false);
+        easy.set_transfer_encoding(true);
+        easy.set_url(url);
         return easy;
     }
 

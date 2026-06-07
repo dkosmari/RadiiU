@@ -17,6 +17,7 @@
 
 #include "IconsFontAwesome4.h"
 #include "RadioBrowserAPI.hpp"
+#include "rest.hpp"
 #include "Station.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
@@ -96,12 +97,16 @@ namespace StationDetailsPopup {
                 result = Station::from_radio_browser(rb_station);
                 state = State::done;
             },
-            [](const std::exception& e,
-               const std::string& response)
+            [](const std::exception& e)
             {
+                state = State::error;
                 error_msg = e.what();
-                if (!response.empty())
-                    error_msg += "\n" + response;
+                if (auto ee = dynamic_cast<const rest::error*>(&e)) {
+                    if (!ee->content_type.empty())
+                        error_msg += "\nContent-Type: " + ee->content_type;
+                    if (!ee->response.empty())
+                        error_msg += "\n" + ee->response;
+                }
             });
     }
 

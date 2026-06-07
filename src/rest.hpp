@@ -23,7 +23,12 @@ namespace rest {
 
     struct error : std::runtime_error {
 
-        using std::runtime_error::runtime_error;
+        std::string response;
+        std::string content_type;
+
+        error(const std::string& msg,
+              const std::string& response = {},
+              const std::string& content_type = {});
 
     }; // struct error
 
@@ -32,8 +37,7 @@ namespace rest {
                                        const std::string& content_type);
     using success_function_t = std::move_only_function<success_function_sig>;
 
-    using error_function_sig = void (const std::exception& error,
-                                     const std::string& response);
+    using error_function_sig = void (const std::exception& err);
     using error_function_t = std::move_only_function<error_function_sig>;
 
 
@@ -101,6 +105,10 @@ namespace rest {
     process();
 
 
+    /* ----------------- */
+    /* Untyped functions */
+    /* ----------------- */
+
     token
     get_async(const std::string& base_url,
               const get_params_t& params,
@@ -129,7 +137,9 @@ namespace rest {
     post_sync(const std::string& url,
               const std::string& body);
 
-    // JSON versions
+    /* -------------- */
+    /* JSON functions */
+    /* -------------- */
 
     token
     get_json_async(const std::string& base_url,

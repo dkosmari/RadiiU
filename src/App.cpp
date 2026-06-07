@@ -51,7 +51,6 @@
 #include "Recent.hpp"
 #include "Settings.hpp"
 #include "Styles.hpp"
-#include "TabID.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
 
@@ -478,7 +477,7 @@ namespace App {
         initialize_config_dir();
         // Note: initialize cfg module early.
         cfg::initialize();
-        next_tab = cfg::state.initial_tab;
+        set_tab(cfg::state.initial_tab);
         if (cfg::state.remember_tab)
             cfg::state.initial_tab = TabID::last_active;
 
@@ -521,7 +520,6 @@ namespace App {
         IconManager::initialize(res->renderer);
         RadioBrowserAPI::initialize(get_user_agent());
         RadioBrowserAPI::set_server(cfg::state.server);
-        RadioBrowserAPI::connect();
 
         // Initialize tabs.
         Favorites::initialize();
@@ -907,5 +905,13 @@ namespace App {
 
         res->renderer.present();
     }
+
+
+    void
+    set_tab(TabID id)
+    {
+        next_tab = id;
+    }
+
 
 } // namespace App

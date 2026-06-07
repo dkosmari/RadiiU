@@ -24,14 +24,19 @@ namespace RadioBrowserAPI {
 
 
     struct error : std::runtime_error {
-        using std::runtime_error::runtime_error;
-    }; // struct error
 
+        // Inherit constructors.
+        using std::runtime_error::runtime_error;
+
+        error(const std::exception& e);
+
+    }; // struct error
 
 
     struct ClickParams {
         string stationuuid;
     }; // stuct ClickParams
+
 
     struct ClickResult {
         bool ok;
@@ -281,8 +286,7 @@ namespace RadioBrowserAPI {
     template<typename... Args>
     using result_function_t = std::move_only_function<result_function_sig<Args...>>;
 
-    using error_function_sig = void (const std::exception& err,
-                                     const std::string& response);
+    using error_function_sig = void (const std::exception& err);
     using error_function_t = std::move_only_function<error_function_sig>;
 
 
@@ -297,7 +301,7 @@ namespace RadioBrowserAPI {
 
 
     bool
-    is_busy();
+    is_searching();
 
 
     void
@@ -351,6 +355,10 @@ namespace RadioBrowserAPI {
     get_tags(const TagParams& params,
              result_function_t<TagVec> result_func,
              error_function_t error_func = {});
+
+
+    void
+    reconnect();
 
 
     void

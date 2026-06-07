@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <string>
 
+#include "TabID.hpp"
 
 namespace App {
 
@@ -18,27 +19,25 @@ namespace App {
     const std::string&
     get_user_agent();
 
-
     [[nodiscard]]
     const std::filesystem::path&
     get_content_path();
-
 
     [[nodiscard]]
     const std::filesystem::path&
     get_config_path();
 
-
     void
     initialize();
-
 
     void
     finalize();
 
-
     void
     run();
+
+    void
+    set_tab(TabID id);
 
 } // namespace App
 

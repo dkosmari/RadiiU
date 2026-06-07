@@ -157,7 +157,7 @@ namespace Player {
                         spec.freq     = radio_spec->rate;
                         spec.channels = radio_spec->channels;
                         spec.format   = radio_spec->format;
-                        spec.samples  = 4096;
+                        spec.samples  = 8192;
                         audio_dev.create(nullptr, false, spec);
                         audio_dev.unpause();
                     } else
@@ -173,9 +173,6 @@ namespace Player {
                      !samples.empty();
                      samples = radio.get_samples())
                     audio_dev.play(samples);
-
-                // if (!is_buffer_too_full())
-                //     easy.unpause();
 
             }
             catch (std::exception& e) {
@@ -247,6 +244,7 @@ namespace Player {
 
         cout << "Playing url=\"" << station->url
              << "\", url_resolved=\"" << station->url_resolved
+             << "\""
              << endl;
 
         Browser::send_click(station);

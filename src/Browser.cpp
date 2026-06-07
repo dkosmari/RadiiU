@@ -140,7 +140,7 @@ namespace Browser {
         std::string filter_codec;
         std::optional<SortOrder> order;
         unsigned page;
-        bool options_visible;
+        bool options_visible = true;
         bool scroll_to_top = false;
 
     } // namespace gui
@@ -162,6 +162,7 @@ namespace Browser {
     std::optional<std::vector<Country>> countries;
     std::optional<std::vector<std::string>> codecs;
     std::optional<std::vector<std::string>> tags;
+
 
     void
     fetch_codecs();
@@ -186,8 +187,7 @@ namespace Browser {
     by_name(const Country& c);
 
     void
-    common_error_handler(const std::exception& e,
-                         const std::string& response);
+    common_error_handler(const std::exception& e);
 
     void
     fetch_server_stats();
@@ -314,7 +314,7 @@ namespace Browser {
 
         load_tags_regex();
         load();
-        search_stations();
+        // search_stations();
     }
 
 
@@ -387,13 +387,6 @@ namespace Browser {
 
 
     void
-    connect()
-    {
-        TRACE_FUNC;
-    }
-
-
-    void
     reset_options()
     {
         TRACE_FUNC;
@@ -462,8 +455,11 @@ namespace Browser {
                 ImGuiChildFlags_NavFlattened
             }) {
 
-            if (ImGui::Button(ICON_FA_REFRESH))
-                connect();
+            if (ImGui::Button(ICON_FA_REFRESH)) {
+                RadioBrowserAPI::set_server(cfg::state.server);
+                RadioBrowserAPI::reconnect();
+            }
+
             ImGui::SetItemTooltip("Reconnect to server, or try a different random mirror.");
 
             ImGui::SameLine();
@@ -687,13 +683,13 @@ namespace Browser {
 
             const bool is_first_page = gui::page == 1;
             const bool is_last_page = stations.size() < cfg::state.browser_page_limit;
-            const bool is_busy = RadioBrowserAPI::is_busy();
+            const bool is_searching = RadioBrowserAPI::is_searching();
 
             {
                 ImGui::RAII::Disabled disable_first_page{is_first_page};
 
                 // 100⏪
-                if (ImGui::Button("100" ICON_FA_ANGLE_DOUBLE_LEFT) && !is_busy) {
+                if (ImGui::Button("100" ICON_FA_ANGLE_DOUBLE_LEFT) && !is_searching) {
                     if (gui::page > 100)
                         gui::page -= 100;
                     else
@@ -705,7 +701,7 @@ namespace Browser {
                 ImGui::SameLine();
 
                 // 10⏪
-                if (ImGui::Button("10" ICON_FA_ANGLE_DOUBLE_LEFT) && !is_busy) {
+                if (ImGui::Button("10" ICON_FA_ANGLE_DOUBLE_LEFT) && !is_searching) {
                     if (gui::page > 10)
                         gui::page -= 10;
                     else
@@ -717,7 +713,7 @@ namespace Browser {
                 ImGui::SameLine();
 
                 // ⏴
-                if (ImGui::Button(" " ICON_FA_ANGLE_LEFT " ") && !is_busy) {
+                if (ImGui::Button(" " ICON_FA_ANGLE_LEFT " ") && !is_searching) {
                     if (gui::page > 1)
                         --gui::page;
                     search_stations();
@@ -742,7 +738,7 @@ namespace Browser {
                 ImGui::RAII::Disabled disable_last_page{is_last_page};
 
                 // ⏵
-                if (ImGui::Button(" " ICON_FA_ANGLE_RIGHT " ") && !is_busy) {
+                if (ImGui::Button(" " ICON_FA_ANGLE_RIGHT " ") && !is_searching) {
                     ++gui::page;
                     search_stations();
                 }
@@ -751,7 +747,7 @@ namespace Browser {
                 ImGui::SameLine();
 
                 // ⏩10
-                if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "10") && !is_busy) {
+                if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "10") && !is_searching) {
                     gui::page += 10;
                     search_stations();
                 }
@@ -760,7 +756,7 @@ namespace Browser {
                 ImGui::SameLine();
 
                 // ⏩100
-                if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "100") && !is_busy) {
+                if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "100") && !is_searching) {
                     gui::page += 100;
                     search_stations();
                 }
@@ -877,7 +873,7 @@ namespace Browser {
     void
     process_ui()
     {
-        ImGui::RAII::Disabled disable_busy{RadioBrowserAPI::is_busy()};
+        ImGui::RAII::Disabled disable_searching{RadioBrowserAPI::is_searching()};
 
         show_status();
 
@@ -962,12 +958,15 @@ namespace Browser {
 
     // TODO: should display errors to the user
     void
-    common_error_handler(const std::exception& e,
-                         const std::string& response)
+    common_error_handler(const std::exception& e)
     {
         // TODO: should show a notification-like message, that goes away after a while.
-        cout << "Browser ERROR: " << e.what() << endl;
-        cout << "<response>\n" << response << "\n</response>" << endl;
+        cout << "Browser ERROR: " << e.what() << '\n';
+        if (auto ee = dynamic_cast<const rest::error*>(&e)) {
+            cout << "Content-Type: " << ee->content_type << '\n';
+            cout << "<response>\n" << ee->response << "\n</response>\n";
+        }
+        cout << std::flush;
     }
 
 
@@ -976,6 +975,7 @@ namespace Browser {
     {
         TRACE_FUNC;
 
+        // TODO: when RB errors out, it should be possible to try again
         if (codecs)
             return;
 
@@ -1002,6 +1002,7 @@ namespace Browser {
     {
         TRACE_FUNC;
 
+        // TODO: when RB errors out, it should be possible to try again
         if (countries)
             return;
 
@@ -1040,8 +1041,7 @@ namespace Browser {
             {
                 server_stats_result = std::move(stats);
             },
-            [](const std::exception& e,
-               const std::string& /*response*/)
+            [](const std::exception& e)
             {
                 server_stats_error = e.what();
             });
@@ -1053,6 +1053,7 @@ namespace Browser {
     {
         TRACE_FUNC;
 
+        // TODO: when RB errors out, it should be possible to try again
         if (tags)
             return;
 
@@ -1156,6 +1157,7 @@ namespace Browser {
         if (code.empty())
             return {};
 
+        // TODO: when RB errors out, it should be possible to try again
         if (!countries) {
             fetch_countries();
             return {};

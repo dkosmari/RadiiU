@@ -17,6 +17,7 @@
 
 #include "UI.hpp"
 
+#include "App.hpp"
 #include "Browser.hpp"
 #include "Favorites.hpp"
 #include "IconManager.hpp"
@@ -25,6 +26,7 @@
 #include "RadioBrowserAPI.hpp"
 #include "Station.hpp"
 #include "string_utils.hpp"
+#include "TabID.hpp"
 
 
 using std::cout;
@@ -290,8 +292,10 @@ namespace UI {
         } else {
             if (show_image_button("play_button",
                                   *IconManager::get("ui/play-button.svg"),
-                                  button_size))
+                                  button_size)) {
+                App::set_tab(TabID::player);
                 Player::play(station);
+            }
         }
     }
 
