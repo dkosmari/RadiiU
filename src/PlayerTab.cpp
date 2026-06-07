@@ -29,17 +29,16 @@
 
 #include <sdl2xx/audio.hpp>
 
-#include "Player.hpp"
+#include "PlayerTab.hpp"
 
 #include "App.hpp"
-#include "Browser.hpp"
+#include "BrowserTab.hpp"
 #include "cfg.hpp"
-#include "Favorites.hpp"
 #include "humanize.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
 #include "radio_client.hpp"
-#include "Recent.hpp"
+#include "RecentTab.hpp"
 #include "Station.hpp"
 #include "StationDetailsPopup.hpp"
 #include "UI.hpp"
@@ -55,7 +54,7 @@ using namespace std::placeholders;
 using sdl::vec2;
 
 
-namespace Player {
+namespace PlayerTab {
 
     struct TrackInfo {
         system_clock::time_point when{};
@@ -231,14 +230,15 @@ namespace Player {
 
         cout << "Starting playback of station \"" << station->name << "\"" << endl;
 
-        Recent::queue_add(station);
+        RecentTab::queue_add(station);
 
         cout << "Playing url=\"" << station->url
              << "\", url_resolved=\"" << station->url_resolved
              << "\""
              << endl;
 
-        Browser::send_click(station);
+        // TODO: call RadioBrowserAPI directly.
+        BrowserTab::send_click(station);
 
         // allocate and initialize resources here
         res.emplace(station->url, station->url_resolved);
@@ -505,4 +505,4 @@ namespace Player {
                                 state.history.begin() + cfg::state.player_history_limit);
     }
 
-} // namespace Player
+} // namespace PlayerTab

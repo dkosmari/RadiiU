@@ -21,13 +21,12 @@
 #include <imgui_raii.h>
 #include <imgui_stdlib.h>
 
-#include "Favorites.hpp"
+#include "FavoritesTab.hpp"
 
 #include "App.hpp"
 #include "cfg.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
-#include "Player.hpp"
 #include "Station.hpp"
 #include "string_utils.hpp"
 #include "tracer.hpp"
@@ -38,7 +37,7 @@ using std::cout;
 using std::endl;
 
 
-namespace Favorites {
+namespace FavoritesTab {
 
     namespace {
 
@@ -613,4 +612,4 @@ namespace Favorites {
                       });
     }
 
-} // namespace Favorites
+} // namespace FavoritesTab

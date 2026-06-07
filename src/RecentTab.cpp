@@ -17,14 +17,12 @@
 #include <imgui_raii.h>
 #include <imgui_stdlib.h>
 
-#include "Recent.hpp"
+#include "RecentTab.hpp"
 
 #include "App.hpp"
 #include "cfg.hpp"
-#include "Favorites.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
-#include "Player.hpp"
 #include "Station.hpp"
 #include "StationDetailsPopup.hpp"
 #include "UI.hpp"
@@ -34,7 +32,7 @@ using std::cout;
 using std::endl;
 
 
-namespace Recent {
+namespace RecentTab {
 
     std::deque<std::shared_ptr<Station>> stations;
 
@@ -237,4 +235,4 @@ namespace Recent {
         pending_add = station;
     }
 
-} // namespace Recent
+} // namespace RecentTab

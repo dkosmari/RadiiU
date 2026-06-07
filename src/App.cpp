@@ -40,16 +40,16 @@
 
 #include "App.hpp"
 
-#include "About.hpp"
-#include "Browser.hpp"
+#include "AboutTab.hpp"
+#include "BrowserTab.hpp"
 #include "cfg.hpp"
-#include "Favorites.hpp"
+#include "FavoritesTab.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
-#include "Player.hpp"
+#include "PlayerTab.hpp"
 #include "RadioBrowserAPI.hpp"
-#include "Recent.hpp"
-#include "Settings.hpp"
+#include "RecentTab.hpp"
+#include "SettingsTab.hpp"
 #include "Styles.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
@@ -522,10 +522,10 @@ namespace App {
         RadioBrowserAPI::set_server(cfg::state.server);
 
         // Initialize tabs.
-        Favorites::initialize();
-        Browser::initialize();
-        Recent::initialize();
-        Player::initialize();
+        FavoritesTab::initialize();
+        BrowserTab::initialize();
+        RecentTab::initialize();
+        PlayerTab::initialize();
     }
 
 
@@ -535,10 +535,10 @@ namespace App {
         TRACE_FUNC;
 
         // Finalize tabs.
-        Player::finalize();
-        Recent::finalize();
-        Browser::finalize();
-        Favorites::finalize();
+        PlayerTab::finalize();
+        RecentTab::finalize();
+        BrowserTab::finalize();
+        FavoritesTab::finalize();
 
         // Finalize modules.
         RadioBrowserAPI::finalize();
@@ -718,41 +718,41 @@ namespace App {
                             nullptr,
                             get_tab_item_flags_for(TabID::favorites)
                         })
-                        Favorites::process_ui();
+                        FavoritesTab::process_ui();
 
                     if (ImGui::RAII::TabItem browser_tab{
                             to_label(TabID::browser),
                             nullptr,
                             get_tab_item_flags_for(TabID::browser)})
-                        Browser::process_ui();
+                        BrowserTab::process_ui();
 
                     if (ImGui::RAII::TabItem recent_tab{
                             to_label(TabID::recent),
                             nullptr,
                             get_tab_item_flags_for(TabID::recent)
                         })
-                        Recent::process_ui();
+                        RecentTab::process_ui();
 
                     if (ImGui::RAII::TabItem player_tab{
                             to_label(TabID::player),
                             nullptr,
                             get_tab_item_flags_for(TabID::player)
                         })
-                        Player::process_ui();
+                        PlayerTab::process_ui();
 
                     if (ImGui::RAII::TabItem settings_tab{
                             to_label(TabID::settings),
                             nullptr,
                             get_tab_item_flags_for(TabID::settings)
                         })
-                        Settings::process_ui();
+                        SettingsTab::process_ui();
 
                     if (ImGui::RAII::TabItem about_tab{
                             to_label(TabID::about),
                             nullptr,
                             get_tab_item_flags_for(TabID::about)
                         })
-                        About::process_ui();
+                        AboutTab::process_ui();
 
                     if (next_tab) {
                         current_tab = *next_tab;
@@ -844,9 +844,9 @@ namespace App {
 
         RadioBrowserAPI::process();
 
-        Favorites::process_logic();
-        Recent::process_logic();
-        Player::process_logic();
+        FavoritesTab::process_logic();
+        RecentTab::process_logic();
+        PlayerTab::process_logic();
 
 
         Uint64 now = SDL_GetTicks64();

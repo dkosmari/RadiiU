@@ -40,13 +40,13 @@ radiiu_elf_SOURCES = \
 	src/rest.hpp \
 	src/RadioBrowserAPI.cpp \
 	src/RadioBrowserAPI.hpp \
-	src/About.cpp \
-	src/About.hpp \
+	src/AboutTab.cpp \
+	src/AboutTab.hpp \
 	src/App.cpp \
 	src/App.hpp \
 	src/async_queue.hpp \
-	src/Browser.cpp \
-	src/Browser.hpp \
+	src/BrowserTab.cpp \
+	src/BrowserTab.hpp \
 	src/byte_stream.cpp \
 	src/byte_stream.hpp \
 	src/cfg.cpp \
@@ -63,8 +63,8 @@ radiiu_elf_SOURCES = \
 	src/decoder_opus.hpp \
 	src/decoder_vorbis.cpp \
 	src/decoder_vorbis.hpp \
-	src/Favorites.cpp \
-	src/Favorites.hpp \
+	src/FavoritesTab.cpp \
+	src/FavoritesTab.hpp \
 	src/http_client.cpp \
 	src/http_client.hpp \
 	src/humanize.cpp \
@@ -81,16 +81,16 @@ radiiu_elf_SOURCES = \
 	src/main.cpp \
 	src/mime_type.cpp \
 	src/mime_type.hpp \
-	src/Player.cpp \
-	src/Player.hpp \
+	src/PlayerTab.cpp \
+	src/PlayerTab.hpp \
 	src/pls.cpp \
 	src/pls.hpp \
 	src/radio_client.cpp \
 	src/radio_client.hpp \
-	src/Recent.cpp \
-	src/Recent.hpp \
-	src/Settings.cpp \
-	src/Settings.hpp \
+	src/RecentTab.cpp \
+	src/RecentTab.hpp \
+	src/SettingsTab.cpp \
+	src/SettingsTab.hpp \
 	src/Station.cpp \
 	src/Station.hpp \
 	src/StationDetailsPopup.cpp \

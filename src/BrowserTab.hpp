@@ -1,12 +1,12 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#ifndef BROWSER_HPP
-#define BROWSER_HPP
+#ifndef BROWSER_TAB_HPP
+#define BROWSER_TAB_HPP
 
 #include <memory>
 #include <string>
@@ -15,7 +15,7 @@
 
 struct Station;
 
-namespace Browser {
+namespace BrowserTab {
 
     void
     initialize();
@@ -42,6 +42,6 @@ namespace Browser {
     std::string
     get_country_name(const std::string& code);
 
-} // namespace Browser
+} // namespace BrowserTab
 
 #endif

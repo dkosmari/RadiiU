@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -28,7 +28,7 @@
 #include <freetype/freetype.h>
 #endif
 
-#include "About.hpp"
+#include "AboutTab.hpp"
 
 #include "App.hpp"
 #include "IconsFontAwesome4.h"
@@ -47,7 +47,7 @@ using std::endl;
 using namespace std::literals;
 
 
-namespace About {
+namespace AboutTab {
 
     namespace {
 
@@ -257,4 +257,4 @@ namespace About {
         }
     }
 
-} // namespace About
+} // namespace AboutTab

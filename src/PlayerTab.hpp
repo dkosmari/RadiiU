@@ -1,12 +1,12 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#ifndef PLAYER_HPP
-#define PLAYER_HPP
+#ifndef PLAYER_TAB_HPP
+#define PLAYER_TAB_HPP
 
 #include <memory>
 #include <string>
@@ -15,7 +15,7 @@
 struct Station;
 
 
-namespace Player {
+namespace PlayerTab {
 
     void
     initialize();
@@ -49,6 +49,6 @@ namespace Player {
     bool
     is_playing(std::shared_ptr<Station>& st);
 
-} // namespace Player
+} // namespace PlayerTab
 
 #endif

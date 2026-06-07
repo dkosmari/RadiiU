@@ -1,12 +1,12 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#ifndef RECENT_HPP
-#define RECENT_HPP
+#ifndef RECENT_TAB_HPP
+#define RECENT_TAB_HPP
 
 #include <memory>
 
@@ -14,7 +14,7 @@
 struct Station;
 
 
-namespace Recent {
+namespace RecentTab {
 
     void
     initialize();
@@ -34,6 +34,6 @@ namespace Recent {
     void
     queue_add(std::shared_ptr<Station>& station);
 
-} // namespace Recent
+} // namespace RecentTab
 
 #endif

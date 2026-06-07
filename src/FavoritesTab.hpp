@@ -1,12 +1,12 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#ifndef FAVORITES_HPP
-#define FAVORITES_HPP
+#ifndef FAVORITES_TAB_HPP
+#define FAVORITES_TAB_HPP
 
 #include <string>
 
@@ -14,7 +14,7 @@
 struct Station;
 
 
-namespace Favorites {
+namespace FavoritesTab {
 
     void
     initialize();
@@ -52,6 +52,6 @@ namespace Favorites {
     void
     remove(const Station& station);
 
-} // namespace Favorites
+} // namespace FavoritesTab
 
 #endif

@@ -37,17 +37,15 @@
 #include <glaze/exceptions/json_exceptions.hpp>
 #include <glaze/core/istream_buffer.hpp>
 
-#include "Browser.hpp"
+#include "BrowserTab.hpp"
 
 #include "App.hpp"
 #include "cfg.hpp"
-#include "Favorites.hpp"
 #include "humanize.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
 #include "net/address.hpp"
 #include "net/resolver.hpp"
-#include "Player.hpp"
 #include "RadioBrowserAPI.hpp"
 #include "rest.hpp"
 #include "Station.hpp"
@@ -64,9 +62,10 @@ using namespace std::literals;
 using sdl::vec2;
 
 
-namespace Browser {
+namespace BrowserTab::GUI {
 
-    enum class SortOrder : unsigned {
+    // Convenience order enum, to combine both sorting and direction.
+    enum class Order : unsigned {
         name_asc,
         name_desc,
         country_asc,
@@ -81,12 +80,33 @@ namespace Browser {
         count
     };
 
-} // namespace Browser
+
+    std::string filter_name;
+    std::string filter_tag;
+    std::string filter_country;
+    // Country* selected_country;
+    std::string filter_codec;
+    std::optional<Order> order;
+    unsigned page;
+    bool options_visible = true;
+    bool scroll_to_top = false;
+
+    std::string
+    to_label(Order order);
+
+    std::string
+    to_label(std::optional<Order> order);
+
+    std::tuple<RadioBrowserAPI::SearchStationParams::Order,
+               bool>
+    get_order_dir(Order o);
+
+} // namespace BrowserTab::GUI
 
 
 template<>
-struct glz::meta<Browser::SortOrder> {
-    using enum Browser::SortOrder;
+struct glz::meta<BrowserTab::GUI::Order> {
+    using enum BrowserTab::GUI::Order;
     static constexpr
     auto value = enumerate(name_asc,
                            name_desc,
@@ -102,12 +122,7 @@ struct glz::meta<Browser::SortOrder> {
                            count);
 };
 
-namespace Browser {
-
-    using RadioBrowserAPI::ClickResult;
-    using RadioBrowserAPI::SearchStationParams;
-    using RadioBrowserAPI::ServerStats;
-    using RadioBrowserAPI::VoteResult;
+namespace BrowserTab {
 
     // Persistent state that's saved in browser.json
 
@@ -120,7 +135,7 @@ namespace Browser {
         }; // struct StateFilter
 
         std::optional<Filter> filter;
-        std::optional<SortOrder> order;
+        std::optional<GUI::Order> order;
         std::optional<unsigned> page;
     }; // struct State
 
@@ -131,32 +146,17 @@ namespace Browser {
     };
 
 
-    namespace gui {
-
-        std::string filter_name;
-        std::string filter_tag;
-        std::string filter_country;
-        // Country* selected_country;
-        std::string filter_codec;
-        std::optional<SortOrder> order;
-        unsigned page;
-        bool options_visible = true;
-        bool scroll_to_top = false;
-
-    } // namespace gui
-
-
     std::regex tags_regex;
 
     std::vector<std::shared_ptr<Station>> stations;
 
     // TODO: allow votes to expire after 10 min.
-    std::unordered_map<std::string, VoteResult> votes_cast;
+    std::unordered_map<std::string, RadioBrowserAPI::VoteResult> votes_cast;
 
 
     const std::string server_stats_popup_id = "info";
 
-    std::optional<ServerStats> server_stats_result;
+    std::optional<RadioBrowserAPI::ServerStats> server_stats_result;
     std::string server_stats_error;
 
     std::optional<std::vector<Country>> countries;
@@ -194,10 +194,10 @@ namespace Browser {
 
 
     std::string
-    to_label(SortOrder order)
+    GUI::to_label(Order order)
     {
         switch (order) {
-            using enum SortOrder;
+            using enum Order;
             case name_asc:
                 return "Name " ICON_FA_SORT_ALPHA_ASC;
             case name_desc:
@@ -225,8 +225,9 @@ namespace Browser {
         }
     }
 
+
     std::string
-    to_label(std::optional<SortOrder> order)
+    GUI::to_label(std::optional<Order> order)
     {
         if (!order)
             return "";
@@ -234,35 +235,38 @@ namespace Browser {
     }
 
 
-    std::tuple<SearchStationParams::Order, bool>
-    get_order_reverse(SortOrder o)
+    std::tuple<RadioBrowserAPI::SearchStationParams::Order,
+               bool>
+    GUI::get_order_dir(Order o)
     {
+        using RBOrder = RadioBrowserAPI::SearchStationParams::Order;
+
         switch (o) {
-            using enum SortOrder;
+            using enum GUI::Order;
 
             default:
             case name_asc:
-                return {SearchStationParams::Order::name, false};
+                return {RBOrder::name, false};
             case name_desc:
-                return {SearchStationParams::Order::name, true};
+                return {RBOrder::name, true};
             case country_asc:
-                return {SearchStationParams::Order::country, false};
+                return {RBOrder::country, false};
             case country_desc:
-                return {SearchStationParams::Order::country, true};
+                return {RBOrder::country, true};
             case language_asc:
-                return {SearchStationParams::Order::language, false};
+                return {RBOrder::language, false};
             case language_desc:
-                return {SearchStationParams::Order::language, true};
+                return {RBOrder::language, true};
             case clicks_asc:
-                return {SearchStationParams::Order::clickcount, false};
+                return {RBOrder::clickcount, false};
             case clicks_desc:
-                return {SearchStationParams::Order::clickcount, true};
+                return {RBOrder::clickcount, true};
             case votes_asc:
-                return {SearchStationParams::Order::votes, false};
+                return {RBOrder::votes, false};
             case votes_desc:
-                return {SearchStationParams::Order::votes, true};
+                return {RBOrder::votes, true};
             case random:
-                return {SearchStationParams::Order::random, false};
+                return {RBOrder::random, false};
         }
     }
 
@@ -338,18 +342,18 @@ namespace Browser {
 
         // Transfer state to gui variables.
         if (state.filter) {
-            gui::filter_name    = state.filter->name.value_or("");
-            gui::filter_tag     = state.filter->tag.value_or("");
-            gui::filter_country = state.filter->country.value_or("");
-            gui::filter_codec   = state.filter->codec.value_or("");
+            GUI::filter_name    = state.filter->name.value_or("");
+            GUI::filter_tag     = state.filter->tag.value_or("");
+            GUI::filter_country = state.filter->country.value_or("");
+            GUI::filter_codec   = state.filter->codec.value_or("");
         } else {
-            gui::filter_name.clear();
-            gui::filter_tag.clear();
-            gui::filter_country.clear();
-            gui::filter_codec.clear();
+            GUI::filter_name.clear();
+            GUI::filter_tag.clear();
+            GUI::filter_country.clear();
+            GUI::filter_codec.clear();
         }
-        gui::order = state.order;
-        gui::page = state.page.value_or(1u);
+        GUI::order = state.order;
+        GUI::page = state.page.value_or(1u);
     }
     catch (std::exception& e) {
         cout << "ERROR: Browser::load(): " << e.what() << endl;
@@ -364,19 +368,19 @@ namespace Browser {
         State state;
         // Transfer gui variables to state.
         State::Filter filter;
-        if (!gui::filter_name.empty())
-            filter.name = gui::filter_name;
-        if (!gui::filter_tag.empty())
-            filter.tag = gui::filter_tag;
-        if (!gui::filter_country.empty())
-            filter.country = gui::filter_country;
-        if (!gui::filter_codec.empty())
-            filter.codec = gui::filter_codec;
+        if (!GUI::filter_name.empty())
+            filter.name = GUI::filter_name;
+        if (!GUI::filter_tag.empty())
+            filter.tag = GUI::filter_tag;
+        if (!GUI::filter_country.empty())
+            filter.country = GUI::filter_country;
+        if (!GUI::filter_codec.empty())
+            filter.codec = GUI::filter_codec;
         if (filter.name || filter.tag || filter.country || filter.codec)
             state.filter = std::move(filter);
-        state.order = gui::order;
-        if (gui::page != 1u)
-            state.page = gui::page;
+        state.order = GUI::order;
+        if (GUI::page != 1u)
+            state.page = GUI::page;
 
         auto filename = App::get_config_path() / "browser.json";
         glz::ex::write_file_json(state, filename.c_str(), std::string{});
@@ -391,11 +395,11 @@ namespace Browser {
     {
         TRACE_FUNC;
 
-        gui::filter_name.clear();
-        gui::filter_tag.clear();
-        gui::filter_country.clear();
-        gui::order.reset();
-        gui::page = 1;
+        GUI::filter_name.clear();
+        GUI::filter_tag.clear();
+        GUI::filter_country.clear();
+        GUI::order.reset();
+        GUI::page = 1;
     }
 
 
@@ -496,8 +500,8 @@ namespace Browser {
                 ImGuiChildFlags_NavFlattened
             }) {
 
-            ImGui::SetNextItemOpen(gui::options_visible);
-            if ((gui::options_visible = ImGui::CollapsingHeader("Options"))) {
+            ImGui::SetNextItemOpen(GUI::options_visible);
+            if ((GUI::options_visible = ImGui::CollapsingHeader("Options"))) {
 
                 ImGui::Indent();
 
@@ -517,7 +521,7 @@ namespace Browser {
                     /*******************
                      * Filter by name. *
                      *******************/
-                    ImGui::InputText("Name", gui::filter_name);
+                    ImGui::InputText("Name", GUI::filter_name);
 
                     /******************
                      * Filter by tag. *
@@ -526,29 +530,29 @@ namespace Browser {
                                                         {1200.0f, FLT_MAX});
                     if (ImGui::RAII::Combo tag_combo{
                             "Tag",
-                            gui::filter_tag,
+                            GUI::filter_tag,
                             ImGuiComboFlags_HeightLargest
                         }) {
-                        static ImGuiTextFilter text_filter{gui::filter_tag.data()};
+                        static ImGuiTextFilter text_filter{GUI::filter_tag.data()};
                         if (ImGui::IsWindowAppearing()) {
                             ImGui::SetKeyboardFocusHere();
                             SDL_strlcpy(text_filter.InputBuf,
-                                        gui::filter_tag.data(),
+                                        GUI::filter_tag.data(),
                                         sizeof text_filter.InputBuf);
                             text_filter.Build();
                         }
                         text_filter.Draw("##tag", 900);
                         // Add empty entry for removing filter.
-                        if (ImGui::Selectable("##", gui::filter_tag.empty()))
-                            gui::filter_tag.clear();
+                        if (ImGui::Selectable("##", GUI::filter_tag.empty()))
+                            GUI::filter_tag.clear();
                         // The rest of tags.
                         if (!tags)
                             fetch_tags();
                         for (auto& tag : *tags) {
-                            const bool is_selected = gui::filter_tag == tag;
+                            const bool is_selected = GUI::filter_tag == tag;
                             if (text_filter.PassFilter(tag.data()))
                                 if (ImGui::Selectable(tag, is_selected))
-                                    gui::filter_tag = tag;
+                                    GUI::filter_tag = tag;
                         }
                     }
 
@@ -557,30 +561,30 @@ namespace Browser {
                      **********************/
                     if (ImGui::RAII::Combo country_combo{
                             "Country",
-                            gui::filter_country,
+                            GUI::filter_country,
                             ImGuiComboFlags_HeightLargest
                         }) {
-                        static ImGuiTextFilter text_filter{gui::filter_country.data()};
+                        static ImGuiTextFilter text_filter{GUI::filter_country.data()};
                         if (ImGui::IsWindowAppearing()) {
                             ImGui::SetKeyboardFocusHere();
                             SDL_strlcpy(text_filter.InputBuf,
-                                        gui::filter_country.data(),
+                                        GUI::filter_country.data(),
                                         sizeof text_filter.InputBuf);
                             text_filter.Build();
                         }
                         text_filter.Draw("##country");
                         // Add empty entry for removing filter.
-                        if (ImGui::Selectable("##", gui::filter_country.empty()))
-                            gui::filter_country.clear();
+                        if (ImGui::Selectable("##", GUI::filter_country.empty()))
+                            GUI::filter_country.clear();
                         // The rest of countries
                         if (!countries)
                             fetch_countries();
                         for (const auto& [code, name] : *countries) {
-                            const bool is_selected = gui::filter_country == code;
+                            const bool is_selected = GUI::filter_country == code;
                             auto label = code + " - " + name;
                             if (text_filter.PassFilter(label.data()))
                                 if (ImGui::Selectable(label, is_selected))
-                                    gui::filter_country = code;
+                                    GUI::filter_country = code;
                         }
                     }
 
@@ -591,17 +595,17 @@ namespace Browser {
                      ********************/
                     if (ImGui::RAII::Combo codec_combo{
                             "Codec",
-                            gui::filter_codec
+                            GUI::filter_codec
                         }) {
                         // Add empty entry for removing filter.
-                        if (ImGui::Selectable("##", gui::filter_codec.empty()))
-                            gui::filter_codec = "";
+                        if (ImGui::Selectable("##", GUI::filter_codec.empty()))
+                            GUI::filter_codec = "";
                         // The rest of codecs.
                         if (!codecs)
                             fetch_codecs();
                         for (const auto& codec : *codecs)
-                            if (ImGui::Selectable(codec, gui::filter_codec == codec))
-                                gui::filter_codec = codec;
+                            if (ImGui::Selectable(codec, GUI::filter_codec == codec))
+                                GUI::filter_codec = codec;
                     }
 
                 } // filters
@@ -622,15 +626,15 @@ namespace Browser {
                     ImGui::SetNextItemWidth(280);
                     if (ImGui::RAII::Combo order_combo{
                             "##order",
-                            to_label(gui::order),
+                            to_label(GUI::order),
                             ImGuiComboFlags_HeightLargest}) {
-                        if (ImGui::Selectable("##", !gui::order))
-                            gui::order.reset();
-                        for (unsigned i = 0; i < static_cast<unsigned>(SortOrder::count); ++i) {
-                            SortOrder o{i};
+                        if (ImGui::Selectable("##", !GUI::order))
+                            GUI::order.reset();
+                        for (unsigned i = 0; i < static_cast<unsigned>(GUI::Order::count); ++i) {
+                            GUI::Order o{i};
                             if (ImGui::Selectable(to_label(o),
-                                                  gui::order && *gui::order == o))
-                                gui::order = o;
+                                                  GUI::order && *GUI::order == o))
+                                GUI::order = o;
                         }
                     }
 
@@ -681,7 +685,7 @@ namespace Browser {
                 ImGuiChildFlags_NavFlattened
             }) {
 
-            const bool is_first_page = gui::page == 1;
+            const bool is_first_page = GUI::page == 1;
             const bool is_last_page = stations.size() < cfg::state.browser_page_limit;
             const bool is_searching = RadioBrowserAPI::is_searching();
 
@@ -690,10 +694,10 @@ namespace Browser {
 
                 // 100⏪
                 if (ImGui::Button("100" ICON_FA_ANGLE_DOUBLE_LEFT) && !is_searching) {
-                    if (gui::page > 100)
-                        gui::page -= 100;
+                    if (GUI::page > 100)
+                        GUI::page -= 100;
                     else
-                        gui::page = 1;
+                        GUI::page = 1;
                     search_stations();
                 }
                 ImGui::SetItemTooltip("Go back 100 pages.");
@@ -702,10 +706,10 @@ namespace Browser {
 
                 // 10⏪
                 if (ImGui::Button("10" ICON_FA_ANGLE_DOUBLE_LEFT) && !is_searching) {
-                    if (gui::page > 10)
-                        gui::page -= 10;
+                    if (GUI::page > 10)
+                        GUI::page -= 10;
                     else
-                        gui::page = 1;
+                        GUI::page = 1;
                     search_stations();
                 }
                 ImGui::SetItemTooltip("Go back 10 pages.");
@@ -714,8 +718,8 @@ namespace Browser {
 
                 // ⏴
                 if (ImGui::Button(" " ICON_FA_ANGLE_LEFT " ") && !is_searching) {
-                    if (gui::page > 1)
-                        --gui::page;
+                    if (GUI::page > 1)
+                        --GUI::page;
                     search_stations();
                 }
                 ImGui::SetItemTooltip("Go back one page.");
@@ -727,8 +731,8 @@ namespace Browser {
             ImGui::SetNextItemWidth(page_width);
             unsigned max_page_num = UINT_MAX;
             if (is_last_page)
-                max_page_num = gui::page;
-            ImGui::Drag<unsigned>("##page"s, gui::page, 0.05f, 1u, max_page_num);
+                max_page_num = GUI::page;
+            ImGui::Drag<unsigned>("##page"s, GUI::page, 0.05f, 1u, max_page_num);
             if (ImGui::IsItemDeactivatedAfterEdit())
                 search_stations();
 
@@ -739,7 +743,7 @@ namespace Browser {
 
                 // ⏵
                 if (ImGui::Button(" " ICON_FA_ANGLE_RIGHT " ") && !is_searching) {
-                    ++gui::page;
+                    ++GUI::page;
                     search_stations();
                 }
                 ImGui::SetItemTooltip("Advance one page.");
@@ -748,7 +752,7 @@ namespace Browser {
 
                 // ⏩10
                 if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "10") && !is_searching) {
-                    gui::page += 10;
+                    GUI::page += 10;
                     search_stations();
                 }
                 ImGui::SetItemTooltip("Advance 10 pages.");
@@ -757,7 +761,7 @@ namespace Browser {
 
                 // ⏩100
                 if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "100") && !is_searching) {
-                    gui::page += 100;
+                    GUI::page += 100;
                     search_stations();
                 }
                 ImGui::SetItemTooltip("Advance 100 pages.");
@@ -884,9 +888,9 @@ namespace Browser {
         // Note: flat navigation doesn't work well on child windows that scroll.
         if (ImGui::RAII::Child stations_child{"stations"}) {
 
-            if (gui::scroll_to_top) {
+            if (GUI::scroll_to_top) {
                 ImGui::SetScrollY(0);
-                gui::scroll_to_top = false;
+                GUI::scroll_to_top = false;
             }
 
 #if 0
@@ -928,7 +932,7 @@ namespace Browser {
 
         RadioBrowserAPI::send_click(
             station_ptr->stationuuid,
-            [station_ptr](ClickResult /*result*/)
+            [station_ptr](RadioBrowserAPI::ClickResult /*result*/)
             {
                 update_station(station_ptr);
             },
@@ -948,7 +952,7 @@ namespace Browser {
 
         RadioBrowserAPI::send_vote(
             station_ptr->stationuuid,
-            [station_ptr](VoteResult /*result*/)
+            [station_ptr](RadioBrowserAPI::VoteResult /*result*/)
             {
                 update_station(station_ptr);
             },
@@ -1037,7 +1041,7 @@ namespace Browser {
         server_stats_error.clear();
 
         RadioBrowserAPI::get_server_stats(
-            [](ServerStats stats)
+            [](RadioBrowserAPI::ServerStats stats)
             {
                 server_stats_result = std::move(stats);
             },
@@ -1097,8 +1101,9 @@ namespace Browser {
 
         RadioBrowserAPI::get_station(
             station_ptr->stationuuid,
-            [station_ptr = std::move(station_ptr)](RadioBrowserAPI::Station rb_station)
-                mutable
+            [station_ptr = std::move(station_ptr)]
+            (RadioBrowserAPI::Station rb_station)
+            mutable
             {
                 *station_ptr = Station::from_radio_browser(rb_station);
             },
@@ -1111,28 +1116,28 @@ namespace Browser {
     {
         TRACE_FUNC;
 
-        gui::options_visible = false;
-        gui::scroll_to_top = true;
+        GUI::options_visible = false;
+        GUI::scroll_to_top = true;
 
         RadioBrowserAPI::SearchStationParams params;
-        params.offset = (gui::page - 1u) * cfg::state.browser_page_limit;
+        params.offset = (GUI::page - 1u) * cfg::state.browser_page_limit;
         params.limit = cfg::state.browser_page_limit;
         params.hidebroken = true;
 
-        if (gui::order) {
-            auto [order, reverse] = get_order_reverse(*gui::order);
+        if (GUI::order) {
+            auto [order, reverse] = get_order_dir(*GUI::order);
             params.order = order;
             params.reverse = reverse;
         }
 
-        if (!gui::filter_name.empty())
-            params.name = gui::filter_name;
-        if (!gui::filter_tag.empty())
-            params.tag = gui::filter_tag;
-        if (!gui::filter_country.empty())
-            params.countrycode = gui::filter_country;
-        if (!gui::filter_codec.empty())
-            params.codec = gui::filter_codec;
+        if (!GUI::filter_name.empty())
+            params.name = GUI::filter_name;
+        if (!GUI::filter_tag.empty())
+            params.tag = GUI::filter_tag;
+        if (!GUI::filter_country.empty())
+            params.countrycode = GUI::filter_country;
+        if (!GUI::filter_codec.empty())
+            params.codec = GUI::filter_codec;
 
         RadioBrowserAPI::search_stations(
             params,
@@ -1185,4 +1190,4 @@ namespace Browser {
         return c.name;
     }
 
-} // namespace Browser
+} // namespace BrowserTab

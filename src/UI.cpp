@@ -18,11 +18,11 @@
 #include "UI.hpp"
 
 #include "App.hpp"
-#include "Browser.hpp"
-#include "Favorites.hpp"
+#include "BrowserTab.hpp"
+#include "FavoritesTab.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
-#include "Player.hpp"
+#include "PlayerTab.hpp"
 #include "RadioBrowserAPI.hpp"
 #include "Station.hpp"
 #include "string_utils.hpp"
@@ -64,12 +64,12 @@ namespace UI {
     void
     show_favorite_button(const Station& station)
     {
-        if (Favorites::contains(station)) {
+        if (FavoritesTab::contains(station)) {
             if (ImGui::Button(ICON_FA_HEART)) // ♥
-                Favorites::remove(station);
+                FavoritesTab::remove(station);
         } else {
             if (ImGui::Button(ICON_FA_HEART_O)) // ♡
-                Favorites::add(station);
+                FavoritesTab::add(station);
         }
     }
 
@@ -284,17 +284,17 @@ namespace UI {
     show_play_button(std::shared_ptr<Station>& station)
     {
         const sdl::vec2 button_size = {96, 96};
-        if (Player::is_playing(station)) {
+        if (PlayerTab::is_playing(station)) {
             if (show_image_button("stop_button",
                                   *IconManager::get("ui/stop-button.svg"),
                                   button_size))
-                Player::stop();
+                PlayerTab::stop();
         } else {
             if (show_image_button("play_button",
                                   *IconManager::get("ui/play-button.svg"),
                                   button_size)) {
                 App::set_tab(TabID::player);
-                Player::play(station);
+                PlayerTab::play(station);
             }
         }
     }
@@ -323,7 +323,7 @@ namespace UI {
             bool has_country = false;
             if (!station.countrycode.empty()) {
                 has_country = true;
-                std::string tooltip = Browser::get_country_name(station.countrycode);
+                std::string tooltip = BrowserTab::get_country_name(station.countrycode);
                 show_boxed(ICON_FA_FLAG_O " " + station.countrycode, tooltip);
             }
 

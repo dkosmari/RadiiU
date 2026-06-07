@@ -11,9 +11,9 @@
 #include <imgui_raii.h>
 #include <imgui_stdlib.h>
 
-#include "Settings.hpp"
+#include "SettingsTab.hpp"
 
-#include "Browser.hpp"
+#include "BrowserTab.hpp"
 #include "cfg.hpp"
 #include "IconsFontAwesome4.h"
 #include "RadioBrowserAPI.hpp"
@@ -26,7 +26,7 @@ using std::endl;
 using namespace std::literals;
 
 
-namespace Settings {
+namespace SettingsTab {
 
     void
     process_ui()
@@ -157,7 +157,7 @@ namespace Settings {
                               cfg::state.browser_page_limit,
                               10u, 50u);
                 if (ImGui::IsItemDeactivatedAfterEdit())
-                    Browser::search_stations();
+                    BrowserTab::search_stations();
 
                 /*************************
                  * Recent stations limit *
@@ -329,4 +329,4 @@ namespace Settings {
         } // settings_child
     }
 
-} // namespace Settings
+} // namespace SettingsTab
