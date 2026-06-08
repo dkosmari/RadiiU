@@ -17,40 +17,40 @@ struct Station;
 namespace FavoritesTab {
 
     void
-    initialize();
-
-
-    void
-    finalize();
-
-
-    void
-    process_ui();
-
-
-    void
-    process_logic();
-
-
-    bool
-    contains(const std::string& uuid);
+    add(const Station& st);
 
     bool
     contains(const Station& station);
 
+    bool
+    contains(const std::string& uuid);
 
     void
-    add(const Station& st);
-
+    finalize();
 
     void
-    remove(const std::string& uuid);
+    initialize();
+
+    void
+    load();
+
+    void
+    process_logic();
+
+    void
+    process_ui();
 
     void
     remove(std::size_t index);
 
     void
+    remove(const std::string& uuid);
+
+    void
     remove(const Station& station);
+
+    void
+    save();
 
 } // namespace FavoritesTab
 
