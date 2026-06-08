@@ -87,7 +87,7 @@ namespace BrowserTab::GUI {
     std::string filter_codec;
     std::optional<Order> order;
     unsigned page;
-    bool options_visible = true;
+    bool search_options_visible = true;
     bool scroll_to_top = false;
 
     std::string
@@ -489,18 +489,18 @@ namespace BrowserTab {
 
 
     void
-    show_options()
+    show_search_options()
     {
         if (ImGui::RAII::Child options_child{
-                "options",
+                "search_options",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeY |
                 ImGuiChildFlags_FrameStyle |
                 ImGuiChildFlags_NavFlattened
             }) {
 
-            ImGui::SetNextItemOpen(GUI::options_visible);
-            if ((GUI::options_visible = ImGui::CollapsingHeader("Options"))) {
+            ImGui::SetNextItemOpen(GUI::search_options_visible);
+            if ((GUI::search_options_visible = ImGui::CollapsingHeader("Search options"))) {
 
                 ImGui::Indent();
 
@@ -664,7 +664,7 @@ namespace BrowserTab {
 
             }
 
-        } // options_child
+        }
     }
 
 
@@ -880,7 +880,7 @@ namespace BrowserTab {
 
         show_status();
 
-        show_options();
+        show_search_options();
 
         show_navigation();
 
@@ -1125,7 +1125,7 @@ namespace BrowserTab {
     {
         TRACE_FUNC;
 
-        GUI::options_visible = false;
+        GUI::search_options_visible = false;
         GUI::scroll_to_top = true;
 
         RadioBrowserAPI::SearchStationParams params;

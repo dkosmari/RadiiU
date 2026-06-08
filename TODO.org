@@ -1,17 +1,7 @@
-* Plan for 0.2 [100%]
+* Plan for 0.4 [0%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
-- [X] General [2/2]
-  - [X] Opt-in data sharing option.
-  - [X] Change color scheme for Holiday season.
-- [X] Browser [3/3]
-  - [X] Filter by codec.
-  - [X] Show stream codec.
-  - [X] Update click/vote count after clicking/voting.
-- [X] Player [4/4]
-  - [X] Add Opus support.
-  - [X] Add Vorbis suport.
-  - [X] Add AAC support.
-  - [X] Show cover art.
-
+- [ ] General [0/2]
+  - [ ] Add scrensavers
+  - [ ] Add Logs tab.
