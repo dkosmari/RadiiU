@@ -44,6 +44,7 @@
 #include "BrowserTab.hpp"
 #include "cfg.hpp"
 #include "FavoritesTab.hpp"
+#include "FontManager.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
 #include "PlayerTab.hpp"
@@ -221,171 +222,6 @@ namespace App {
     }
 
 
-#ifdef __WIIU__
-
-    void
-    load_system_fonts()
-    {
-        auto& io = ImGui::GetIO();
-        // Load main font: CafeStd
-        ImFontConfig config;
-        config.Flags |= ImFontFlags_NoLoadError;
-        config.EllipsisChar = U'…';
-#ifdef IMGUI_ENABLE_FREETYPE
-        config.GlyphOffset.y = - default_font_size * (4.0f / 32.0f);
-#endif
-        config.FontDataOwnedByAtlas = false;
-
-        void* font_data = nullptr;
-        uint32_t font_size = 0;
-
-        if (OSGetSharedData(OS_SHAREDDATATYPE_FONT_STANDARD, 0,
-                            &font_data, &font_size)) {
-            if (!io.Fonts->AddFontFromMemoryTTF(font_data, font_size,
-                                                default_font_size, &config))
-                throw std::runtime_error{"could not load CafeStd"};
-        } else
-            throw std::runtime_error{"CafeStd font is missing"};
-
-        config.MergeMode = true;
-        if (OSGetSharedData(OS_SHAREDDATATYPE_FONT_CHINESE, 0,
-                            &font_data, &font_size)) {
-            io.Fonts->AddFontFromMemoryTTF(font_data, font_size,
-                                           default_font_size, &config);
-        }
-        if (OSGetSharedData(OS_SHAREDDATATYPE_FONT_KOREAN, 0,
-                            &font_data, &font_size)) {
-            io.Fonts->AddFontFromMemoryTTF(font_data, font_size,
-                                           default_font_size, &config);
-        }
-        if (OSGetSharedData(OS_SHAREDDATATYPE_FONT_TAIWANESE, 0,
-                            &font_data, &font_size)) {
-            io.Fonts->AddFontFromMemoryTTF(font_data, font_size,
-                                           default_font_size, &config);
-        }
-    }
-
-#else // !__WIIU__
-
-    std::filesystem::path
-    find_font(const std::string& family,
-              const std::string& lang)
-    {
-        // TODO: these should use RAII, but fontconfig failing is rare
-
-        FcPattern* pattern = FcPatternCreate();
-        FcPatternAddString(pattern, FC_FAMILY,
-                           reinterpret_cast<const FcChar8*>(family.data()));
-        // Tell fontconfig the fallback font should be "sans"
-        FcPatternAddString(pattern, FC_FAMILY,
-                           reinterpret_cast<const FcChar8*>("sans"));
-
-        FcLangSet* lang_set = FcLangSetCreate();
-        FcLangSetAdd(lang_set, reinterpret_cast<const FcChar8*>(lang.data()));
-        FcPatternAddLangSet(pattern, FC_LANG, lang_set);
-
-        FcPatternAddDouble(pattern, FC_SIZE, default_font_size);
-
-        // cout << "DEBUG: pattern:" << endl;
-        // FcPatternPrint(pattern);
-
-        FcConfigSubstitute(nullptr, pattern, FcMatchPattern);
-        FcDefaultSubstitute(pattern);
-
-        FcResult fresult;
-        FcPattern* font_pattern = FcFontMatch(nullptr, pattern, &fresult);
-        if (fresult != FcResultMatch)
-            throw std::runtime_error{"fc match error"};
-
-        // cout << "DEBUG font_pattern:" << endl;
-        // FcPatternPrint(font_pattern);
-
-        FcChar8* file = nullptr;
-        if (FcPatternGetString(font_pattern, FC_FILE, 0, &file) != FcResultMatch)
-            throw std::logic_error{"font has no file!"};
-
-        std::filesystem::path result = reinterpret_cast<char*>(file);
-
-        FcPatternDestroy(font_pattern);
-        FcPatternDestroy(pattern);
-        FcLangSetDestroy(lang_set);
-
-        return result;
-    }
-
-
-    void
-    load_system_fonts()
-    {
-        auto& io = ImGui::GetIO();
-
-        ImFontConfig config;
-        config.EllipsisChar = U'…';
-        config.Flags |= ImFontFlags_NoLoadError;
-
-        if (!FcInit())
-            throw std::runtime_error{"failed to initialize fontconfig"};
-
-        auto cafe_std_path = find_font("nintendo_NTLG-DB_002", "en");
-        auto cafe_cn_path = find_font("nintendo_HeiTiW5_002", "zh-cn");
-        auto cafe_ko_path = find_font("nintendo_Tae-Gothic_002", "ko");
-        auto cafe_tw_path = find_font("nintendo_HeiMedium-B5_002", "zh-tw");
-
-        std::set<std::filesystem::path> extra_fonts{
-            cafe_cn_path,
-            cafe_ko_path,
-            cafe_tw_path
-        };
-
-        // if fontconfig returned the same font for every case
-        if (extra_fonts.contains(cafe_std_path))
-            extra_fonts.clear();
-
-        // Note: CafeStd seems to always be too low, about 1/8th of the font size
-#ifdef IMGUI_ENABLE_FREETYPE
-        config.GlyphOffset.y = - default_font_size * (4.0f / 32.0f);
-#endif
-        if (!io.Fonts->AddFontFromFileTTF(cafe_std_path.c_str(),
-                                          default_font_size,
-                                          &config))
-            throw std::runtime_error{"could not load \""s + cafe_std_path.string() + "\""s};
-
-        config.MergeMode = true;
-
-        for (const auto& font : extra_fonts)
-            if (!io.Fonts->AddFontFromFileTTF(font.c_str(),
-                                              default_font_size,
-                                              &config))
-            throw std::runtime_error{"could not load \""s + font.string() + "\""s};
-
-        FcFini();
-    }
-
-#endif // __WIIU__
-
-
-    void
-    load_fonts()
-    {
-        load_system_fonts();
-
-        auto& io = ImGui::GetIO();
-        // Load FontAwesome
-        ImFontConfig config;
-#ifdef IMGUI_ENABLE_FREETYPE
-        config.GlyphOffset.y = - default_font_size * (4.0f / 32.0f);
-#endif
-        config.Flags |= ImFontFlags_NoLoadError;
-        config.MergeMode = true;
-        // config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
-        // config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
-
-        std::filesystem::path font_path = get_content_path() / FONT_ICON_FILE_NAME_FA;
-        if (!io.Fonts->AddFontFromFileTTF(font_path.c_str(), default_font_size, &config))
-            throw std::runtime_error{"could not load \"" + font_path.string() + "\""};
-    }
-
-
     ImGuiTabItemFlags
     get_tab_item_flags_for(TabID tab)
     {
@@ -406,36 +242,26 @@ namespace App {
         const float rounding = ui_rounding;
         const ImVec2 spacing = {9, 9};
 
-        style.WindowPadding = padding;
-        style.WindowRounding = 0;
-        style.WindowBorderSize = 0;
-
-        style.ChildRounding = rounding;
-        style.ChildBorderSize = 0;
-
-        style.PopupRounding = rounding;
-
-        style.FramePadding = padding;
-        style.FrameRounding = rounding;
-        style.FrameBorderSize = 0;
-
-        style.ItemSpacing = spacing;
-        style.ItemInnerSpacing = spacing;
-
-        style.CellPadding = {padding.x, padding.y / 2};
-
-        style.ScrollbarSize = 32;
+        style.CellPadding       = {padding.x, padding.y / 2};
+        style.ChildBorderSize   = 0;
+        style.ChildRounding     = rounding;
+        style.FrameBorderSize   = 0;
+        style.FramePadding      = padding;
+        style.FrameRounding     = rounding;
+        style.GrabMinSize       = 32;
+        style.GrabRounding      = rounding;
+        style.ImageBorderSize   = 0;
+        style.ItemInnerSpacing  = spacing;
+        style.ItemSpacing       = spacing;
+        style.PopupRounding     = rounding;
         style.ScrollbarRounding = rounding;
-
-        style.GrabMinSize = 32;
-        style.GrabRounding = rounding;
-
-        style.ImageBorderSize = 0;
-
-        style.TabRounding = rounding;
-        style.TabBorderSize = 0;
-
-        style.TabBarBorderSize = 2;
+        style.ScrollbarSize     = 32;
+        style.TabBarBorderSize  = 2;
+        style.TabBorderSize     = 0;
+        style.TabRounding       = rounding;
+        style.WindowBorderSize  = 0;
+        style.WindowPadding     = padding;
+        style.WindowRounding    = 0;
     }
 
 
@@ -453,19 +279,26 @@ namespace App {
         io.ConfigWindowsMoveFromTitleBarOnly = true;
         io.MouseDragThreshold = 25;
 
-        io.Fonts->FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
-        io.Fonts->FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
-
         io.LogFilename = nullptr; // don't save log
         io.IniFilename = nullptr; // don't save ini
 
-        load_fonts();
+        FontManager::initialize(); // load system font(s)
+        FontManager::load_dir(get_content_path() / "fonts");
+        FontManager::load_dir(get_config_path() / "fonts");
 
         setup_imgui_style();
 
         ImGui_ImplSDL2_InitForSDLRenderer(res->window.data(),
                                           res->renderer.data());
         ImGui_ImplSDLRenderer2_Init(res->renderer.data());
+    }
+
+
+    void
+    finalize_imgui()
+    {
+        FontManager::finalize();
+        ImGui::DestroyContext();
     }
 
 

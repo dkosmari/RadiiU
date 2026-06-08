@@ -65,6 +65,8 @@ radiiu_elf_SOURCES = \
 	src/decoder_vorbis.hpp \
 	src/FavoritesTab.cpp \
 	src/FavoritesTab.hpp \
+	src/FontManager.cpp \
+	src/FontManager.hpp \
 	src/http_client.cpp \
 	src/http_client.hpp \
 	src/humanize.cpp \
