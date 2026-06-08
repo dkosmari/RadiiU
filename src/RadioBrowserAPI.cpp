@@ -130,7 +130,8 @@ namespace RadioBrowserAPI {
         to_string(State st);
 
 
-        constexpr const glz::opts custom_glz_options{
+        constexpr
+        const glz::opts glz_options{
             .error_on_unknown_keys = false,
             .prettify = true,
         };
@@ -719,7 +720,7 @@ namespace RadioBrowserAPI {
                 mutable
             {
                 CodecVec result;
-                glz::ex::read<custom_glz_options>(result, response);
+                glz::ex::read<glz_options>(result, response);
                 if (result_func)
                     result_func(std::move(result));
             },
@@ -750,7 +751,7 @@ namespace RadioBrowserAPI {
                 mutable
             {
                 CountryVec result;
-                glz::ex::read<custom_glz_options>(result, response);
+                glz::ex::read<glz_options>(result, response);
                 if (result_func)
                     result_func(std::move(result));
             },
@@ -777,7 +778,7 @@ namespace RadioBrowserAPI {
                 mutable
             {
                 ServerStats result;
-                glz::ex::read<custom_glz_options>(result, response);
+                glz::ex::read<glz_options>(result, response);
                 if (result_func)
                     result_func(std::move(result));
             },
@@ -809,7 +810,7 @@ namespace RadioBrowserAPI {
                 mutable
             {
                 StationVec result;
-                glz::ex::read<custom_glz_options>(result, response);
+                glz::ex::read<glz_options>(result, response);
                 if (result.size() != 1)
                     throw error{"incorrect array size: " + std::to_string(result.size())};
                 if (result_func)
@@ -842,7 +843,7 @@ namespace RadioBrowserAPI {
                 mutable
             {
                 TagVec result;
-                glz::ex::read<custom_glz_options>(result, response);
+                glz::ex::read<glz_options>(result, response);
                 if (result_func)
                     result_func(std::move(result));
             },
@@ -890,7 +891,7 @@ namespace RadioBrowserAPI {
             {
                 searching = false;
                 StationVec result;
-                glz::ex::read<custom_glz_options>(result, response);
+                glz::ex::read<glz_options>(result, response);
                 if (result_func)
                     result_func(std::move(result));
             },
@@ -928,7 +929,7 @@ namespace RadioBrowserAPI {
                 mutable
             {
                 ClickResult result;
-                glz::ex::read<custom_glz_options>(result, response);
+                glz::ex::read<glz_options>(result, response);
                 if (result_func)
                     result_func(std::move(result));
             },
@@ -960,7 +961,7 @@ namespace RadioBrowserAPI {
                 mutable
             {
                 VoteResult result;
-                glz::ex::read<custom_glz_options>(result, response);
+                glz::ex::read<glz_options>(result, response);
                 if (result_func)
                     result_func(std::move(result));
             },

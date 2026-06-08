@@ -19,6 +19,7 @@
 
 #include "App.hpp"
 #include "BrowserTab.hpp"
+#include "cfg.hpp"
 #include "FavoritesTab.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
@@ -293,7 +294,8 @@ namespace UI {
             if (show_image_button("play_button",
                                   *IconManager::get("ui/play-button.svg"),
                                   button_size)) {
-                App::set_tab(TabID::player);
+                if (cfg::state.switch_to_player)
+                    App::set_tab(TabID::player);
                 PlayerTab::play(station);
             }
         }

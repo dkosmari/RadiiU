@@ -14,9 +14,6 @@
 #include <vector>
 #include <unordered_set>
 
-#include <glaze/json.hpp>
-#include <glaze/exceptions/json_exceptions.hpp>
-
 #include <imgui.h>
 #include <imgui_raii.h>
 #include <imgui_stdlib.h>
@@ -27,6 +24,7 @@
 #include "cfg.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
+#include "Serializer.hpp"
 #include "Station.hpp"
 #include "string_utils.hpp"
 #include "tracer.hpp"
@@ -521,9 +519,10 @@ namespace FavoritesTab {
     try {
         TRACE_FUNC;
 
-        auto filename = App::get_config_path() / "favorites.json";
         stations.clear();
-        glz::ex::read_file_json(stations, filename.c_str(), std::string{});
+
+        auto filename = App::get_config_path() / "favorites.json";
+        Serializer::load(stations, filename);
 
         uuids.clear();
         for (auto& st : stations) {
@@ -651,7 +650,7 @@ namespace FavoritesTab {
         TRACE_FUNC;
 
         auto filename = App::get_config_path() / "favorites.json";
-        glz::ex::write_file_json(stations, filename.c_str(), std::string{});
+        Serializer::save(stations, filename);
     }
     catch (std::exception& e) {
         cout << "ERROR: Favorites::save(): " << e.what() << endl;

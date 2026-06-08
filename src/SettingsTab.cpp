@@ -177,6 +177,23 @@ namespace SettingsTab {
                               cfg::state.recent_limit,
                               10u, 50u);
 
+                /********************
+                 * Switch to player *
+                 ********************/
+
+                ImGui::TableNextRow();
+
+                ImGui::TableNextColumn();
+
+                ImGui::AlignTextToFramePadding();
+                UI::show_label("Switch to Player when playing");
+
+                ImGui::TableNextColumn();
+
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                ImGui::Checkbox("##switch_to_player", &cfg::state.switch_to_player);
+
+
                 /**********************
                  * Player buffer size *
                  **********************/

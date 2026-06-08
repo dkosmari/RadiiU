@@ -20,9 +20,6 @@
 
 #include <curlxx/curl.hpp>
 
-#include <glaze/json.hpp>
-#include <glaze/exceptions/json_exceptions.hpp>
-
 #include <imgui.h>
 #include <imgui_raii.h>
 #include <imgui_stdlib.h>
@@ -39,6 +36,7 @@
 #include "IconsFontAwesome4.h"
 #include "radio_client.hpp"
 #include "RecentTab.hpp"
+#include "Serializer.hpp"
 #include "Station.hpp"
 #include "StationDetailsPopup.hpp"
 #include "UI.hpp"
@@ -201,7 +199,7 @@ namespace PlayerTab {
     load()
     try {
         auto filename = App::get_config_path() / "player.json";
-        glz::ex::read_file_json(state, filename.c_str(), std::string{});
+        Serializer::load(state, filename);
     }
     catch (std::exception& e) {
         cout << "ERROR: Player::load(): " << e.what() << endl;
@@ -212,7 +210,7 @@ namespace PlayerTab {
     save()
     try {
         auto filename = App::get_config_path() / "player.json";
-        glz::ex::write_file_json(state, filename.c_str(), std::string{});
+        Serializer::save(state, filename);
     }
     catch (std::exception& e) {
         cout << "ERROR: Player::save(): " << e.what() << endl;

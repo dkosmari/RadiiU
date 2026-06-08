@@ -33,9 +33,7 @@
 
 #include <curlxx/easy.hpp>
 
-#include <glaze/json.hpp>
-#include <glaze/exceptions/json_exceptions.hpp>
-#include <glaze/core/istream_buffer.hpp>
+#include <glaze/core/meta.hpp>
 
 #include "BrowserTab.hpp"
 
@@ -48,6 +46,7 @@
 #include "net/resolver.hpp"
 #include "RadioBrowserAPI.hpp"
 #include "rest.hpp"
+#include "Serializer.hpp"
 #include "Station.hpp"
 #include "StationDetailsPopup.hpp"
 #include "tracer.hpp"
@@ -338,7 +337,7 @@ namespace BrowserTab {
 
         State state;
         auto filename = App::get_config_path() / "browser.json";
-        glz::ex::read_file_json(state, filename.c_str(), std::string{});
+        Serializer::load(state, filename);
 
         // Transfer state to gui variables.
         if (state.filter) {
@@ -383,7 +382,7 @@ namespace BrowserTab {
             state.page = GUI::page;
 
         auto filename = App::get_config_path() / "browser.json";
-        glz::ex::write_file_json(state, filename.c_str(), std::string{});
+        Serializer::save(state, filename);
     }
     catch (std::exception& e) {
         cout << "ERROR: Browser::save(): " << e.what() << endl;

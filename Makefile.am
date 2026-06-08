@@ -91,6 +91,7 @@ radiiu_elf_SOURCES = \
 	src/radio_client.hpp \
 	src/RecentTab.cpp \
 	src/RecentTab.hpp \
+	src/Serializer.hpp \
 	src/SettingsTab.cpp \
 	src/SettingsTab.hpp \
 	src/Station.cpp \

@@ -10,9 +10,6 @@
 #include <optional>
 #include <utility>
 
-#include <glaze/json.hpp>
-#include <glaze/exceptions/json_exceptions.hpp>
-
 #include <imgui.h>
 #include <imgui_raii.h>
 #include <imgui_stdlib.h>
@@ -23,6 +20,7 @@
 #include "cfg.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
+#include "Serializer.hpp"
 #include "Station.hpp"
 #include "StationDetailsPopup.hpp"
 #include "UI.hpp"
@@ -48,9 +46,9 @@ namespace RecentTab {
     void
     load()
     try {
-        auto filename = App::get_config_path() / "recent.json";
         stations.clear();
-        glz::ex::read_file_json(stations, filename.c_str(), std::string{});
+        auto filename = App::get_config_path() / "recent.json";
+        Serializer::load(stations, filename);
     }
     catch (std::exception& e) {
         cout << "ERROR: Recent::load(): " << e.what() << endl;
@@ -61,7 +59,7 @@ namespace RecentTab {
     save()
     try {
         auto filename = App::get_config_path() / "recent.json";
-        glz::ex::write_file_json(stations, filename.c_str(), std::string{});
+        Serializer::save(stations, filename);
     }
     catch (std::exception& e) {
         cout << "ERROR: Recent::save(): " << e.what() << endl;
@@ -143,11 +141,11 @@ namespace RecentTab {
 
                     UI::show_tags(station->tags);
 
-                } // extra_info_child
+                }
 
-            } // details_child
+            }
 
-        } // station_child
+        }
     }
 
 
@@ -170,15 +168,12 @@ namespace RecentTab {
             ImGui::AlignTextToFramePadding();
             UI::show_text_right("%zu stations", stations.size());
 
-        } // toolbar_child
+        }
 
         // Note: flat navigation doesn't work well on child windows that scroll.
-        if (ImGui::RAII::Child recent_child{"recent"}) {
-
+        if (ImGui::RAII::Child recent_child{"recent"})
             for (std::size_t index = stations.size() - 1; index + 1 > 0; --index)
                 show_station(stations[index], index);
-
-        } // recent_child
 
         StationDetailsPopup::process_ui();
     }

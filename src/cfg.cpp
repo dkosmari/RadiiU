@@ -12,11 +12,10 @@
 #include <iostream>
 #include <optional>
 
-#include <glaze/json.hpp>
-#include <glaze/exceptions/json_exceptions.hpp>
+#include "cfg.hpp"
 
 #include "App.hpp"
-#include "cfg.hpp"
+#include "Serializer.hpp"
 
 
 using std::cout;
@@ -55,7 +54,7 @@ namespace cfg {
     {
         try {
             auto filename = App::get_config_path() / "settings.json";
-            glz::ex::read_file_json(state, filename.c_str(), std::string{});
+            Serializer::load(state, filename);
         }
         catch (std::exception& e) {
             cout << "Error loading settings: " << e.what() << endl;
@@ -68,7 +67,7 @@ namespace cfg {
     {
         try {
             auto filename = App::get_config_path() / "settings.json";
-            glz::ex::write_file_json(state, filename.c_str(), std::string{});
+            Serializer::save(state, filename);
         }
         catch (std::exception& e) {
             cout << "Error saving settings: " << e.what() << endl;

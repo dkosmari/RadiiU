@@ -31,6 +31,7 @@ namespace cfg {
         bool        send_clicks          = false;
         std::string server               = {};
         std::string style                = {};
+        bool        switch_to_player     = false;
     };
 
     extern State state;

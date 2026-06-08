@@ -16,7 +16,7 @@
 #include <string>
 #include <vector>
 
-#include <glaze/json.hpp>
+#include <glaze/core/meta.hpp>
 #include <glaze/exceptions/json_exceptions.hpp>
 
 #include <imgui.h>
@@ -230,7 +230,6 @@ namespace Styles {
     {
         if (!exists(filename))
             return false;
-        // auto root = json::load(filename);
         Style st;
         glz::ex::read_file_json(st, filename.c_str(), std::string{});
         current_style.emplace(st);
