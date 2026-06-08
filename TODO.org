@@ -5,3 +5,5 @@
 - [ ] General [0/2]
   - [ ] Add scrensavers
   - [ ] Add Logs tab.
+- [ ] Favorites [0/1]
+  - [ ] Add option to filter by tag.
