@@ -11,6 +11,12 @@
 namespace AboutTab {
 
     void
+    initialize();
+
+    void
+    finalize();
+
+    void
     process_ui();
 
 } // namespace AboutTab

@@ -355,6 +355,7 @@ namespace App {
         RadioBrowserAPI::set_server(cfg::state.server);
 
         // Initialize tabs.
+        AboutTab::initialize();
         FavoritesTab::initialize();
         BrowserTab::initialize();
         RecentTab::initialize();
@@ -372,6 +373,7 @@ namespace App {
         RecentTab::finalize();
         BrowserTab::finalize();
         FavoritesTab::finalize();
+        AboutTab::finalize();
 
         // Finalize modules.
         RadioBrowserAPI::finalize();

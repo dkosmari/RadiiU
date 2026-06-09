@@ -7,6 +7,9 @@
 [submodule "external/imgui"]
 	path = external/imgui
 	url = https://github.com/dkosmari/imgui.git
+[submodule "external/librpxloader"]
+	path = external/librpxloader
+	url = https://github.com/wiiu-env/librpxloader.git
 [submodule "external/mpg123xx"]
 	path = external/mpg123xx
 	url = https://github.com/dkosmari/mpg123xx.git

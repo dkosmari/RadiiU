@@ -24,6 +24,10 @@
 #include <SDL_version.h>
 #include <vorbis/codec.h>
 
+#ifdef __WIIU__
+#include <rpxloader/rpxloader.h>
+#endif
+
 #ifdef IMGUI_ENABLE_FREETYPE
 #include <freetype/freetype.h>
 #endif
@@ -50,6 +54,10 @@ using namespace std::literals;
 namespace AboutTab {
 
     namespace {
+
+#ifdef __WIIU__
+        std::filesystem::path real_save_path;
+#endif
 
         std::string
         get_sdl_version_str()
@@ -115,7 +123,7 @@ namespace AboutTab {
                 auto pos = result.find(src);
                 if (pos == std::string::npos)
                     continue;
-                result = result.substr(0, pos) + dst + result.substr(pos + src.size());
+                result.replace(pos, src.size(), dst);
             }
             return result;
         }
@@ -170,6 +178,27 @@ namespace AboutTab {
 
 
     void
+    initialize()
+    {
+#ifdef __WIIU__
+        if (RPXLoader_InitLibrary() == RPX_LOADER_RESULT_SUCCESS) {
+            char real_save_buf[1024];
+            if (RPXLoader_GetPathOfSaveRedirection(real_save_buf,
+                                                   sizeof real_save_buf)
+                == RPX_LOADER_RESULT_SUCCESS)
+                real_save_path = std::filesystem::path{"SD:/"} / real_save_buf;
+            RPXLoader_DeInitLibrary();
+        }
+#endif
+    }
+
+
+    void
+    finalize()
+    {}
+
+
+    void
     process_ui()
     {
         // Note: flat navigation doesn't work well on child windows that scroll.
@@ -187,7 +216,14 @@ namespace AboutTab {
                 UI::show_link_row("Homepage", PACKAGE_URL);
                 UI::show_link_row("Bugs", PACKAGE_BUGREPORT);
                 UI::show_info_row("User Agent", App::get_user_agent());
-
+#ifdef __WIIU__
+                if (!real_save_path.empty())
+                    UI::show_info_row("Save folder", real_save_path);
+                else
+                    UI::show_info_row("Save folder", App::get_config_path());
+#else
+                UI::show_info_row("Save folder", App::get_config_path());
+#endif
             }
 
             ImGui::SeparatorText("Credits");

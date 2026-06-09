@@ -12,7 +12,7 @@ EXTRA_DIST = \
 SUBDIRS = external
 
 external/%:
-	(cd external && $(MAKE) $(AM_MAKEFLAGS))
+	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C external
 
 
 AM_CXXFLAGS = \
@@ -158,6 +158,11 @@ if ENABLE_WIIU
 radiiu_elf_LDFLAGS = \
 	$(AM_LDFLAGS) \
 	-Wl,-Map,radiiu.map
+
+radiiu_elf_CPPFLAGS += -I$(srcdir)/external/librpxloader/include
+
+radiiu_elf_LDADD += external/librpxloader.la
+
 
 RPX_FILE = radiiu.rpx
 

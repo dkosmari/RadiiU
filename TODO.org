@@ -1,9 +1,11 @@
-* Plan for 0.4 [0%]
+* Plan for 0.4 [28%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
 - [ ] General [0/2]
   - [ ] Add scrensavers
   - [ ] Add Logs tab.
+- [X] About [1/1]
+  - [X] Show save path.
 - [ ] Favorites [0/1]
   - [ ] Add option to filter by tag.

@@ -1,3 +1,11 @@
+LIBRPXLOADER_FILES ?= \
+	$(addprefix librpxloader/,$(shell git -C $(srcdir)/librpxloader ls-files))
+
+
+EXTRA_DIST = \
+	update-submodules.sh \
+	$(LIBRPXLOADER_FILES)
+
 SUBDIRS = \
 	curlxx \
 	mpg123xx \
@@ -295,6 +303,21 @@ libglaze_la_SOURCES = \
 	glaze/include/glaze/yaml/read.hpp \
 	glaze/include/glaze/yaml/skip.hpp \
 	glaze/include/glaze/yaml/write.hpp
+
+
+if ENABLE_WIIU
+
+noinst_LTLIBRARIES += librpxloader.la
+
+librpxloader_la_CPPFLAGS = -I$(srcdir)/librpxloader/include
+
+librpxloader_la_SOURCES = \
+	librpxloader/include/rpxloader/rpxloader.h \
+	librpxloader/source/logger.h \
+	librpxloader/source/rpxloader.cpp
+
+endif ENABLE_WIIU
+
 
 
 .PHONY: company
