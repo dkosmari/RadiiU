@@ -10,9 +10,6 @@
 
 #include <string>
 
-#include <glaze/core/common.hpp>
-#include <glaze/forward.hpp>
-
 
 enum class TabID : unsigned {
     favorites,
@@ -34,21 +31,5 @@ to_string(TabID tab);
 [[nodiscard]]
 std::string
 to_label(TabID tab);
-
-
-template<>
-struct glz::meta<TabID> {
-    using enum TabID;
-    static
-    constexpr
-    auto value = enumerate(favorites,
-                           browser,
-                           recent,
-                           player,
-                           settings,
-                           about,
-                           last_active,
-                           num_tabs);
-}; // struct glz::meta<TabID>
 
 #endif

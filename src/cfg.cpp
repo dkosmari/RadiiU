@@ -12,6 +12,8 @@
 #include <iostream>
 #include <optional>
 
+#include <glaze/core/meta.hpp>
+
 #include "cfg.hpp"
 
 #include "App.hpp"
@@ -21,6 +23,22 @@
 using std::cout;
 using std::endl;
 using std::string;
+
+
+template<>
+struct glz::meta<TabID> {
+    using enum TabID;
+    static
+    constexpr
+    auto value = enumerate(favorites,
+                           browser,
+                           recent,
+                           player,
+                           settings,
+                           about,
+                           last_active,
+                           num_tabs);
+}; // struct glz::meta<TabID>
 
 
 namespace cfg {

@@ -98,7 +98,6 @@ radiiu_elf_SOURCES = \
 	src/Station.hpp \
 	src/StationDetailsPopup.cpp \
 	src/StationDetailsPopup.hpp \
-	src/stdout-wiiu.cpp \
 	src/stream_metadata.cpp \
 	src/stream_metadata.hpp \
 	src/string_utils.cpp \
@@ -112,7 +111,9 @@ radiiu_elf_SOURCES = \
 	src/tracer.hpp \
 	src/UI.cpp \
 	src/UI.hpp \
-	src/unit_test.hpp
+	src/unit_test.hpp \
+	src/wiiu-stderr.cpp \
+	src/wiiu-stdout.cpp
 
 
 radiiu_elf_CPPFLAGS = \

@@ -1,7 +1,7 @@
 /*
  * Automatically redirect stdout to WHBLogWrite().
+ * Copyright 2026  Daniel K. O. (dkosmari)
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: Apache-2.0
  * SPDX-License-Identifier: LGPL-3.0-or-later
  * SPDX-License-Identifier: MIT
@@ -11,19 +11,19 @@
 
 #ifdef __WIIU__
 
-#include <mutex>
-#include <optional>
-#include <string>
+#include <cstdlib>              // malloc(), free()
+#include <cstring>              // memcpy()
 
 #include <sys/iosupport.h>      // devoptab_list, devoptab_t
 
+#include <coreinit/mutex.h>
 #include <whb/log.h>
 #include <whb/log_cafe.h>
 #include <whb/log_module.h>
 #include <whb/log_udp.h>
 
 
-std::optional<std::mutex> whb_log_mutex; // initialized by stderr code.
+OSMutex* wiiu_whb_log_mutex; // initialized by wiiu-stderr.cpp
 
 
 namespace {
@@ -32,12 +32,12 @@ namespace {
     bool module_initialized = false;
     bool udp_initialized    = false;
 
-}
+} // namespace
 
 
 __attribute__ (( __constructor__ (101) ))
 void
-init_whb_log()
+wiiu_init_whb_log()
     noexcept
 {
     module_initialized = WHBLogModuleInit();
@@ -50,7 +50,7 @@ init_whb_log()
 
 __attribute__ (( __destructor__ (101) ))
 void
-fini_whb_log()
+wiiu_fini_whb_log()
     noexcept
 {
     if (module_initialized) {
@@ -69,38 +69,44 @@ fini_whb_log()
 
 
 ssize_t
-devoptab_to_whb_log(struct _reent*,
-                    void*,
-                    const char* buf,
-                    size_t len)
+wiiu_devoptab_to_whb_log(struct _reent*,
+                         void*,
+                         const char* buf,
+                         std::size_t len)
     noexcept
 {
-    try {
-        // Note: WHBLogWrite expects a null-terminated string.
-        std::string msg(buf, len);
-
-        if (whb_log_mutex) {
-            std::lock_guard guard{*whb_log_mutex};
-            WHBLogWrite(msg.data());
-        } else {
-            WHBLogWrite(msg.data());
-        }
-        return len;
-    }
-    catch (...) {
+    // Note: WHBLogWrite expects a null-terminated string.
+    std::size_t msg_size = len + 1;
+    if (msg_size == 0)
         return -1;
+    char* msg = static_cast<char*>(std::malloc(msg_size));
+    if (!msg)
+        return -1;
+    std::memcpy(msg, buf, len);
+    msg[len] = 0;
+
+    if (wiiu_whb_log_mutex) {
+        OSLockMutex(wiiu_whb_log_mutex);
+        WHBLogWrite(msg);
+        OSUnlockMutex(wiiu_whb_log_mutex);
+    } else {
+        WHBLogWrite(msg);
     }
+
+    std::free(msg);
+    return len;
 }
 
 
 __attribute__(( __constructor__ (102) ))
 void
-init_stdout()
+wiiu_init_stdout()
+    noexcept
 {
     static devoptab_t stdout_dev;
     stdout_dev.name = "STDOUT";
     stdout_dev.structSize = sizeof stdout_dev;
-    stdout_dev.write_r = devoptab_to_whb_log;
+    stdout_dev.write_r = wiiu_devoptab_to_whb_log;
     devoptab_list[STD_OUT] = &stdout_dev;
 }
 

@@ -1,11 +1,15 @@
-* Plan for 0.4 [28%]
+* Plan for 0.4 [20%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
 - [ ] General [0/2]
-  - [ ] Add scrensavers
-  - [ ] Add Logs tab.
+  - [ ] Scrensavers.
+  - [ ] Logs tab.
+  - [ ] Line up buttons better under Play button.
 - [X] About [1/1]
   - [X] Show save path.
-- [ ] Favorites [0/1]
-  - [ ] Add option to filter by tag.
+- [ ] Favorites [0/2]
+  - [ ] Option to filter by tag.
+  - [ ] Option to update station details from RB.
+- [ ] Browser
+  - [ ] Dedicated server stats popup module.
