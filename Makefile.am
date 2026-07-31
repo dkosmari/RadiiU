@@ -113,9 +113,7 @@ radiiu_elf_SOURCES = \
 	src/tracer.hpp \
 	src/UI.cpp \
 	src/UI.hpp \
-	src/unit_test.hpp \
-	src/wiiu-stderr.cpp \
-	src/wiiu-stdout.cpp
+	src/unit_test.hpp
 
 
 radiiu_elf_CPPFLAGS = \
@@ -157,6 +155,10 @@ radiiu_elf_LDADD =  \
 
 
 if ENABLE_WIIU
+
+radiiu_elf_SOURCES +=
+	external/wiiu-stdout/cpp/wiiu-stdout.cpp \
+	external/wiiu-stdout/cpp/wiiu-stderr.hpp
 
 radiiu_elf_LDFLAGS = \
 	$(AM_LDFLAGS) \

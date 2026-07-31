@@ -12,12 +12,14 @@ update_submodule()
 }
 
 
+updatesubmodule cafe_glyphs
 update_submodule curlxx
 update_submodule glaze
 update_submodule imgui
 update_submodule librpxloader
 update_submodule mpg123xx
 update_submodule sdl2xx
+update_submodule wiiu-stdout
 
 
 exit 0

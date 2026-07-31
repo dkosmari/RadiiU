@@ -1,3 +1,6 @@
+[submodule "external/cafe_glyphs"]
+	path = external/cafe_glyphs
+	url = https://github.com/dkosmari/cafe_glyphs.git
 [submodule "external/curlxx"]
 	path = external/curlxx
 	url = https://github.com/dkosmari/curlxx.git
@@ -16,3 +19,6 @@
 [submodule "external/sdl2xx"]
 	path = external/sdl2xx
 	url = https://github.com/dkosmari/sdl2xx.git
+[submodule "external/wiiu-stdout"]
+	path = external/wiiu-stdout
+	url = https://github.com/dkosmari/wiiu-stdout.git
