@@ -203,7 +203,7 @@ namespace decoder {
 
         auto comment_vec = to_vector(comment);
         for (auto entry : comment_vec) {
-            auto tokens = string_utils::split(entry, "="sv, false, 2);
+            auto tokens = string_utils::split_view(entry, "="sv, false, 2);
             if (tokens.size() != 2)
                 continue;
             auto key = tokens[0];

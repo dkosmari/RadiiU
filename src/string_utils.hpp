@@ -51,6 +51,7 @@ namespace string_utils {
                std::string_view b);
 
 
+    // TODO: string_utils::format() is obsolete now
     // Return the correct printf width fromatter for a given integer value.
     template<typename T>
     [[nodiscard]]
@@ -59,6 +60,12 @@ namespace string_utils {
     {
         return detail::format_helper<std::remove_cv_t<T>>;
     }
+
+
+    [[nodiscard]]
+    std::vector<std::string>
+    from_csv(const std::string& csv,
+             bool compress = true);
 
 
     [[nodiscard]]
@@ -73,28 +80,33 @@ namespace string_utils {
     split(const std::string& input,
           const std::vector<std::string>& separators = {","},
           bool compress = true,
-          std::size_t max_tokens = 0);
+          std::string::size_type max_tokens = 0);
 
     [[nodiscard]]
     std::vector<std::string>
     split(const std::string& input,
           const std::string& separator = ",",
           bool compress = true,
-          std::size_t max_tokens = 0);
+          std::string::size_type max_tokens = 0);
 
     [[nodiscard]]
     std::vector<std::string_view>
-    split(const std::string_view& input,
-          const std::vector<std::string_view>& separators = {","},
-          bool compress = true,
-          std::size_t max_tokens = 0);
+    split_view(const std::string_view& input,
+               const std::vector<std::string_view>& separators = {","},
+               bool compress = true,
+               std::string_view::size_type max_tokens = 0);
 
     [[nodiscard]]
     std::vector<std::string_view>
-    split(const std::string_view& input,
-          const std::string_view& separator = ",",
-          bool compress = true,
-          std::size_t max_tokens = 0);
+    split_view(const std::string_view& input,
+               const std::string_view& separator = ",",
+               bool compress = true,
+               std::string_view::size_type max_tokens = 0);
+
+    [[nodiscard]]
+    std::string
+    to_csv(const std::vector<std::string>& vec,
+           bool compress = true);
 
 
     // equivalent to trimmed(..., std::isspace)
@@ -120,19 +132,10 @@ namespace string_utils {
     trimmed(const std::string& input,
             const std::function<bool(std::string::value_type)>& predicate);
 
-
-    // Overload to easily use predicates from <cctype>, such as std::isspace()
     [[nodiscard]]
-    inline
     std::string
     trimmed(const std::string& input,
-            int (*predicate)(int))
-    {
-        return trimmed(input, [predicate](std::string::value_type c) -> bool
-        {
-            return predicate(static_cast<unsigned char>(c));
-        });
-    }
+            int (*predicate)(int));
 
 } // namespace string_utils
 

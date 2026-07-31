@@ -29,7 +29,6 @@
 #include "PlayerTab.hpp"
 
 #include "App.hpp"
-#include "BrowserTab.hpp"
 #include "cfg.hpp"
 #include "humanize.hpp"
 #include "IconManager.hpp"
@@ -37,7 +36,6 @@
 #include "radio_client.hpp"
 #include "RecentTab.hpp"
 #include "Serializer.hpp"
-#include "Station.hpp"
 #include "StationDetailsPopup.hpp"
 #include "UI.hpp"
 
@@ -67,7 +65,7 @@ namespace PlayerTab {
 
     State state;
 
-    std::shared_ptr<Station> station;
+    ConstStationPtr station;
 
     void
     history_add(const std::string& title);
@@ -235,16 +233,13 @@ namespace PlayerTab {
              << "\""
              << endl;
 
-        // TODO: call RadioBrowserAPI directly.
-        BrowserTab::send_click(station);
-
         // allocate and initialize resources here
         res.emplace(station->url, station->url_resolved);
     }
 
 
     void
-    play(std::shared_ptr<Station>& st)
+    play(StationPtr& st)
     {
         station = st;
         play();
@@ -477,16 +472,9 @@ namespace PlayerTab {
             return false;
         if (res->radio.current_state == radio_client::state::stopped)
             return false;
+        if (&st == station.get())
+            return true;
         return st == *station;
-    }
-
-
-    bool
-    is_playing(std::shared_ptr<Station>& st)
-    {
-        if (!st)
-            return false;
-        return is_playing(*st);
     }
 
 

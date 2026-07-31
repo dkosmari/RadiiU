@@ -10,7 +10,6 @@
 
 #include <concepts>
 #include <cstdarg>
-#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -20,10 +19,7 @@
 #include <sdl2xx/color.hpp>
 #include <sdl2xx/texture.hpp>
 
-#include "csv_strings.hpp"
-
-
-struct Station;
+#include "Station.hpp"
 
 
 namespace UI {
@@ -95,7 +91,7 @@ namespace UI {
 
     void
     show_info_row(const std::string& label,
-                  const csv_strings& values);
+                  const std::vector<std::string>& values);
 
 
     // Align to the right, with label color
@@ -118,7 +114,7 @@ namespace UI {
 
 
     void
-    show_play_button(std::shared_ptr<Station>& station);
+    show_play_button(StationPtr& station);
 
 
     void

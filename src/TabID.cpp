@@ -27,6 +27,8 @@ to_string(TabID tab)
             return "player";
         case settings:
             return "settings";
+        case logs:
+            return "logs";
         case about:
             return "about";
         case last_active:
@@ -53,6 +55,8 @@ to_label(TabID tab)
             return ICON_FA_MUSIC " Player";
         case settings:
             return ICON_FA_SLIDERS " Settings";
+        case logs:
+            return ICON_FA_COMMENT " Logs";
         case about:
             return ICON_FA_LIGHTBULB_O " About";
         case last_active:

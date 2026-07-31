@@ -47,8 +47,8 @@
 #include "RadioBrowserAPI.hpp"
 #include "rest.hpp"
 #include "Serializer.hpp"
-#include "Station.hpp"
 #include "StationDetailsPopup.hpp"
+#include "StationGlaze.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
 
@@ -86,7 +86,7 @@ namespace BrowserTab::GUI {
     // Country* selected_country;
     std::string filter_codec;
     std::optional<Order> order;
-    unsigned page;
+    unsigned page = 1;
     bool search_options_visible = true;
     bool scroll_to_top = false;
 
@@ -147,7 +147,7 @@ namespace BrowserTab {
 
     std::regex tags_regex;
 
-    std::vector<std::shared_ptr<Station>> stations;
+    std::vector<StationPtr> stations;
 
     // TODO: allow votes to expire after 10 min.
     std::unordered_map<std::string, RadioBrowserAPI::VoteResult> votes_cast;
@@ -180,10 +180,10 @@ namespace BrowserTab {
 
 
     const std::string&
-    by_code(const Country& c);
+    get_code(const Country& c);
 
     const std::string&
-    by_name(const Country& c);
+    get_name(const Country& c);
 
     void
     common_error_handler(const std::exception& e);
@@ -317,7 +317,6 @@ namespace BrowserTab {
 
         load_tags_regex();
         load();
-        // search_stations();
     }
 
 
@@ -405,8 +404,10 @@ namespace BrowserTab {
     void
     process_server_stats_popup()
     {
+        using namespace ImGui::RAII;
+
         // ImGui::SetNextWindowSize({550, 0}, ImGuiCond_Always);
-        if (ImGui::RAII::Popup server_stats{
+        if (Popup server_stats{
                 server_stats_popup_id,
                 ImGuiWindowFlags_NoSavedSettings
             }) {
@@ -423,7 +424,7 @@ namespace BrowserTab {
 
             } else {
 
-                if (ImGui::RAII::Table fields_table{
+                if (Table fields_table{
                         "fields",
                         2,
                         ImGuiTableFlags_None
@@ -451,7 +452,9 @@ namespace BrowserTab {
     void
     show_status()
     {
-        if (ImGui::RAII::Child status_child{
+        using namespace ImGui::RAII;
+
+        if (Child status_child{
                 "status",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeY |
@@ -491,7 +494,9 @@ namespace BrowserTab {
     void
     show_search_options()
     {
-        if (ImGui::RAII::Child options_child{
+        using namespace ImGui::RAII;
+
+        if (Child options_child{
                 "search_options",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeY |
@@ -504,7 +509,7 @@ namespace BrowserTab {
 
                 ImGui::Indent();
 
-                if (ImGui::RAII::Child filters_guard{
+                if (Child filters_guard{
                         "filters",
                         {0, 0},
                         ImGuiChildFlags_AutoResizeX |
@@ -513,21 +518,21 @@ namespace BrowserTab {
                         ImGuiChildFlags_NavFlattened
                     }) {
 
-                    ImGui::RAII::ItemWidth filters_width{500};
+                    ItemWidth filters_width{500};
 
                     ImGui::TextUnformatted(ICON_FA_FILTER " Filters");
 
-                    /*******************
-                     * Filter by name. *
-                     *******************/
+                    /*-----------------*/
+                    /* Filter by name. */
+                    /*-----------------*/
                     ImGui::InputText("Name", GUI::filter_name);
 
-                    /******************
-                     * Filter by tag. *
-                     ******************/
+                    /*----------------*/
+                    /* Filter by tag. */
+                    /*----------------*/
                     ImGui::SetNextWindowSizeConstraints({0, 0},
                                                         {1200.0f, FLT_MAX});
-                    if (ImGui::RAII::Combo tag_combo{
+                    if (Combo tag_combo{
                             "Tag",
                             GUI::filter_tag,
                             ImGuiComboFlags_HeightLargest
@@ -555,10 +560,10 @@ namespace BrowserTab {
                         }
                     }
 
-                    /**********************
-                     * Filter by country. *
-                     **********************/
-                    if (ImGui::RAII::Combo country_combo{
+                    /*--------------------*/
+                    /* Filter by country. */
+                    /*--------------------*/
+                    if (Combo country_combo{
                             "Country",
                             GUI::filter_country,
                             ImGuiComboFlags_HeightLargest
@@ -589,10 +594,10 @@ namespace BrowserTab {
 
                     // TODO: add language filter
 
-                    /********************
-                     * Filter by codec. *
-                     ********************/
-                    if (ImGui::RAII::Combo codec_combo{
+                    /*------------------*/
+                    /* Filter by codec. */
+                    /*------------------*/
+                    if (Combo codec_combo{
                             "Codec",
                             GUI::filter_codec
                         }) {
@@ -611,7 +616,7 @@ namespace BrowserTab {
 
                 ImGui::SameLine();
 
-                if (ImGui::RAII::Child sorting_child{
+                if (Child sorting_child{
                         "sorting",
                         {0, 0},
                         ImGuiChildFlags_AutoResizeX |
@@ -623,7 +628,7 @@ namespace BrowserTab {
                     ImGui::TextUnformatted(ICON_FA_SORT " Order");
 
                     ImGui::SetNextItemWidth(280);
-                    if (ImGui::RAII::Combo order_combo{
+                    if (Combo order_combo{
                             "##order",
                             to_label(GUI::order),
                             ImGuiComboFlags_HeightLargest}) {
@@ -641,7 +646,7 @@ namespace BrowserTab {
 
                 ImGui::SameLine();
 
-                if (ImGui::RAII::Child buttons{
+                if (Child buttons{
                         "buttons",
                         {0, 0},
                         ImGuiChildFlags_AutoResizeX |
@@ -671,12 +676,14 @@ namespace BrowserTab {
     void
     show_navigation()
     {
+        using namespace ImGui::RAII;
+
         const float parent_width = ImGui::GetContentRegionAvail().x;
         const ImVec2 global_pos = ImGui::GetCursorScreenPos();
         ImGui::SetNextWindowPos({global_pos.x + parent_width / 2.0f, global_pos.y + 0.0f},
                                 ImGuiCond_Always,
                                 {0.5f, 0.0f});
-        if (ImGui::RAII::Child navigation_child{
+        if (Child navigation_child{
                 "navigation",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeX |
@@ -689,7 +696,7 @@ namespace BrowserTab {
             const bool is_searching = RadioBrowserAPI::is_searching();
 
             {
-                ImGui::RAII::Disabled disable_first_page{is_first_page};
+                Disabled disable_first_page{is_first_page};
 
                 // 100⏪
                 if (ImGui::Button("100" ICON_FA_ANGLE_DOUBLE_LEFT) && !is_searching) {
@@ -738,7 +745,7 @@ namespace BrowserTab {
             ImGui::SameLine();
 
             {
-                ImGui::RAII::Disabled disable_last_page{is_last_page};
+                Disabled disable_last_page{is_last_page};
 
                 // ⏵
                 if (ImGui::Button(" " ICON_FA_ANGLE_RIGHT " ") && !is_searching) {
@@ -766,17 +773,19 @@ namespace BrowserTab {
                 ImGui::SetItemTooltip("Advance 100 pages.");
             }
 
-        }
+        } // navigation_child
 
-    } // navigation_child
+    }
 
 
     void
-    show_station(std::shared_ptr<Station>& station)
+    show_station(StationPtr& station)
     {
-        ImGui::RAII::ID station_id{station.get()};
+        using namespace ImGui::RAII;
 
-        if (ImGui::RAII::Child station_child{
+        ID station_id{station.get()};
+
+        if (Child station_child{
                 "station",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeY |
@@ -784,7 +793,7 @@ namespace BrowserTab {
                 ImGuiChildFlags_NavFlattened
             }) {
 
-            if (ImGui::RAII::Child actions_child{
+            if (Child actions_child{
                     "actions",
                     {0, 0},
                     ImGuiChildFlags_AutoResizeX |
@@ -810,7 +819,7 @@ namespace BrowserTab {
                                          + humanize::value(station->votes);
 
                 {
-                    ImGui::RAII::Disabled disable_voting{voted || !cfg::state.send_clicks};
+                    Disabled disable_voting{voted || !cfg::state.send_clicks};
                     if (ImGui::Button(vote_label))
                         send_vote(station);
                     if (voted)
@@ -823,7 +832,7 @@ namespace BrowserTab {
 
             ImGui::SameLine();
 
-            if (ImGui::RAII::Child details_child{
+            if (Child details_child{
                     "details",
                     {0, 0},
                     ImGuiChildFlags_AutoResizeY |
@@ -836,7 +845,7 @@ namespace BrowserTab {
 
                 UI::show_station_basic_info(*station);
 
-                if (ImGui::RAII::Child extra_info_child{
+                if (Child extra_info_child{
                         "extra_info",
                         {0, 0},
                         ImGuiChildFlags_AutoResizeY |
@@ -876,7 +885,9 @@ namespace BrowserTab {
     void
     process_ui()
     {
-        ImGui::RAII::Disabled disable_searching{RadioBrowserAPI::is_searching()};
+        using namespace ImGui::RAII;
+
+        Disabled if_searching{RadioBrowserAPI::is_searching()};
 
         show_status();
 
@@ -885,7 +896,7 @@ namespace BrowserTab {
         show_navigation();
 
         // Note: flat navigation doesn't work well on child windows that scroll.
-        if (ImGui::RAII::Child stations_child{"stations"}) {
+        if (Child stations_child{"stations"}) {
 
             if (GUI::scroll_to_top) {
                 ImGui::SetScrollY(0);
@@ -903,8 +914,8 @@ namespace BrowserTab {
                 }
 #endif
 
-            for (auto& station_ptr : stations)
-                show_station(station_ptr);
+            for (auto& station : stations)
+                show_station(station);
 
 #if 0
             // Disabled until ImGui fixes navigation.
@@ -922,16 +933,16 @@ namespace BrowserTab {
 
 
     void
-    send_click(std::shared_ptr<Station>& station_ptr)
+    send_click(StationPtr& station)
     {
         TRACE_FUNC;
 
-        if (!station_ptr || station_ptr->stationuuid.empty())
+        if (!station || station->stationuuid.empty())
             return;
 
         RadioBrowserAPI::send_click(
-            station_ptr->stationuuid,
-            [station_ptr](RadioBrowserAPI::ClickResult result)
+            station->stationuuid,
+            [station](RadioBrowserAPI::ClickResult result)
             {
                 cout << "Result of click: "
                      << (result.ok ? "success" : "failure")
@@ -939,23 +950,23 @@ namespace BrowserTab {
                 if (!result.message.empty())
                     cout << result.message << endl;
 
-                update_station(station_ptr);
+                update_station(station);
             },
             common_error_handler);
     }
 
 
     void
-    send_vote(std::shared_ptr<Station>& station_ptr)
+    send_vote(StationPtr& station)
     {
         TRACE_FUNC;
 
-        if (!station_ptr || station_ptr->stationuuid.empty())
+        if (!station || station->stationuuid.empty())
             return;
 
         RadioBrowserAPI::send_vote(
-            station_ptr->stationuuid,
-            [station_ptr](RadioBrowserAPI::VoteResult result)
+            station->stationuuid,
+            [station](RadioBrowserAPI::VoteResult result)
             {
                 cout << "Result of vote: "
                      << (result.ok ? "success" : "failure")
@@ -963,7 +974,7 @@ namespace BrowserTab {
                 if (!result.message.empty())
                     cout << result.message << endl;
 
-                update_station(station_ptr);
+                update_station(station);
             },
             common_error_handler);
     }
@@ -1035,7 +1046,7 @@ namespace BrowserTab {
                                             std::move(name));
                 cout << "Got " << countries->size()
                      << " countries" << endl;
-                std::ranges::sort(*countries, {}, by_code);
+                std::ranges::sort(*countries, {}, get_code);
             },
             common_error_handler);
     }
@@ -1103,18 +1114,18 @@ namespace BrowserTab {
 
 
     void
-    update_station(std::shared_ptr<Station> station_ptr)
+    update_station(StationPtr station)
     {
         TRACE_FUNC;
 
-        if (!station_ptr || station_ptr->stationuuid.empty())
+        if (!station || station->stationuuid.empty())
             return;
 
         RadioBrowserAPI::get_station(
-            station_ptr->stationuuid,
-            [station_ptr](RadioBrowserAPI::Station rb_station)
+            station->stationuuid,
+            [station](RadioBrowserAPI::Station rb_station)
             {
-                *station_ptr = Station::from_radio_browser(rb_station);
+                *station = Station::from_radio_browser(rb_station);
             },
             common_error_handler);
     }
@@ -1173,11 +1184,12 @@ namespace BrowserTab {
 
         // TODO: when RB errors out, it should be possible to try again
         if (!countries) {
+            cout << "get_country_name() needs to fetch countries" << endl;
             fetch_countries();
             return {};
         }
 
-        auto it = std::ranges::lower_bound(*countries, code, {}, by_code);
+        auto it = std::ranges::lower_bound(*countries, code, {}, get_code);
         if (it == countries->end())
             return {};
         if (it->code != code)
@@ -1187,14 +1199,14 @@ namespace BrowserTab {
 
 
     const std::string&
-    by_code(const Country& c)
+    get_code(const Country& c)
     {
         return c.code;
     }
 
 
     const std::string&
-    by_name(const Country& c)
+    get_name(const Country& c)
     {
         return c.name;
     }

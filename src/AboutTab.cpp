@@ -204,7 +204,7 @@ namespace AboutTab {
         // Note: flat navigation doesn't work well on child windows that scroll.
         if (ImGui::RAII::Child about{"about"}) {
 
-            auto radiiu_icon_tex = IconManager::get("ui/radiiu-icon.png");
+            auto radiiu_icon_tex = IconManager::get("content:/ui/radiiu-icon.png");
             UI::show_image(*radiiu_icon_tex, sdl::vec2{128, 128});
             ImGui::SameLine();
 

@@ -11,8 +11,7 @@
 #include <memory>
 #include <string>
 
-
-struct Station;
+#include "Station.hpp"
 
 
 namespace PlayerTab {
@@ -36,7 +35,7 @@ namespace PlayerTab {
     play();
 
     void
-    play(std::shared_ptr<Station>& st);
+    play(StationPtr& st);
 
 
     void
@@ -45,9 +44,6 @@ namespace PlayerTab {
 
     bool
     is_playing(const Station& st);
-
-    bool
-    is_playing(std::shared_ptr<Station>& st);
 
 } // namespace PlayerTab
 

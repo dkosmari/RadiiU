@@ -12,8 +12,7 @@
 #include <string>
 #include <vector>
 
-
-struct Station;
+#include "Station.hpp"
 
 namespace BrowserTab {
 
@@ -28,13 +27,13 @@ namespace BrowserTab {
     process_ui();
 
     void
-    send_click(std::shared_ptr<Station>& station_ptr);
+    send_click(StationPtr& station);
 
     void
-    send_vote(std::shared_ptr<Station>& station_ptr);
+    send_vote(StationPtr& station);
 
     void
-    update_station(std::shared_ptr<Station> station_ptr);
+    update_station(StationPtr station);
 
     void
     search_stations();

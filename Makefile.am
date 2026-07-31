@@ -51,8 +51,6 @@ radiiu_elf_SOURCES = \
 	src/byte_stream.hpp \
 	src/cfg.cpp \
 	src/cfg.hpp \
-	src/csv_strings.cpp \
-	src/csv_strings.hpp \
 	src/decoder.cpp \
 	src/decoder.hpp \
 	src/decoder_aac.cpp \
@@ -78,6 +76,8 @@ radiiu_elf_SOURCES = \
 	src/icy.hpp \
 	src/icy_stream.cpp \
 	src/icy_stream.hpp \
+	src/LogsTab.cpp \
+	src/LogsTab.hpp \
 	src/m3u.cpp \
 	src/m3u.hpp \
 	src/main.cpp \
@@ -96,6 +96,7 @@ radiiu_elf_SOURCES = \
 	src/SettingsTab.hpp \
 	src/Station.cpp \
 	src/Station.hpp \
+	src/StationGlaze.hpp \
 	src/StationDetailsPopup.cpp \
 	src/StationDetailsPopup.hpp \
 	src/stream_metadata.cpp \
@@ -106,6 +107,7 @@ radiiu_elf_SOURCES = \
 	src/Styles.hpp \
 	src/TabID.cpp \
 	src/TabID.hpp \
+	src/TabIDGlaze.hpp \
 	src/thread_safe.hpp \
 	src/tracer.cpp \
 	src/tracer.hpp \

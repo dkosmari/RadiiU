@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -13,14 +13,16 @@
 #include <concepts>
 #include <filesystem>
 #include <functional>
+#include <future>
 #include <iostream>
-#include <unordered_map>
+#include <memory>
 #include <optional>
 #include <queue>
 #include <ranges>
 #include <span>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include <curlxx/curl.hpp>
@@ -35,230 +37,274 @@
 
 
 using std::cout;
+using std::cerr;
 using std::endl;
-
 using namespace std::literals;
 
+using sdl::vec2;
 
 namespace IconManager {
 
-    std::string user_agent;
+    namespace {
 
-    std::filesystem::path content_prefix;
+        /*-------*/
+        /* Types */
+        /*-------*/
 
-    const std::size_t max_cache_size = 256;
-
-    std::uint64_t use_counter = 0;
-
-    sdl::renderer* renderer = nullptr;
-    sdl::texture error_icon;
-    sdl::texture loading_icon;
-
-    std::optional<curl::multi> multi;
-
-
-    enum class LoadState : int {
-        unloaded,
-        requested,
-        loading,
-        loaded,
-        error,
-    };
-
-    std::string
-    to_string(LoadState st);
+        enum class LoadState : int {
+            unloaded,
+            loading,
+            loaded,
+            converted,
+            error,
+        };
 
 
-    struct CacheEntry {
-        std::atomic<LoadState> state{LoadState::unloaded};
-        std::uint64_t last_use = 0;
-        sdl::surface img;
-        sdl::texture tex;
-        std::optional<curl::easy> easy;
-        std::optional<std::vector<char>> raw_buf;
-        std::string location;
-    };
+        struct CacheEntry : std::enable_shared_from_this<CacheEntry> {
+            std::atomic<LoadState> state{LoadState::loading};
+            std::uint64_t last_use = 0;
+            sdl::texture tex;
+            sdl::surface img;
+            std::optional<curl::easy> easy;
+            std::optional<std::vector<char>> raw_buf; // TODO: use byte_stream, implement rwops
+            std::string location;
+            vec2 size_limit;
+
+            CacheEntry(std::uint64_t now,
+                       const std::string& location,
+                       const vec2& size_limit);
+
+            ~CacheEntry()
+                noexcept;
+
+            void
+            finish_download();
+
+            bool
+            is_remote()
+                const noexcept;
+
+            void
+            load();
+
+            void
+            make_texture(sdl::renderer& renderer);
+
+            curl::easy&
+            start_download(const std::string& user_agent);
+
+        private:
+
+            void
+            enforce_size_limit();
+
+            void
+            load_from_buffer();
+
+            void
+            load_from_file();
+
+        }; // struct CacheEntry
+
+        using CacheEntryPtr = std::shared_ptr<CacheEntry>;
 
 
-    // TODO: use a good hash map here
-    using cache_t = std::unordered_map<std::string, CacheEntry>;
-    thread_safe<cache_t> safe_cache;
+        // TODO: use a good hash map here
+        using Cache = std::unordered_map<std::string, CacheEntryPtr>;
 
 
-    // std::queue<std::string> load_queue;
-    async_queue<std::string> requests_queue;
+        struct Resources {
+
+            std::uint64_t timestamp = 0;
+            sdl::renderer& renderer;
+            std::string user_agent;
+            std::filesystem::path content_dir;
+            sdl::texture error_icon;
+            sdl::texture loading_icon;
+            curl::multi multi;
+            Cache cache;
+
+            async_queue<CacheEntryPtr> load_queue;
+            std::jthread loader_thread;
+
+            async_queue<CacheEntryPtr> convert_queue;
+
+            Resources(sdl::renderer& renderer,
+                      const std::string& user_agent,
+                      const std::filesystem::path& content_dir);
+
+            ~Resources()
+                noexcept;
+
+            // Prevent moving
+            Resources(Resources&&) = delete;
+
+            const sdl::texture*
+            get(const std::string& location,
+                const sdl::vec2& size_limit);
+
+            void
+            loader_thread_func(std::stop_token stopper);
+
+            void
+            prepare_load(CacheEntryPtr entry);
+
+            void
+            process();
+
+            void
+            trim_cache();
+
+        }; // struct Resources
 
 
-    std::jthread worker_thread;
+        /*-----------*/
+        /* Constants */
+        /*-----------*/
+
+        const std::string content_prefix = "content:/";
+        const std::size_t max_cache_size = 256;
+
+        // Variables
+
+        std::optional<Resources> res;
 
 
-    void
-    worker_func(std::stop_token token);
+        /*-----------------------*/
+        /* Function declarations */
+        /*-----------------------*/
+
+        std::uint64_t&
+        by_last_use(Cache::iterator it)
+            noexcept;
+
+#ifdef __WIIU__
+        sdl::surface
+        optimized(sdl::surface input);
+#endif
+
+        template<std::ranges::random_access_range R,
+                 typename Comp = std::ranges::less,
+                 class Proj = std::identity>
+        requires std::sortable<std::ranges::iterator_t<R>, Comp, Proj>
+        void
+        sift_down_heap(R&& r,
+                       Comp comp = {},
+                       Proj proj = {});
+
+        std::string
+        to_string(LoadState st);
 
 
-    void
-    initialize(sdl::renderer& rend)
-    {
-        TRACE_FUNC;
+        /*----------------------*/
+        /* Function definitions */
+        /*----------------------*/
 
-        user_agent = App::get_user_agent();
-        content_prefix = App::get_content_path();
-
-        renderer = &rend;
-
-        error_icon   = sdl::img::load_texture(*renderer,
-                                              content_prefix / "ui/error-icon.png");
-        error_icon.set_blend_mode(SDL_BLENDMODE_BLEND);
-
-        loading_icon = sdl::img::load_texture(*renderer,
-                                              content_prefix / "ui/loading-icon.png");
-        loading_icon.set_blend_mode(SDL_BLENDMODE_BLEND);
-
-        requests_queue.reset();
-        cout << "IconManager: launching worker thread." << endl;
-        worker_thread = std::jthread{worker_func};
-
-        assert((std::atomic<LoadState>{}.is_lock_free()));
-    }
-
-
-    void
-    finalize()
-    {
-        TRACE_FUNC;
-
-        cout << "Stopping requests_queue" << endl;
-        requests_queue.stop();
-
-        cout << "Destroying thread." << endl;
-        worker_thread = {};
-        cout << "Thread destroyed." << endl;
-
+        std::uint64_t&
+        by_last_use(Cache::iterator it)
+            noexcept
         {
-            cout << "Clearing safe_cache" << endl;
-            auto cache = safe_cache.lock();
-            cache->clear();
+            return it->second->last_use;
         }
 
-        cout << "Destroying predefined icons" << endl;
-        loading_icon.destroy();
-        error_icon.destroy();
-    }
+
+        CacheEntry::CacheEntry(std::uint64_t now,
+                               const std::string& location_,
+                               const vec2& size_limit_) :
+            last_use{now},
+            location{location_},
+            size_limit{size_limit_}
+        {
+            if (size_limit.x < 0)
+                size_limit.x = 0;
+            if (size_limit.y < 0)
+                size_limit.y = 0;
+        }
 
 
-    const sdl::texture*
-    get(const std::string& location)
-    {
-        ++use_counter;
-        auto cache = safe_cache.lock();
-        auto it = cache->find(location);
-        try {
-            if (it != cache->end()) {
-                auto& status = it->second;
-                status.last_use = use_counter;
+        CacheEntry::~CacheEntry()
+            noexcept
+        {}
 
-                try {
-                    switch (status.state) {
+        void
+        CacheEntry::finish_download()
+        {
+            easy.reset();
+        }
 
-                        case LoadState::loaded:
-                            if (!status.tex) {
-                                status.tex.create(*renderer, status.img);
-                                status.tex.set_blend_mode(SDL_BLENDMODE_BLEND);
-                                status.img.destroy();
-                            }
-                            return &status.tex;
 
-                        case LoadState::error:
-                            return &error_icon;
+        bool
+        CacheEntry::is_remote()
+            const noexcept
+        {
+            return location.starts_with("http://")
+                || location.starts_with("https://");
+        }
 
-                        case LoadState::requested:
-                        case LoadState::loading:
-                            return &loading_icon;
 
-                        case LoadState::unloaded:
-                            status.state = LoadState::loading;
-                            requests_queue.push(location);
-                            return &loading_icon;
+        void
+        CacheEntry::load()
+        {
+            if (state != LoadState::loading) {
+                cerr << "ERROR: wrong cache entry state" << endl;
+                return;
+            }
 
-                        default:
-                            throw std::logic_error{"invalid entry state: "
-                                                   + to_string(status.state)};
-                    }
-                }
-                catch (std::exception& e) {
-                    status.state = LoadState::error;
-                    throw;
-                }
-            } else {
-                (*cache)[location].state = LoadState::requested;
-                requests_queue.push(location);
-                return &loading_icon;
+            try {
+                if (is_remote())
+                    load_from_buffer();
+                else
+                    load_from_file();
+                enforce_size_limit();
+#ifdef __WIIU__
+                img = optimized(std::move(img));
+#endif
+                state = LoadState::loaded;
+            }
+            catch (std::exception& e) {
+                cout << "ERROR: :\n"
+                     << "  location: \"" << location << "\"\n"
+                     << "  exception: " << e.what() << endl;
+                state = LoadState::error;
+                throw;
             }
         }
-        catch (std::exception& e) {
-            cout << "ERROR: IconManager::get(): " << e.what() << endl;
-            return &error_icon;
-        }
-    }
 
 
-    // Find a CacheEntry that contains this specific curl::easy object.
-    CacheEntry*
-    find(thread_safe<cache_t>::guard<cache_t>& cache,
-         const curl::easy* ez)
-    {
-        // TODO: use an auxiliary data structure to speed this up
-        for (auto& [location, entry] : *cache)
-            if (entry.easy && &*entry.easy == ez)
-                return &entry;
-        return nullptr;
-    }
-
-
-    void
-    process_one_request(const std::string& location)
-    {
-        // TRACE("IconManager::process_one_request(\"" + location + "\")");
-
-        cache_t::iterator it;
-
+        void
+        CacheEntry::make_texture(sdl::renderer& renderer)
         {
-            auto cache = safe_cache.lock();
-            it = cache->find(location);
-            if (it == cache->end())
-                return;
-            LoadState expected = LoadState::requested;
-            if (!it->second.state.compare_exchange_strong(expected, LoadState::loading)) {
-                cout << "ERROR: IconManager::process_one_request() wrong cache entry state: "
-                     << to_string(expected) << endl;
-                return;
-            }
+            assert(img);
+            assert(!tex);
+            assert(state == LoadState::loaded);
+            tex.create(renderer, img);
+            tex.set_blend_mode(SDL_BLENDMODE_BLEND);
+            img.destroy();
+            state = LoadState::converted;
         }
 
-        auto& entry = it->second;
-        entry.location = location;
 
-        try {
-
-            if (location.starts_with("http://") || location.starts_with("https://")) {
-                // URL
-                auto& easy = entry.easy.emplace();
-                easy.set_verbose(false);
-                easy.set_http_version(curl::easy::http_version::none);
-                easy.set_ssl_verify_peer(false);
-                if (!user_agent.empty())
-                    easy.set_user_agent(user_agent);
-                easy.set_url(location);
-                easy.set_follow_location(true);
-                easy.set_auto_referer(true);
-                easy.set_accept_encoding("");
-                easy.set_transfer_encoding(true);
-                easy.set_buffer_size(65536);
-                easy.set_tcp_no_delay(false);
-                easy.set_http_headers({ "Accept: image/*" });
-                easy.set_write_function([&entry](std::span<const char> buf) -> std::size_t
+        curl::easy&
+        CacheEntry::start_download(const std::string& user_agent)
+        {
+            easy.emplace();
+            easy->set_verbose(true);
+            easy->set_http_version(curl::easy::http_version::none);
+            easy->set_ssl_verify_peer(false);
+            if (!user_agent.empty())
+                easy->set_user_agent(user_agent);
+            easy->set_url(location);
+            easy->set_follow_location(true);
+            easy->set_auto_referer(true);
+            easy->set_accept_encoding("");
+            easy->set_transfer_encoding(true);
+            easy->set_buffer_size(65536);
+            easy->set_tcp_no_delay(false);
+            easy->set_http_headers({ "Accept: image/*" });
+            easy->set_write_function(
+                [this](std::span<const char> buf) -> std::size_t
                 {
-                    auto content_type_header = entry.easy->try_get_header("Content-Type");
+                    auto content_type_header = easy->try_get_header("Content-Type");
                     if (content_type_header) {
                         std::string ct = content_type_header->value;
                         if (!ct.starts_with("image/")) {
@@ -268,239 +314,441 @@ namespace IconManager {
                         }
                     }
 
-                    if (!entry.raw_buf)
-                        entry.raw_buf.emplace();
-#ifdef __cpp_lib_containers_ranges
-                    entry.raw_buf->append_range(buf);
-#else
-                    entry.raw_buf->insert(entry.raw_buf->end(),
-                                          buf.begin(),
-                                          buf.end());
-#endif
+                    if (!raw_buf)
+                        raw_buf.emplace();
+                    raw_buf->append_range(buf);
                     return buf.size();
-                });
-                multi->add(easy);
-            } else if (location.starts_with("ui/")) {
-                // local path
-                // cout << "Loading local image from " << location << endl;
-                entry.img = sdl::img::load(content_prefix / location);
-                entry.state = LoadState::loaded;
-                // cout << "Created local image in format: "
-                //      << entry.img.get_format_enum()
-                //      << endl;
-            } else
-                throw std::runtime_error{"invalid location"};
-
+                }
+            );
+            easy->set_private(shared_from_this());
+            return *easy;
         }
-        catch (std::exception& e) {
-            cout << "ERROR: IconManager::process_one_request():\n"
-                 << "  location: \"" << location << "\"\n"
-                 << "  exception: " << e.what() << endl;
-            entry.state = LoadState::error;
-        }
-    }
 
 
-    // Pushes the max element downwards to its correct heap location.
-    template<std::ranges::random_access_range R,
-             typename Comp = std::ranges::less,
-             class Proj = std::identity>
-    requires std::sortable<std::ranges::iterator_t<R>, Comp, Proj>
-    void
-    sift_down_heap(R&& r,
-                   Comp comp = {},
-                   Proj proj = {})
-    {
-        if (std::empty(r))
-            return;
-        const auto size = std::size(r);
-        std::ranges::range_size_t<R> cur_idx = 0;
-        for (;;) {
-            auto left_idx = 2u * cur_idx + 1u;
-            // If reached bottom of heap, we can stop.
-            if (left_idx >= size)
-                break;
-            // Select the largest child to be the next.
-            auto next_idx = left_idx;
-            auto right_idx = 2u * cur_idx + 2u;
-            if (right_idx < size
-                && std::invoke(comp,
-                               std::invoke(proj, r[left_idx]),
-                               std::invoke(proj, r[right_idx])))
-                next_idx = right_idx;
-            // If max-heap property was restored, we can stop.
-            if (!std::invoke(comp,
-                             std::invoke(proj, r[cur_idx]),
-                             std::invoke(proj, r[next_idx])))
-                break;
-            std::swap(r[cur_idx], r[next_idx]);
-            cur_idx = next_idx;
-        }
-    }
+        void
+        CacheEntry::enforce_size_limit()
+        {
+            if (size_limit.x <= 0 && size_limit.y <= 0)
+                return;
 
+            const auto size = img.get_size();
 
-    std::uint64_t&
-    by_last_use(cache_t::iterator it)
-        noexcept
-    {
-        return it->second.last_use;
-    }
+            const double x_scale = double(size_limit.x) / size.x;
+            const double y_scale = double(size_limit.y) / size.y;
 
-
-    void
-    trim_cache()
-    {
-        auto cache = safe_cache.lock();
-        if (cache->size() <= max_cache_size)
-            return;
-
-        std::size_t excess = cache->size() - max_cache_size;
-        // cout << "IconManager: prunning " << excess << " icons" << endl;
-        std::vector<cache_t::iterator> to_remove(excess);
-        auto to_remove_end = to_remove.begin();
-        for (auto it = cache->begin(); it != cache->end(); ++it) {
-            if (to_remove_end != to_remove.end()) {
-                *to_remove_end++ = it;
-                std::ranges::push_heap(to_remove.begin(),
-                                       to_remove_end,
-                                       {},
-                                       by_last_use);
+            vec2 scaled_size;
+            if (size_limit.x > 0 && size_limit.y > 0) {
+                // Select the smaller of the two scales.
+                if (x_scale < y_scale) {
+                    // Scale based on X limit.
+                    int new_height = size.y * x_scale;
+                    if (new_height < 1)
+                        new_height = 1;
+                    scaled_size = {size_limit.x, new_height};
+                } else {
+                    // Scale based on Y limit.
+                    int new_width = size.x * y_scale;
+                    if (new_width < 1)
+                        new_width = 1;
+                    scaled_size = {new_width, size_limit.y};
+                }
             } else {
-                /*
-                 * Heap is already full:
-                 * If new element is older than the max element on the heap,
-                 * just replace the max element, and update the heap.
-                 */
-                if (by_last_use(it) < by_last_use(to_remove.front())) {
-                    to_remove.front() = it;
-                    sift_down_heap(to_remove, {}, by_last_use);
+                // Only one limit exists.
+                if (size_limit.x > 0) {
+                    // Scale based on X limit.
+                    int new_height = size.y * x_scale;
+                    if (new_height < 1)
+                        new_height = 1;
+                    scaled_size = {size_limit.x, new_height};
+                } else {
+                    // Scale based on Y limit.
+                    int new_width = size.x * y_scale;
+                    if (new_width < 1)
+                        new_width = 1;
+                    scaled_size = {new_width, size_limit.y};
                 }
             }
+            sdl::surface scaled_img{scaled_size, 32, img.get_format_enum()};
+            sdl::blit_scaled(img, nullptr, scaled_img, nullptr);
+            img = std::move(scaled_img);
         }
-        // Now to_remove contains the "excess" elements that must be purged.
-        for (auto it : to_remove) {
-            auto& info = it->second;
-            if (info.easy) {
-                // If removing an active request, make sure it's removed from the curl::multi.
-                // cout << "IconManager: prunning an active request" << endl;
-                multi->remove(*info.easy);
-            }
-            // unordered_map guarantees all other iterators remain valid
-            cache->erase(it);
-        }
-    }
 
 
-    void
-    handle_finished_downloads()
-    {
-        for (auto [ez, error_code] : multi->get_done()) {
-            auto cache = safe_cache.lock();
-            auto* entry = find(cache, ez);
-            if (!entry) {
-                cout << "ERROR: IconManager::handle_finished_downloads(): failed to find entry for "
-                     << ez << endl;
-                continue;
+        void
+        CacheEntry::load_from_buffer()
+        {
+            TRACE_FUNC;
+            assert(raw_buf);
+            sdl::rwops rw{std::span(*raw_buf)};
+            img = sdl::img::load(rw);
+            raw_buf.reset();
+        }
+
+
+        void
+        CacheEntry::load_from_file()
+        {
+            TRACE_FUNC;
+            img = sdl::img::load(location);
+            cout << "LOADED from file: " << location << endl;
+        }
+
+
+#ifdef __WIIU__
+        /*
+         * NOTE: GX2 only supports a few texture formats, so this allows converting the image to
+         * a supported format early.
+         */
+        sdl::surface
+        optimized(sdl::surface input)
+        {
+            if (!input)
+                return {};
+            switch (input.get_format().get_enum) {
+                // Supported formats, see SDL_render_wiiu.h from the SDL2 port.
+                using enum sdl::pixels::format_enum;
+
+                case argb_4444:
+                case rgba_4444:
+                case abgr_4444:
+                case bgra_4444:
+                case argb_1555:
+                case abgr_1555:
+                case rgba_5551:
+                case bgra_5551:
+                case rgb_565:
+                case bgr_565:
+                case rgbx_8888:
+                case rgba_8888:
+                case argb_8888:
+                case bgrx_8888:
+                case bgra_8888:
+                case abgr_8888:
+                case argb_2101010:
+                    return input;
+
+                default:
+                    return sdl::surface(input, sdl::pixels::format_enum::rgba_32);
             }
+        }
+#endif
+
+
+        Resources::Resources(sdl::renderer& renderer_,
+                             const std::string& user_agent_,
+                             const std::filesystem::path& content_dir_) :
+            renderer(renderer_),
+            user_agent{user_agent_},
+            content_dir{content_dir_},
+            error_icon{sdl::img::load_texture(renderer,
+                                              content_dir / "ui/error-icon.png")},
+            loading_icon{sdl::img::load_texture(renderer,
+                                                content_dir / "ui/loading-icon.png")}
+        {
+            TRACE_FUNC;
+
+            error_icon.set_blend_mode(SDL_BLENDMODE_BLEND);
+            loading_icon.set_blend_mode(SDL_BLENDMODE_BLEND);
+
+            multi.set_max_total_connections(10);
+            multi.set_max_connections(10);
+
+            loader_thread = std::jthread{
+                std::bind_front(&Resources::loader_thread_func, this)
+            };
+        }
+
+
+        Resources::~Resources()
+            noexcept
+        {
+            TRACE_FUNC;
+
+            load_queue.stop();
+            convert_queue.stop();
+
+            for (auto& [location, entry] : cache)
+                if (entry->easy)
+                    multi.remove(*entry->easy);
+        }
+
+
+        const sdl::texture*
+        Resources::get(const std::string& location,
+                       const sdl::vec2& size_limit)
+        {
+            CacheEntryPtr entry;
+            auto it = cache.find(location);
+            if (it != cache.end())
+                entry = it->second;
 
             try {
-                if (error_code)
-                    throw curl::error{error_code};
+                if (entry) {
+                    entry->last_use = timestamp;
 
-                if (!entry->raw_buf)
-                    throw std::runtime_error{"empty download"};
+                    switch (entry->state) {
 
-                // cout << "Loading image from " << entry->location << endl;
-                sdl::rwops rw{std::span(*entry->raw_buf)};
-                auto img = sdl::img::load(rw);
-                const int max_size = 256; // TODO: make it customizable per icon
-                const sdl::vec2 old_size = img.get_size();
-                if (old_size.x > max_size || old_size.y > max_size) {
-                    sdl::vec2 new_size;
-                    if (old_size.x > old_size.y) {
-                        new_size.x = max_size;
-                        new_size.y = std::max(1, max_size * old_size.y / old_size.x);
-                    } else {
-                        new_size.y = max_size;
-                        new_size.x = std::max(1, max_size * old_size.x / old_size.y);
+                        case LoadState::converted:
+                            return &entry->tex;
+
+                        case LoadState::error:
+                            return &error_icon;
+
+                        case LoadState::loading:
+                        case LoadState::loaded:
+                            return &loading_icon;
+
+                        case LoadState::unloaded:
+                            prepare_load(std::move(entry));
+                            return &loading_icon;
+
+                        default:
+                            throw std::logic_error{"invalid entry state: "
+                                                   + to_string(entry->state)};
+
                     }
-                    entry->img.create(new_size, 32, img.get_format_enum());
-                    // cout << "Created shrunk image in format: "
-                    //      << entry->img.get_format_enum()
-                    //      << endl;
-                    sdl::blit_scaled(img, nullptr, entry->img, nullptr);
                 } else {
-                    entry->img = std::move(img);
-                    // cout << "Created image in format: "
-                    //      << entry->img.get_format_enum()
-                    //      << endl;
+                    // entry not found, queue it up to load
+                    std::string real_location;
+                    if (location.starts_with(content_prefix)) {
+                        cout << "Requested content asset: " << location << endl;
+                        real_location =
+                            content_dir / location.substr(content_prefix.size());
+                        cout << "Real location: " << real_location << endl;
+
+                    } else
+                        real_location = location;
+
+                    entry = std::make_shared<CacheEntry>(timestamp, real_location, size_limit);
+                    cache[location] = entry;
+                    prepare_load(std::move(entry));
+                    return &loading_icon;
                 }
-                entry->state = LoadState::loaded;
-                entry->raw_buf.reset();
             }
             catch (std::exception& e) {
-                cout << "ERROR: IconManager::handle_finished_downloads(): " << e.what() << endl;
-                entry->state = LoadState::error;
+                cout << "ERROR: IconManager::get(): " << e.what() << endl;
+                return &error_icon;
+            }
+        }
+
+
+        void
+        Resources::loader_thread_func(std::stop_token stopper)
+        try {
+            while (!stopper.stop_requested()) {
+                auto entry = load_queue.try_pop_block(stopper);
+                if (entry) {
+                    try {
+                        (*entry)->load();
+                        convert_queue.push(std::move(*entry));
+                    }
+                    catch (std::exception& e) {
+                        cerr << "ERROR loading: " << e.what() << endl;
+                    }
+                } else if (stopper.stop_requested() ||
+                           entry.error() == async_queue_error::stop) {
+                    break;
+                } else if (entry.error() == async_queue_error::locked) {
+                    cerr << "WARNING: load_queue was locked" << endl;
+                }
+                // std::this_thread::sleep_for(50ms);
+            }
+        }
+        catch (std::exception& e) {
+            cerr << "ERROR: loader_thread_func(): " << e.what() << endl;
+        }
+
+
+        void
+        Resources::prepare_load(CacheEntryPtr entry)
+        {
+            entry->state = LoadState::loading;
+            if (entry->is_remote())
+                multi.add(entry->start_download(user_agent));
+            else
+                load_queue.push(std::move(entry));
+        }
+
+
+        void
+        Resources::process()
+        {
+            ++timestamp;
+
+            multi.perform();
+            for (auto [easy, error_code] : multi.get_done()) {
+                auto entry = std::any_cast<CacheEntryPtr>(easy->get_private());
+                if (!entry) {
+                    cerr << "ERROR: invalid download handle: " << easy << endl;
+                    continue;
+                }
+
+                multi.remove(*easy);
+                entry->finish_download();
+
+                try {
+                    if (error_code)
+                        throw curl::error{error_code};
+
+                    load_queue.push(entry);
+                }
+                catch (std::exception& e) {
+                    cerr << "ERROR: " << e.what() << endl;
+                    entry->state = LoadState::error;
+                }
             }
 
-            multi->remove(*entry->easy);
-            entry->easy.reset();
-            entry->raw_buf.reset();
+            // Convert at most one image into a texture.
+            if (auto value = convert_queue.try_pop()) {
+                auto& entry = *value;
+                entry->make_texture(renderer);
+            }
+
+            trim_cache();
         }
+
+
+        void
+        Resources::trim_cache()
+        {
+            if (cache.size() <= max_cache_size)
+                return;
+
+            std::size_t excess = cache.size() - max_cache_size;
+            // cout << "IconManager: prunning " << excess << " icons" << endl;
+            std::vector<Cache::iterator> to_remove(excess);
+            auto to_remove_end = to_remove.begin();
+            for (auto it = cache.begin(); it != cache.end(); ++it) {
+                if (to_remove_end != to_remove.end()) {
+                    *to_remove_end++ = it;
+                    std::ranges::push_heap(to_remove.begin(),
+                                           to_remove_end,
+                                           {},
+                                           by_last_use);
+                } else {
+                    /*
+                     * Heap is already full:
+                     * If new element is older than the max element on the heap,
+                     * just replace the max element, and update the heap.
+                     */
+                    if (by_last_use(it) < by_last_use(to_remove.front())) {
+                        to_remove.front() = it;
+                        sift_down_heap(to_remove, {}, by_last_use);
+                    }
+                }
+            }
+            // Now "to_remove" contains the "excess" elements that must be purged.
+            for (auto it : to_remove) {
+                auto& entry = it->second;
+                if (entry->easy) {
+                    // If removing an active request, make sure it's removed from the curl::multi.
+                    // cout << "IconManager: prunning an active request" << endl;
+                    multi.remove(*entry->easy);
+                }
+                // unordered_map guarantees all other iterators remain valid
+                cache.erase(it);
+            }
+        }
+
+
+        // Heap operation: After lowering the max element, push it downwards to its correct
+        // location.
+        template<std::ranges::random_access_range R,
+                 typename Comp,
+                 class Proj>
+        requires std::sortable<std::ranges::iterator_t<R>, Comp, Proj>
+        void
+        sift_down_heap(R&& r,
+                       Comp comp,
+                       Proj proj)
+        {
+            if (std::empty(r))
+                return;
+            const auto size = std::size(r);
+            std::ranges::range_size_t<R> cur_idx = 0;
+            for (;;) {
+                auto left_idx = 2u * cur_idx + 1u;
+                // If reached bottom of heap, we can stop.
+                if (left_idx >= size)
+                    break;
+                // Select the largest child to be the next.
+                auto next_idx = left_idx;
+                auto right_idx = 2u * cur_idx + 2u;
+                if (right_idx < size
+                    && std::invoke(comp,
+                                   std::invoke(proj, r[left_idx]),
+                                   std::invoke(proj, r[right_idx])))
+                    next_idx = right_idx;
+                // If max-heap property was restored, we can stop.
+                if (!std::invoke(comp,
+                                 std::invoke(proj, r[cur_idx]),
+                                 std::invoke(proj, r[next_idx])))
+                    break;
+                std::swap(r[cur_idx], r[next_idx]);
+                cur_idx = next_idx;
+            }
+        }
+
+
+        std::string
+        to_string(LoadState st)
+        {
+            switch (st) {
+                using enum LoadState;
+                case unloaded:
+                    return "unloaded";
+                case loading:
+                    return "loading";
+                case loaded:
+                    return "loaded";
+                case converted:
+                    return "converted";
+                case error:
+                    return "error";
+                default:
+                    return "unknown (" + std::to_string(static_cast<int>(st)) + ")";
+            }
+        }
+
+    } // namespace
+
+
+    /*------------------*/
+    /* Public functions */
+    /*------------------*/
+
+    void
+    initialize(sdl::renderer& rend)
+    {
+        TRACE_FUNC;
+
+        res.emplace(rend,
+                    App::get_user_agent(),
+                    App::get_content_path());
     }
 
 
     void
-    worker_func(std::stop_token token)
+    finalize()
     {
-        try {
-            multi.emplace();
-            multi->set_max_total_connections(10);
-            multi->set_max_connections(10);
+        TRACE_FUNC;
 
-            while (!token.stop_requested()) {
-#if 1
-                auto location = requests_queue.try_pop_for(50ms);
-#else
-                auto location = requests_queue.try_pop();
-#endif
-                if (location) {
-                    process_one_request(*location);
-                } else if (location.error() == async_queue_error::stop) {
-                    break;
-                } else if (location.error() == async_queue_error::locked) {
-                    cout << "WARNING: requests_queue was locked" << endl;
-                }
-                multi->perform();
-                handle_finished_downloads();
-                trim_cache();
-                std::this_thread::sleep_for(50ms);
-            }
-        }
-        catch (std::exception& e) {
-            cout << "ERROR: IconManager::worker_func(): " << e.what() << endl;
-        }
-        multi.reset();
+        res.reset();
     }
 
 
-    std::string
-    to_string(LoadState st)
+    void
+    process()
     {
-        switch (st) {
-            case LoadState::unloaded:
-                return "unloaded";
-            case LoadState::requested:
-                return "requested";
-            case LoadState::loading:
-                return "loading";
-            case LoadState::loaded:
-                return "loaded";
-            case LoadState::error:
-                return "loaded";
-            default:
-                return "unknown (" + std::to_string(static_cast<int>(st)) + ")";
-        }
+        res->process();
+    }
+
+
+    const sdl::texture*
+    get(const std::string& location,
+        const sdl::vec2& size_limit)
+    {
+        return res->get(location, size_limit);
     }
 
 } // namespace IconManager

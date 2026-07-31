@@ -1,15 +1,22 @@
+/*
+ * RadiiU - an internet radio player for the Wii U.
+ *
+ * Copyright (C) 2026  Daniel K. O. <dkosmari>
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 #include <algorithm>
 #include <cstdlib>
-#include <deque>
+#include <future>
 #include <iostream>
 #include <memory>
+#include <queue>
 #include <random>
 #include <ranges>
 #include <stdexcept>
+#include <stop_token>
 #include <thread>
 #include <unordered_set>
-#include <future>
-#include <stop_token>
 
 #ifdef __WIIU__
 #include <coreinit/time.h>
@@ -22,6 +29,7 @@
 
 #include "RadioBrowserAPI.hpp"
 
+#include "async_queue.hpp"
 #include "net/address.hpp"
 #include "net/resolver.hpp"
 #include "rest.hpp"
@@ -29,6 +37,7 @@
 #include "tracer.hpp"
 
 
+using std::cerr;
 using std::cout;
 using std::endl;
 
@@ -55,24 +64,26 @@ template<>
 struct glz::meta<RadioBrowserAPI::SearchStationParams::Order> {
     using enum RadioBrowserAPI::SearchStationParams::Order;
     static constexpr
-    auto value = enumerate(name,
-                           url,
-                           homepage,
-                           favicon,
-                           tags,
-                           country,
-                           state,
-                           language,
-                           votes,
-                           codec,
-                           bitrate,
-                           lastcheckok,
-                           lastchecktime,
-                           clicktimestamp,
-                           clickcount,
-                           clicktrend,
-                           changetimestamp,
-                           random);
+    auto value = enumerate(
+        name,
+        url,
+        homepage,
+        favicon,
+        tags,
+        country,
+        state,
+        language,
+        votes,
+        codec,
+        bitrate,
+        lastcheckok,
+        lastchecktime,
+        clicktimestamp,
+        clickcount,
+        clicktrend,
+        changetimestamp,
+        random
+    );
 };
 
 
@@ -80,24 +91,26 @@ template<>
 struct glz::meta<RadioBrowserAPI::StationParams::Order> {
     using enum RadioBrowserAPI::StationParams::Order;
     static constexpr
-    auto value = enumerate(name,
-                           url,
-                           homepage,
-                           favicon,
-                           tags,
-                           country,
-                           state,
-                           language,
-                           votes,
-                           codec,
-                           bitrate,
-                           lastcheckok,
-                           lastchecktime,
-                           clicktimestamp,
-                           clickcount,
-                           clicktrend,
-                           changetimestamp,
-                           random);
+    auto value = enumerate(
+        name,
+        url,
+        homepage,
+        favicon,
+        tags,
+        country,
+        state,
+        language,
+        votes,
+        codec,
+        bitrate,
+        lastcheckok,
+        lastchecktime,
+        clicktimestamp,
+        clickcount,
+        clicktrend,
+        changetimestamp,
+        random
+    );
 };
 
 
@@ -113,29 +126,37 @@ namespace RadioBrowserAPI {
 
     namespace {
 
+        /*-------*/
+        /* Types */
+        /*-------*/
+
         enum class State {
             disconnected,
             connecting,
             connected,
         };
 
-
         struct StatusResponse {
             bool result;
             std::string response;
         };
 
+        /*--------------*/
+        /* Type aliases */
+        /*--------------*/
 
-        string
-        to_string(State st);
+        using task_t = std::future<void>;
 
+        /*-----------*/
+        /* Constants */
+        /*-----------*/
 
         constexpr
-        const glz::opts glz_options{
-            .error_on_unknown_keys = false,
-            .prettify = true,
-        };
+        const glz::opts glz_options{ .error_on_unknown_keys = false, };
 
+        /*-----------*/
+        /* Variables */
+        /*-----------*/
 
         State state;
         bool searching;
@@ -144,43 +165,63 @@ namespace RadioBrowserAPI {
         thread_safe<MirrorsVec> mirrors;     // TODO: consider not caching the mirrors.
         std::jthread connect_thread;
         std::jthread mirrors_thread;
+        async_queue<task_t> pending_tasks;
 
-        using pending_call_t = std::future<void>;
-        using pending_call_list_t = std::deque<pending_call_t>;
-        thread_safe<pending_call_list_t> pending_calls;
+        /*-----------------------*/
+        /* Function declarations */
+        /*-----------------------*/
 
+        template<typename F,
+                 typename... Args>
+        void
+        add_task(F&& func,
+                 Args&& ...args);
+
+        void
+        dispatch_one_pending_task();
+
+        MirrorsVec
+        get_mirrors_sync(std::stop_token stopper);
+
+        std::minstd_rand
+        make_random_engine();
 
         string
-        make_url(const string& endpoint)
+        make_url(const string& endpoint);
+
+        StatusResponse
+        test_server_sync(const std::string& srv);
+
+        string
+        to_string(State st);
+
+        /*----------------------*/
+        /* Function definitions */
+        /*----------------------*/
+
+        template<typename F,
+                 typename... Args>
+        void
+        add_task(F&& func,
+                 Args&& ...args)
         {
-            string current_server = server.load();
-            if (current_server.empty()) {
-                auto m = mirrors.lock();
-                if (m->empty())
-                    throw error{"no server, no mirrors to build URL"};
-                current_server = m->front();
-            }
-            return "http://"s + current_server + endpoint;
+            pending_tasks.push(std::async(std::launch::deferred,
+                                          std::forward<F>(func),
+                                          std::forward<Args>(args)...));
         }
 
 
-        std::minstd_rand
-        make_random_engine()
+        void
+        dispatch_one_pending_task()
         {
-#ifdef __WIIU__
-            std::uint64_t now = OSGetTime();
-            std::seed_seq seeder{
-                static_cast<std::uint32_t>(now >> 32),
-                static_cast<std::uint32_t>(now >> 0 )
-            };
-#else
-            std::random_device rnd_dev;
-            std::seed_seq seeder{
-                rnd_dev(),
-                rnd_dev()
-            };
-#endif
-            return std::minstd_rand{seeder};
+            if (auto task = pending_tasks.try_pop()) {
+                try {
+                    task->get();
+                }
+                catch (std::exception& e) {
+                    cerr << "ERROR: in dispatch_one_pending_task(): " << e.what() << endl;
+                }
+            }
         }
 
 
@@ -249,8 +290,42 @@ namespace RadioBrowserAPI {
         }
 
 
+        std::minstd_rand
+        make_random_engine()
+        {
+#ifdef __WIIU__
+            std::uint64_t now = OSGetTime();
+            std::seed_seq seeder{
+                static_cast<std::uint32_t>(now >> 32),
+                static_cast<std::uint32_t>(now >> 0 )
+            };
+#else
+            std::random_device rnd_dev;
+            std::seed_seq seeder{
+                rnd_dev(),
+                rnd_dev()
+            };
+#endif
+            return std::minstd_rand{seeder};
+        }
+
+
+        string
+        make_url(const string& endpoint)
+        {
+            string current_server = server.load();
+            if (current_server.empty()) {
+                auto m = mirrors.lock();
+                if (m->empty())
+                    throw error{"no server, no mirrors to build URL"};
+                current_server = m->front();
+            }
+            return "http://"s + current_server + endpoint;
+        }
+
+
         StatusResponse
-        test_server(const std::string& srv)
+        test_server_sync(const std::string& srv)
         {
             std::string result;
             try {
@@ -264,41 +339,6 @@ namespace RadioBrowserAPI {
                 cout << "Failed to connect to " << srv << ": " << e.what() << endl;
                 return {false, std::move(result)};
             }
-        }
-
-
-        template<typename F,
-                 typename... Args>
-        void
-        defer_call(F&& func,
-                   Args&& ...args)
-        {
-            if (func) {
-                auto pc = pending_calls.lock();
-                auto fut = std::async(std::launch::deferred,
-                                      std::forward<F>(func),
-                                      std::forward<Args>(args)...);
-                pc->push_back(std::move(fut));
-            }
-        }
-
-
-        void
-        perform_deferred_calls()
-        {
-            pending_call_list_t local_pending_calls;
-            if (auto pc = pending_calls.try_lock()) {
-                if (!pc->empty())
-                    local_pending_calls = std::move(*pc);
-            }
-            for (auto& item : local_pending_calls)
-                try {
-                    cout << "making deferred call" << endl;
-                    item.get(); // make the pending calls
-                }
-                catch (std::exception& e) {
-                    cout << "BUG: issuing pending call threw: " << e.what() << endl;
-                }
         }
 
 
@@ -369,10 +409,10 @@ namespace RadioBrowserAPI {
             switch (state) {
                 case State::connecting:
                     // If in connecting state, just defer the call.
-                    defer_call(std::move(api_func),
-                               params,
-                               std::move(result_func),
-                               std::move(error_func));
+                    add_task(std::move(api_func),
+                             params,
+                             std::move(result_func),
+                             std::move(error_func));
                     break;
                 case State::disconnected: {
                     // If disconnected, do a connect then call the handlers.
@@ -423,9 +463,9 @@ namespace RadioBrowserAPI {
             switch (state) {
                 case State::connecting:
                     // If in connecting state, just defer the call.
-                    defer_call(std::move(api_func),
-                               std::move(result_func),
-                               std::move(error_func));
+                    add_task(std::move(api_func),
+                             std::move(result_func),
+                             std::move(error_func));
                     break;
 
                 case State::disconnected: {
@@ -470,18 +510,15 @@ namespace RadioBrowserAPI {
 
 
 
-    /*
-     * This performs a connection "test" on a background thread:
-     * - if there's no server set:
-     *   - two DNS lookups are used to find a list of all mirrors.
-     *   - the list is randomized
-     *   - a synchronous server stats call is done on each until one mirror succeeds.
-     * - if there's a server:
-     *   - a synchronous server stats call is done to see if it's online
-     *
-     * Then, back on the main thread (during a RadioBrowser::process() call) either the
-     * `result_func' or the `error_func' is invoked.
-     */
+    /*-----------------------------------------------------------------------------------------*
+     | This performs a connection "test" on a background thread: - if there's no server set: - |
+     | two DNS lookups are used to find a list of all mirrors.  - the list is randomized - a   |
+     | synchronous server stats call is done on each until one mirror succeeds.  - if there's  |
+     | a server: - a synchronous server stats call is done to see if it's online               |
+     |                                                                                         |
+     | Then, back on the main thread (during a RadioBrowser::process() call) either the        |
+     | `result_func' or the `error_func' is invoked.                                           |
+     *-----------------------------------------------------------------------------------------*/
     void
     connect(result_function_t<> result_func,
             error_function_t error_func)
@@ -520,7 +557,7 @@ namespace RadioBrowserAPI {
                         for (const auto& mirror : local_mirrors) {
                             if (stopper.stop_requested())
                                 throw error{"stop requested"};
-                            auto [test_success, test_response] = test_server(mirror);
+                            auto [test_success, test_response] = test_server_sync(mirror);
                             if (test_success) {
                                 server.store(mirror);
                                 success = true;
@@ -530,7 +567,7 @@ namespace RadioBrowserAPI {
                         if (!success)
                             throw error{"no working mirror found"};
                         // Defer the result_func call, after updating the connection state.
-                        defer_call(
+                        add_task(
                             [](result_function_t<> result_func)
                             {
                                 cout << "DEBUG: connection succeeded [1]!" << endl;
@@ -542,13 +579,13 @@ namespace RadioBrowserAPI {
                             std::move(result_func));
                     } else {
                         // We have a server.
-                        auto [test_success, test_response] = test_server(srv);
+                        auto [test_success, test_response] = test_server_sync(srv);
                         if (!test_success)
                             throw error{"mirror "s + srv + " failed with:\n"s + test_response};
 
                         server.store(srv);
                         // Defer the result_func call, after updating the connection state.
-                        defer_call(
+                        add_task(
                             [](result_function_t<> result_func)
                             {
                                 cout << "DEBUG: connection succeeded [2]!" << endl;
@@ -562,7 +599,7 @@ namespace RadioBrowserAPI {
                 }
                 catch (std::exception& e) {
                     // Defer the error_func call, after updating the connection state.
-                    defer_call(
+                    add_task(
                         [](error_function_t error_func,
                             const error& e)
                         {
@@ -572,7 +609,8 @@ namespace RadioBrowserAPI {
                                 std::invoke(error_func, e);
                         },
                         std::move(error_func),
-                        error{e});
+                        error{e}
+                    );
                 }
             },
             std::move(result_func),
@@ -586,7 +624,6 @@ namespace RadioBrowserAPI {
     {
         return mirrors.load();
     }
-
 
 
     void
@@ -621,7 +658,7 @@ namespace RadioBrowserAPI {
     void
     process()
     {
-        perform_deferred_calls();
+        dispatch_one_pending_task();
         rest::process();
     }
 
@@ -685,10 +722,10 @@ namespace RadioBrowserAPI {
                 try {
                     auto new_mirrors = get_mirrors_sync(stopper);
                     mirrors.store(std::move(new_mirrors));
-                    defer_call(std::move(result_func));
+                    add_task(std::move(result_func));
                 }
                 catch (std::exception& e) {
-                    defer_call(std::move(error_func), error{e});
+                    add_task(std::move(error_func), error{e});
                 }
             },
             std::move(result_func),

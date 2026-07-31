@@ -53,11 +53,9 @@ namespace UI {
         if (station.favicon.empty())
             return;
 
-        auto icon = IconManager::get(station.favicon);
-        auto icon_size = icon->get_size();
-        sdl::vec2 size = {128, 128};
-        size.x = icon_size.x * size.y / icon_size.y;
-        show_image(*IconManager::get(station.favicon), size);
+        sdl::vec2 max_size = {0, 128};
+        auto icon = IconManager::get(station.favicon, max_size);
+        show_image(*icon);
         ImGui::SetItemTooltip(station.favicon);
     }
 
@@ -173,10 +171,9 @@ namespace UI {
 
     void
     show_info_row(const std::string& label,
-                  const csv_strings& values)
+                  const std::vector<std::string>& values)
     {
-        std::optional<std::string> values_str{values};
-        show_info_row(label, values_str.value_or(""));
+        show_info_row(label, string_utils::to_csv(values));
     }
 
 
@@ -282,21 +279,23 @@ namespace UI {
 
 
     void
-    show_play_button(std::shared_ptr<Station>& station)
+    show_play_button(StationPtr& station)
     {
         const sdl::vec2 button_size = {96, 96};
-        if (PlayerTab::is_playing(station)) {
+        if (PlayerTab::is_playing(*station)) {
             if (show_image_button("stop_button",
-                                  *IconManager::get("ui/stop-button.svg"),
+                                  *IconManager::get("content:/ui/stop-button.svg"),
                                   button_size))
                 PlayerTab::stop();
         } else {
             if (show_image_button("play_button",
-                                  *IconManager::get("ui/play-button.svg"),
+                                  *IconManager::get("content:/ui/play-button.svg"),
                                   button_size)) {
                 if (cfg::state.switch_to_player)
                     App::set_tab(TabID::player);
                 PlayerTab::play(station);
+                // TODO: call RadioBrowserAPI directly.
+                BrowserTab::send_click(station);
             }
         }
     }

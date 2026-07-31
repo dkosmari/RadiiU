@@ -12,7 +12,8 @@
 #include <stdexcept>
 #include <string>
 
-#include <glaze/json.hpp>
+#include <glaze/json/read.hpp>
+#include <glaze/json/write.hpp>
 #include <glaze/exceptions/json_exceptions.hpp>
 
 
@@ -46,7 +47,7 @@ namespace Serializer {
          const std::filesystem::path& filename)
     {
         std::filesystem::path filename_new = filename.string() + ".new";
-        glz::ex::write_file_json<glz_options>(obj, filename_new.c_str(), std::string{});
+        glz::ex::write_file_json<glz_options>(obj, filename_new.string(), std::string{});
 
 #ifdef __WIIU__
         // WORKAROUND: wut+newlib cannot rename when destination file already exists.

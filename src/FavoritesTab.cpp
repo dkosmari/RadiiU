@@ -26,6 +26,7 @@
 #include "IconsFontAwesome4.h"
 #include "Serializer.hpp"
 #include "Station.hpp"
+#include "StationGlaze.hpp"
 #include "string_utils.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
@@ -33,11 +34,16 @@
 
 using std::cout;
 using std::endl;
-
+using string_utils::from_csv;
+using string_utils::to_csv;
 
 namespace FavoritesTab {
 
     namespace {
+
+        /*-------*/
+        /* Types */
+        /*-------*/
 
         struct MoveOp {
             std::size_t src;
@@ -57,20 +63,14 @@ namespace FavoritesTab {
 
             EditFields(const Station& station);
 
-
-            csv_strings
-            language_csv()
-                const;
-
-            csv_strings
-            tags_csv()
-                const;
-
         }; // struct EditFields
 
+        /*-----------------------*/
+        /* Function declarations */
+        /*-----------------------*/
 
         const std::string&
-        get_id(const std::shared_ptr<Station>& st);
+        get_id(const StationPtr& st);
 
         void
         process_popup_create();
@@ -87,53 +87,48 @@ namespace FavoritesTab {
                  std::string& value);
 
         void
-        show_station(std::shared_ptr<Station>& station,
+        show_station(StationPtr& station,
                      std::size_t index);
 
         void
         show_station_fields(Station& st);
 
+        /*-----------*/
+        /* Constants */
+        /*-----------*/
 
-        std::vector<std::shared_ptr<Station>> stations;
+        const std::string popup_delete_title = "Delete station?";
+        const std::string popup_edit_title = "Edit station";
+        const std::string popup_create_title = "Create station";
+
+        /*-----------*/
+        /* Variables */
+        /*-----------*/
+
+        std::vector<StationPtr> stations;
         std::unordered_multiset<std::string> uuids;
         std::optional<MoveOp> move_operation;
         std::optional<std::size_t> scroll_to_station;
-        const std::string popup_delete_title = "Delete station?";
         std::optional<std::size_t> station_index_to_remove;
-        const std::string popup_edit_title = "Edit station";
-        const std::string popup_create_title = "Create station";
         std::optional<EditFields> edit_fields;
         std::optional<Station> created_station;
 
+        /*----------------------*/
+        /* Function definitions */
+        /*----------------------*/
 
         EditFields::EditFields() = default;
 
 
         EditFields::EditFields(const Station& station) :
             old_uuid{station.stationuuid},
-            language{static_cast<std::optional<std::string>>(station.language).value_or("")},
-            tags{static_cast<std::optional<std::string>>(station.tags).value_or("")}
+            language{to_csv(station.language)},
+            tags{to_csv(station.tags)}
         {}
 
 
-        csv_strings
-        EditFields::language_csv()
-            const
-        {
-            return csv_strings(language);
-        }
-
-
-        csv_strings
-        EditFields::tags_csv()
-            const
-        {
-            return csv_strings(tags);
-        }
-
-
         const std::string&
-        get_id(const std::shared_ptr<Station>& st)
+        get_id(const StationPtr& st)
         {
             return st->stationuuid;
         }
@@ -142,10 +137,12 @@ namespace FavoritesTab {
         void
         process_popup_create()
         {
+            using namespace ImGui::RAII;
+
             ImGui::SetNextWindowSize({1100, 700}, ImGuiCond_Appearing);
             ImGui::SetNextWindowSizeConstraints({ 400, 400 },
                                                 { FLT_MAX, FLT_MAX });
-            if (ImGui::RAII::PopupModal popup_create{
+            if (PopupModal popup_create{
                     popup_create_title,
                     nullptr,
                     ImGuiWindowFlags_NoSavedSettings
@@ -158,7 +155,7 @@ namespace FavoritesTab {
                     edit_fields.emplace();
 
                 // Note: use a helper child window to push the response buttons to the bottom.
-                if (ImGui::RAII::Child content_child{
+                if (Child content_child{
                         "content",
                         {0, -ImGui::GetFrameHeightWithSpacing()},
                         ImGuiChildFlags_NavFlattened
@@ -193,8 +190,8 @@ namespace FavoritesTab {
                     if (ImGui::Button(label)) {
                         ImGui::CloseCurrentPopup();
                         if (edit_fields) {
-                            created_station->language = edit_fields->language_csv();
-                            created_station->tags = edit_fields->tags_csv();
+                            created_station->language = from_csv(edit_fields->language);
+                            created_station->tags = from_csv(edit_fields->tags);
                             edit_fields.reset();
                             add(*created_station);
                             created_station.reset();
@@ -211,10 +208,12 @@ namespace FavoritesTab {
         process_popup_delete(const Station& station,
                              std::size_t index)
         {
+            using namespace ImGui::RAII;
+
             ImGui::SetNextWindowSize({800, 300}, ImGuiCond_Appearing);
             ImGui::SetNextWindowSizeConstraints({ 400, 250 },
                                                 { FLT_MAX, FLT_MAX });
-            if (ImGui::RAII::PopupModal popup_delete{
+            if (PopupModal popup_delete{
                     popup_delete_title,
                     nullptr,
                     ImGuiWindowFlags_NoSavedSettings
@@ -223,7 +222,7 @@ namespace FavoritesTab {
                 auto window_size = ImGui::GetContentRegionAvail();
 
                 // Note: we use a helper child window to push the response buttons to the bottom.
-                if (ImGui::RAII::Child content_child{
+                if (Child content_child{
                         "content",
                         {0, -ImGui::GetFrameHeightWithSpacing()
                         }})
@@ -263,12 +262,14 @@ namespace FavoritesTab {
         void
         process_popup_edit(Station& station)
         {
+            using namespace ImGui::RAII;
+
             // TODO: add button for updating from Browser, if uuid is present
 
             ImGui::SetNextWindowSize({1100, 700}, ImGuiCond_Appearing);
             ImGui::SetNextWindowSizeConstraints({ 400, 400 },
                                                 { FLT_MAX, FLT_MAX });
-            if (ImGui::RAII::PopupModal popup_edit{
+            if (PopupModal popup_edit{
                     popup_edit_title,
                     nullptr,
                     ImGuiWindowFlags_NoSavedSettings
@@ -278,7 +279,7 @@ namespace FavoritesTab {
                     edit_fields.emplace(station);
 
                 // Note: use a helper child window to push the response buttons to the bottom.
-                if (ImGui::RAII::Child content_child{
+                if (Child content_child{
                         "content",
                         {0, -ImGui::GetFrameHeightWithSpacing()},
                         ImGuiChildFlags_NavFlattened
@@ -320,8 +321,8 @@ namespace FavoritesTab {
                                 if (!station.stationuuid.empty())
                                     uuids.insert(station.stationuuid);
                             }
-                            station.language = edit_fields->language_csv();
-                            station.tags = edit_fields->tags_csv();
+                            station.language = from_csv(edit_fields->language);
+                            station.tags = from_csv(edit_fields->tags);
                             edit_fields.reset();
                         }
                     }
@@ -347,12 +348,14 @@ namespace FavoritesTab {
 
 
         void
-        show_station(std::shared_ptr<Station>& station,
+        show_station(StationPtr& station,
                      std::size_t index)
         {
-            ImGui::RAII::ID station_id{std::to_string(index) + ":" + station->stationuuid};
+            using namespace ImGui::RAII;
 
-            if (ImGui::RAII::Child station_child{
+            ID station_id{std::to_string(index) + ":" + station->stationuuid};
+
+            if (Child station_child{
                     "station",
                     {0, 0},
                     ImGuiChildFlags_AutoResizeY |
@@ -360,7 +363,7 @@ namespace FavoritesTab {
                     ImGuiChildFlags_NavFlattened
                 }) {
 
-                if (ImGui::RAII::Child actions_child{
+                if (Child actions_child{
                         "actions",
                         {0, 0},
                         ImGuiChildFlags_AutoResizeX |
@@ -371,7 +374,7 @@ namespace FavoritesTab {
                     UI::show_play_button(station);
 
                     {
-                        ImGui::RAII::Disabled disable_first_index{index == 0};
+                        Disabled disable_first_index{index == 0};
                         // ▲
                         if (ImGui::Button(ICON_FA_CHEVRON_UP)) {
                             move_operation.emplace();
@@ -384,7 +387,7 @@ namespace FavoritesTab {
                     ImGui::SameLine();
 
                     {
-                        ImGui::RAII::Disabled disable_last_index{index + 1 >= stations.size()};
+                        Disabled disable_last_index{index + 1 >= stations.size()};
                         // ▼
                         if (ImGui::Button(ICON_FA_CHEVRON_DOWN)) {
                             move_operation.emplace();
@@ -412,7 +415,7 @@ namespace FavoritesTab {
 
                 ImGui::SameLine();
 
-                if (ImGui::RAII::Child details_child{
+                if (Child details_child{
                         "details",
                         {0, 0},
                         ImGuiChildFlags_AutoResizeY |
@@ -425,7 +428,7 @@ namespace FavoritesTab {
 
                     UI::show_station_basic_info(*station);
 
-                    if (ImGui::RAII::Child extra_info_child{
+                    if (Child extra_info_child{
                             "extra_info",
                             {0, 0},
                             ImGuiChildFlags_AutoResizeY |
@@ -446,10 +449,12 @@ namespace FavoritesTab {
         void
         show_station_fields(Station& st)
         {
+            using namespace ImGui::RAII;
+
             if (!edit_fields)
                 return;
 
-            if (ImGui::RAII::Table fields_table{"fields", 2}) {
+            if (Table fields_table{"fields", 2}) {
                 ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
@@ -563,7 +568,9 @@ namespace FavoritesTab {
     void
     process_ui()
     {
-        if (ImGui::RAII::Child toolbar_child{
+        using namespace ImGui::RAII;
+
+        if (Child toolbar_child{
                 "toolbar",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeY |
@@ -584,7 +591,7 @@ namespace FavoritesTab {
         } // toolbar_child
 
         // Note: flat navigation doesn't work well on child windows that scroll.
-        if (ImGui::RAII::Child favorites_child{"favorites"}) {
+        if (Child favorites_child{"favorites"}) {
 
             for (std::size_t index = 0; index < stations.size(); ++index) {
                 show_station(stations[index], index);
@@ -637,7 +644,7 @@ namespace FavoritesTab {
             return remove(station.stationuuid);
 
         std::erase_if(stations,
-                      [&station](const std::shared_ptr<Station>& st)
+                      [&station](const StationPtr& st)
                       {
                           return station.stationuuid == st->stationuuid;
                       });

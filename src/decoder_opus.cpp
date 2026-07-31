@@ -176,7 +176,7 @@ namespace decoder {
 
         auto tags_vec = to_vector(tags);
         for (auto entry : tags_vec) {
-            auto tokens = string_utils::split(entry, "="sv, false, 2);
+            auto tokens = string_utils::split_view(entry, "="sv, false, 2);
             if (tokens.size() != 2)
                 continue;
             auto key = tokens[0];

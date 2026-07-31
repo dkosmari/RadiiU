@@ -12,33 +12,18 @@
 #include <iostream>
 #include <optional>
 
-#include <glaze/core/meta.hpp>
 
 #include "cfg.hpp"
 
 #include "App.hpp"
 #include "Serializer.hpp"
+#include "TabIDGlaze.hpp"
+#include "tracer.hpp"
 
 
 using std::cout;
 using std::endl;
 using std::string;
-
-
-template<>
-struct glz::meta<TabID> {
-    using enum TabID;
-    static
-    constexpr
-    auto value = enumerate(favorites,
-                           browser,
-                           recent,
-                           player,
-                           settings,
-                           about,
-                           last_active,
-                           num_tabs);
-}; // struct glz::meta<TabID>
 
 
 namespace cfg {
@@ -55,6 +40,7 @@ namespace cfg {
     void
     initialize()
     {
+        TRACE_FUNC;
         load_defaults();
         load();
     }
@@ -63,6 +49,7 @@ namespace cfg {
     void
     finalize()
     {
+        TRACE_FUNC;
         save();
     }
 
@@ -70,6 +57,7 @@ namespace cfg {
     void
     load()
     {
+        TRACE_FUNC;
         try {
             auto filename = App::get_config_path() / "settings.json";
             Serializer::load(state, filename);
@@ -83,6 +71,7 @@ namespace cfg {
     void
     save()
     {
+        TRACE_FUNC;
         try {
             auto filename = App::get_config_path() / "settings.json";
             Serializer::save(state, filename);

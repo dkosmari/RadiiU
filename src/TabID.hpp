@@ -17,6 +17,7 @@ enum class TabID : unsigned {
     recent,
     player,
     settings,
+    logs,
     about,
     last_active,
     num_tabs

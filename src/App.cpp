@@ -47,6 +47,7 @@
 #include "FontManager.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
+#include "LogsTab.hpp"
 #include "PlayerTab.hpp"
 #include "RadioBrowserAPI.hpp"
 #include "RecentTab.hpp"
@@ -355,6 +356,7 @@ namespace App {
         RadioBrowserAPI::set_server(cfg::state.server);
 
         // Initialize tabs.
+        LogsTab::initialize();
         AboutTab::initialize();
         FavoritesTab::initialize();
         BrowserTab::initialize();
@@ -374,6 +376,7 @@ namespace App {
         BrowserTab::finalize();
         FavoritesTab::finalize();
         AboutTab::finalize();
+        LogsTab::finalize();
 
         // Finalize modules.
         RadioBrowserAPI::finalize();
@@ -535,7 +538,7 @@ namespace App {
 
                     ImGui::SameLine();
                     // Put a close button on the top right
-                    auto tex = IconManager::get("ui/close-button.svg");
+                    auto tex = IconManager::get("content:/ui/close-button.svg");
                     auto tex_size = ImGui::ToVec2(tex->get_size());
                     ImVec2 close_button_size = tex_size
                         + 2 * (style.FramePadding + style.FrameBorderSize * ImVec2{1, 1});
@@ -590,6 +593,15 @@ namespace App {
                         }) {
                         current_tab = TabID::settings;
                         SettingsTab::process_ui();
+                    }
+
+                    if (ImGui::RAII::TabItem logs_tab{
+                            to_label(TabID::logs),
+                            nullptr,
+                            get_tab_item_flags_for(TabID::logs)
+                        }) {
+                        current_tab = TabID::logs;
+                        LogsTab::process_ui();
                     }
 
                     if (ImGui::RAII::TabItem about_tab{
@@ -691,10 +703,12 @@ namespace App {
 
         RadioBrowserAPI::process();
 
+        LogsTab::process_logic();
         FavoritesTab::process_logic();
         RecentTab::process_logic();
         PlayerTab::process_logic();
 
+        IconManager::process();
 
         Uint64 now = SDL_GetTicks64();
         // process transitions to screen saver

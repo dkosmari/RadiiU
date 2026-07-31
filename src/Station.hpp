@@ -9,16 +9,15 @@
 #define STATION_HPP
 
 #include <cstdint>
+#include <memory>
 #include <string>
-#include <string_view>
 #include <utility>
 #include <vector>
 
-#include <glaze/core/meta.hpp>
 
-#include "csv_strings.hpp"
-#include "RadioBrowserAPI.hpp"
-
+namespace RadioBrowserAPI {
+    struct Station;
+}
 
 struct Station {
 
@@ -30,8 +29,8 @@ struct Station {
     std::string favicon;
     std::string countrycode;
 
-    csv_strings language;
-    csv_strings tags;
+    std::vector<std::string> language; // special serialization needed
+    std::vector<std::string> tags; // special serialization needed
 
     // Volatile fields, never stored.
     std::uint64_t votes = 0;
@@ -48,29 +47,15 @@ struct Station {
 }; // struct Station
 
 
+using StationPtr = std::shared_ptr<Station>;
+
+using ConstStationPtr = std::shared_ptr<Station>;
+
+
 // Comparison ignores volatile fields.
 bool
 operator ==(const Station& a,
             const Station& b)
     noexcept;
-
-
-template<>
-struct glz::meta<Station> {
-    static
-    constexpr
-    bool
-    skip(const std::string_view key,
-         const meta_context&) {
-        using namespace std::literals;
-        if (key == "votes"sv ||
-            key == "click_count"sv ||
-            key == "click_trend"sv ||
-            key == "bitrate"sv ||
-            key == "codec"sv)
-            return true;
-        return false;
-    }
-};
 
 #endif

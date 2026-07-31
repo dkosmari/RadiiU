@@ -21,8 +21,8 @@
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
 #include "Serializer.hpp"
-#include "Station.hpp"
 #include "StationDetailsPopup.hpp"
+#include "StationGlaze.hpp"
 #include "UI.hpp"
 
 
@@ -32,12 +32,12 @@ using std::endl;
 
 namespace RecentTab {
 
-    std::deque<std::shared_ptr<Station>> stations;
+    std::deque<ConstStationPtr> stations;
 
 
     namespace {
 
-        std::shared_ptr<Station> pending_add;
+        StationPtr pending_add;
         std::optional<std::size_t> pending_remove;
 
     } // namespace
@@ -81,7 +81,7 @@ namespace RecentTab {
 
 
     void
-    show_station(std::shared_ptr<Station>& station,
+    show_station(ConstStationPtr& station,
                  std::size_t index)
     {
         ImGui::RAII::ID station_id{static_cast<int>(index)};
@@ -225,7 +225,7 @@ namespace RecentTab {
 
 
     void
-    queue_add(std::shared_ptr<Station>& station)
+    queue_add(ConstStationPtr& station)
     {
         pending_add = station;
     }

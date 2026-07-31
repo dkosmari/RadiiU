@@ -10,8 +10,7 @@
 
 #include <memory>
 
-
-struct Station;
+#include "Station.hpp"
 
 
 namespace RecentTab {
@@ -32,7 +31,7 @@ namespace RecentTab {
 
 
     void
-    queue_add(std::shared_ptr<Station>& station);
+    queue_add(ConstStationPtr& station);
 
 } // namespace RecentTab
 

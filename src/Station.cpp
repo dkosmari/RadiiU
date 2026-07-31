@@ -8,10 +8,10 @@
 #include <concepts>
 #include <utility>
 
-#include <glaze/json.hpp>
-#include <glaze/exceptions/json_exceptions.hpp>
-
 #include "Station.hpp"
+
+#include "RadioBrowserAPI.hpp"
+#include "string_utils.hpp"
 
 
 Station
@@ -25,15 +25,13 @@ Station::from_radio_browser(const RadioBrowserAPI::Station& st)
         .homepage     = st.homepage,
         .favicon      = st.favicon,
         .countrycode  = st.countrycode,
-
-        .language = csv_strings(std::optional<std::string>{st.language}),
-        .tags     = csv_strings(std::optional<std::string>{st.tags}),
-
-        .votes       = st.votes,
-        .click_count = st.clickcount,
-        .click_trend = st.clicktrend,
-        .bitrate     = st.bitrate,
-        .codec       = st.codec,
+        .language     = string_utils::from_csv(st.language),
+        .tags         = string_utils::from_csv(st.tags),
+        .votes        = st.votes,
+        .click_count  = st.clickcount,
+        .click_trend  = st.clicktrend,
+        .bitrate      = st.bitrate,
+        .codec        = st.codec,
     };
 }
 

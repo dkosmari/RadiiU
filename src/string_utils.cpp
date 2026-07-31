@@ -108,6 +108,18 @@ namespace string_utils {
     } // namespace detail
 
 
+    std::vector<std::string>
+    from_csv(const std::string& csv,
+             bool compress)
+    {
+        std::vector<std::string> result;
+        for (auto token : csv | std::views::split(','))
+            if (!compress || !token.empty())
+                result.emplace_back(token.cbegin(), token.cend());
+        return result;
+    }
+
+
     std::string
     join(const std::vector<std::string>& tokens,
          const std::string& separator,
@@ -117,7 +129,7 @@ namespace string_utils {
             return "";
 
         std::string result;
-        std::size_t total = 0;
+        std::string::size_type total = 0;
         if (compress) {
             for (const auto& tok : tokens) {
                 if (tok.empty())
@@ -196,7 +208,7 @@ namespace string_utils {
     split(const std::string& input,
           const std::vector<std::string>& separators,
           bool compress,
-          std::size_t max_tokens)
+          std::string::size_type max_tokens)
     {
         std::vector<std::string> result;
 
@@ -228,21 +240,21 @@ namespace string_utils {
     split(const std::string& input,
           const std::string& separator,
           bool compress,
-          std::size_t max_tokens)
+          std::string::size_type max_tokens)
     {
         return split(input, std::vector{separator}, compress, max_tokens);
     }
 
 
     std::vector<std::string_view>
-    split(const std::string_view& input,
-          const std::vector<std::string_view>& separators,
-          bool compress,
-          std::size_t max_tokens)
+    split_view(const std::string_view& input,
+               const std::vector<std::string_view>& separators,
+               bool compress,
+               std::string_view::size_type max_tokens)
     {
         std::vector<std::string_view> result;
 
-        using size_type = std::string::size_type;
+        using size_type = std::string_view::size_type;
         auto [sep_start, sep_index] = find_first_of(input, separators);
         size_type tok_start = 0;
 
@@ -267,12 +279,20 @@ namespace string_utils {
 
 
     std::vector<std::string_view>
-    split(const std::string_view& input,
-          const std::string_view& separator,
-          bool compress,
-          std::size_t max_tokens)
+    split_view(const std::string_view& input,
+               const std::string_view& separator,
+               bool compress,
+               std::string_view::size_type max_tokens)
     {
-        return split(input, std::vector{separator}, compress, max_tokens);
+        return split_view(input, std::vector{separator}, compress, max_tokens);
+    }
+
+
+    std::string
+    to_csv(const std::vector<std::string>& vec,
+           bool compress)
+    {
+        return join(vec, ",", compress);
     }
 
 
@@ -322,6 +342,17 @@ namespace string_utils {
             return {};
         auto finish = std::ranges::find_if_not(input | std::views::reverse, predicate).base();
         return std::string{start, finish};
+    }
+
+
+    std::string
+    trimmed(const std::string& input,
+            int (*predicate)(int))
+    {
+        return trimmed(input, [predicate](std::string::value_type c) -> bool
+        {
+            return predicate(static_cast<unsigned char>(c));
+        });
     }
 
 } // namespace string_utils
