@@ -404,7 +404,7 @@ namespace IconManager {
         {
             if (!input)
                 return {};
-            switch (input.get_format().get_enum) {
+            switch (input.get_format().get_enum()) {
                 // Supported formats, see SDL_render_wiiu.h from the SDL2 port.
                 using enum sdl::pixels::format_enum;
 
