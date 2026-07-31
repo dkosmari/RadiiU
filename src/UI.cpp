@@ -50,10 +50,11 @@ namespace UI {
     void
     show_favicon(const Station& station)
     {
+        using namespace ImGui::RAII;
         if (station.favicon.empty())
             return;
 
-        sdl::vec2 max_size = {0, 128};
+        const sdl::vec2 max_size = {400, 128};
         auto icon = IconManager::get(station.favicon, max_size);
         show_image(*icon);
         ImGui::SetItemTooltip(station.favicon);
@@ -261,15 +262,17 @@ namespace UI {
     show_link_row(const std::string& label,
                   const std::string& url)
     {
+        using namespace ImGui::RAII;
+
         ImGui::TableNextRow();
 
-        ImGui::RAII::ID label_id{label};
+        ID label_id{label};
 
         ImGui::TableNextColumn();
         show_label(label);
 
         ImGui::TableNextColumn();
-        ImGui::RAII::TextWrapPos wrapper{0.0f};
+        TextWrapPos wrapper{0.0f};
         if (show_link(url)) {
 #ifdef __WIIU__
             // TODO: show QR code
@@ -304,7 +307,9 @@ namespace UI {
     void
     show_station_basic_info(const Station& station)
     {
-        if (ImGui::RAII::Child basic_info_child{
+        using namespace ImGui::RAII;
+
+        if (Child basic_info_child{
                 "basic_info",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeY |
@@ -361,7 +366,9 @@ namespace UI {
     show_boxed(const std::string& text,
                const std::string& tooltip)
     {
-        ImGui::RAII::ID text_id{text};
+        using namespace ImGui::RAII;
+
+        ID text_id{text};
 
         const ImGuiStyle& style = ImGui::GetStyle();
         const ImVec2 size = ImGui::CalcTextSize(text)
@@ -372,7 +379,7 @@ namespace UI {
         if (size.x + spacing > available.x)
             ImGui::NewLine();
 
-        if (ImGui::RAII::Child boxed_child{
+        if (Child boxed_child{
                 "boxed",
                 size,
                 ImGuiChildFlags_FrameStyle
@@ -433,7 +440,9 @@ namespace UI {
                const char* fmt,
                std::va_list args)
     {
-        std::optional<ImGui::RAII::StyleColor> color_style;
+        using namespace ImGui::RAII;
+
+        std::optional<StyleColor> color_style;
         if (spec.color)
             color_style.emplace(ImGuiCol_Text, *spec.color);
 
@@ -450,7 +459,7 @@ namespace UI {
             float new_x = old_x + space_left;
             ImGui::SetCursorPosX(new_x);
         }
-        ImGui::RAII::TextWrapPos wrapper{spec.wrap};
+        TextWrapPos wrapper{spec.wrap};
         ImGui::Text(text);
     }
 
