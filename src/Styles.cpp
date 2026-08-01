@@ -9,7 +9,6 @@
 #include <array>
 #include <cstdio>
 #include <filesystem>
-#include <iostream>
 #include <unordered_map>
 #include <optional>
 #include <stdexcept>
@@ -20,17 +19,19 @@
 #include <glaze/exceptions/json_exceptions.hpp>
 
 #include <imgui.h>
+#include <imgui_stdlib.h>
 
 #include "Styles.hpp"
 
 #include "App.hpp"
 #include "cfg.hpp"
+#include "LogManager.hpp"
 #include "tracer.hpp"
 
 
-using std::cout;
-using std::endl;
 using namespace std::literals;
+
+using ImGui::to_string;
 
 
 template<>
@@ -56,13 +57,6 @@ namespace Styles {
             default:
                 throw std::logic_error{"invalid group"};
         }
-    }
-
-
-    std::string
-    to_string(ImGuiCol_ col)
-    {
-        return ImGui::GetStyleColorName(col);
     }
 
 
@@ -113,7 +107,7 @@ namespace Styles {
                 if (auto idx = color_name_to_index(key)) {
                     im_colors[*idx] = value;
                 } else {
-                    cout << "WARNING: style color for \"" << key << "\" is invalid" << endl;
+                    LOG_ERROR("Style color name {:?} is invalid.", key);
                 }
             }
         }
@@ -211,17 +205,17 @@ namespace Styles {
                 }
             }
             catch (std::exception& e) {
-                cout << "ERROR: trying to list user styles: " << e.what() << endl;
+                LOG_ERROR("Trying to list user styles: {}", e.what());
             }
         }
 
         std::ranges::sort(style_list);
 
-        cout << "Found " << style_list.size() << " styles" << endl;
+        LOG_INFO("Found {} styles.", style_list.size());
 
     }
     catch (std::exception& e) {
-        cout << "ERROR: Styles::find_styles(): " << e.what() << endl;
+        LOG_ERROR("{}", e.what());
     }
 
 
@@ -243,14 +237,14 @@ namespace Styles {
     try {
 
         if (cfg::state.style.empty()) {
-            cout << "Loading " << imgui_styles.front().name << " style" << endl;
+            LOG_INFO("Applying style: {:?}", imgui_styles.front().name);
             imgui_styles.front().apply();
             return;
         }
 
         for (auto& st : imgui_styles) {
             if (st.name == cfg::state.style) {
-                cout << "Loading " << st.name << " style" << endl;
+                LOG_INFO("Applying style: {:?}", st.name);
                 st.apply();
                 return;
             }
@@ -265,7 +259,7 @@ namespace Styles {
         load_style_file(App::get_content_path() / filename);
     }
     catch (std::exception& e) {
-        cout << "ERROR: Styles::load(): " << e.what() << endl;
+        LOG_ERROR("{}", e.what());
     }
 
 } // namespace Styles

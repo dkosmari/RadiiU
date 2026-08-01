@@ -8,7 +8,6 @@
 #include <cctype>
 #include <exception>
 #include <fstream>
-#include <iostream>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -35,8 +34,9 @@
 #include "AboutTab.hpp"
 
 #include "App.hpp"
-#include "IconsFontAwesome4.h"
 #include "IconManager.hpp"
+#include "IconsFontAwesome4.h"
+#include "LogManager.hpp"
 #include "string_utils.hpp"
 #include "UI.hpp"
 
@@ -44,9 +44,6 @@
 #include <config.h>
 #endif
 
-
-using std::cout;
-using std::endl;
 
 using namespace std::literals;
 
@@ -153,11 +150,9 @@ namespace AboutTab {
                         continue;
                     auto tokens = split(line, ":", false, 2);
                     if (tokens.size() != 2) {
-                        cout << "ERROR: get_credits(): wrong number of tokens ("
-                             << tokens.size()
-                             << "): \""
-                             << line << "\""
-                             << endl;
+                        LOG_ERROR("wrong number of tokens ({}): {:?}",
+                                  tokens.size(),
+                                  line);
                         continue;
                     }
                     for (auto& t : tokens)
@@ -168,7 +163,7 @@ namespace AboutTab {
                 }
             }
             catch (std::exception& e) {
-                cout << "ERROR: get_credits(): " << e.what() << endl;
+                LOG_ERROR("{}", e.what());
             }
 
             return result;

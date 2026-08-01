@@ -1,24 +1,21 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include <bit>
 #include <cerrno>
-#include <iostream>
 #include <string_view>
 
 #include <opus/opus_defines.h>
 
 #include "decoder_opus.hpp"
 
+#include "LogManager.hpp"
 #include "string_utils.hpp"
 
-
-using std::cout;
-using std::endl;
 
 using namespace std::literals;
 
@@ -66,7 +63,7 @@ namespace decoder {
         if (!oof)
             throw error{"op_open_callbacks() failed", e};
 
-        cout << "Created opus decoder." << endl;
+        LOG_INFO("Created opus decoder.");
     }
 
 
@@ -97,7 +94,7 @@ namespace decoder {
                     return {};
                 case OP_HOLE:
                 case OP_EREAD:
-                    cout << "Harmless (?) Opus error: " << opus_error_to_string(r) << endl;
+                    LOG_DEBUG("Harmless (?) Opus error: {:?}", opus_error_to_string(r));
                     return {};
                 default:
                     throw error{"op_read_stereo() failed", r};

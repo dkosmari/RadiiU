@@ -47,6 +47,7 @@
 #include "FontManager.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
+#include "LogManager.hpp"
 #include "LogsTab.hpp"
 #include "PlayerTab.hpp"
 #include "RadioBrowserAPI.hpp"
@@ -169,7 +170,8 @@ namespace App {
 
     void
     initialize_config_dir()
-    {
+        noexcept
+    try {
 #ifdef __WIIU__
         nn::act::Initialize();
         char buf[256];
@@ -177,12 +179,12 @@ namespace App {
         config_path = buf;
         SAVEInit();
         if (!exists(config_path)) {
-            cout << "Creating save dir..." << endl;
+            LOG_INFO("Creating save dir: {:?}", config_path.string());
             auto status = SAVEInitSaveDir(nn::act::GetSlotNo());
             if (status)
-                cout << "SAVEInitSaveDir() returned " << int(status) << endl;
+                LOG_ERROR("SAVEInitSaveDir() failed: {}", static_cast<int>(status));
             else
-                cout << "Save dir created." << endl;
+                LOG_INFO("Save dir created.");
         }
 #else
         std::filesystem::path config_home;
@@ -198,11 +200,14 @@ namespace App {
         wordfree(&expanded);
 
         if (!exists(config_path)) {
-            cout << "Creating " << config_path << endl;
+            LOG_INFO("Creating config dir: {:?}", config_path.string());
             if (!create_directory(config_path))
-                cout << "Could not create " << config_path << endl;
+                LOG_ERROR("create_directories() failed.");
         }
 #endif
+    }
+    catch (std::exception& e) {
+        LOG_ERROR("{}(): {}", __func__, e.what());
     }
 
 
@@ -244,7 +249,7 @@ namespace App {
         const ImVec2 spacing = {9, 9};
 
         style.CellPadding       = {padding.x, padding.y / 2};
-        style.ChildBorderSize   = 0;
+        style.ChildBorderSize   = 3;
         style.ChildRounding     = rounding;
         style.FrameBorderSize   = 0;
         style.FramePadding      = padding;
@@ -269,6 +274,8 @@ namespace App {
     void
     initialize_imgui()
     {
+        TRACE_FUNC;
+
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
 
@@ -309,6 +316,7 @@ namespace App {
         TRACE_FUNC;
 
         initialize_config_dir();
+        LogManager::initialize();
         // Note: initialize cfg module early.
         cfg::initialize();
         set_tab(cfg::state.initial_tab);
@@ -392,6 +400,7 @@ namespace App {
         if (cfg::state.remember_tab)
             cfg::state.initial_tab = current_tab;
         cfg::finalize();
+        LogManager::finalize();
         finalize_config_dir();
 
         res.reset();
@@ -438,7 +447,7 @@ namespace App {
 
                 case controller_device_added: {
                     auto gc = sdl::game_controller::device(event.cdevice.which);
-                    cout << "Added controller: " << gc.get_name() << endl;
+                    LOG_INFO("Added controller: {:?}", gc.get_name());
                     res->controllers.push_back(std::move(gc));
                     last_activity = now;
                     break;
@@ -664,7 +673,7 @@ namespace App {
                     // TODO: find out how to do it with TV also.
                     if (dim_countdown == 0) {
                         if (current_vpad_mode != VPAD_LCD_STANDBY) {
-                            cout << "Screen dimming started, putting gamepad on standby." << endl;
+                            LOG_DEBUG("Screen dimming started, putting gamepad on standby.");
                             current_vpad_mode = VPAD_LCD_STANDBY;
                             VPADSetLcdMode(VPAD_CHAN_0, current_vpad_mode);
                         }
@@ -675,23 +684,23 @@ namespace App {
                 // activity. Note that this event can be triggered by the gamepad's
                 // accelerometers.
                 if (dim_countdown > old_dim_countdown) {
-                    cout << "Detected activity from DIM" << endl;
+                    LOG_DEBUG("Detected activity from DIM");
                     last_activity = SDL_GetTicks64();
                     // Normally a standby gamepad only wakes up when using buttons or
                     // sticks, this will wake on accelerometer and touch activity too.
                     if (current_vpad_mode == VPAD_LCD_STANDBY) {
-                        cout << "Turning gamepad LCD backon." << endl;
+                        LOG_DEBUG("Turning gamepad LCD backon.");
                         current_vpad_mode = VPAD_LCD_ON;
                         VPADSetLcdMode(VPAD_CHAN_0, current_vpad_mode);
                     }
                 }
                 if (dim_countdown == 0 && old_dim_countdown > 0) {
-                    cout << "Entered DIM state" << endl;
+                    LOG_DEBUG("Entered DIM state");
                 }
 
                 old_dim_countdown = dim_countdown;
             } else {
-                cout << "IMGetTimeBeforeDimming() returned " << dim_error << endl;
+                LOG_ERROR("IMGetTimeBeforeDimming() failed: {}", static_cast<int>(dim_error));
             }
 
         }
@@ -703,7 +712,6 @@ namespace App {
 
         RadioBrowserAPI::process();
 
-        LogsTab::process_logic();
         FavoritesTab::process_logic();
         RecentTab::process_logic();
         PlayerTab::process_logic();
@@ -717,7 +725,7 @@ namespace App {
                 // normal -> fading
                 if (cfg::state.screen_saver_timeout
                     && (now - last_activity) > cfg::state.screen_saver_timeout * 1000) {
-                    cout << "Fading out..." << endl;
+                    LOG_DEBUG("Fading out...");
                     state = State::fading;
                     fade_start = now;
                 }
@@ -725,7 +733,7 @@ namespace App {
             case State::fading:
                 // fading -> screen_saver
                 if ((now - fade_start) > fade_duration_ms) {
-                    cout << "Full screen saver" << endl;
+                    LOG_DEBUG("Fade out finished.");
                     state = State::screen_saver;
                 }
                 break;
@@ -735,9 +743,11 @@ namespace App {
         // any user activity forces it back to normal state
         if (state != State::normal)
             if ((now - last_activity) <= cfg::state.screen_saver_timeout * 1000) {
-                cout << "Returning to normal" << endl;
+                LOG_DEBUG("Returned to normal.");
                 state = State::normal;
             }
+
+        LogManager::process();
 
         process_ui();
 

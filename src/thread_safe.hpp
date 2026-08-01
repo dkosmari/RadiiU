@@ -13,33 +13,38 @@
 #include <utility>
 
 
-template<typename T>
+template<typename T,
+         typename M = std::mutex>
 class thread_safe {
 
-    mutable std::mutex mutex;
+    mutable M mutex;
     T data;
 
 public:
 
+    using mutex_type = M;
+    using data_type = T;
+
+
     template<typename U>
     class guard {
 
-        std::unique_lock<std::mutex> guard_;
+        std::unique_lock<mutex_type> guard_;
         U* data_ = nullptr;
 
-        guard(std::mutex& m,
+        guard(mutex_type& m,
               U* d) :
             guard_{m},
             data_{d}
         {}
 
-        guard(std::unique_lock<std::mutex>&& locker,
+        guard(std::unique_lock<mutex_type>&& locker,
               U* d) :
             guard_{std::move(locker)},
             data_{d}
         {}
 
-        friend class thread_safe<std::remove_cv_t<U>>;
+        friend class thread_safe<std::remove_cv_t<U>, mutex_type>;
 
     public:
 
@@ -96,34 +101,34 @@ public:
 
 
     [[nodiscard]]
-    guard<T>
+    guard<data_type>
     lock()
         &
     {
-        return guard<T>{mutex, &data};
+        return guard<data_type>{mutex, &data};
     }
 
 
     [[nodiscard]]
-    guard<const T>
+    guard<const data_type>
     lock()
         const &
     {
-        return guard<const T>{mutex, &data};
+        return guard<const data_type>{mutex, &data};
     }
 
 
     [[nodiscard]]
-    guard<const T>
+    guard<const data_type>
     c_lock()
         const &
     {
-        return guard<const T>{mutex, &data};
+        return guard<const data_type>{mutex, &data};
     }
 
 
     [[nodiscard]]
-    guard<T>
+    guard<data_type>
     try_lock()
         &
     {
@@ -132,7 +137,7 @@ public:
 
 
     [[nodiscard]]
-    T
+    data_type
     load()
         const &
     {
@@ -148,6 +153,6 @@ public:
         *lock() = std::forward<U>(new_data);
     }
 
-}; // class thread_safe<T>
+}; // class thread_safe<T, M>
 
 #endif

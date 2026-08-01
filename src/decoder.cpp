@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -15,10 +15,7 @@
 #include "decoder_mp3.hpp"
 #include "decoder_opus.hpp"
 #include "decoder_vorbis.hpp"
-
-
-using std::cout;
-using std::endl;
+#include "LogManager.hpp"
 
 
 namespace decoder {
@@ -53,48 +50,59 @@ namespace decoder {
             content_type == "audio/aacp" ||
             content_type == "audio/x-aac" ||
             content_type == "audio/audio/x-hx-aac-adts") {
-            cout << "Creating aac decoder from content type: " << content_type << endl;
+            LOG_INFO("Creating aac decoder from content type: {}", content_type);
             return std::make_unique<aac>(data);
         }
 
         if (content_type == "audio/mpeg") {
-            cout << "Creating mp3 decoder from content type: " << content_type << endl;
+            LOG_INFO("Creating MP3 decoder from content type: {}", content_type);
             return std::make_unique<mp3>(data);
         }
 
         if (content_type == "audio/vorbis") {
-            cout << "Creating opus decoder from content type: " << content_type << endl;
+            LOG_INFO("Creating Opus decoder from content type: {}", content_type);
             return std::make_unique<opus>(data);
         }
 
         if (content_type == "audio/vorbis") {
-            cout << "Creating vorbis decoder from content type: " << content_type << endl;
+            LOG_INFO("Creating Vorbis decoder from content type: {}", content_type);
             return std::make_unique<vorbis>(data);
         }
 
-        cout << "No match for content type: " << content_type << endl;
+        LOG_INFO("No match for content type: {}", content_type);
 
         if (match(data, "\xff\xfb") || match(data, "ID3")) {
-            cout << "Creating mp3 decoder from data signature" << endl;
+            LOG_INFO("Creating MP3 decoder from data signature");
             return std::make_unique<mp3>(data);
         }
 
         if (match(data, "OggS")) {
             try {
+                LOG_INFO("Creating Opus decoder from data signature.");
                 return std::make_unique<opus>(data);
             }
-            catch (...) {
+            catch (std::exception& e) {
+                LOG_INFO("Failed: {}", e.what());
             }
+            catch (...) {
+                LOG_INFO("Failed!");
+            }
+
             try {
+                LOG_INFO("Creating Vorbis decoder from data signature.");
                 return std::make_unique<vorbis>(data);
             }
+            catch (std::exception& e) {
+                LOG_INFO("Failed: {}", e.what());
+            }
             catch (...) {
+                LOG_INFO("Failed!");
             }
         }
 
         if (match(data, "\xff\xf1") ||
             match(data, "\xff\xf9")) {
-            cout << "Creating aac decoder from data signature" << endl;
+            LOG_INFO("Creating AAC decoder from data signature.");
             return std::make_unique<aac>(data);
         }
 

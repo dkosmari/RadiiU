@@ -1,22 +1,19 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include <bit>
 #include <cerrno>
-#include <iostream>
 #include <string_view>
 
 #include "decoder_vorbis.hpp"
 
+#include "LogManager.hpp"
 #include "string_utils.hpp"
 
-
-using std::cout;
-using std::endl;
 
 using namespace std::literals;
 
@@ -94,7 +91,7 @@ namespace decoder {
         if (e)
             throw error{"ov_open_callbacks() failed", e};
 
-        cout << "Created vorbis decoder." << endl;
+        LOG_INFO("Created vorbis decoder.");
     }
 
 
@@ -127,7 +124,7 @@ namespace decoder {
         if (r == 0)
             return {};
         if (r < 0) {
-            cout << "vorbis::decode(): " << vorbis_error_to_string(r) << endl;
+            LOG_ERROR("{}", vorbis_error_to_string(r));
             return {};
         }
         return std::span(samples.data(), r);

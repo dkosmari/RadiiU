@@ -5,7 +5,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <iostream>
 #include <optional>
 #include <stdexcept>
 
@@ -16,6 +15,7 @@
 #include "StationDetailsPopup.hpp"
 
 #include "IconsFontAwesome4.h"
+#include "LogManager.hpp"
 #include "RadioBrowserAPI.hpp"
 #include "rest.hpp"
 #include "Station.hpp"
@@ -23,29 +23,43 @@
 #include "UI.hpp"
 
 
-using std::cout;
-using std::endl;
-
-
 using namespace std::literals;
 
 
 namespace StationDetailsPopup {
 
-    enum class State {
-        hidden,
-        fetching,
-        done,
-        error,
-    };
+    namespace {
+
+        /*-------*/
+        /* Types */
+        /*-------*/
+
+        enum class State {
+            hidden,
+            fetching,
+            done,
+            error,
+        };
 
 
-    bool popup_queued;
-    State state = State::hidden;
-    std::string request_uuid;
-    const std::string popup_id = "details";
-    std::optional<Station> result;
-    std::string error_msg;
+        /*-----------*/
+        /* Constants */
+        /*-----------*/
+
+        const std::string popup_id = "details";
+
+
+        /*-----------*/
+        /* Variables */
+        /*-----------*/
+
+        bool popup_queued;
+        State state = State::hidden;
+        std::string request_uuid;
+        std::optional<Station> result;
+        std::string error_msg;
+
+    } // namespace
 
 
     bool
@@ -80,7 +94,7 @@ namespace StationDetailsPopup {
             return;
 
         if (uuid.empty()) {
-            cout << "WARNING: should not be querying station details with empty UUID" << endl;
+            LOG_WARN("Should not be querying station details with empty UUID");
             return;
         }
 
@@ -93,7 +107,7 @@ namespace StationDetailsPopup {
             request_uuid,
             [](RadioBrowserAPI::Station rb_station)
             {
-                cout << "got station details" << endl;
+                LOG_DEBUG("received station details");
                 result = Station::from_radio_browser(rb_station);
                 state = State::done;
             },
@@ -107,6 +121,7 @@ namespace StationDetailsPopup {
                     if (!ee->response.empty())
                         error_msg += "\n" + ee->response;
                 }
+                LOG_ERROR("{}", error_msg);
             });
     }
 

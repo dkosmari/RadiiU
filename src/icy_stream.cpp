@@ -5,18 +5,14 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <iostream>
 #include <stdexcept>
 
 #include "icy_stream.hpp"
 
 #include "icy.hpp"
+#include "LogManager.hpp"
 #include "string_utils.hpp"
 #include "tracer.hpp"
-
-
-using std::cout;
-using std::endl;
 
 
 namespace icy {
@@ -31,7 +27,7 @@ namespace icy {
         unsigned icy_num = 0;
 
         if (auto hdr = http.get_header("icy-metaint")) {
-            cout << "Got icy-metaint: " << *hdr << endl;
+            LOG_INFO("Got icy-metaint={} in header.", *hdr);
             data_left = interval = std::stoull(*hdr);
             ++icy_num;
         }
@@ -132,13 +128,6 @@ namespace icy {
         std::string meta_str = trimmed(meta_stream.read_str(), '\0');
 
         auto meta = icy::parse(meta_str);
-
-#if 0
-        cout << "Icy Metadata:\n";
-        for (auto [key, val] : meta)
-            cout << "    " << key << "=\"" << val << "\"\n";
-        cout << endl;
-#endif
 
         for (const auto& [k, v] : meta) {
             // TODO: check if there are more special keys

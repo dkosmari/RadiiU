@@ -5,7 +5,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <iostream>
 #include <memory>
 #include <set>
 #include <stdexcept>
@@ -25,11 +24,9 @@
 
 #include "FontManager.hpp"
 
+#include "LogManager.hpp"
 #include "tracer.hpp"
 
-
-using std::cout;
-using std::endl;
 
 using namespace std::literals;
 
@@ -168,7 +165,6 @@ namespace FontManager {
             FcPatternAddLangSet(pattern.get(), FC_LANG, lang_set.get());
             FcPatternAddDouble(pattern.get(), FC_SIZE, default_size);
 
-            // cout << "DEBUG: pattern:" << endl;
             // FcPatternPrint(pattern.get());
 
             FcConfigSubstitute(nullptr, pattern.get(), FcMatchPattern);
@@ -179,7 +175,6 @@ namespace FontManager {
             if (fresult != FcResultMatch)
                 throw std::runtime_error{"fc match error"};
 
-            // cout << "DEBUG font_pattern:" << endl;
             // FcPatternPrint(font_pattern.get());
 
             FcChar8* file = nullptr;
@@ -218,7 +213,7 @@ namespace FontManager {
                     load(extra_path);
                 }
                 catch (std::exception& e) {
-                    cout << "ERROR: " << e.what() << endl;
+                    LOG_ERROR("{}", e.what());
                 }
         }
 
@@ -268,7 +263,7 @@ namespace FontManager {
          bool merge)
     {
         TRACE_FUNC;
-        cout << "DEBUG: font = " << filename << endl;
+        LOG_DEBUG("font = {:?}", filename.string());
 
         ImFontConfig config;
         config.EllipsisChar = U'…';
@@ -290,7 +285,7 @@ namespace FontManager {
     load_dir(const std::filesystem::path& dir)
     {
         TRACE_FUNC;
-        cout << "DEBUG: dir = " << dir << endl;
+        LOG_DEBUG("dir = {:?}", dir.string());
 
         if (!exists(dir) || !is_directory(dir))
             return;
@@ -305,7 +300,7 @@ namespace FontManager {
                 load(entry);
             }
             catch (std::exception& e) {
-                cout << "ERROR: " << e.what() << endl;
+                LOG_ERROR("{}", e.what());
             }
         }
     }

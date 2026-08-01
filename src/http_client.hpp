@@ -13,7 +13,8 @@
 #include <optional>
 #include <string>
 
-#include <curlxx/curl.hpp>
+#include <curlxx/easy.hpp>
+#include <curlxx/multi.hpp>
 
 #include "byte_stream.hpp"
 

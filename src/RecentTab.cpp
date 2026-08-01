@@ -5,7 +5,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <iostream>
 #include <deque>
 #include <optional>
 #include <utility>
@@ -20,15 +19,14 @@
 #include "cfg.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
+#include "LogManager.hpp"
 #include "Serializer.hpp"
 #include "StationDetailsPopup.hpp"
 #include "StationGlaze.hpp"
+#include "tracer.hpp"
 #include "UI.hpp"
 
-
-using std::cout;
-using std::endl;
-
+// TODO: process add and remove using future
 
 namespace RecentTab {
 
@@ -51,7 +49,7 @@ namespace RecentTab {
         Serializer::load(stations, filename);
     }
     catch (std::exception& e) {
-        cout << "ERROR: Recent::load(): " << e.what() << endl;
+        LOG_ERROR("{}", e.what());
     }
 
 
@@ -62,13 +60,14 @@ namespace RecentTab {
         Serializer::save(stations, filename);
     }
     catch (std::exception& e) {
-        cout << "ERROR: Recent::save(): " << e.what() << endl;
+        LOG_ERROR("{}", e.what());
     }
 
 
     void
     initialize()
     {
+        TRACE_FUNC;
         load();
     }
 
@@ -76,6 +75,7 @@ namespace RecentTab {
     void
     finalize()
     {
+        TRACE_FUNC;
         save();
     }
 

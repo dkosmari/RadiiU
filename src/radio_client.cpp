@@ -15,9 +15,8 @@
 #include "pls.hpp"
 #include "tracer.hpp"
 
+#include "LogManager.hpp"
 
-using std::cout;
-using std::endl;
 
 using namespace std::literals;
 
@@ -142,34 +141,34 @@ radio_client::process_http_response_started()
 
     auto content_type = http.get_header("content-type");
     if (!content_type) {
-        cout << "ERROR: server provided no content-type" << endl;
+        LOG_ERROR("server provided no content-type");
         current_state = state::stopped;
         return;
     }
 
     if (mime_type::match(*content_type, m3u_mimes)) {
-        cout << "Detected M3U mime: " << *content_type << endl;
+        LOG_INFO("Detected M3U mime: {}", *content_type);
         current_state = state::receiving_playlist;
         current_playlist = playlist_type::m3u;
     } else if (mime_type::match(*content_type, pls_mimes)) {
-        cout << "Detected PLS mime: " << *content_type << endl;
+        LOG_INFO("Detected PLS mime: {}", *content_type);
         current_state = state::receiving_playlist;
         current_playlist = playlist_type::pls;
     } else if (mime_type::match(*content_type, audio_mimes)) {
-        cout << "Detected audio mime: " << *content_type << endl;
+        LOG_INFO("Detected audio mime: {}", *content_type);
         current_state = state::streaming_audio;
         try {
-            cout << "Trying to create ICY stream" << endl;
+            LOG_INFO("Trying to create ICY stream");
             icy_stream = std::make_unique<icy::stream>(http);
-            cout << "ICY stream created. " << endl;
+            LOG_INFO("ICY stream created. ");
             data_stream = &icy_stream->data_stream;
             metadata = icy_stream->get_metadata();
         }
         catch (std::exception& e) {
-            cout << "Could not create ICY stream: " << e.what() << endl;
+            LOG_ERROR("Could not create ICY stream: {}", e.what());
         }
     } else
-        cout << "ERROR: don't know how to handle mime-type: " << *content_type << endl;
+        LOG_ERROR("Cannot handle mime-type: {}", *content_type);
 }
 
 
@@ -210,8 +209,7 @@ radio_client::process_playlist()
                 url_resolved = pl.at(0).url;
             }
             catch (std::exception& e) {
-                cout << "ERROR: " << e.what() << endl;
-                cout << "<m3u>\n" << data << "\n</m3u>" << endl;
+                LOG_ERROR("{}\n<m3u>\n{}\n</m3u>", e.what(), data);
             }
             break;
         }
@@ -222,17 +220,16 @@ radio_client::process_playlist()
                 url_resolved = pl.at(0).url;
             }
             catch (std::exception& e) {
-                cout << "ERROR: " << e.what() << endl;
-                cout << "<pls>\n" << data << "\n</pls>" << endl;
+                LOG_ERROR("{}\n<pls>\n{}\n</pls>", e.what(), data);
             }
             break;
         }
 
         default:
-            cout << "ERROR: should not invoke process_playlist() when no playlist" << endl;
+            LOG_ERROR("BUG: should not invoke process_playlist() when no playlist exists");
     } // switch (current_playlist)
 
-    cout << "radio_client::url_resolved = \"" << url_resolved << "\"" << endl;
+    LOG_INFO("url_resolved = {:?}", url_resolved);
     set_next_url(url_resolved);
 }
 
@@ -241,7 +238,7 @@ void
 radio_client::process_audio()
 {
     if (current_state != state::streaming_audio)
-        cout << "WARNING: logic error! process_audio should only happen during streaming_audio state" << endl;
+        LOG_ERROR("BUG: process_audio should only happen during streaming_audio state");
 
     if (icy_stream)
         metadata = icy_stream->get_metadata();
@@ -260,9 +257,9 @@ radio_client::process_audio()
             data_stream->discard(initial_size);
         }
         catch (std::exception& e) {
-            cout << "Failed to create decoder with "
-                 << data_stream->size()
-                 << " bytes: " << e.what() << endl;
+            LOG_ERROR("Failed to create decoder with {} bytes: {}",
+                      data_stream->size(),
+                      e.what());
         }
     }
     if (!dec)

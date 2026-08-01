@@ -6,20 +6,16 @@
  */
 
 #include <functional>
-#include <iostream>
 #include <vector>
 
 #include "http_client.hpp"
 
+#include "LogManager.hpp"
 #include "string_utils.hpp"
 #include "tracer.hpp"
 
 
-using std::cout;
-using std::endl;
-
 using namespace std::literals;
-using namespace std::placeholders;
 
 
 http_client::http_client(const std::string& user_agent) :
@@ -34,7 +30,7 @@ http_client::~http_client()
 {
     auto e = multi.try_remove(easy);
     if (!e)
-        cout << "BUG: removing easy handle failed: " << e.error().what() << endl;
+        LOG_ERROR("BUG: removing easy handle failed: {}", e.error().what());
 }
 
 
@@ -80,6 +76,7 @@ http_client::set_url(const std::string& url)
 
     easy.reset();
     easy.set_verbose(true); // DEBUG
+    LogManager::capture_curl_debug(easy);
     if (!user_agent.empty())
         easy.set_user_agent(user_agent);
     easy.set_accept_encoding("");
@@ -93,7 +90,7 @@ http_client::set_url(const std::string& url)
     easy.set_tcp_no_delay(false);
     easy.set_transfer_encoding(true);
     easy.set_url(url);
-    easy.set_write_function(std::bind(&http_client::curl_write_callback, this, _1));
+    easy.set_write_function(std::bind_front(&http_client::curl_write_callback, this));
 
     multi.add(easy);
 
@@ -159,7 +156,7 @@ std::size_t
 http_client::curl_write_callback(std::span<const char> buf)
 {
     if (buf.empty()) {
-        cout << "End of connection detected." << endl;
+        LOG_DEBUG("End of connection detected.");
         return 0;
     }
 

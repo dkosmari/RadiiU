@@ -5,8 +5,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <iostream>
-
 #include <imgui.h>
 #include <imgui_raii.h>
 #include <imgui_stdlib.h>
@@ -21,8 +19,6 @@
 #include "UI.hpp"
 
 
-using std::cout;
-using std::endl;
 using namespace std::literals;
 
 
@@ -31,12 +27,14 @@ namespace SettingsTab {
     void
     process_ui()
     {
+        using namespace ImGui::RAII;
+
         const ImGuiStyle& style = ImGui::GetStyle();
 
         // Note: flat navigation doesn't work well on child windows that scroll.
-        if (ImGui::RAII::Child settings_child{"settings"}) {
+        if (Child settings_child{"settings"}) {
 
-            if (ImGui::RAII::Table settings_table{"settings", 2}) {
+            if (Table settings_table{"settings", 2}) {
 
                 ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
@@ -56,7 +54,7 @@ namespace SettingsTab {
                 ImGui::TableNextColumn();
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                if (ImGui::RAII::Combo styles_combo{"##style", cfg::state.style}) {
+                if (Combo styles_combo{"##style", cfg::state.style}) {
                     auto& styles = Styles::get_styles();
                     for (const auto& [type, name] : styles) {
                         std::string label = "("s + to_string(type) + ") "s + name;
@@ -81,7 +79,7 @@ namespace SettingsTab {
                 ImGui::TableNextColumn();
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                if (ImGui::RAII::Combo initial_combo{
+                if (Combo initial_combo{
                         "##initial_tab",
                         to_label(cfg::state.initial_tab)
                     }) {
@@ -113,7 +111,7 @@ namespace SettingsTab {
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x
                                         - style.ItemSpacing.x
                                         - refresh_btn_width);
-                if (ImGui::RAII::Combo server_combo{
+                if (Combo server_combo{
                         "##server",
                         cfg::state.server.empty()
                         ? "(random)"

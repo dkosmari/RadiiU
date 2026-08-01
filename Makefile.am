@@ -76,6 +76,8 @@ radiiu_elf_SOURCES = \
 	src/icy.hpp \
 	src/icy_stream.cpp \
 	src/icy_stream.hpp \
+	src/LogManager.cpp \
+	src/LogManager.hpp \
 	src/LogsTab.cpp \
 	src/LogsTab.hpp \
 	src/m3u.cpp \

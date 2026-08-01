@@ -1,18 +1,16 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include <cassert>
-#include <iostream>
 
 #include "decoder_aac.hpp"
 
+#include "LogManager.hpp"
 
-using std::cout;
-using std::endl;
 
 using namespace std::literals;
 
@@ -89,14 +87,19 @@ namespace decoder {
         void
         dump(const NeAACDecConfiguration* cfg)
         {
-            cout << "aac conf:\n"
-                 << "  defObjectType: " << obj_type_to_string(cfg->defObjectType) << '\n'
-                 << "  defSampleRate: " << cfg->defSampleRate << '\n'
-                 << "  outputFormat: " << out_fmt_to_string(cfg->outputFormat) << '\n'
-                 << "  downMatrix: " << (unsigned)cfg->downMatrix << '\n'
-                 << "  useOldADTSFormat: " << (unsigned)cfg->useOldADTSFormat << '\n'
-                 << "  dontUpSampleImplicitSBR: " << (unsigned)cfg->dontUpSampleImplicitSBR
-                 << endl;
+            LOG_DEBUG("aac conf:\n"
+                      "  defObjectType: {}\n"
+                      "  defSampleRate: {}\n"
+                      "  outputFormat: {}\n"
+                      "  downMatrix: {}\n"
+                      "  useOldADTSFormat: {}\n"
+                      "  dontUpSampleImplicitSBR: {}\n",
+                      obj_type_to_string(cfg->defObjectType),
+                      cfg->defSampleRate,
+                      out_fmt_to_string(cfg->outputFormat),
+                      cfg->downMatrix,
+                      cfg->useOldADTSFormat,
+                      cfg->dontUpSampleImplicitSBR);
         }
 #endif
 
@@ -127,8 +130,10 @@ namespace decoder {
         }
         assert((unsigned long)r <= data.size());
 
-        cout << "aac::rate = " << rate << '\n'
-             << "aac::channels = " << (unsigned)channels << endl;
+        LOG_DEBUG("aac::rate = {}\n"
+                  "aac::channels = {}",
+                  rate,
+                  channels);
 
         cfg = NeAACDecGetCurrentConfiguration(handle);
         // dump(cfg);
@@ -168,14 +173,12 @@ namespace decoder {
                                       sz);
         if (frame.error) {
             //throw error{"NeAACDecDecode() failed", frame.error};
-            cout << "aac::decode(): error: "
-                 << NeAACDecGetErrorMessage(frame.error)
-                 << endl;
+            LOG_ERROR("{}", NeAACDecGetErrorMessage(frame.error));
             return {};
         }
         stream.discard(frame.bytesconsumed);
         if (frame.samples == 0) {
-            cout << "aac::decode(): frame.samples == 0" << endl;
+            LOG_ERROR("frame.samples == 0");
             return {};
         }
 

@@ -9,20 +9,17 @@
 #include <cstdio>
 #include <exception>
 #include <filesystem>
-#include <iostream>
 #include <optional>
-
 
 #include "cfg.hpp"
 
 #include "App.hpp"
+#include "LogManager.hpp"
 #include "Serializer.hpp"
 #include "TabIDGlaze.hpp"
 #include "tracer.hpp"
 
 
-using std::cout;
-using std::endl;
 using std::string;
 
 
@@ -63,7 +60,7 @@ namespace cfg {
             Serializer::load(state, filename);
         }
         catch (std::exception& e) {
-            cout << "Error loading settings: " << e.what() << endl;
+            LOG_ERROR("load(): {}", e.what());
         }
     }
 
@@ -77,7 +74,7 @@ namespace cfg {
             Serializer::save(state, filename);
         }
         catch (std::exception& e) {
-            cout << "Error saving settings: " << e.what() << endl;
+            LOG_ERROR("save(): {}", e.what());
         }
     }
 

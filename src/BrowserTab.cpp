@@ -15,7 +15,6 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
-#include <iostream>
 #include <random>
 #include <regex>
 #include <span>
@@ -42,6 +41,7 @@
 #include "humanize.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
+#include "LogManager.hpp"
 #include "net/address.hpp"
 #include "net/resolver.hpp"
 #include "RadioBrowserAPI.hpp"
@@ -52,9 +52,6 @@
 #include "tracer.hpp"
 #include "UI.hpp"
 
-
-using std::cout;
-using std::endl;
 
 using namespace std::literals;
 
@@ -302,11 +299,11 @@ namespace BrowserTab {
         tags_regex.assign(full_regex,
                           std::regex_constants::ECMAScript |
                           std::regex_constants::optimize);
-        cout << "tags_regex has " << counter << " rules" << endl;
-        // cout << full_regex << endl;
+        LOG_INFO("Found {} rules in tags.ignore.", counter);
+        // LOG_DEBUG("{}", full_regex);
     }
     catch (std::exception& e) {
-        cout << "ERROR: load_tags_regex(): " << e.what() << endl;
+        LOG_ERROR("{}", e.what());
     }
 
 
@@ -354,7 +351,7 @@ namespace BrowserTab {
         GUI::page = state.page.value_or(1u);
     }
     catch (std::exception& e) {
-        cout << "ERROR: Browser::load(): " << e.what() << endl;
+        LOG_ERROR("{}", e.what());
     }
 
 
@@ -384,7 +381,7 @@ namespace BrowserTab {
         Serializer::save(state, filename);
     }
     catch (std::exception& e) {
-        cout << "ERROR: Browser::save(): " << e.what() << endl;
+        LOG_ERROR("{}", e.what());
     }
 
 
@@ -944,11 +941,9 @@ namespace BrowserTab {
             station->stationuuid,
             [station](RadioBrowserAPI::ClickResult result)
             {
-                cout << "Result of click: "
-                     << (result.ok ? "success" : "failure")
-                     << endl;
+                LOG_DEBUG("Result of click: {}", result.ok);
                 if (!result.message.empty())
-                    cout << result.message << endl;
+                    LOG_ERROR("{}", result.message);
 
                 update_station(station);
             },
@@ -968,11 +963,9 @@ namespace BrowserTab {
             station->stationuuid,
             [station](RadioBrowserAPI::VoteResult result)
             {
-                cout << "Result of vote: "
-                     << (result.ok ? "success" : "failure")
-                     << endl;
+                LOG_DEBUG("Result of vote: ", result.ok);
                 if (!result.message.empty())
-                    cout << result.message << endl;
+                    LOG_ERROR("{}", result.message);
 
                 update_station(station);
             },
@@ -985,12 +978,11 @@ namespace BrowserTab {
     common_error_handler(const std::exception& e)
     {
         // TODO: should show a notification-like message, that goes away after a while.
-        cout << "Browser ERROR: " << e.what() << '\n';
+        LOG_ERROR("{}", e.what());
         if (auto ee = dynamic_cast<const rest::error*>(&e)) {
-            cout << "Content-Type: " << ee->content_type << '\n';
-            cout << "<response>\n" << ee->response << "\n</response>\n";
+            LOG_ERROR("Content-Type: {}", ee->content_type);
+            LOG_ERROR("<response>\n{}\n</response>", ee->response);
         }
-        cout << std::flush;
     }
 
 
@@ -1015,7 +1007,7 @@ namespace BrowserTab {
             {
                 for (auto& [name, stationcount] : rb_codecs)
                     codecs->push_back(std::move(name));
-                cout << "Got " << codecs->size() << " codecs" << endl;
+                LOG_INFO("Received {} codecs.", codecs->size());
             },
             common_error_handler);
     }
@@ -1044,8 +1036,7 @@ namespace BrowserTab {
                 for (auto& [name, code, count] : rb_countries)
                     countries->emplace_back(std::move(code),
                                             std::move(name));
-                cout << "Got " << countries->size()
-                     << " countries" << endl;
+                LOG_INFO("Received {} countries.", countries->size());
                 std::ranges::sort(*countries, {}, get_code);
             },
             common_error_handler);
@@ -1063,13 +1054,13 @@ namespace BrowserTab {
         RadioBrowserAPI::get_server_stats(
             [](RadioBrowserAPI::ServerStats stats)
             {
-                cout << "Got server stats" << endl;
+                LOG_INFO("Received server stats.");
                 server_stats_result = std::move(stats);
             },
             [](const std::exception& e)
             {
-                cout << "Got server stats error" << endl;
                 server_stats_error = e.what();
+                LOG_ERROR("{}", server_stats_error);
             });
     }
 
@@ -1101,13 +1092,12 @@ namespace BrowserTab {
                         continue;
                     if (regex_search(name, matches, tags_regex) &&
                         matches.length() > 0) {
-                        // cout << "Ignored tag: " << name << endl;
-                        // cout << "RE match: " << matches.str() << endl;
+                        // LOG_DEBUG("Ignored tag: {} (from {})", name, matches.str());
                         continue;
                     }
                     tags->push_back(std::move(name));
                 }
-                cout << "Got " << tags->size() << " tags" << endl;
+                LOG_INFO("Received {} tags.", tags->size());
             },
             common_error_handler);
     }
@@ -1163,7 +1153,7 @@ namespace BrowserTab {
             params,
             [](RadioBrowserAPI::StationVec rb_stations)
             {
-                cout << "Received " << rb_stations.size() << " stations" << endl;
+                LOG_INFO("Received {} stations.", rb_stations.size());
                 stations.clear();
                 for (auto& st : rb_stations) {
                     // ensure the page size limit is respected
@@ -1184,7 +1174,6 @@ namespace BrowserTab {
 
         // TODO: when RB errors out, it should be possible to try again
         if (!countries) {
-            cout << "get_country_name() needs to fetch countries" << endl;
             fetch_countries();
             return {};
         }

@@ -12,9 +12,9 @@
 #include <cmath>
 #include <concepts>
 #include <filesystem>
+#include <format>
 #include <functional>
 #include <future>
-#include <iostream>
 #include <memory>
 #include <optional>
 #include <queue>
@@ -32,13 +32,12 @@
 
 #include "App.hpp"
 #include "async_queue.hpp"
+#include "LogManager.hpp"
+#include "mime_type.hpp"
 #include "thread_safe.hpp"
 #include "tracer.hpp"
 
 
-using std::cout;
-using std::cerr;
-using std::endl;
 using namespace std::literals;
 
 using sdl::vec2;
@@ -246,7 +245,7 @@ namespace IconManager {
         CacheEntry::load()
         {
             if (state != LoadState::loading) {
-                cerr << "ERROR: wrong cache entry state" << endl;
+                LOG_ERROR("wrong cache entry state: {}", to_string(state.load()));
                 return;
             }
 
@@ -262,9 +261,11 @@ namespace IconManager {
                 state = LoadState::loaded;
             }
             catch (std::exception& e) {
-                cout << "ERROR: :\n"
-                     << "  location: \"" << location << "\"\n"
-                     << "  exception: " << e.what() << endl;
+                LOG_ERROR("loading image:\n"
+                          "  location: {:?}\n"
+                          "  what: {}",
+                          location,
+                          e.what());
                 state = LoadState::error;
                 throw;
             }
@@ -306,10 +307,12 @@ namespace IconManager {
                 {
                     auto content_type_header = easy->try_get_header("Content-Type");
                     if (content_type_header) {
-                        std::string ct = content_type_header->value;
-                        if (!ct.starts_with("image/")) {
-                            cout << "ERROR: Content-Type should be \"image/*\" but got \""
-                                 << ct << "\"" << endl;
+                        std::string desired = "image/*";
+                        std::string received = content_type_header->value;
+                        if (!mime_type::match(received, desired)) {
+                            LOG_ERROR("Content-Type should be {:?} but received {:?}",
+                                      desired,
+                                      received);
                             return CURL_READFUNC_ABORT;
                         }
                     }
@@ -382,6 +385,7 @@ namespace IconManager {
             sdl::rwops rw{std::span(*raw_buf)};
             img = sdl::img::load(rw);
             raw_buf.reset();
+            LOG_DEBUG("Loaded URL {:?}", location);
         }
 
 
@@ -390,7 +394,7 @@ namespace IconManager {
         {
             TRACE_FUNC;
             img = sdl::img::load(location);
-            cout << "LOADED from file: " << location << endl;
+            LOG_DEBUG("Loaded file {:?}", location);
         }
 
 
@@ -510,12 +514,11 @@ namespace IconManager {
                 } else {
                     // entry not found, queue it up to load
                     std::string real_location;
+                    LOG_DEBUG("Requested: {:?}", location);
                     if (location.starts_with(content_prefix)) {
-                        cout << "Requested content asset: " << location << endl;
                         real_location =
                             content_dir / location.substr(content_prefix.size());
-                        cout << "Real location: " << real_location << endl;
-
+                        LOG_DEBUG("Content: {:?}", real_location);
                     } else
                         real_location = location;
 
@@ -526,7 +529,7 @@ namespace IconManager {
                 }
             }
             catch (std::exception& e) {
-                cout << "ERROR: IconManager::get(): " << e.what() << endl;
+                LOG_ERROR("{}", e.what());
                 return &error_icon;
             }
         }
@@ -543,19 +546,19 @@ namespace IconManager {
                         convert_queue.push(std::move(*entry));
                     }
                     catch (std::exception& e) {
-                        cerr << "ERROR loading: " << e.what() << endl;
+                        LOG_ERROR("Loading: {}", e.what());
                     }
                 } else if (stopper.stop_requested() ||
                            entry.error() == async_queue_error::stop) {
                     break;
                 } else if (entry.error() == async_queue_error::locked) {
-                    cerr << "WARNING: load_queue was locked" << endl;
+                    LOG_ERROR("load_queue was locked");
                 }
                 // std::this_thread::sleep_for(50ms);
             }
         }
         catch (std::exception& e) {
-            cerr << "ERROR: loader_thread_func(): " << e.what() << endl;
+            LOG_ERROR("{}", e.what());
         }
 
 
@@ -579,7 +582,8 @@ namespace IconManager {
             for (auto [easy, error_code] : multi.get_done()) {
                 auto entry = std::any_cast<CacheEntryPtr>(easy->get_private());
                 if (!entry) {
-                    cerr << "ERROR: invalid download handle: " << easy << endl;
+                    LOG_ERROR("invalid download handle: {:p}",
+                              reinterpret_cast<void*>(easy));
                     continue;
                 }
 
@@ -593,7 +597,7 @@ namespace IconManager {
                     load_queue.push(entry);
                 }
                 catch (std::exception& e) {
-                    cerr << "ERROR: " << e.what() << endl;
+                    LOG_ERROR("Processing finished download: {}", e.what());
                     entry->state = LoadState::error;
                 }
             }
@@ -615,7 +619,7 @@ namespace IconManager {
                 return;
 
             std::size_t excess = cache.size() - max_cache_size;
-            // cout << "IconManager: prunning " << excess << " icons" << endl;
+            LOG_DEBUG("Prunning {} icons.", excess);
             std::vector<Cache::iterator> to_remove(excess);
             auto to_remove_end = to_remove.begin();
             for (auto it = cache.begin(); it != cache.end(); ++it) {
@@ -641,8 +645,8 @@ namespace IconManager {
             for (auto it : to_remove) {
                 auto& entry = it->second;
                 if (entry->easy) {
+                    LOG_DEBUG("prunning an active request");
                     // If removing an active request, make sure it's removed from the curl::multi.
-                    // cout << "IconManager: prunning an active request" << endl;
                     multi.remove(*entry->easy);
                 }
                 // unordered_map guarantees all other iterators remain valid

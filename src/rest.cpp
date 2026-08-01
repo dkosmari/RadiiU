@@ -6,7 +6,6 @@
  */
 
 #include <cassert>
-#include <iostream>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -18,11 +17,9 @@
 #include "rest.hpp"
 
 #include "byte_stream.hpp"
+#include "LogManager.hpp"
 #include "tracer.hpp"
 
-
-using std::cout;
-using std::endl;
 
 using namespace std::literals;
 
@@ -31,6 +28,13 @@ using namespace std::literals;
 
 
 namespace rest {
+
+    namespace {
+
+
+
+    } // namespace
+
 
     /* --------------------- */
     /* function declarations */
@@ -207,7 +211,6 @@ namespace rest {
         success_func{std::move(success_func)},
         error_func{std::move(error_func)}
     {
-        // cout << "creating request for '" << url << "'" << endl;
         easy.set_write_function(
             [this](std::span<const char> data)
             {
@@ -253,13 +256,14 @@ namespace rest {
     }
     catch (std::exception& e) {
         TRACE_FUNC;
-        cout << "ERROR: " << e.what() << endl;
+        LOG_ERROR("{}", e.what());
         handle_error(error{e.what(), response, content_type});
     }
     catch (...) {
         TRACE_FUNC;
-        cout << "ERROR: caught unknown exception!" << endl;
-        cout << "response was:\n<response>\n" << response << "\n</response>" << endl;
+        LOG_ERROR("caught unknown exception!\n"
+                  "<response>\n{}\n</response>",
+                  response);
         handle_error(error{"unknown exception", response, content_type});
     }
 
@@ -273,11 +277,11 @@ namespace rest {
     }
     catch (std::exception& ee) {
         TRACE_FUNC;
-        cout << "ERROR: " << ee.what() << endl;
+        LOG_ERROR("{}", ee.what());
     }
     catch (...) {
         TRACE_FUNC;
-        cout << "ERROR: caught unknown exception!" << endl;
+        LOG_ERROR("caught unknown exception!");
     }
 
 
@@ -373,10 +377,11 @@ namespace rest {
         request_post{url, body},
         json_request_base{std::move(json_success_func)}
     {
-        cout << "DEBUG: making json post request\n"
-             << "    URL: " << url << "\n"
-             << "    body: " << body
-             << endl;
+        LOG_DEBUG("making json post request\n"
+                  "    URL: {}\n"
+                  "    body: {}",
+                  url,
+                  body);
         easy.append_http_header("Content-Type: application/json");
     }
 
@@ -427,7 +432,7 @@ namespace rest {
             auto id = easy->data();
             auto it = requests.find(id);
             if (it == requests.end()) {
-                cout << "BUG: finished an unknown handle!" << endl;
+                LOG_ERROR("BUG: finished an unknown handle!");
                 continue;
             }
             auto req = std::move(it->second);
@@ -694,6 +699,7 @@ namespace rest {
     {
         curl::easy easy;
         easy.set_verbose(true);
+        LogManager::capture_curl_debug(easy);
         if (!user_agent.empty())
             easy.set_user_agent(user_agent);
         easy.set_accept_encoding("");

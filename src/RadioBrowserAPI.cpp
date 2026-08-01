@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <cstdlib>
 #include <future>
-#include <iostream>
 #include <memory>
 #include <queue>
 #include <random>
@@ -30,16 +29,13 @@
 #include "RadioBrowserAPI.hpp"
 
 #include "async_queue.hpp"
+#include "LogManager.hpp"
 #include "net/address.hpp"
 #include "net/resolver.hpp"
 #include "rest.hpp"
 #include "thread_safe.hpp"
 #include "tracer.hpp"
 
-
-using std::cerr;
-using std::cout;
-using std::endl;
 
 using namespace std::literals;
 
@@ -189,6 +185,7 @@ namespace RadioBrowserAPI {
         string
         make_url(const string& endpoint);
 
+        // TODO: use std::expected
         StatusResponse
         test_server_sync(const std::string& srv);
 
@@ -219,7 +216,7 @@ namespace RadioBrowserAPI {
                     task->get();
                 }
                 catch (std::exception& e) {
-                    cerr << "ERROR: in dispatch_one_pending_task(): " << e.what() << endl;
+                    LOG_ERROR("{}", e.what());
                 }
             }
         }
@@ -250,7 +247,7 @@ namespace RadioBrowserAPI {
                     addresses.push_back(entry.addr);
             }
 
-            // cout << "Found " << addresses.size() << " mirrors" << endl;
+            LOG_INFO("Found {} mirrors.", addresses.size());
 
             // now find the canonical names for each IP address
             {
@@ -269,7 +266,7 @@ namespace RadioBrowserAPI {
                             mirrors_set.insert(std::move(*nr.result.name));
                     }
                     catch (std::exception& e) {
-                        cout << "ERROR: " << e.what() << endl;
+                        LOG_ERROR("{}", e.what());
                     }
                 }
             }
@@ -330,18 +327,17 @@ namespace RadioBrowserAPI {
             std::string result;
             try {
                 result = rest::get_json_sync("https://" + srv + "/json/stats");
-                // cout << "connect() thread obtained server stats:\n"
-                //      << glz::prettify_json(result)
-                //      << endl;
+                LOG_INFO("test_server_sync() got server stats:\n{}", glz::prettify_json(result));
                 return {true, std::move(result)};
             }
             catch (std::exception& e) {
-                cout << "Failed to connect to " << srv << ": " << e.what() << endl;
+                LOG_ERROR("Failed to connect to {:?}: {}", srv, e.what());
                 return {false, std::move(result)};
             }
         }
 
 
+        [[maybe_unused]]
         string
         to_string(State st)
         {
@@ -570,9 +566,8 @@ namespace RadioBrowserAPI {
                         add_task(
                             [](result_function_t<> result_func)
                             {
-                                cout << "DEBUG: connection succeeded [1]!" << endl;
                                 state = State::connected;
-                                cout << "state = " << to_string(state) << endl;
+                                LOG_INFO("connection succeeded [1]");
                                 if (result_func)
                                     std::invoke(result_func);
                             },
@@ -588,9 +583,8 @@ namespace RadioBrowserAPI {
                         add_task(
                             [](result_function_t<> result_func)
                             {
-                                cout << "DEBUG: connection succeeded [2]!" << endl;
                                 state = State::connected;
-                                cout << "state = " << to_string(state) << endl;
+                                LOG_INFO("connection succeeded [2]");
                                 if (result_func)
                                     std::invoke(result_func);
                             },
@@ -598,13 +592,13 @@ namespace RadioBrowserAPI {
                     }
                 }
                 catch (std::exception& e) {
+                    LOG_ERROR("connect thread: {}", e.what());
                     // Defer the error_func call, after updating the connection state.
                     add_task(
                         [](error_function_t error_func,
                             const error& e)
                         {
                             state = State::disconnected;
-                            cout << "state = " << to_string(state) << endl;
                             if (error_func)
                                 std::invoke(error_func, e);
                         },
@@ -801,7 +795,7 @@ namespace RadioBrowserAPI {
                      error_function_t error_func)
     {
         if (state != State::connected) {
-            cout << "DEBUG: calling get_server_stats() after connection" << endl;
+            LOG_INFO("deferring call to get_server_stats()");
             when_connected(get_server_stats,
                            std::move(result_func),
                            std::move(error_func));

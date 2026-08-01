@@ -1,18 +1,16 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <iostream>
 #include <utility>
 
 #include "decoder_mp3.hpp"
 
+#include "LogManager.hpp"
 
-using std::cout;
-using std::endl;
 
 using namespace std::literals;
 
@@ -25,7 +23,7 @@ namespace decoder {
         mpg.open_feed();
         feed(data);
 
-        cout << "Created mp3 decoder." << endl;
+        LOG_INFO("Created mp3 decoder.");
     }
 
 
@@ -208,21 +206,21 @@ namespace decoder {
         if ((meta_flags & MPG123_NEW_ID3) == 0)
             return {};
 
-        cout << "Got ID3 metadata." << endl;
+        LOG_DEBUG("Got ID3 metadata.");
         auto id3 = mpg.get_id3();
         if (id3.v2) {
             stream_metadata result;
             auto& tag = *id3.v2;
             if (!tag.title.empty()) {
-                cout << "Title: " << tag.title << endl;
+                LOG_DEBUG("Title: {:?}", tag.title);
                 result.title = std::move(tag.title);
             }
             if (!tag.artist.empty()) {
-                cout << "Artist: " << tag.artist << endl;
+                LOG_DEBUG("Artist: {:?}", tag.artist);
                 result.artist = std::move(tag.artist);
             }
             if (!tag.album.empty()) {
-                cout << "Album: " << tag.album << endl;
+                LOG_DEBUG("Album: {:?}", tag.album);
                 result.album = std::move(tag.album);
             }
             return result;
@@ -230,15 +228,15 @@ namespace decoder {
             stream_metadata result;
             auto& tag = *id3.v1;
             if (!tag.title.empty()) {
-                cout << "Title: " << tag.title << endl;
+                LOG_DEBUG("Title: {:?}", tag.title);
                 result.title = std::move(tag.title);
             }
             if (!tag.artist.empty()) {
-                cout << "Artist: " << tag.artist << endl;
+                LOG_DEBUG("Artist: {:?}", tag.artist);
                 result.artist = std::move(tag.artist);
             }
             if (!tag.album.empty()) {
-                cout << "Album: " << tag.album << endl;
+                LOG_DEBUG("Album: {:?}", tag.album);
                 result.album = std::move(tag.album);
             }
             return result;

@@ -8,7 +8,6 @@
 #include <array>
 #include <chrono>
 #include <deque>
-#include <iostream>
 #include <memory>
 #include <optional>
 #include <ranges>
@@ -33,6 +32,7 @@
 #include "humanize.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
+#include "LogManager.hpp"
 #include "radio_client.hpp"
 #include "RecentTab.hpp"
 #include "Serializer.hpp"
@@ -40,8 +40,6 @@
 #include "UI.hpp"
 
 
-using std::cout;
-using std::endl;
 using std::chrono::system_clock;
 
 using namespace std::literals;
@@ -132,7 +130,7 @@ namespace PlayerTab {
                     }
 
                 if (is_buffer_too_empty()) {
-                    // cout << "buffer too empty" << endl;
+                    // LOG_DEBUG("buffer too empty");
                     return;
                 }
 
@@ -151,7 +149,7 @@ namespace PlayerTab {
                 }
 
                 if (!audio_dev) {
-                    cout << "no audio dev yet" << endl;
+                    LOG_DEBUG("no audio dev yet");
                     return;
                 }
 
@@ -162,7 +160,7 @@ namespace PlayerTab {
 
             }
             catch (std::exception& e) {
-                cout << "ERROR: Player::Resources::process(): " << e.what() << endl;
+                LOG_ERROR("{}", e.what());
             }
         }
 
@@ -200,7 +198,7 @@ namespace PlayerTab {
         Serializer::load(state, filename);
     }
     catch (std::exception& e) {
-        cout << "ERROR: Player::load(): " << e.what() << endl;
+        LOG_ERROR("{}", e.what());
     }
 
 
@@ -211,7 +209,7 @@ namespace PlayerTab {
         Serializer::save(state, filename);
     }
     catch (std::exception& e) {
-        cout << "ERROR: Player::save(): " << e.what() << endl;
+        LOG_ERROR("{}", e.what());
     }
 
 
@@ -224,14 +222,13 @@ namespace PlayerTab {
         if (res && res->radio.current_state != radio_client::state::stopped)
             stop();
 
-        cout << "Starting playback of station \"" << station->name << "\"" << endl;
+        LOG_INFO("Starting playback of station {:?}", station->name);
 
         RecentTab::queue_add(station);
 
-        cout << "Playing url=\"" << station->url
-             << "\", url_resolved=\"" << station->url_resolved
-             << "\""
-             << endl;
+        LOG_INFO("Playing url={:?}, url_resolved={:?}",
+                 station->url,
+                 station->url_resolved);
 
         // allocate and initialize resources here
         res.emplace(station->url, station->url_resolved);

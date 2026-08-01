@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <filesystem>
-#include <iostream>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -24,6 +23,7 @@
 #include "cfg.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
+#include "LogManager.hpp"
 #include "Serializer.hpp"
 #include "Station.hpp"
 #include "StationGlaze.hpp"
@@ -32,8 +32,6 @@
 #include "UI.hpp"
 
 
-using std::cout;
-using std::endl;
 using string_utils::from_csv;
 using string_utils::to_csv;
 
@@ -535,10 +533,10 @@ namespace FavoritesTab {
                 uuids.insert(st->stationuuid);
         }
 
-        cout << "Loaded " << stations.size() << " favorites" << endl;
+        LOG_INFO("Loaded {} favorites.", stations.size());
     }
     catch (std::exception& e) {
-        cout << "ERROR: Favorites::load(): " << e.what() << endl;
+        LOG_ERROR("{}", e.what());
     }
 
 
@@ -660,7 +658,7 @@ namespace FavoritesTab {
         Serializer::save(stations, filename);
     }
     catch (std::exception& e) {
-        cout << "ERROR: Favorites::save(): " << e.what() << endl;
+        LOG_ERROR("{}", e.what());
     }
 
 } // namespace FavoritesTab
