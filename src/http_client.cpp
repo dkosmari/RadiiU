@@ -11,6 +11,7 @@
 #include "http_client.hpp"
 
 #include "LogManager.hpp"
+#include "LogManagerCurl.hpp"
 #include "string_utils.hpp"
 #include "tracer.hpp"
 
@@ -76,7 +77,7 @@ http_client::set_url(const std::string& url)
 
     easy.reset();
     easy.set_verbose(true); // DEBUG
-    LogManager::capture_curl_debug(easy);
+    LogManagerCurl::capture_curl_debug(easy);
     if (!user_agent.empty())
         easy.set_user_agent(user_agent);
     easy.set_accept_encoding("");

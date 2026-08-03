@@ -504,6 +504,8 @@ namespace App {
     void
     process_ui()
     {
+        using namespace ImGui::RAII;
+
         ImGui_ImplSDLRenderer2_NewFrame();
         ImGui_ImplSDL2_NewFrame();
 
@@ -524,7 +526,7 @@ namespace App {
 
             ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Always);
             ImGui::SetNextWindowSize(ImGui::GetMainViewport()->WorkSize, ImGuiCond_Always);
-            if (ImGui::RAII::Window main_window{
+            if (Window main_window{
                     PACKAGE_STRING,
                     nullptr,
                     ImGuiWindowFlags_NoTitleBar |
@@ -533,15 +535,15 @@ namespace App {
                     ImGuiWindowFlags_NoResize
                 }) {
 
-                ImGui::RAII::StyleVar window_border_size{ImGuiStyleVar_WindowBorderSize,
+                StyleVar window_border_size{ImGuiStyleVar_WindowBorderSize,
                                                          1.0f};
-                ImGui::RAII::StyleVar window_rounding{ImGuiStyleVar_WindowRounding,
+                StyleVar window_rounding{ImGuiStyleVar_WindowRounding,
                                                       ui_rounding};
 
                 {
                     // App name, centered
                     {
-                        ImGui::RAII::Font title_font{nullptr, 48};
+                        Font title_font{nullptr, 48};
                         UI::show_text_centered("%s", PACKAGE_STRING);
                     }
 
@@ -558,9 +560,9 @@ namespace App {
                         quit();
                 }
 
-                if (ImGui::RAII::TabBar tab_bar{"main_tabs"}) {
+                if (TabBar tab_bar{"main_tabs"}) {
 
-                    if (ImGui::RAII::TabItem fav_tab{
+                    if (TabItem fav_tab{
                             to_label(TabID::favorites),
                             nullptr,
                             get_tab_item_flags_for(TabID::favorites)
@@ -569,7 +571,7 @@ namespace App {
                         FavoritesTab::process_ui();
                     }
 
-                    if (ImGui::RAII::TabItem browser_tab{
+                    if (TabItem browser_tab{
                             to_label(TabID::browser),
                             nullptr,
                             get_tab_item_flags_for(TabID::browser)}) {
@@ -577,7 +579,7 @@ namespace App {
                         BrowserTab::process_ui();
                     }
 
-                    if (ImGui::RAII::TabItem recent_tab{
+                    if (TabItem recent_tab{
                             to_label(TabID::recent),
                             nullptr,
                             get_tab_item_flags_for(TabID::recent)
@@ -586,7 +588,7 @@ namespace App {
                         RecentTab::process_ui();
                     }
 
-                    if (ImGui::RAII::TabItem player_tab{
+                    if (TabItem player_tab{
                             to_label(TabID::player),
                             nullptr,
                             get_tab_item_flags_for(TabID::player)
@@ -595,7 +597,7 @@ namespace App {
                         PlayerTab::process_ui();
                     }
 
-                    if (ImGui::RAII::TabItem settings_tab{
+                    if (TabItem settings_tab{
                             to_label(TabID::settings),
                             nullptr,
                             get_tab_item_flags_for(TabID::settings)
@@ -604,7 +606,7 @@ namespace App {
                         SettingsTab::process_ui();
                     }
 
-                    if (ImGui::RAII::TabItem logs_tab{
+                    if (TabItem logs_tab{
                             to_label(TabID::logs),
                             nullptr,
                             get_tab_item_flags_for(TabID::logs)
@@ -613,7 +615,7 @@ namespace App {
                         LogsTab::process_ui();
                     }
 
-                    if (ImGui::RAII::TabItem about_tab{
+                    if (TabItem about_tab{
                             to_label(TabID::about),
                             nullptr,
                             get_tab_item_flags_for(TabID::about)

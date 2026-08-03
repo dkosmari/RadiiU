@@ -38,6 +38,7 @@
 
 #include "App.hpp"
 #include "cfg.hpp"
+#include "enumerator.hpp"
 #include "humanize.hpp"
 #include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
@@ -48,7 +49,6 @@
 #include "rest.hpp"
 #include "Serializer.hpp"
 #include "StationDetailsPopup.hpp"
-#include "StationGlaze.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
 
@@ -91,7 +91,7 @@ namespace BrowserTab::GUI {
     to_label(Order order);
 
     std::string
-    to_label(std::optional<Order> order);
+    to_label(const std::optional<Order>& order);
 
     std::tuple<RadioBrowserAPI::SearchStationParams::Order,
                bool>
@@ -223,7 +223,7 @@ namespace BrowserTab {
 
 
     std::string
-    GUI::to_label(std::optional<Order> order)
+    GUI::to_label(const std::optional<Order>& order)
     {
         if (!order)
             return "";
@@ -631,8 +631,7 @@ namespace BrowserTab {
                             ImGuiComboFlags_HeightLargest}) {
                         if (ImGui::Selectable("##", !GUI::order))
                             GUI::order.reset();
-                        for (unsigned i = 0; i < static_cast<unsigned>(GUI::Order::count); ++i) {
-                            GUI::Order o{i};
+                        for (auto o : enumerator::enumerate<GUI::Order>()) {
                             if (ImGui::Selectable(to_label(o),
                                                   GUI::order && *GUI::order == o))
                                 GUI::order = o;

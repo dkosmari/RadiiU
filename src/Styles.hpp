@@ -21,9 +21,6 @@ namespace Styles {
         user,
     };
 
-    std::string
-    to_string(Group g);
-
 
     struct Info {
 
@@ -56,6 +53,10 @@ namespace Styles {
 
     void
     load();
+
+
+    std::string
+    to_label(Group g);
 
 } // namespace Styles
 

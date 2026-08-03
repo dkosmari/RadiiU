@@ -12,27 +12,30 @@
 #include "IconsFontAwesome4.h"
 
 
+using namespace std::literals;
+
+
 std::string
 to_string(TabID tab)
 {
     switch (tab) {
         using enum TabID;
         case favorites:
-            return "favorites";
+            return "favorites"s;
         case browser:
-            return "browser";
+            return "browser"s;
         case recent:
-            return "recent";
+            return "recent"s;
         case player:
-            return "player";
+            return "player"s;
         case settings:
-            return "settings";
+            return "settings"s;
         case logs:
-            return "logs";
+            return "logs"s;
         case about:
-            return "about";
+            return "about"s;
         case last_active:
-            return "last_active";
+            return "last_active"s;
         default:
             throw std::runtime_error{"invalid TabID value: "
                                      + static_cast<std::underlying_type_t<TabID>>(tab)};
@@ -46,21 +49,21 @@ to_label(TabID tab)
     switch (tab) {
         using enum TabID;
         case favorites:
-            return ICON_FA_HEART " Favorites";
+            return ICON_FA_HEART " Favorites"s;
         case browser:
-            return ICON_FA_GLOBE " Browser";
+            return ICON_FA_GLOBE " Browser"s;
         case recent:
-            return ICON_FA_HISTORY " Recent";
+            return ICON_FA_HISTORY " Recent"s;
         case player:
-            return ICON_FA_MUSIC " Player";
+            return ICON_FA_MUSIC " Player"s;
         case settings:
-            return ICON_FA_SLIDERS " Settings";
+            return ICON_FA_SLIDERS " Settings"s;
         case logs:
-            return ICON_FA_LIST_ALT " Logs";
+            return ICON_FA_LIST_ALT " Logs"s;
         case about:
-            return ICON_FA_LIGHTBULB_O " About";
+            return ICON_FA_LIGHTBULB_O " About"s;
         case last_active:
-            return "Last active";
+            return "Last active"s;
         default:
             throw std::runtime_error{"invalid TabID value: "
                                      + static_cast<std::underlying_type_t<TabID>>(tab)};

@@ -36,10 +36,6 @@ noinst_PROGRAMS = radiiu.elf
 
 
 radiiu_elf_SOURCES = \
-	src/rest.cpp \
-	src/rest.hpp \
-	src/RadioBrowserAPI.cpp \
-	src/RadioBrowserAPI.hpp \
 	src/AboutTab.cpp \
 	src/AboutTab.hpp \
 	src/App.cpp \
@@ -61,6 +57,7 @@ radiiu_elf_SOURCES = \
 	src/decoder_opus.hpp \
 	src/decoder_vorbis.cpp \
 	src/decoder_vorbis.hpp \
+	src/enumerator.hpp \
 	src/FavoritesTab.cpp \
 	src/FavoritesTab.hpp \
 	src/FontManager.cpp \
@@ -76,8 +73,12 @@ radiiu_elf_SOURCES = \
 	src/icy.hpp \
 	src/icy_stream.cpp \
 	src/icy_stream.hpp \
+	src/LogLevel.cpp \
+	src/LogLevel.hpp \
 	src/LogManager.cpp \
 	src/LogManager.hpp \
+	src/LogManagerCurl.cpp \
+	src/LogManagerCurl.hpp \
 	src/LogsTab.cpp \
 	src/LogsTab.hpp \
 	src/m3u.cpp \
@@ -91,16 +92,20 @@ radiiu_elf_SOURCES = \
 	src/pls.hpp \
 	src/radio_client.cpp \
 	src/radio_client.hpp \
+	src/RadioBrowserAPI.cpp \
+	src/RadioBrowserAPI.hpp \
 	src/RecentTab.cpp \
 	src/RecentTab.hpp \
+	src/rest.cpp \
+	src/rest.hpp \
 	src/Serializer.hpp \
 	src/SettingsTab.cpp \
 	src/SettingsTab.hpp \
 	src/Station.cpp \
 	src/Station.hpp \
-	src/StationGlaze.hpp \
 	src/StationDetailsPopup.cpp \
 	src/StationDetailsPopup.hpp \
+	src/StationGlaze.hpp \
 	src/stream_metadata.cpp \
 	src/stream_metadata.hpp \
 	src/string_utils.cpp \

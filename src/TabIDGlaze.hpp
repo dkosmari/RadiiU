@@ -25,7 +25,7 @@ struct glz::meta<TabID> {
                            logs,
                            about,
                            last_active,
-                           num_tabs);
+                           count);
 }; // struct glz::meta<TabID>
 
 #endif

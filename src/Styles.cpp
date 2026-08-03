@@ -44,22 +44,6 @@ struct glz::meta<ImVec4> {
 
 namespace Styles {
 
-    std::string
-    to_string(Group g)
-    {
-        switch (g) {
-            case Group::imgui:
-                return "ImGui";
-            case Group::builtin:
-                return "built-in";
-            case Group::user:
-                return "user";
-            default:
-                throw std::logic_error{"invalid group"};
-        }
-    }
-
-
     std::optional<unsigned>
     color_name_to_index(const std::string& name)
     {
@@ -260,6 +244,22 @@ namespace Styles {
     }
     catch (std::exception& e) {
         LOG_ERROR("{}", e.what());
+    }
+
+
+    std::string
+    to_label(Group g)
+    {
+        switch (g) {
+            case Group::imgui:
+                return "ImGui";
+            case Group::builtin:
+                return "built-in";
+            case Group::user:
+                return "user";
+            default:
+                throw std::logic_error{"invalid group"};
+        }
     }
 
 } // namespace Styles

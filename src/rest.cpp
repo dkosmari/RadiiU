@@ -18,6 +18,7 @@
 
 #include "byte_stream.hpp"
 #include "LogManager.hpp"
+#include "LogManagerCurl.hpp"
 #include "tracer.hpp"
 
 
@@ -699,7 +700,7 @@ namespace rest {
     {
         curl::easy easy;
         easy.set_verbose(true);
-        LogManager::capture_curl_debug(easy);
+        LogManagerCurl::capture_curl_debug(easy);
         if (!user_agent.empty())
             easy.set_user_agent(user_agent);
         easy.set_accept_encoding("");

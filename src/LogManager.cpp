@@ -12,14 +12,12 @@
 #include <future>
 #include <iostream>
 #include <iterator>
-#include <ostream>
-#include <type_traits>
+#include <print>
 
 #include "LogManager.hpp"
 
 #include "App.hpp"
 #include "async_queue.hpp"
-#include "IconsFontAwesome4.h"
 #include "thread_safe.hpp"
 #include "tracer.hpp"
 
@@ -81,7 +79,7 @@ namespace LogManager {
         real_clear();
 
         void
-        real_log(Message msg);
+        real_log(const Message& msg);
 
         void
         trim_messages(MessageVec& messages);
@@ -138,10 +136,16 @@ namespace LogManager {
 
 
         void
-        real_log(Message msg)
+        real_log(const Message& msg)
         {
             ++timestamp;
-            cout << "[LOG] [" << to_string(msg.level) << "] " << msg.text << endl;
+            // TODO: set ANSI colors for each level
+            std::println("[LOG:{}] [{}:{}] {}\n{}",
+                         msg.level,
+                         msg.location.file_name(),
+                         msg.location.line(),
+                         msg.tag,
+                         msg.text);
             auto messages = safe_messages.lock();
             messages->push_back(std::move(msg));
             trim_messages(*messages);
@@ -189,12 +193,12 @@ namespace LogManager {
     void
     for_each(const CallbackFunction& func)
     {
-        for_each(Level::debug, func);
+        for_each(LogLevel::debug, func);
     }
 
 
     void
-    for_each(Level min_level,
+    for_each(LogLevel min_level,
              const CallbackFunction& func)
     {
         auto messages = safe_messages.c_lock();
@@ -240,100 +244,12 @@ namespace LogManager {
 
         auto messages = safe_messages.c_lock();
         for (auto& msg : *messages)
-            output << "["
-                   << msg.level
-                   << "] ["
-                   << msg.location.file_name()
-                   << ":"
-                   << msg.location.line()
-                   << "]: "
-                   << msg.text
-                   << '\n';
-    }
-
-
-    void
-    capture_curl_debug(curl::easy& easy,
-                       const std::source_location& location)
-    {
-        easy.set_debug_function(
-            [location](CURL*,
-                       curl_infotype type,
-                       std::span<const char> data)
-            {
-                switch (type) {
-                    case CURLINFO_TEXT:
-                        log(Level::debug,
-                            location,
-                            "CURL " ICON_FA_INFO_CIRCLE,
-                            "{}",
-                            std::string_view(data.data(), data.size()));
-                        break;
-
-                    case CURLINFO_HEADER_IN:
-                        log(Level::debug,
-                            location,
-                            "CURL " ICON_FA_ARROW_CIRCLE_O_DOWN,
-                            "{}",
-                            std::string_view(data.data(), data.size()));
-                        break;
-
-                    case CURLINFO_HEADER_OUT:
-                        log(Level::debug,
-                            location,
-                            "CURL " ICON_FA_ARROW_CIRCLE_O_UP,
-                            "{}",
-                            std::string_view(data.data(), data.size()));
-                        break;
-
-                    default:
-                        ;
-                }
-            }
-        );
-    }
-
-
-    Level&
-    operator ++(Level& level)
-        noexcept
-    {
-        auto value = static_cast<std::underlying_type_t<Level>>(level);
-        ++value;
-        level = static_cast<Level>(value);
-        return level;
-    }
-
-
-    std::string
-    to_string(Level level)
-    {
-        switch (level) {
-            using enum Level;
-
-            case debug:
-                return "DEBUG";
-
-            case info:
-                return "INFO"s;
-
-            case warning:
-                return "WARN"s;
-
-            case error:
-                return "ERROR"s;
-
-            case count:
-            default:
-                return "<UNKNOWN>"s;
-        }
-    }
-
-    std::ostream&
-    operator <<(std::ostream& out,
-                Level level)
-    {
-        return out << to_string(level);
+            std::println(output, "[{}] [{}:{}] {}: {}",
+                         msg.level,
+                         msg.location.file_name(),
+                         msg.location.line(),
+                         msg.tag,
+                         msg.text);
     }
 
 } // namespace LogManager

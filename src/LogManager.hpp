@@ -11,27 +11,16 @@
 #include <cstdint>
 #include <format>
 #include <functional>
+#include <source_location>
 #include <string>
 #include <utility>
-#include <iosfwd>
-#include <source_location>
 
-#include <curlxx/easy.hpp>
-
+#include "LogLevel.hpp"
 
 namespace LogManager {
 
-    enum class Level : unsigned {
-        debug,
-        info,
-        warning,
-        error,
-        count
-    };
-
-
     struct Message {
-        Level level;
+        LogLevel level;
         std::source_location location;
         std::string tag;
         std::string text;
@@ -59,7 +48,7 @@ namespace LogManager {
     for_each(const CallbackFunction& func);
 
     void
-    for_each(Level min_level,
+    for_each(LogLevel min_level,
              const CallbackFunction& func);
 
 
@@ -74,7 +63,7 @@ namespace LogManager {
     template<typename... Args>
     inline
     void
-    log(Level level,
+    log(LogLevel level,
         std::source_location location,
         std::string tag,
         std::format_string<Args...> fmt,
@@ -97,51 +86,33 @@ namespace LogManager {
     void
     save();
 
-
-    void
-    capture_curl_debug(curl::easy& easy,
-                       const std::source_location& location = std::source_location::current());
-
-
-    Level&
-    operator ++(Level& level)
-        noexcept;
-
-    std::string
-    to_string(Level level);
-
-
-    std::ostream&
-    operator <<(std::ostream& out,
-                Level level);
-
 } // namespace LogManager
 
 
 // TAG-less macros
 
 #define LOG_DEBUG(...)                                  \
-    LogManager::log(LogManager::Level::debug,           \
+    LogManager::log(LogLevel::debug,                    \
                     std::source_location::current(),    \
                     "",                                 \
                     __VA_ARGS__)
 
 #define LOG_INFO(...)                                   \
-    LogManager::log(LogManager::Level::info,            \
+    LogManager::log(LogLevel::info,                     \
                     std::source_location::current(),    \
                     "",                                 \
                     __VA_ARGS__)
 
 
 #define LOG_WARN(...)                                   \
-    LogManager::log(LogManager::Level::warning,         \
+    LogManager::log(LogLevel::warning,                  \
                     std::source_location::current(),    \
                     "",                                 \
                     __VA_ARGS__)
 
 
 #define LOG_ERROR(...)                                  \
-    LogManager::log(LogManager::Level::error,           \
+    LogManager::log(LogLevel::error,                    \
                     std::source_location::current(),    \
                     "",                                 \
                     __VA_ARGS__)
@@ -150,27 +121,27 @@ namespace LogManager {
 // TAG macros
 
 #define LOG_DEBUG_TAG(tag, ...)                         \
-    LogManager::log(LogManager::Level::debug,           \
+    LogManager::log(LogLevel::debug,                    \
                     std::source_location::current(),    \
                     tag,                                \
                     __VA_ARGS__)
 
 #define LOG_INFO_TAG(tag, ...)                          \
-    LogManager::log(LogManager::Level::info,            \
+    LogManager::log(LogLevel::info,                     \
                     std::source_location::current(),    \
                     tag,                                \
                     __VA_ARGS__)
 
 
 #define LOG_WARN_TAG(tag, ...)                          \
-    LogManager::log(LogManager::Level::warning,         \
+    LogManager::log(LogLevel::warning,                  \
                     std::source_location::current(),    \
                     tag,                                \
                     __VA_ARGS__)
 
 
 #define LOG_ERROR_TAG(tag, ...)                         \
-    LogManager::log(LogManager::Level::error,           \
+    LogManager::log(LogLevel::error,                    \
                     std::source_location::current(),    \
                     tag,                                \
                     __VA_ARGS__)

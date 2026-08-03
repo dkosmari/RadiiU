@@ -13,6 +13,7 @@
 
 #include "BrowserTab.hpp"
 #include "cfg.hpp"
+#include "enumerator.hpp"
 #include "IconsFontAwesome4.h"
 #include "RadioBrowserAPI.hpp"
 #include "Styles.hpp"
@@ -39,9 +40,9 @@ namespace SettingsTab {
                 ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-                /*********
-                 * Style *
-                 *********/
+                /*-------*/
+                /* Style */
+                /*-------*/
 
                 ImGui::TableNextRow();
 
@@ -57,7 +58,7 @@ namespace SettingsTab {
                 if (Combo styles_combo{"##style", cfg::state.style}) {
                     auto& styles = Styles::get_styles();
                     for (const auto& [type, name] : styles) {
-                        std::string label = "("s + to_string(type) + ") "s + name;
+                        std::string label = "("s + to_label(type) + ") "s + name;
                         if (ImGui::Selectable(label, cfg::state.style == name)) {
                             cfg::state.style = name;
                             Styles::load();
@@ -65,9 +66,9 @@ namespace SettingsTab {
                     }
                 } // styles_combo
 
-                /***************
-                 * Initial tab *
-                 ***************/
+                /*-------------*/
+                /* Initial tab */
+                /*-------------*/
 
                 ImGui::TableNextRow();
 
@@ -83,17 +84,16 @@ namespace SettingsTab {
                         "##initial_tab",
                         to_label(cfg::state.initial_tab)
                     }) {
-                    for (unsigned i = 0; i < static_cast<unsigned>(TabID::num_tabs); ++i) {
-                        TabID tab{i};
+                    for (auto tab : enumerator::enumerate<TabID>()) {
                         if (ImGui::Selectable(to_label(tab),
                                               cfg::state.initial_tab == tab))
                             cfg::state.initial_tab = tab;
                     }
                 } // initial_combo
 
-                /********************
-                 * Preferred server *
-                 ********************/
+                /*------------------*/
+                /* Preferred server */
+                /*------------------*/
 
                 ImGui::TableNextRow();
 
@@ -136,9 +136,9 @@ namespace SettingsTab {
                 if (ImGui::Button(refresh_label))
                     RadioBrowserAPI::get_mirrors();
 
-                /*********************
-                 * Browser page size *
-                 *********************/
+                /*-------------------*/
+                /* Browser page size */
+                /*-------------------*/
 
                 ImGui::TableNextRow();
 
@@ -157,9 +157,9 @@ namespace SettingsTab {
                 if (ImGui::IsItemDeactivatedAfterEdit())
                     BrowserTab::search_stations();
 
-                /*************************
-                 * Recent stations limit *
-                 *************************/
+                /*-----------------------*/
+                /* Recent stations limit */
+                /*-----------------------*/
 
                 ImGui::TableNextRow();
 
@@ -175,9 +175,9 @@ namespace SettingsTab {
                               cfg::state.recent_limit,
                               10u, 50u);
 
-                /********************
-                 * Switch to player *
-                 ********************/
+                /*------------------*/
+                /* Switch to player */
+                /*------------------*/
 
                 ImGui::TableNextRow();
 
@@ -192,9 +192,9 @@ namespace SettingsTab {
                 ImGui::Checkbox("##switch_to_player", &cfg::state.switch_to_player);
 
 
-                /**********************
-                 * Player buffer size *
-                 **********************/
+                /*--------------------*/
+                /* Player buffer size */
+                /*--------------------*/
 
                 ImGui::TableNextRow();
 
@@ -213,9 +213,9 @@ namespace SettingsTab {
                               "",
                               ImGuiSliderFlags_Logarithmic);
 
-                /***********************
-                 * Player history limit *
-                 ***********************/
+                /*----------------------*/
+                /* Player history limit */
+                /*----------------------*/
 
                 ImGui::TableNextRow();
 
@@ -231,9 +231,9 @@ namespace SettingsTab {
                               cfg::state.player_history_limit,
                               0u, 50u);
 
-                /***************
-                 * Disable APD *
-                 ***************/
+                /*-------------*/
+                /* Disable APD */
+                /*-------------*/
 
                 ImGui::TableNextRow();
 
@@ -248,9 +248,9 @@ namespace SettingsTab {
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::Checkbox("##disable_apd", &cfg::state.disable_apd);
 
-                /***********************
-                 * Inactive Screen Off *
-                 ***********************/
+                /*---------------------*/
+                /* Inactive Screen Off */
+                /*---------------------*/
 
                 ImGui::TableNextRow();
 
@@ -265,9 +265,9 @@ namespace SettingsTab {
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::Checkbox("##inactive_screen_off", &cfg::state.inactive_screen_off);
 
-                /************************
-                 * Screen Saver Timeout *
-                 ************************/
+                /*----------------------*/
+                /* Screen Saver Timeout */
+                /*----------------------*/
 
                 ImGui::TableNextRow();
 
@@ -285,9 +285,9 @@ namespace SettingsTab {
                             1.0f / 8.0f,
                             {0u}, {600u});
 
-                /*****************
-                 * Disable swkbd *
-                 *****************/
+                /*---------------*/
+                /* Disable swkbd */
+                /*---------------*/
 
                 ImGui::TableNextRow();
 
@@ -302,9 +302,9 @@ namespace SettingsTab {
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::Checkbox("##disable_swkbd", &cfg::state.disable_swkbd);
 
-                /*************************
-                 * Send clicks and votes *
-                 *************************/
+                /*-----------------------*/
+                /* Send clicks and votes */
+                /*-----------------------*/
 
                 ImGui::TableNextRow();
 
@@ -320,9 +320,9 @@ namespace SettingsTab {
                 ImGui::Checkbox("##send_clicks", &cfg::state.send_clicks);
 
 
-                /*******************
-                 * End of settings *
-                 *******************/
+                /*-----------------*/
+                /* End of settings */
+                /*-----------------*/
 
                 ImGui::TableNextRow();
 

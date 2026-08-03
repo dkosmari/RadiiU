@@ -19,6 +19,7 @@
 
 #include "LogsTab.hpp"
 
+#include "enumerator.hpp"
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
 #include "tracer.hpp"
@@ -34,8 +35,6 @@ using namespace std::literals;
 
 
 namespace LogsTab {
-
-    using LogManager::Level;
 
     namespace {
 
@@ -64,7 +63,7 @@ namespace LogsTab {
 
         LogManager::Timestamp timestamp;
 
-        Level min_level;
+        LogLevel min_level;
 
 
         /*-----------------------*/
@@ -107,7 +106,7 @@ namespace LogsTab {
     {
         TRACE_FUNC;
         timestamp = LogManager::get_timestamp();
-        min_level = Level::info;
+        min_level = LogLevel::info;
     }
 
 
@@ -142,7 +141,7 @@ namespace LogsTab {
             2 * style.FramePadding.x;
         ImGui::SetNextItemWidth(combo_width);
         if (Combo min_level_combo{"##min_level_combo", to_string(min_level)}) {
-            for (Level level = Level::debug; level < Level::count; ++level)
+            for (auto level : enumerator::enumerate<LogLevel>())
                 if (ImGui::Selectable(to_string(level), min_level == level)) {
                     min_level = level;
                     timestamp = 0;
@@ -180,7 +179,7 @@ namespace LogsTab {
             Font font{nullptr, log_font_size};
 
             float level_label_width = 0;
-            for (Level level = min_level; level < Level::count; ++level)
+            for (auto level : enumerator::enumerate(min_level))
                 level_label_width = std::fmax(level_label_width,
                                               ImGui::CalcTextSize(to_string(level)).x);
 

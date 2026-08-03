@@ -20,7 +20,7 @@ enum class TabID : unsigned {
     logs,
     about,
     last_active,
-    num_tabs
+    count
 };
 
 
