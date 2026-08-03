@@ -158,9 +158,9 @@ radiiu_elf_LDADD =  \
 
 if ENABLE_WIIU
 
-radiiu_elf_SOURCES +=
+radiiu_elf_SOURCES += \
 	external/wiiu-stdout/cpp/wiiu-stdout.cpp \
-	external/wiiu-stdout/cpp/wiiu-stderr.hpp
+	external/wiiu-stdout/cpp/wiiu-stderr.cpp
 
 radiiu_elf_LDFLAGS = \
 	$(AM_LDFLAGS) \

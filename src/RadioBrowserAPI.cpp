@@ -137,6 +137,7 @@ namespace RadioBrowserAPI {
             std::string response;
         };
 
+
         /*--------------*/
         /* Type aliases */
         /*--------------*/
@@ -149,6 +150,7 @@ namespace RadioBrowserAPI {
 
         constexpr
         const glz::opts glz_options{ .error_on_unknown_keys = false, };
+
 
         /*-----------*/
         /* Variables */
@@ -163,6 +165,7 @@ namespace RadioBrowserAPI {
         std::jthread mirrors_thread;
         async_queue<task_t> pending_tasks;
 
+
         /*-----------------------*/
         /* Function declarations */
         /*-----------------------*/
@@ -172,6 +175,12 @@ namespace RadioBrowserAPI {
         void
         add_task(F&& func,
                  Args&& ...args);
+
+        void
+        connect_thread_func(std::stop_token stopper,
+                            result_function_t<> result_func,
+                            error_function_t error_func)
+            noexcept;
 
         void
         dispatch_one_pending_task();
@@ -192,6 +201,7 @@ namespace RadioBrowserAPI {
         string
         to_string(State st);
 
+
         /*----------------------*/
         /* Function definitions */
         /*----------------------*/
@@ -205,6 +215,80 @@ namespace RadioBrowserAPI {
             pending_tasks.push(std::async(std::launch::deferred,
                                           std::forward<F>(func),
                                           std::forward<Args>(args)...));
+        }
+
+
+        void
+        connect_thread_func(std::stop_token stopper,
+                            result_function_t<> result_func,
+                            error_function_t error_func)
+            noexcept
+        try {
+            auto srv = server.load();
+            if (srv.empty()) {
+                // No server set, use a random one from the mirrors list.
+                auto local_mirrors = mirrors.load();
+                if (local_mirrors.empty()) {
+                    // If no mirrors list yet, fetch it.
+                    local_mirrors = get_mirrors_sync(stopper);
+                    mirrors.store(local_mirrors);
+                }
+                bool success = false;
+                for (const auto& mirror : local_mirrors) {
+                    if (stopper.stop_requested())
+                        throw error{"stop requested"};
+                    auto [test_success, test_response] = test_server_sync(mirror);
+                    if (test_success) {
+                        server.store(mirror);
+                        success = true;
+                        break;
+                    }
+                }
+                if (!success)
+                    throw error{"no working mirror found"};
+                // Defer the result_func call, after updating the connection state.
+                add_task(
+                    [](result_function_t<> result_func)
+                    {
+                        state = State::connected;
+                        LOG_INFO("connection succeeded [1]");
+                        if (result_func)
+                            std::invoke(result_func);
+                    },
+                    std::move(result_func));
+            } else {
+                // We have a server.
+                auto [test_success, test_response] = test_server_sync(srv);
+                if (!test_success)
+                    throw error{"mirror "s + srv + " failed with:\n"s + test_response};
+
+                server.store(srv);
+                // Defer the result_func call, after updating the connection state.
+                add_task(
+                    [](result_function_t<> result_func)
+                    {
+                        state = State::connected;
+                        LOG_INFO("connection succeeded [2]");
+                        if (result_func)
+                            std::invoke(result_func);
+                    },
+                    std::move(result_func));
+            }
+        }
+        catch (std::exception& e) {
+            LOG_ERROR("{}", e.what());
+            // Defer the error_func call, after updating the connection state.
+            add_task(
+                [](error_function_t error_func,
+                   const error& e)
+                {
+                    state = State::disconnected;
+                    if (error_func)
+                        std::invoke(error_func, e);
+                },
+                std::move(error_func),
+                error{e}
+            );
         }
 
 
@@ -500,10 +584,13 @@ namespace RadioBrowserAPI {
     } // namespace
 
 
+    /*-------------------*/
+    /* Public functions. */
+    /*-------------------*/
+
     error::error(const std::exception& e) :
         std::runtime_error{e.what()}
     {}
-
 
 
     /*-----------------------------------------------------------------------------------------*
@@ -534,82 +621,9 @@ namespace RadioBrowserAPI {
             return;
         }
 
-        connect_thread = std::jthread{
-            [](std::stop_token stopper,
-               result_function_t<> result_func,
-               error_function_t error_func)
-            {
-                try {
-                    auto srv = server.load();
-                    if (srv.empty()) {
-                        // No server set, use a random one from the mirrors list.
-                        auto local_mirrors = mirrors.load();
-                        if (local_mirrors.empty()) {
-                            // If no mirrors list yet, fetch it.
-                            local_mirrors = get_mirrors_sync(stopper);
-                            mirrors.store(local_mirrors);
-                        }
-                        bool success = false;
-                        for (const auto& mirror : local_mirrors) {
-                            if (stopper.stop_requested())
-                                throw error{"stop requested"};
-                            auto [test_success, test_response] = test_server_sync(mirror);
-                            if (test_success) {
-                                server.store(mirror);
-                                success = true;
-                                break;
-                            }
-                        }
-                        if (!success)
-                            throw error{"no working mirror found"};
-                        // Defer the result_func call, after updating the connection state.
-                        add_task(
-                            [](result_function_t<> result_func)
-                            {
-                                state = State::connected;
-                                LOG_INFO("connection succeeded [1]");
-                                if (result_func)
-                                    std::invoke(result_func);
-                            },
-                            std::move(result_func));
-                    } else {
-                        // We have a server.
-                        auto [test_success, test_response] = test_server_sync(srv);
-                        if (!test_success)
-                            throw error{"mirror "s + srv + " failed with:\n"s + test_response};
-
-                        server.store(srv);
-                        // Defer the result_func call, after updating the connection state.
-                        add_task(
-                            [](result_function_t<> result_func)
-                            {
-                                state = State::connected;
-                                LOG_INFO("connection succeeded [2]");
-                                if (result_func)
-                                    std::invoke(result_func);
-                            },
-                            std::move(result_func));
-                    }
-                }
-                catch (std::exception& e) {
-                    LOG_ERROR("connect thread: {}", e.what());
-                    // Defer the error_func call, after updating the connection state.
-                    add_task(
-                        [](error_function_t error_func,
-                            const error& e)
-                        {
-                            state = State::disconnected;
-                            if (error_func)
-                                std::invoke(error_func, e);
-                        },
-                        std::move(error_func),
-                        error{e}
-                    );
-                }
-            },
-            std::move(result_func),
-            std::move(error_func)
-        };
+        connect_thread = std::jthread{connect_thread_func,
+                                      std::move(result_func),
+                                      std::move(error_func)};
     }
 
 

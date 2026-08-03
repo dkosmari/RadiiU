@@ -26,12 +26,14 @@ namespace LogManager {
         info,
         warning,
         error,
+        count
     };
 
 
     struct Message {
         Level level;
         std::source_location location;
+        std::string tag;
         std::string text;
     };
 
@@ -74,12 +76,14 @@ namespace LogManager {
     void
     log(Level level,
         std::source_location location,
+        std::string tag,
         std::format_string<Args...> fmt,
         Args&&... args)
     {
         log(
             Message{level,
                     std::move(location),
+                    tag,
                     std::format(std::move(fmt),
                                 std::forward<Args>(args)...)}
         );
@@ -99,6 +103,10 @@ namespace LogManager {
                        const std::source_location& location = std::source_location::current());
 
 
+    Level&
+    operator ++(Level& level)
+        noexcept;
+
     std::string
     to_string(Level level);
 
@@ -110,26 +118,61 @@ namespace LogManager {
 } // namespace LogManager
 
 
+// TAG-less macros
+
 #define LOG_DEBUG(...)                                  \
     LogManager::log(LogManager::Level::debug,           \
                     std::source_location::current(),    \
+                    "",                                 \
                     __VA_ARGS__)
 
 #define LOG_INFO(...)                                   \
     LogManager::log(LogManager::Level::info,            \
                     std::source_location::current(),    \
+                    "",                                 \
                     __VA_ARGS__)
 
 
 #define LOG_WARN(...)                                   \
     LogManager::log(LogManager::Level::warning,         \
                     std::source_location::current(),    \
+                    "",                                 \
                     __VA_ARGS__)
 
 
 #define LOG_ERROR(...)                                  \
     LogManager::log(LogManager::Level::error,           \
                     std::source_location::current(),    \
+                    "",                                 \
+                    __VA_ARGS__)
+
+
+// TAG macros
+
+#define LOG_DEBUG_TAG(tag, ...)                         \
+    LogManager::log(LogManager::Level::debug,           \
+                    std::source_location::current(),    \
+                    tag,                                \
+                    __VA_ARGS__)
+
+#define LOG_INFO_TAG(tag, ...)                          \
+    LogManager::log(LogManager::Level::info,            \
+                    std::source_location::current(),    \
+                    tag,                                \
+                    __VA_ARGS__)
+
+
+#define LOG_WARN_TAG(tag, ...)                          \
+    LogManager::log(LogManager::Level::warning,         \
+                    std::source_location::current(),    \
+                    tag,                                \
+                    __VA_ARGS__)
+
+
+#define LOG_ERROR_TAG(tag, ...)                         \
+    LogManager::log(LogManager::Level::error,           \
+                    std::source_location::current(),    \
+                    tag,                                \
                     __VA_ARGS__)
 
 #endif

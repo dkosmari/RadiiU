@@ -13,11 +13,13 @@
 #include <iostream>
 #include <iterator>
 #include <ostream>
+#include <type_traits>
 
 #include "LogManager.hpp"
 
 #include "App.hpp"
 #include "async_queue.hpp"
+#include "IconsFontAwesome4.h"
 #include "thread_safe.hpp"
 #include "tracer.hpp"
 
@@ -139,7 +141,7 @@ namespace LogManager {
         real_log(Message msg)
         {
             ++timestamp;
-            cout << "[LOG] [" << to_string(msg.level)<< "] " << msg.text << endl;
+            cout << "[LOG] [" << to_string(msg.level) << "] " << msg.text << endl;
             auto messages = safe_messages.lock();
             messages->push_back(std::move(msg));
             trim_messages(*messages);
@@ -174,7 +176,6 @@ namespace LogManager {
     finalize()
     {
         TRACE_FUNC;
-
     }
 
 
@@ -264,21 +265,24 @@ namespace LogManager {
                     case CURLINFO_TEXT:
                         log(Level::debug,
                             location,
-                            "curl info: {}",
+                            "CURL " ICON_FA_INFO_CIRCLE,
+                            "{}",
                             std::string_view(data.data(), data.size()));
                         break;
 
                     case CURLINFO_HEADER_IN:
                         log(Level::debug,
                             location,
-                            "curl header in: {}",
+                            "CURL " ICON_FA_ARROW_CIRCLE_O_DOWN,
+                            "{}",
                             std::string_view(data.data(), data.size()));
                         break;
 
                     case CURLINFO_HEADER_OUT:
                         log(Level::debug,
                             location,
-                            "curl header out: {}",
+                            "CURL " ICON_FA_ARROW_CIRCLE_O_UP,
+                            "{}",
                             std::string_view(data.data(), data.size()));
                         break;
 
@@ -287,6 +291,17 @@ namespace LogManager {
                 }
             }
         );
+    }
+
+
+    Level&
+    operator ++(Level& level)
+        noexcept
+    {
+        auto value = static_cast<std::underlying_type_t<Level>>(level);
+        ++value;
+        level = static_cast<Level>(value);
+        return level;
     }
 
 
@@ -308,6 +323,7 @@ namespace LogManager {
             case error:
                 return "ERROR"s;
 
+            case count:
             default:
                 return "<UNKNOWN>"s;
         }

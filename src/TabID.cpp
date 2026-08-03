@@ -56,7 +56,7 @@ to_label(TabID tab)
         case settings:
             return ICON_FA_SLIDERS " Settings";
         case logs:
-            return ICON_FA_COMMENT " Logs";
+            return ICON_FA_LIST_ALT " Logs";
         case about:
             return ICON_FA_LIGHTBULB_O " About";
         case last_active:
