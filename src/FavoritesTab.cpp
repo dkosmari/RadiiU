@@ -338,7 +338,7 @@ namespace FavoritesTab {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             ImGui::AlignTextToFramePadding();
-            UI::show_label(label);
+            UI::Label(label);
             ImGui::TableNextColumn();
             ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
             ImGui::InputText("##" + label, value);
@@ -584,7 +584,7 @@ namespace FavoritesTab {
             ImGui::SameLine();
 
             ImGui::AlignTextToFramePadding();
-            UI::show_text_right("%zu stations", stations.size());
+            ImGui::FormatTextAligned(1, -1, "{} stations", stations.size());
 
         } // toolbar_child
 

@@ -2,6 +2,7 @@
 #define ENUMERATOR_HPP
 
 #include <type_traits>
+#include <utility>
 
 
 namespace enumerator {
@@ -59,7 +60,7 @@ namespace enumerator {
             constexpr
             iterator(enum_type e)
                 noexcept :
-                current{static_cast<underlying_type>(e)}
+                current{std::to_underlying(e)}
             {}
 
 

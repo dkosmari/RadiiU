@@ -12,9 +12,6 @@
 
 namespace FontManager {
 
-    extern float default_size;
-
-
     void
     initialize();
 

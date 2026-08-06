@@ -49,7 +49,7 @@ namespace SettingsTab {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                UI::show_label("UI color style");
+                UI::Label("UI color style");
                 ImGui::SetItemTooltip("Select color style for user interface");
 
                 ImGui::TableNextColumn();
@@ -75,7 +75,7 @@ namespace SettingsTab {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                UI::show_label("Initial tab");
+                UI::Label("Initial tab");
 
                 ImGui::TableNextColumn();
 
@@ -100,7 +100,7 @@ namespace SettingsTab {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                UI::show_label("Preferred server");
+                UI::Label("Preferred server");
 
                 ImGui::TableNextColumn();
 
@@ -145,7 +145,7 @@ namespace SettingsTab {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                UI::show_label("Browser page size");
+                UI::Label("Browser page size");
                 ImGui::SetItemTooltip("How many stations to show per page.");
 
                 ImGui::TableNextColumn();
@@ -166,7 +166,7 @@ namespace SettingsTab {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                UI::show_label("Recent stations limit");
+                UI::Label("Recent stations limit");
 
                 ImGui::TableNextColumn();
 
@@ -184,7 +184,7 @@ namespace SettingsTab {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                UI::show_label("Switch to Player when playing");
+                UI::Label("Switch to Player when playing");
 
                 ImGui::TableNextColumn();
 
@@ -201,7 +201,7 @@ namespace SettingsTab {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                UI::show_label("Player buffer size (KiB)");
+                UI::Label("Player buffer size (KiB)");
                 ImGui::SetItemTooltip("Playback will only start after this many bytes are received.");
 
                 ImGui::TableNextColumn();
@@ -222,7 +222,7 @@ namespace SettingsTab {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                UI::show_label("Player track history limit");
+                UI::Label("Player track history limit");
 
                 ImGui::TableNextColumn();
 
@@ -240,7 +240,7 @@ namespace SettingsTab {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                UI::show_label("Disable Auto Power-Down");
+                UI::Label("Disable Auto Power-Down");
                 ImGui::SetItemTooltip("APD is only disabled while playing.");
 
                 ImGui::TableNextColumn();
@@ -257,7 +257,7 @@ namespace SettingsTab {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                UI::show_label("Turn gamepad screen off on inactivity");
+                UI::Label("Turn gamepad screen off on inactivity");
                 ImGui::SetItemTooltip("When the gamepad screen turns off, it also stops playing sounds.");
 
                 ImGui::TableNextColumn();
@@ -274,7 +274,7 @@ namespace SettingsTab {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                UI::show_label("Screen saver timeout");
+                UI::Label("Screen saver timeout");
                 ImGui::SetItemTooltip("Time to wait to activate the screen saver, in seconds (0 = disable screen saver.");
 
                 ImGui::TableNextColumn();
@@ -294,7 +294,7 @@ namespace SettingsTab {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                UI::show_label("Disable SWKBD");
+                UI::Label("Disable SWKBD");
                 ImGui::SetItemTooltip("Use only USB keyboard for text input.");
 
                 ImGui::TableNextColumn();
@@ -311,14 +311,13 @@ namespace SettingsTab {
                 ImGui::TableNextColumn();
 
                 ImGui::AlignTextToFramePadding();
-                UI::show_label("Send clicks and votes");
+                UI::Label("Send clicks and votes");
                 ImGui::SetItemTooltip("Enable to send clicks and votes to radio-browser.info.");
 
                 ImGui::TableNextColumn();
 
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::Checkbox("##send_clicks", &cfg::state.send_clicks);
-
 
                 /*-----------------*/
                 /* End of settings */
@@ -328,7 +327,7 @@ namespace SettingsTab {
 
                 ImGui::TableNextColumn();
                 ImGui::AlignTextToFramePadding();
-                UI::show_label("Reset everything to default");
+                UI::Label("Reset everything to default");
 
                 ImGui::TableNextColumn();
 

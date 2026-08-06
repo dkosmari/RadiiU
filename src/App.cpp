@@ -26,6 +26,8 @@
 #include <wordexp.h>
 #endif
 
+#include <cafe_glyphs.h>
+
 #include <curlxx/global.hpp>
 
 #include <imgui.h>
@@ -116,9 +118,6 @@ namespace App {
 
         bool running;
 
-        const float default_font_size = 32;
-        const float ui_rounding = 8;
-
         std::optional<TabID> next_tab;
         TabID current_tab;
 
@@ -172,6 +171,8 @@ namespace App {
     initialize_config_dir()
         noexcept
     try {
+        TRACE_FUNC;
+
 #ifdef __WIIU__
         nn::act::Initialize();
         char buf[256];
@@ -214,6 +215,8 @@ namespace App {
     void
     finalize_config_dir()
     {
+        TRACE_FUNC;
+
 #ifdef __WIIU__
         SAVEShutdown();
         nn::act::Finalize();
@@ -242,32 +245,77 @@ namespace App {
     void
     setup_imgui_style()
     {
+        TRACE_FUNC;
+
         auto& style = ImGui::GetStyle();
 
-        const ImVec2 padding = {9, 9};
-        const float rounding = ui_rounding;
-        const ImVec2 spacing = {9, 9};
+        style.FontSizeBase = 32;
 
-        style.CellPadding       = {padding.x, padding.y / 2};
-        style.ChildBorderSize   = 3;
-        style.ChildRounding     = rounding;
-        style.FrameBorderSize   = 0;
-        style.FramePadding      = padding;
-        style.FrameRounding     = rounding;
-        style.GrabMinSize       = 32;
-        style.GrabRounding      = rounding;
-        style.ImageBorderSize   = 0;
-        style.ItemInnerSpacing  = spacing;
-        style.ItemSpacing       = spacing;
-        style.PopupRounding     = rounding;
-        style.ScrollbarRounding = rounding;
-        style.ScrollbarSize     = 32;
-        style.TabBarBorderSize  = 2;
-        style.TabBorderSize     = 0;
-        style.TabRounding       = rounding;
-        style.WindowBorderSize  = 0;
-        style.WindowPadding     = padding;
-        style.WindowRounding    = 0;
+        const ImVec2 padding = {9, 9};
+        const float rounding = 9;
+        const ImVec2 spacing = {12, 9};
+        const float thickness = 2;
+
+        // Thickness of borders and lines
+        style.ChildBorderSize          = thickness;
+        style.DragDropTargetBorderSize = thickness;
+        style.FrameBorderSize          = 0;
+        style.ImageBorderSize          = 0;
+        style.InputTextCursorSize      = 2;
+        style.PopupBorderSize          = thickness;
+        style.SeparatorSize            = 2;
+        style.SeparatorTextBorderSize  = 2;
+        style.TabBarBorderSize         = thickness;
+        style.TabBarOverlineSize       = thickness;
+        style.TabBorderSize            = 0;
+        style.TreeLinesSize            = thickness;
+        style.WindowBorderSize         = 0;
+
+        // Padding
+        style.CellPadding           = padding;
+        style.DragDropTargetPadding = padding.x;
+        style.FramePadding          = padding;
+        style.ScrollbarPadding      = 4;
+        style.SeparatorTextPadding  = { style.FontSizeBase, padding.y };
+        style.WindowPadding         = {6, 6};
+
+        // Rounding
+        style.ChildRounding          = rounding;
+        style.DragDropTargetRounding = rounding;
+        style.FrameRounding          = rounding;
+        style.GrabRounding           = rounding;
+        style.ImageRounding          = 0;
+        style.MenuItemRounding       = rounding;
+        style.PopupRounding          = rounding;
+        style.ScrollbarRounding      = rounding;
+        style.SelectableRounding     = rounding;
+        style.TabRounding            = rounding;
+        style.TreeLinesRounding      = rounding;
+        style.WindowRounding         = rounding;
+
+        // Spacing
+        style.IndentSpacing    = style.FontSizeBase + 2 * padding.x;
+        style.ItemInnerSpacing = spacing;
+        style.ItemSpacing      = spacing;
+
+        // Sizes
+        style.ColorMarkerSize         = 12;
+        style.GrabMinSize             = 32;
+        style.ScrollbarSize           = 32;
+
+        // Misc
+        style.ColumnsMinSpacing        = padding.x + 1;
+        style.DisplaySafeAreaPadding   = {9, 9};
+        style.DisplayWindowPadding     = {12, 12};
+        style.LogSliderDeadzone        = 12;
+        style.MouseCursorScale         = 2;
+        style.TabMinWidthBase          = 128;
+        style.TabMinWidthShrink        = 63;
+        style.TouchExtraPadding        = {4, 4};
+        style.WindowBorderHoverPadding = 6;
+        style.WindowMinSize            = {64, 64};
+
+        style.DisplaySafeAreaPadding = {10, 10};
     }
 
 
@@ -290,11 +338,11 @@ namespace App {
         io.LogFilename = nullptr; // don't save log
         io.IniFilename = nullptr; // don't save ini
 
+        setup_imgui_style();
+
         FontManager::initialize(); // load system font(s)
         FontManager::load_dir(get_content_path() / "fonts");
         FontManager::load_dir(get_config_path() / "fonts");
-
-        setup_imgui_style();
 
         ImGui_ImplSDL2_InitForSDLRenderer(res->window.data(),
                                           res->renderer.data());
@@ -305,6 +353,8 @@ namespace App {
     void
     finalize_imgui()
     {
+        TRACE_FUNC;
+
         FontManager::finalize();
         ImGui::DestroyContext();
     }
@@ -506,58 +556,30 @@ namespace App {
     {
         using namespace ImGui::RAII;
 
-        ImGui_ImplSDLRenderer2_NewFrame();
-        ImGui_ImplSDL2_NewFrame();
+        const auto& style = ImGui::GetStyle();
 
-        ImGui::NewFrame();
+        {
+            /*
+             * Main window:
+             * - Occupy the whole viewort.
+             * - No decorations, no move.
+             */
+            auto viewport = ImGui::GetMainViewport();
+            ImGui::SetNextWindowPos(viewport->WorkPos, ImGuiCond_Always);
+            ImGui::SetNextWindowSize(viewport->WorkSize, ImGuiCond_Always);
+            if (Window main_window{PACKAGE_STRING,
+                                   nullptr,
+                                   ImGuiWindowFlags_NoDecoration |
+                                   ImGuiWindowFlags_NoMove |
+                                   ImGuiWindowFlags_NoSavedSettings}) {
+                const auto content_begin = ImGui::GetCursorStartPos();
+                const auto content_end = content_begin + ImGui::GetContentRegionAvail();
 
-        if (state == State::normal || state == State::fading) {
-
-            auto& style = ImGui::GetStyle();
-            if (state == State::fading) {
-                Uint64 now = SDL_GetTicks64();
-                float ratio = 1.0f - (now - fade_start) / float(fade_duration_ms);
-                if (ratio < 0)
-                    ratio = 0;
-                style.Alpha = ratio;
-            } else {
-                style.Alpha = 1.0f;
-            }
-
-            ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Always);
-            ImGui::SetNextWindowSize(ImGui::GetMainViewport()->WorkSize, ImGuiCond_Always);
-            if (Window main_window{
-                    PACKAGE_STRING,
-                    nullptr,
-                    ImGuiWindowFlags_NoTitleBar |
-                    ImGuiWindowFlags_NoMove |
-                    ImGuiWindowFlags_NoSavedSettings |
-                    ImGuiWindowFlags_NoResize
-                }) {
-
-                StyleVar window_border_size{ImGuiStyleVar_WindowBorderSize,
-                                                         1.0f};
-                StyleVar window_rounding{ImGuiStyleVar_WindowRounding,
-                                                      ui_rounding};
-
+                // App name, centered
                 {
-                    // App name, centered
-                    {
-                        Font title_font{nullptr, 48};
-                        UI::show_text_centered("%s", PACKAGE_STRING);
-                    }
-
-                    ImGui::SameLine();
-                    // Put a close button on the top right
-                    auto tex = IconManager::get("content:/ui/close-button.svg");
-                    auto tex_size = ImGui::ToVec2(tex->get_size());
-                    ImVec2 close_button_size = tex_size
-                        + 2 * (style.FramePadding + style.FrameBorderSize * ImVec2{1, 1});
-                    ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x
-                                         - close_button_size.x);
-
-                    if (UI::show_image_button("close_button", *tex))
-                        quit();
+                    Font title_font{nullptr, 48};
+                    ImGui::TextAligned(0.5f, -1, PACKAGE_STRING);
+                    // UI::show_last_bounding_box();
                 }
 
                 if (TabBar tab_bar{"main_tabs"}) {
@@ -631,16 +653,22 @@ namespace App {
 
                 } // tab_bar
 
+                // Put an exit button on the top right
+                {
+                    Font font{nullptr, 28};
+                    const std::string label = ICON_FA_SIGN_OUT;
+                    ImVec2 size = ImGui::CalcTextSize(label) + 2 * style.FramePadding;
+                    const ImVec2 pos = { content_end.x - size.x, content_begin.y };
+                    ImGui::SetCursorPos(pos);
+                    if (ImGui::Button(label, size))
+                        quit();
+                }
+
             } // main_window
-
-            Styles::process_ui();
-
-            // ImGui::ShowStyleEditor();
-
         }
 
-        ImGui::EndFrame();
-        ImGui::Render();
+        ImGui::ShowStyleEditor();
+
     }
 
 
@@ -751,7 +779,33 @@ namespace App {
 
         LogManager::process();
 
-        process_ui();
+        // ImGui frame processing
+        ImGui_ImplSDLRenderer2_NewFrame();
+        ImGui_ImplSDL2_NewFrame();
+
+        ImGui::NewFrame();
+
+        if (state == State::normal || state == State::fading) {
+
+            auto& style = ImGui::GetStyle();
+
+            // Apply fading effect if fading is active.
+            if (state == State::fading) {
+                Uint64 now = SDL_GetTicks64();
+                float ratio = 1.0f - (now - fade_start) / float(fade_duration_ms);
+                if (ratio < 0)
+                    ratio = 0;
+                style.Alpha = ratio;
+            } else {
+                style.Alpha = 1.0f;
+            }
+
+            process_ui();
+
+        }
+
+        ImGui::EndFrame();
+        ImGui::Render();
 
         process_screen_saver();
     }
@@ -760,6 +814,8 @@ namespace App {
     void
     quit()
     {
+        TRACE_FUNC;
+
         running = false;
     }
 

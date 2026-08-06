@@ -129,9 +129,9 @@ radiiu_elf_CPPFLAGS = \
 	$(MPG123_CFLAGS) \
 	$(SDL_CFLAGS) \
 	$(FAAD2_CFLAGS) \
-	$(FT_CFLAGS) \
 	$(OPUSFILE_CFLAGS) \
 	$(VORBISFILE_CFLAGS) \
+	-I$(srcdir)/external/cafe_glyphs/include \
 	-I$(srcdir)/external/curlxx/include \
 	-DIMGUI_USER_CONFIG='"$(srcdir)/external/custom_imconfig.h"' \
 	-I$(srcdir)/external/glaze/include \
@@ -157,8 +157,25 @@ radiiu_elf_LDADD =  \
 	$(MPG123_LIBS) \
 	$(OPUSFILE_LIBS) \
 	$(VORBISFILE_LIBS) \
-	$(SDL_LIBS) \
-	$(FT_LIBS)
+	$(SDL_LIBS)
+
+
+if ENABLE_FREETYPE
+
+radiiu_elf_CPPFLAGS += \
+	-DIMGUI_ENABLE_FREETYPE \
+	$(FT_CFLAGS)
+
+radiiu_elf_LDADD += $(FT_LIBS)
+
+endif ENABLE_FREETYPE
+
+
+if ENABLE_STB_TRUETYPE
+
+radiiu_elf_CPPFLAGS += -DIMGUI_ENABLE_STB_TRUETYPE
+
+endif ENABLE_STB_TRUETYPE
 
 
 if ENABLE_WIIU

@@ -38,6 +38,7 @@
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
 #include "string_utils.hpp"
+#include "tracer.hpp"
 #include "UI.hpp"
 
 #ifdef HAVE_CONFIG_H
@@ -175,6 +176,8 @@ namespace AboutTab {
     void
     initialize()
     {
+        TRACE_FUNC;
+
 #ifdef __WIIU__
         if (RPXLoader_InitLibrary() == RPX_LOADER_RESULT_SUCCESS) {
             char real_save_buf[1024];
@@ -190,7 +193,9 @@ namespace AboutTab {
 
     void
     finalize()
-    {}
+    {
+        TRACE_FUNC;
+    }
 
 
     void
@@ -219,6 +224,7 @@ namespace AboutTab {
 #else
                 UI::show_info_row("Save folder", App::get_config_path());
 #endif
+
             }
 
             ImGui::SeparatorText("Credits");
@@ -233,12 +239,9 @@ namespace AboutTab {
 
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                UI::show_label("Stations list");
+                UI::Label("Stations list");
                 ImGui::TableNextColumn();
-                auto rb_url = "https://www.radio-browser.info";
-                if (UI::show_link(rb_url)) {
-                    // TODO
-                }
+                UI::TextLinkOpenURL("https://www.radio-browser.info");
                 // ImGui::SameLine();
                 // auto rb_icon_tex = IconManager::get("https://www.radio-browser.info/favicon.ico");
                 // ImGui::Image(*rb_icon_tex, sdl::vec2{64, 64});

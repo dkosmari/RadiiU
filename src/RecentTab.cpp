@@ -166,8 +166,7 @@ namespace RecentTab {
             ImGui::SameLine();
 
             ImGui::AlignTextToFramePadding();
-            UI::show_text_right("%zu stations", stations.size());
-
+            ImGui::FormatTextAligned(1, -1, "{} stations", stations.size());
         }
 
         // Note: flat navigation doesn't work well on child windows that scroll.

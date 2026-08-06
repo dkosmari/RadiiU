@@ -362,10 +362,10 @@ namespace PlayerTab {
                             auto art = IconManager::get(*meta->cover_art);
                             ImGui::TableNextRow();
                             ImGui::TableNextColumn();
-                            UI::show_label("Cover art");
+                            UI::Label("Cover art");
                             ImGui::TableNextColumn();
                             UI::show_image(*art);
-                            ImGui::SetItemTooltip("%s", meta->cover_art->data());
+                            ImGui::SetItemTooltip(*meta->cover_art);
                         }
                         for (auto& [k, v] : meta->extra)
                             UI::show_info_row(k, v);

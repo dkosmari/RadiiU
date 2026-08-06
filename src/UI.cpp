@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <optional>
@@ -159,7 +160,7 @@ namespace UI {
         ImGui::TableNextRow();
 
         ImGui::TableNextColumn();
-        show_label(label);
+        Label(label);
         // show_last_bounding_box();
 
         ImGui::TableNextColumn();
@@ -208,55 +209,6 @@ namespace UI {
 
 
     void
-    show_label(const char* fmt,
-               ...)
-    {
-        std::string text;
-        std::va_list args;
-        va_start(args, fmt);
-        try {
-            text = string_utils::cpp_vsprintf(fmt, args);
-            va_end(args);
-        }
-        catch (...) {
-            va_end(args);
-            throw;
-        }
-        TextSpec spec{
-            .halign = 1.0f,
-            .color = get_label_color(),
-        };
-        show_text(spec, text);
-    }
-
-
-    void
-    show_label(const std::string& label)
-    {
-        show_label("%s", label.data());
-    }
-
-
-    bool
-    show_link(const std::string& label)
-    {
-        auto& style = ImGui::GetStyle();
-        TextSpec spec{
-            .wrap = 0,
-            .color = style.Colors[ImGuiCol_TextLink],
-        };
-        show_text(spec, ICON_FA_LINK " " + label);
-        if (ImGui::IsItemHovered())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-        if (ImGui::IsItemClicked()) {
-            LOG_DEBUG("clicked on link: {}", label);
-            return true;
-        }
-        return false;
-    }
-
-
-    void
     show_link_row(const std::string& label,
                   const std::string& url)
     {
@@ -267,31 +219,25 @@ namespace UI {
         ID label_id{label};
 
         ImGui::TableNextColumn();
-        show_label(label);
+        Label(label);
 
         ImGui::TableNextColumn();
-        TextWrapPos wrapper{0.0f};
-        if (show_link(url)) {
-#ifdef __WIIU__
-            // TODO: show QR code
-#endif
-        }
+        TextLinkOpenURL(url);
     }
 
 
     void
     show_play_button(StationPtr& station)
     {
-        const sdl::vec2 button_size = {96, 96};
+        using namespace ImGui::RAII;
+
+        const ImVec2 button_size = {96, 96};
+        Font text{nullptr, 64};
         if (PlayerTab::is_playing(*station)) {
-            if (show_image_button("stop_button",
-                                  *IconManager::get("content:/ui/stop-button.svg"),
-                                  button_size))
+            if (ImGui::Button(ICON_FA_STOP, button_size))
                 PlayerTab::stop();
         } else {
-            if (show_image_button("play_button",
-                                  *IconManager::get("content:/ui/play-button.svg"),
-                                  button_size)) {
+            if (ImGui::Button(ICON_FA_PLAY, button_size)) {
                 if (cfg::state.switch_to_player)
                     App::set_tab(TabID::player);
                 PlayerTab::play(station);
@@ -316,13 +262,8 @@ namespace UI {
 
             ImGui::TextWrapped(station.name);
 
-            if (!station.homepage.empty()) {
-                if (show_link(station.homepage)) {
-#ifdef __WIIU__
-                    // TODO: show QR code
-#endif
-                }
-            }
+            if (!station.homepage.empty())
+                TextLinkOpenURL(station.homepage);
 
             bool has_country = false;
             if (!station.countrycode.empty()) {
@@ -371,7 +312,7 @@ namespace UI {
         const ImGuiStyle& style = ImGui::GetStyle();
         const ImVec2 size = ImGui::CalcTextSize(text)
             + 2 * style.FramePadding
-            + style.FrameBorderSize * ImVec2{2, 2};
+            + 2 * style.FrameBorderSize * ImVec2{1, 1};
         const float spacing = style.ItemSpacing.x;
         const ImVec2 available = ImGui::GetContentRegionAvail();
         if (size.x + spacing > available.x)
@@ -406,107 +347,77 @@ namespace UI {
             auto min = ImGui::GetItemRectMin();
             auto max = ImGui::GetItemRectMax();
             ImU32 col = ImGui::GetColorU32(ImVec4{1.0f, 0.0f, 0.0f, 0.5f});
-            auto draw_list = ImGui::GetForegroundDrawList();
+            auto draw_list = ImGui::GetWindowDrawList();
             draw_list->AddRect(min, max, col);
         }
     }
 
 
-
     void
-    show_text(const TextSpec& spec,
-              const char* fmt,
-              ...)
+    Label(std::string_view label)
     {
-        std::va_list args;
-        va_start(args, fmt);
-        show_textv(spec, fmt, args);
-        va_end(args);
+        auto available = ImGui::GetContentRegionAvail();
+        auto label_size = ImGui::CalcTextSize(label);
+        float offset = available.x - label_size.x;
+        if (offset > 0)
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
+        ImGui::TextColored(get_label_color(), label);
+        // show_last_bounding_box();
     }
 
 
-    void
-    show_text(const TextSpec& spec,
-         const std::string& text)
-    {
-        show_text(spec, "%s", text.data());
-    }
-
-
-    void
-    show_textv(const TextSpec& spec,
-               const char* fmt,
-               std::va_list args)
+    bool
+    TextLinkOpenURL(const std::string& url)
     {
         using namespace ImGui::RAII;
-
-        std::optional<StyleColor> color_style;
-        if (spec.color)
-            color_style.emplace(ImGuiCol_Text, *spec.color);
-
-        auto text = string_utils::cpp_vsprintf(fmt, args);
-
-        float width = spec.width > 0
-            ? spec.width
-            : ImGui::GetContentRegionAvail().x;
-        auto str_size = ImGui::CalcTextSize(text, true, spec.wrap);
-        float space = width - str_size.x;
-        if (space > 0) {
-            float old_x = ImGui::GetCursorPosX();
-            float space_left = spec.halign * space;
-            float new_x = old_x + space_left;
-            ImGui::SetCursorPosX(new_x);
+#if 1
+        const auto& style = ImGui::GetStyle();
+        const auto link_color = style.Colors[ImGuiCol_TextLink];
+        float url_width = ImGui::CalcTextSize(url).x;
+        {
+            StyleColor text_color{ImGuiCol_Text, link_color};
+            ImGui::TextUnformatted(ICON_FA_LINK);
+            ImGui::SameLine();
+            if (ImGui::TextAligned(0, -1, url))
+                url_width = -1; // got truncated
         }
-        TextWrapPos wrapper{spec.wrap};
-        ImGui::Text(text);
+
+        // Draw underline
+        auto draw_list = ImGui::GetWindowDrawList();
+        auto min = ImGui::GetItemRectMin();
+        auto max = ImGui::GetItemRectMax();
+        auto baked = ImGui::GetFontBaked();
+        float underline_y = max.y
+            + std::floor(baked->Descent * style.FontSizeBase / baked->Size * 0.2f);
+        float underline_max = url_width < 0 ? max.x : min.x + url_width;
+        draw_list->AddLineH(min.x,
+                            underline_max,
+                            underline_y,
+                            ImGui::GetColorU32(link_color),
+                            2.0f);
+
+        // Mouse hover
+        if (ImGui::IsItemHovered())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+
+        // Left-click
+        if (ImGui::IsItemClicked()) {
+            // TODO: show QR popup
+            LOG_DEBUG("clicked on link: {}", url);
+            return true;
+        }
+
+        // Right-click
+        if (PopupContextItem context_menu{"context-" + url}) {
+            if (ImGui::MenuItem("Copy link to clipboard"))
+                ImGui::SetClipboardText(url);
+        }
+        return false;
+#else
+        TextWrapPos wrapper{0};
+        return ImGui::TextLinkOpenURL(url);
+#endif
     }
 
-
-    void
-    show_text_centered(const char* fmt,
-                       ...)
-    {
-        std::va_list args;
-        va_start(args, fmt);
-        try {
-            show_textv({ .halign = 0.5f, }, fmt, args);
-            va_end(args);
-        }
-        catch (...) {
-            va_end(args);
-            throw;
-        }
-    }
-
-
-    void
-    show_text_centered(const std::string& text)
-    {
-        show_text_centered("%s", text.data());
-    }
-
-
-    void
-    show_text_right(const char* fmt,
-                    ...)
-    {
-        std::va_list args;
-        va_start(args, fmt);
-        try {
-            show_textv({ .halign = 1.0f }, fmt, args);
-            va_end(args);
-        }
-        catch (...) {
-            va_end(args);
-            throw;
-        }
-    }
-
-
-    void
-    show_text_right(const std::string& text)
-    {
-        show_text_right("%s", text.data());
-    }
 
 } // namespace UI

@@ -9,9 +9,10 @@
 #define UI_HPP
 
 #include <concepts>
-#include <cstdarg>
+#include <format>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <imgui.h> // ImVec4
@@ -94,20 +95,6 @@ namespace UI {
                   const std::vector<std::string>& values);
 
 
-    // Align to the right, with label color
-    void
-    show_label(const char* fmt,
-               ...)
-        IM_FMTARGS(1);
-
-    void
-    show_label(const std::string& label);
-
-
-    bool
-    show_link(const std::string& label);
-
-
     void
     show_link_row(const std::string& label,
                   const std::string& url);
@@ -137,48 +124,25 @@ namespace UI {
     show_last_bounding_box();
 
 
-    struct TextSpec {
-        float halign = 0;
-        float width = 0;
-        float wrap = -1;
-        std::optional<ImVec4> color = {};
-    };
+    // ImGui-like functions
 
 
+    // Align to the right, with label color
     void
-    show_text(const TextSpec& spec,
-              const char* fmt,
-              ...)
-        IM_FMTARGS(2);
+    Label(std::string_view label);
 
+
+    template<typename... Args>
     void
-    show_text(const TextSpec& spec,
-              const std::string& text);
-
-    void
-    show_textv(const TextSpec& spec,
-               const char* fmt,
-               std::va_list args)
-        IM_FMTLIST(2);
+    FormatLabel(std::format_string<Args...> fmt,
+                Args&&... args)
+    {
+        Label(std::format(std::move(fmt), std::forward<Args>(args)...));
+    }
 
 
-    void
-    show_text_centered(const char* fmt,
-                  ...)
-        IM_FMTARGS(1);
-
-    void
-    show_text_centered(const std::string& text);
-
-
-    void
-    show_text_right(const char* fmt,
-               ...)
-        IM_FMTARGS(1);
-
-
-    void
-    show_text_right(const std::string& text);
+    bool
+    TextLinkOpenURL(const std::string& url);
 
 } // namespace UI
 

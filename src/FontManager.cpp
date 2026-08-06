@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <array>
 #include <memory>
 #include <set>
 #include <stdexcept>
@@ -33,63 +34,84 @@ using namespace std::literals;
 
 namespace FontManager {
 
-    float default_size = 32;
-
-
     namespace {
 
+        void
+        tweak_cafe(ImFontConfig& config)
+        {
+            LOG_DEBUG("Adjusting for Cafe font.");
+            config.GlyphOffset.y = -6;
+        }
+
+        void
+        tweak_font_awesome(ImFontConfig& config)
+        {
+            LOG_DEBUG("Adjusting for fontawesome.");
+            // font_size *= 33.0f / 40.0f;
+            config.GlyphOffset.y = -6;
+        }
+
 #ifdef __WIIU__
+
+        const std::array font_names = {
+            "CafeCn.ttf"s,
+            "CafeKr.ttf"s,
+            "CafeStd.ttf"s,
+            "CafeTw.ttf"s
+        };
+
+        void
+        load_system_font(OSSharedDataType type,
+                         bool merge = true)
+        {
+            const auto& style = ImGui::GetStyle();
+            ImFontConfig config;
+            config.Flags |= ImFontFlags_NoLoadError;
+            config.EllipsisChar = U'…';
+            config.FontDataOwnedByAtlas = false;
+            config.MergeMode = merge;
+
+            LOG_DEBUG("Loading {:?}", font_names.at(type));
+            tweak_cafe(config);
+
+            void* blob = nullptr;
+            uint32_t blob_size = 0;
+            if (!OSGetSharedData(type, 0, &blob, &blob_size))
+                throw std::runtime_error{"Could not find \"" + font_names.at(type) + "\""};
+
+            auto& io = ImGui::GetIO();
+            if (!io.Fonts->AddFontFromMemoryTTF(blob, blob_size,
+                                                style.FontSizeBase, &config))
+                    throw std::runtime_error{"Could not parse \"" + font_names.at(type) + "\""};
+        }
+
 
         void
         load_system_fonts()
         {
-            auto& io = ImGui::GetIO();
-            // Load main font: CafeStd
-            ImFontConfig config;
-            config.Flags |= ImFontFlags_NoLoadError;
-            config.EllipsisChar = U'…';
-#ifdef IMGUI_ENABLE_FREETYPE
-            // NOTE: CafeStd seems to always be too low, about 1/8th of the font size
-            config.GlyphOffset.y = - default_size * (1.0f / 8.0f);
-#endif
-            config.FontDataOwnedByAtlas = false;
+            // NOTE: first font is required, so we don't catch the exception here.
+            load_system_font(OS_SHAREDDATATYPE_FONT_STANDARD, false);
 
-            void* font_data = nullptr;
-            uint32_t font_size = 0;
+            try {
+                load_system_font(OS_SHAREDDATATYPE_FONT_CHINESE);
+            }
+            catch (std::exception& e) {
+                LOG_ERROR("{}", e.what());
+            }
 
-            if (OSGetSharedData(OS_SHAREDDATATYPE_FONT_STANDARD, 0,
-                                &font_data, &font_size)) {
-                if (!io.Fonts->AddFontFromMemoryTTF(font_data, font_size,
-                                                    default_size, &config))
-                    throw std::runtime_error{"could not load CafeStd"};
-            } else
-                throw std::runtime_error{"CafeStd font is missing"};
+            try {
+                load_system_font(OS_SHAREDDATATYPE_FONT_KOREAN);
+            }
+            catch (std::exception& e) {
+                LOG_ERROR("{}", e.what());
+            }
 
-            config.MergeMode = true;
-
-            if (OSGetSharedData(OS_SHAREDDATATYPE_FONT_CHINESE, 0,
-                                &font_data, &font_size)) {
-                if (!io.Fonts->AddFontFromMemoryTTF(font_data, font_size,
-                                                    default_size, &config))
-                    throw std::runtime_error{"could not load CafeCn"};
-            } else
-                throw std::runtime_error{"CafeCn font is missing"};
-
-            if (OSGetSharedData(OS_SHAREDDATATYPE_FONT_KOREAN, 0,
-                                &font_data, &font_size)) {
-                if (!io.Fonts->AddFontFromMemoryTTF(font_data, font_size,
-                                                    default_size, &config))
-                    throw std::runtime_error{"could not load CafeKr"};
-            } else
-                throw std::runtime_error{"CafeKr font is missing"};
-
-            if (OSGetSharedData(OS_SHAREDDATATYPE_FONT_TAIWANESE, 0,
-                                &font_data, &font_size)) {
-                if (!io.Fonts->AddFontFromMemoryTTF(font_data, font_size,
-                                                    default_size, &config))
-                    throw std::runtime_error{"could not load CafeTw"};
-            } else
-                throw std::runtime_error{"CafeTw font is missing"};
+            try {
+                load_system_font(OS_SHAREDDATATYPE_FONT_TAIWANESE);
+            }
+            catch (std::exception& e) {
+                LOG_ERROR("{}", e.what());
+            }
         }
 
 #else // !__WIIU__
@@ -163,7 +185,8 @@ namespace FontManager {
 
             FcLangSetAdd(lang_set.get(), reinterpret_cast<const FcChar8*>(lang.data()));
             FcPatternAddLangSet(pattern.get(), FC_LANG, lang_set.get());
-            FcPatternAddDouble(pattern.get(), FC_SIZE, default_size);
+            const auto& style = ImGui::GetStyle();
+            FcPatternAddDouble(pattern.get(), FC_SIZE, style.FontSizeBase);
 
             // FcPatternPrint(pattern.get());
 
@@ -203,11 +226,12 @@ namespace FontManager {
                 cafe_tw_path
             };
 
-            // if fontconfig returned the same font for every case
             if (extra_fonts.contains(cafe_std_path))
-                extra_fonts.clear();
+                extra_fonts.erase(cafe_std_path);
 
+            // NOTE: first font is required, so we don't catch the exception here.
             load(cafe_std_path, false);
+
             for (const auto& extra_path : extra_fonts)
                 try {
                     load(extra_path);
@@ -217,7 +241,7 @@ namespace FontManager {
                 }
         }
 
-#endif // __WIIU__
+#endif // !__WIIU__
 
         std::u32string
         to_lower(const std::u32string& input)
@@ -238,12 +262,10 @@ namespace FontManager {
     {
         TRACE_FUNC;
 
-        auto& io = ImGui::GetIO();
 #ifdef IMGUI_ENABLE_FREETYPE
+        auto& io = ImGui::GetIO();
         io.Fonts->FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
         io.Fonts->FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
-#else
-        std::ignore = io;
 #endif
 
         load_system_fonts();
@@ -257,27 +279,30 @@ namespace FontManager {
     }
 
 
-
     void
-    load(const std::filesystem::path& filename,
+    load(const std::filesystem::path& font,
          bool merge)
     {
         TRACE_FUNC;
-        LOG_DEBUG("font = {:?}", filename.string());
+        LOG_DEBUG("load({:?})", font.string());
 
+        const auto& style = ImGui::GetStyle();
         ImFontConfig config;
         config.EllipsisChar = U'…';
         config.Flags |= ImFontFlags_NoLoadError;
         config.MergeMode = merge;
 
-#ifdef IMGUI_ENABLE_FREETYPE
-        // NOTE: CafeStd seems to always be too low, about 1/8th of the font size
-        config.GlyphOffset.y = - default_size * (1.0f / 8.0f);
+        if (font.filename() == "fontawesome-webfont.ttf")
+            tweak_font_awesome(config);
+
+#ifndef __WIIU__
+        if (font.filename().string().starts_with("Cafe"))
+            tweak_cafe(config);
 #endif
 
         auto& io = ImGui::GetIO();
-        if (!io.Fonts->AddFontFromFileTTF(filename.c_str(), default_size, &config))
-            throw std::runtime_error{"could not load \""s + filename.string() + "\""s};
+        if (!io.Fonts->AddFontFromFileTTF(font.c_str(), style.FontSizeBase, &config))
+            throw std::runtime_error{"Could not load \""s + font.string() + "\""s};
     }
 
 
@@ -285,7 +310,7 @@ namespace FontManager {
     load_dir(const std::filesystem::path& dir)
     {
         TRACE_FUNC;
-        LOG_DEBUG("dir = {:?}", dir.string());
+        LOG_DEBUG("load_dir({:?})", dir.string());
 
         if (!exists(dir) || !is_directory(dir))
             return;
