@@ -261,8 +261,10 @@ namespace PlayerTab {
     void
     show_station()
     {
+        using namespace ImGui::RAII;
+
         if (!station) {
-            if (ImGui::RAII::Child no_station_child{
+            if (Child no_station_child{
                     "no_station",
                     {0, 0},
                     ImGuiChildFlags_AutoResizeY |
@@ -277,7 +279,7 @@ namespace PlayerTab {
             return;
         }
 
-        if (ImGui::RAII::Child station_child{
+        if (Child station_child{
                 "station",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeY |
@@ -285,7 +287,7 @@ namespace PlayerTab {
                 ImGuiChildFlags_NavFlattened
             }) {
 
-            if (ImGui::RAII::Child actions_child{
+            if (Child actions_child{
                     "actions",
                     {0, 0},
                     ImGuiChildFlags_AutoResizeX |
@@ -306,7 +308,7 @@ namespace PlayerTab {
 
             ImGui::SameLine();
 
-            if (ImGui::RAII::Child details_child{
+            if (Child details_child{
                     "details",
                     {0, 0},
                     ImGuiChildFlags_AutoResizeY |
@@ -329,7 +331,9 @@ namespace PlayerTab {
     void
     show_stream()
     {
-        if (ImGui::RAII::Child stream_child{
+        using namespace ImGui::RAII;
+
+        if (Child stream_child{
                 "stream",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeY |
@@ -343,8 +347,8 @@ namespace PlayerTab {
                 if (!res)
                     return;
 
-                ImGui::RAII::Indent indenter;
-                if (ImGui::RAII::Table metadata_table{"metadata", 2}) {
+                Indent indenter;
+                if (Table metadata_table{"metadata", 2}) {
 
                     ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
                     ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
@@ -399,9 +403,11 @@ namespace PlayerTab {
     void
     show_history()
     {
+        using namespace ImGui::RAII;
+
         auto now = system_clock::now();
 
-        if (ImGui::RAII::Child history_child{
+        if (Child history_child{
                 "history",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeY |
@@ -412,11 +418,11 @@ namespace PlayerTab {
             ImGui::SetNextItemOpen(state.history_expanded);
             if ((state.history_expanded = ImGui::CollapsingHeader("Track history"))) {
 
-                ImGui::RAII::Indent indenter;
+                Indent indenter;
 
-                if (ImGui::RAII::Table table{"table",
-                                            2,
-                                            ImGuiTableFlags_BordersInnerH}) {
+                if (Table table{"table",
+                                2,
+                                ImGuiTableFlags_BordersInnerH}) {
 
                     ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
                     ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
@@ -444,7 +450,9 @@ namespace PlayerTab {
     void
     process_ui()
     {
-        if (ImGui::RAII::Child player_child{
+        using namespace ImGui::RAII;
+
+        if (Child player_child{
                 "player",
                 {0, 0},
                 ImGuiChildFlags_NavFlattened

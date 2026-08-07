@@ -83,9 +83,11 @@ namespace RecentTab {
     show_station(ConstStationPtr& station,
                  std::size_t index)
     {
-        ImGui::RAII::ID station_id{static_cast<int>(index)};
+        using namespace ImGui::RAII;
 
-        if (ImGui::RAII::Child station_child{
+        ID station_id{static_cast<int>(index)};
+
+        if (Child station_child{
                 "station",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeY |
@@ -93,7 +95,7 @@ namespace RecentTab {
                 ImGuiChildFlags_NavFlattened
             }) {
 
-            if (ImGui::RAII::Child actions_child{
+            if (Child actions_child{
                     "actions",
                     {0, 0},
                     ImGuiChildFlags_AutoResizeX |
@@ -118,7 +120,7 @@ namespace RecentTab {
 
             ImGui::SameLine();
 
-            if (ImGui::RAII::Child details_child{
+            if (Child details_child{
                     "details",
                     {0, 0},
                     ImGuiChildFlags_AutoResizeY |
@@ -131,7 +133,7 @@ namespace RecentTab {
 
                 UI::show_station_basic_info(*station);
 
-                if (ImGui::RAII::Child extra_info_child{
+                if (Child extra_info_child{
                         "extra_info",
                         {0, 0},
                         ImGuiChildFlags_AutoResizeY |
@@ -151,7 +153,9 @@ namespace RecentTab {
     void
     process_ui()
     {
-        if (ImGui::RAII::Child toolbar_child{
+        using namespace ImGui::RAII;
+
+        if (Child toolbar_child{
                 "toolbar",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeY |
@@ -169,7 +173,7 @@ namespace RecentTab {
         }
 
         // Note: flat navigation doesn't work well on child windows that scroll.
-        if (ImGui::RAII::Child recent_child{"recent"})
+        if (Child recent_child{"recent"})
             for (std::size_t index = stations.size() - 1; index + 1 > 0; --index)
                 show_station(stations[index], index);
 

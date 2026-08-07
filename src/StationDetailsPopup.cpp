@@ -65,8 +65,10 @@ namespace StationDetailsPopup {
     bool
     show_button(const std::string& uuid)
     {
+        using namespace ImGui::RAII;
+
         bool result = false;
-        ImGui::RAII::Disabled disable_no_uuid{uuid.empty()};
+        Disabled disable_no_uuid{uuid.empty()};
         if (ImGui::Button(ICON_FA_INFO_CIRCLE)) // 🛈
             result = true;
         if (!uuid.empty())
@@ -129,6 +131,8 @@ namespace StationDetailsPopup {
     void
     process_ui()
     {
+        using namespace ImGui::RAII;
+
         if (state == State::hidden)
             return;
 
@@ -141,10 +145,10 @@ namespace StationDetailsPopup {
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(),
                                 ImGuiCond_Always,
                                 {0.5f, 0.5f});
-        ImGui::RAII::Popup popup{popup_id,
-                                 ImGuiWindowFlags_NoSavedSettings |
-                                 //ImGuiWindowFlags_AlwaysAutoResize |
-                                 ImGuiWindowFlags_NoMove};
+        Popup popup{popup_id,
+                    ImGuiWindowFlags_NoSavedSettings |
+                    //ImGuiWindowFlags_AlwaysAutoResize |
+                    ImGuiWindowFlags_NoMove};
         if (!popup) {
             reset();
             return;
@@ -160,7 +164,7 @@ namespace StationDetailsPopup {
                 break;
 
             case State::done:
-                if (ImGui::RAII::Table fields_table{
+                if (Table fields_table{
                         "fields",
                         2,
                         ImGuiTableFlags_None

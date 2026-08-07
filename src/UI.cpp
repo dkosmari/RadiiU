@@ -234,6 +234,8 @@ namespace UI {
         const ImVec2 button_size = {96, 96};
         Font text{nullptr, 64};
         if (PlayerTab::is_playing(*station)) {
+            // const auto& style = ImGui::GetStyle();
+            StyleColor text_color{ImGuiCol_Text, get_label_color()};
             if (ImGui::Button(ICON_FA_STOP, button_size))
                 PlayerTab::stop();
         } else {

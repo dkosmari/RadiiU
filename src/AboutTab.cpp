@@ -58,32 +58,19 @@ namespace AboutTab {
         std::filesystem::path real_save_path;
 #endif
 
-        std::string
-        get_sdl_version_str()
-        {
-            SDL_version v;
-            SDL_GetVersion(&v);
-            return std::format("{}.{}.{}",
-                               v.major,
-                               v.minor,
-                               v.patch);
-        }
-
 
         std::string
-        get_sdl_img_version_str()
+        get_faad2_version()
         {
-            const SDL_version* v = IMG_Linked_Version();
-            return std::format("{}.{}.{}",
-                               v->major,
-                               v->minor,
-                               v->patch);
+            char* faad_id = nullptr;
+            NeAACDecGetVersion(&faad_id, nullptr);
+            return faad_id;
         }
 
 
 #ifdef IMGUI_ENABLE_FREETYPE
         std::string
-        get_ft_version_str()
+        get_ft_version()
         {
             FT_Library lib;
             if (!FT_Init_FreeType(&lib)) {
@@ -98,6 +85,40 @@ namespace AboutTab {
             return "";
         }
 #endif
+
+
+        std::string
+        get_glaze_version()
+        {
+            return std::format("{}.{}.{}",
+                               glz::version.major,
+                               glz::version.minor,
+                               glz::version.patch);
+        }
+
+
+        std::string
+        get_sdl_version()
+        {
+            SDL_version v;
+            SDL_GetVersion(&v);
+            return std::format("{}.{}.{}",
+                               v.major,
+                               v.minor,
+                               v.patch);
+        }
+
+
+        std::string
+        get_sdl_img_version()
+        {
+            const SDL_version* v = IMG_Linked_Version();
+            return std::format("{}.{}.{}",
+                               v->major,
+                               v->minor,
+                               v->patch);
+        }
+
 
         std::string
         replace_brand_glyphs(const std::string& input)
@@ -193,14 +214,16 @@ namespace AboutTab {
     void
     process_ui()
     {
+        using namespace ImGui::RAII;
+
         // Note: flat navigation doesn't work well on child windows that scroll.
-        if (ImGui::RAII::Child about{"about"}) {
+        if (Child about{"about"}) {
 
             auto radiiu_icon_tex = ImageLoader::get("content:/ui/radiiu-icon.png");
             UI::show_image(*radiiu_icon_tex, sdl::vec2{128, 128});
             ImGui::SameLine();
 
-            if (ImGui::RAII::Table app_table{"app-details", 2}) {
+            if (Table app_table{"app-details", 2}) {
 
                 ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
@@ -221,7 +244,7 @@ namespace AboutTab {
 
             ImGui::SeparatorText("Credits");
             static const auto credits = get_credits();
-            if (ImGui::RAII::Table credits_table{"credits", 2}) {
+            if (Table credits_table{"credits", 2}) {
 
                 ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
@@ -241,43 +264,43 @@ namespace AboutTab {
             }
 
             ImGui::SeparatorText("Components");
-            if (ImGui::RAII::Table componets_table{"components", 2}) {
+            if (Table componets_table{"components", 2}) {
 
                 ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
 
-                static const std::string sdl_version = get_sdl_version_str();
-                UI::show_info_row("SDL", sdl_version);
+                static const std::string sdl_version_str = get_sdl_version();
+                UI::show_info_row("SDL", sdl_version_str);
 
-                static const std::string sdl_img_version = get_sdl_img_version_str();
-                UI::show_info_row("SDL_image", sdl_img_version);
+                static const std::string sdl_img_version_str = get_sdl_img_version();
+                UI::show_info_row("SDL_image", sdl_img_version_str);
                 // TODO: show versions for all image libraries
 
                 UI::show_info_row("ImGui", IMGUI_VERSION);
 
 #ifdef IMGUI_ENABLE_FREETYPE
-                static const std::string ft_version = get_ft_version_str();
-                if (!ft_version.empty())
-                    UI::show_info_row("FreeType", ft_version);
+                static const std::string ft_version_str = get_ft_version();
+                if (!ft_version_str.empty())
+                    UI::show_info_row("FreeType", ft_version_str);
 #endif
 
-                UI::show_info_row("libcurl", curl_version());
+                static const std::string curl_version_str = curl_version();
+                UI::show_info_row("libcurl", curl_version_str);
 
-                static const std::string glaze_version =
-                    std::to_string(glz::version.major) + "." +
-                    std::to_string(glz::version.minor) + "." +
-                    std::to_string(glz::version.patch);
-                UI::show_info_row("glaze", glaze_version);
+                static const std::string glaze_version_str = get_glaze_version();
+                UI::show_info_row("glaze", glaze_version_str);
 
-                UI::show_info_row("mpg123", MPG123_VERSION);
+                static const std::string mpg123_version_str = MPG123_VERSION;
+                UI::show_info_row("mpg123", mpg123_version_str);
 
-                UI::show_info_row("Opus", opus_get_version_string());
+                static const std::string opus_version_str = opus_get_version_string();
+                UI::show_info_row("Opus", opus_version_str);
 
-                UI::show_info_row("Vorbis", vorbis_version_string());
+                static const std::string vorbis_version_str = vorbis_version_string();
+                UI::show_info_row("Vorbis", vorbis_version_str);
 
-                char* faad_id = nullptr;
-                NeAACDecGetVersion(&faad_id, nullptr);
-                UI::show_info_row("FAAD2", faad_id);
+                static const std::string faad2_version_str = get_faad2_version();
+                UI::show_info_row("FAAD2", faad2_version_str);
 
             }
         }
