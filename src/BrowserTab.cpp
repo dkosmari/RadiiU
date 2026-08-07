@@ -936,7 +936,7 @@ namespace BrowserTab {
             {
                 LOG_DEBUG("Result of click: {}", result.ok);
                 if (!result.message.empty())
-                    LOG_ERROR("{}", result.message);
+                    LOG_DEBUG("{}", result.message);
 
                 update_station(station);
             },
@@ -958,8 +958,9 @@ namespace BrowserTab {
             {
                 LOG_DEBUG("Result of vote: ", result.ok);
                 if (!result.message.empty())
-                    LOG_ERROR("{}", result.message);
-
+                    LOG_DEBUG("{}", result.message);
+                if (result.ok)
+                    votes_cast[station->stationuuid] = std::move(result);
                 update_station(station);
             },
             common_error_handler);
