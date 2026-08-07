@@ -38,7 +38,6 @@
 #include "cfg.hpp"
 #include "enumerator.hpp"
 #include "humanize.hpp"
-#include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
 #include "net/address.hpp"

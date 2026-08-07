@@ -47,8 +47,8 @@
 #include "BrowserTab.hpp"
 #include "cfg.hpp"
 #include "FavoritesTab.hpp"
-#include "FontManager.hpp"
-#include "IconManager.hpp"
+#include "FontLoader.hpp"
+#include "ImageLoader.hpp"
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
 #include "LogsTab.hpp"
@@ -339,9 +339,9 @@ namespace App {
 
         setup_imgui_style();
 
-        FontManager::initialize(); // load system font(s)
-        FontManager::load_dir(get_content_path() / "fonts");
-        FontManager::load_dir(get_config_path() / "fonts");
+        FontLoader::initialize(); // load system font(s)
+        FontLoader::load_dir(get_content_path() / "fonts");
+        FontLoader::load_dir(get_config_path() / "fonts");
 
         ImGui_ImplSDL2_InitForSDLRenderer(res->window.data(),
                                           res->renderer.data());
@@ -354,7 +354,7 @@ namespace App {
     {
         TRACE_FUNC;
 
-        FontManager::finalize();
+        FontLoader::finalize();
         ImGui::DestroyContext();
     }
 
@@ -408,7 +408,7 @@ namespace App {
 
         // Initialize modules.
         Styles::initialize();
-        IconManager::initialize(res->renderer);
+        ImageLoader::initialize(res->renderer);
         RadioBrowserAPI::initialize(get_user_agent(), cfg::state.server);
         RadioBrowserAPI::set_server(cfg::state.server);
 
@@ -437,7 +437,7 @@ namespace App {
 
         // Finalize modules.
         RadioBrowserAPI::finalize();
-        IconManager::finalize();
+        ImageLoader::finalize();
         Styles::finalize();
 
         ImGui_ImplSDLRenderer2_Shutdown();
@@ -745,7 +745,7 @@ namespace App {
         RecentTab::process_logic();
         PlayerTab::process_logic();
 
-        IconManager::process();
+        ImageLoader::process();
 
         Uint64 now = SDL_GetTicks64();
         // process transitions to screen saver

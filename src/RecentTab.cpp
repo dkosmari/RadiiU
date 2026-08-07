@@ -17,7 +17,6 @@
 
 #include "App.hpp"
 #include "cfg.hpp"
-#include "IconManager.hpp"
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
 #include "Serializer.hpp"

@@ -35,7 +35,7 @@
 #include "AboutTab.hpp"
 
 #include "App.hpp"
-#include "IconManager.hpp"
+#include "ImageLoader.hpp"
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
 #include "string_utils.hpp"
@@ -196,7 +196,7 @@ namespace AboutTab {
         // Note: flat navigation doesn't work well on child windows that scroll.
         if (ImGui::RAII::Child about{"about"}) {
 
-            auto radiiu_icon_tex = IconManager::get("content:/ui/radiiu-icon.png");
+            auto radiiu_icon_tex = ImageLoader::get("content:/ui/radiiu-icon.png");
             UI::show_image(*radiiu_icon_tex, sdl::vec2{128, 128});
             ImGui::SameLine();
 
@@ -235,7 +235,7 @@ namespace AboutTab {
                 ImGui::TableNextColumn();
                 UI::TextLinkOpenURL("https://www.radio-browser.info");
                 // ImGui::SameLine();
-                // auto rb_icon_tex = IconManager::get("https://www.radio-browser.info/favicon.ico");
+                // auto rb_icon_tex = ImageLoader::get("https://www.radio-browser.info/favicon.ico");
                 // ImGui::Image(*rb_icon_tex, sdl::vec2{64, 64});
 
             }

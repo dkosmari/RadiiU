@@ -125,17 +125,7 @@ This is just a C++ wrapper for SDL2.
 ### ImGui
 
 The user interface is done with ImGui. There are a few patches to the SDL2 backend,
-regarding input handling. The config 
-
-Additional ImGui functions are available here in [`imgui_extras.cpp`](imgui_extras.cpp)
-and [`imgui_extras.hpp`](imgui_extras.hpp). These include convenience overloads, including
-for `sdl2xx` types. There's also code to handle drag scrolling.
-
-The drag scrolling code needs improvement, as it doesn't allow dragging on top of an
-actionable widget, like a button or a hyperlink. For that reason, I attempted to put the
-UI elements all to the left of the screen, leaving the right side a free area to drag
-scroll (since most users are right-handed, and will be scrolling more than they will be
-tapping buttons.)
+regarding input handling. A fork of ImGui is used, that optimizes touch screen interactions.
 
 
 ## Audio decoding
@@ -158,14 +148,11 @@ ambiguous when reporting to the user.
 
 ## Stream artwork and favicon loading
 
-The [`IconsManager.cpp`](IconsManager.cpp) and [`IconsManager.hpp`](IconsManager.hpp)
+The [`ImageLoader.cpp`](ImageLoader.cpp) and [`ImageLoader.hpp`](ImageLoader.hpp)
 files are responsible for keeping images cached in RAM.
 
-This should implement a texture atlas in the future, but for now, loading each icon and
+This could implement a texture atlas in the future, but for now, loading each icon and
 artwork as a separated texture does not cause performance issues.
-
-All images loaded by that module are scaled down to a limit size, because too many station
-owners think it's cute to set a 4k wallpaper as the favicon.
 
 
 ## Threading
@@ -174,8 +161,8 @@ Most of the application is single threaded, except:
 
 - libcurl uses a threaded name resolver;
 
-- [`Browser.cpp`](Browser.cpp) uses a worker thread to resolve a radio-browser.info
+- [`RadioBrowserAPI.cpp`](RadioBrowserAPI.cpp) uses a worker thread to resolve a radio-browser.info
   mirror;
   
-- [`IconManager.cpp`](IconManager.cpp) uses a worker thread to load images.
+- [`ImageLoader.cpp`](ImageLoader.cpp) uses a worker thread to load images.
 

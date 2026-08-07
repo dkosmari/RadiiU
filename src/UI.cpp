@@ -22,7 +22,7 @@
 #include "BrowserTab.hpp"
 #include "cfg.hpp"
 #include "FavoritesTab.hpp"
-#include "IconManager.hpp"
+#include "ImageLoader.hpp"
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
 #include "PlayerTab.hpp"
@@ -54,7 +54,7 @@ namespace UI {
             return;
 
         const sdl::vec2 max_size = {400, 128};
-        auto icon = IconManager::get(station.favicon, max_size);
+        auto icon = ImageLoader::get(station.favicon, max_size);
         show_image(*icon);
         ImGui::SetItemTooltip(station.favicon);
     }

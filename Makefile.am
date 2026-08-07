@@ -60,19 +60,19 @@ radiiu_elf_SOURCES = \
 	src/enumerator.hpp \
 	src/FavoritesTab.cpp \
 	src/FavoritesTab.hpp \
-	src/FontManager.cpp \
-	src/FontManager.hpp \
+	src/FontLoader.cpp \
+	src/FontLoader.hpp \
 	src/http_client.cpp \
 	src/http_client.hpp \
 	src/humanize.cpp \
 	src/humanize.hpp \
-	src/IconManager.cpp \
-	src/IconManager.hpp \
 	src/IconsFontAwesome4.h \
 	src/icy.cpp \
 	src/icy.hpp \
 	src/icy_stream.cpp \
 	src/icy_stream.hpp \
+	src/ImageLoader.cpp \
+	src/ImageLoader.hpp \
 	src/LogLevel.cpp \
 	src/LogLevel.hpp \
 	src/LogManager.cpp \

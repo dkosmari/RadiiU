@@ -172,6 +172,7 @@ namespace decoder {
                                       buf.data(),
                                       sz);
         if (frame.error) {
+            // TODO: check which errors should throw, which are harmless.
             //throw error{"NeAACDecDecode() failed", frame.error};
             LOG_ERROR("{}", NeAACDecGetErrorMessage(frame.error));
             return {};

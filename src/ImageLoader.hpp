@@ -5,8 +5,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#ifndef ICON_MANAGER_HPP
-#define ICON_MANAGER_HPP
+#ifndef IMAGE_LOADER_HPP
+#define IMAGE_LOADER_HPP
 
 #include <string>
 
@@ -14,7 +14,7 @@
 #include <sdl2xx/texture.hpp>
 #include <sdl2xx/vec2.hpp>
 
-namespace IconManager {
+namespace ImageLoader {
 
     void
     initialize(sdl::renderer& rend);
@@ -29,6 +29,6 @@ namespace IconManager {
     get(const std::string& location,
         const sdl::vec2& size_limit = {0, 0});
 
-} // namespace IconManager
+} // namespace ImageLoader
 
 #endif

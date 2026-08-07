@@ -30,7 +30,7 @@
 #include "App.hpp"
 #include "cfg.hpp"
 #include "humanize.hpp"
-#include "IconManager.hpp"
+#include "ImageLoader.hpp"
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
 #include "radio_client.hpp"
@@ -359,7 +359,7 @@ namespace PlayerTab {
                         if (meta->genre)
                             UI::show_info_row("Genre", *meta->genre);
                         if (meta->cover_art && !meta->cover_art->empty()) {
-                            auto art = IconManager::get(*meta->cover_art);
+                            auto art = ImageLoader::get(*meta->cover_art);
                             ImGui::TableNextRow();
                             ImGui::TableNextColumn();
                             UI::Label("Cover art");

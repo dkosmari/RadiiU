@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <bit>
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -28,7 +29,7 @@
 #include <curlxx/curl.hpp>
 #include <sdl2xx/img.hpp>
 
-#include "IconManager.hpp"
+#include "ImageLoader.hpp"
 
 #include "App.hpp"
 #include "async_queue.hpp"
@@ -42,7 +43,8 @@ using namespace std::literals;
 
 using sdl::vec2;
 
-namespace IconManager {
+
+namespace ImageLoader {
 
     namespace {
 
@@ -57,6 +59,32 @@ namespace IconManager {
             converted,
             error,
         };
+
+
+        struct CacheKey {
+
+            std::string location;
+            vec2 size;
+
+
+            constexpr
+            bool
+            operator ==(const CacheKey& other)
+                const noexcept = default;
+
+            constexpr
+            auto
+            operator <=>(const CacheKey& other)
+                const noexcept = default;
+
+        }; // struct CacheKey
+
+
+        struct CacheKeyHasher {
+            std::size_t
+            operator ()(const CacheKey& key)
+                const noexcept;
+        }; // struct CacheKeyHasher
 
 
         struct CacheEntry : std::enable_shared_from_this<CacheEntry> {
@@ -109,7 +137,7 @@ namespace IconManager {
 
 
         // TODO: use a good hash map here
-        using Cache = std::unordered_map<std::string, CacheEntryPtr>;
+        using Cache = std::unordered_map<CacheKey, CacheEntryPtr, CacheKeyHasher>;
 
 
         struct Resources {
@@ -177,6 +205,10 @@ namespace IconManager {
         by_last_use(Cache::iterator it)
             noexcept;
 
+        template<typename T>
+        std::size_t
+        calc_hash(const T& val);
+
 #ifdef __WIIU__
         sdl::surface
         optimized(sdl::surface input);
@@ -204,6 +236,19 @@ namespace IconManager {
             noexcept
         {
             return it->second->last_use;
+        }
+
+
+        std::size_t
+        CacheKeyHasher::operator ()(const CacheKey& key)
+            const noexcept
+        {
+            return
+                std::rotl(calc_hash(key.location), 16)
+                ^
+                std::rotl(calc_hash(key.size.x), 8)
+                ^
+                calc_hash(key.size.y);
         }
 
 
@@ -398,6 +443,14 @@ namespace IconManager {
         }
 
 
+        template<typename T>
+        std::size_t
+        calc_hash(const T& val)
+        {
+            return std::hash<T>{}(val);
+        }
+
+
 #ifdef __WIIU__
         /*
          * NOTE: GX2 only supports a few texture formats, so this allows converting the image to
@@ -481,8 +534,9 @@ namespace IconManager {
         Resources::get(const std::string& location,
                        const sdl::vec2& size_limit)
         {
+            const CacheKey key = {location, size_limit};
             CacheEntryPtr entry;
-            auto it = cache.find(location);
+            auto it = cache.find(key);
             if (it != cache.end())
                 entry = it->second;
 
@@ -523,7 +577,7 @@ namespace IconManager {
                         real_location = location;
 
                     entry = std::make_shared<CacheEntry>(timestamp, real_location, size_limit);
-                    cache[location] = entry;
+                    cache[key] = entry;
                     prepare_load(std::move(entry));
                     return &loading_icon;
                 }
@@ -755,4 +809,4 @@ namespace IconManager {
         return res->get(location, size_limit);
     }
 
-} // namespace IconManager
+} // namespace ImageLoader

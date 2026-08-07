@@ -23,7 +23,7 @@
 #include <fontconfig/fontconfig.h>
 #endif
 
-#include "FontManager.hpp"
+#include "FontLoader.hpp"
 
 #include "LogManager.hpp"
 #include "tracer.hpp"
@@ -32,7 +32,7 @@
 using namespace std::literals;
 
 
-namespace FontManager {
+namespace FontLoader {
 
     namespace {
 
@@ -330,4 +330,4 @@ namespace FontManager {
         }
     }
 
-} // namespace FontManager
+} // namespace FontLoader

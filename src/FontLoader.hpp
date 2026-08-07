@@ -5,12 +5,12 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#ifndef FONT_MANAGER_HPP
-#define FONT_MANAGER_HPP
+#ifndef FONT_LOADER_HPP
+#define FONT_LOADER_HPP
 
 #include <filesystem>
 
-namespace FontManager {
+namespace FontLoader {
 
     void
     initialize();
@@ -26,6 +26,6 @@ namespace FontManager {
     void
     load_dir(const std::filesystem::path& dir);
 
-} // namespace FontManager
+} // namespace FontLoader
 
 #endif
