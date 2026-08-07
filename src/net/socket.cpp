@@ -99,10 +99,8 @@ namespace net {
 
     socket::socket(socket&& other)
         noexcept :
-        fd{other.fd}
-    {
-        other.fd = -1;
-    }
+        fd{std::exchange(other.fd, -1)}
+    {}
 
 
     socket&
@@ -112,11 +110,10 @@ namespace net {
         if (this != &other) {
             try {
                 close();
-                fd = other.fd;
-                other.fd = -1;
+                fd = std::exchange(other.fd, -1);
             }
             catch (std::exception& e) {
-                //WHBLogPrintf("socket::operator=() failed: %s", e.what());
+                // TODO: log the error
             }
         }
         return *this;

@@ -8,17 +8,15 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
-#include <cinttypes>
 #include <compare>
-#include <cstdio>
 #include <exception>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <functional>
 #include <random>
 #include <regex>
 #include <span>
-#include <thread>
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
@@ -415,7 +413,7 @@ namespace BrowserTab {
             if (!server_stats_result) {
 
                 if (!server_stats_error.empty())
-                    ImGui::TextWrapped("Error: %s", server_stats_error.data());
+                    ImGui::FormatTextWrapped("Error: {}", server_stats_error);
                 else
                     ImGui::Text("Fetching server details...");
 
@@ -458,30 +456,30 @@ namespace BrowserTab {
                 ImGuiChildFlags_NavFlattened
             }) {
 
-            if (ImGui::Button(ICON_FA_REFRESH)) {
-                RadioBrowserAPI::set_server(cfg::state.server);
-                RadioBrowserAPI::reconnect();
+            {
+                Disabled if_preferred_server{!cfg::state.server.empty()};
+                if (ImGui::Button(ICON_FA_REFRESH))
+                    RadioBrowserAPI::update_mirrors_and_select_random();
+                ImGui::SetItemTooltip("Switch to random mirror.");
             }
-
-            ImGui::SetItemTooltip("Reconnect to server, or try a different random mirror.");
 
             ImGui::SameLine();
 
-            auto server = RadioBrowserAPI::get_server();
-            if (!server.empty()) {
+            if (ImGui::Button(ICON_FA_INFO_CIRCLE)) {
+                fetch_server_stats();
+                ImGui::OpenPopup(server_stats_popup_id);
+            }
+            ImGui::SetItemTooltip("Show server details.");
 
-                if (ImGui::Button(ICON_FA_INFO_CIRCLE)) {
-                    fetch_server_stats();
-                    ImGui::OpenPopup(server_stats_popup_id);
-                }
-                ImGui::SetItemTooltip("Show server details.");
+            process_server_stats_popup();
 
-                process_server_stats_popup();
+            ImGui::SameLine();
 
-                ImGui::SameLine();
-
-                ImGui::Text("%s", server.data());
-
+            auto server = cfg::state.server;
+            ImGui::Text(server.empty() ? "(random)" : server);
+            if (server.empty()) {
+                auto current_server = RadioBrowserAPI::get_server();
+                ImGui::SetItemTooltip(current_server);
             }
 
         }
@@ -689,13 +687,13 @@ namespace BrowserTab {
 
             const bool is_first_page = GUI::page == 1;
             const bool is_last_page = stations.size() < cfg::state.browser_page_limit;
-            const bool is_searching = RadioBrowserAPI::is_searching();
+            const bool is_busy = RadioBrowserAPI::is_busy();
 
             {
                 Disabled disable_first_page{is_first_page};
 
                 // 100⏪
-                if (ImGui::Button("100" ICON_FA_ANGLE_DOUBLE_LEFT) && !is_searching) {
+                if (ImGui::Button("100" ICON_FA_ANGLE_DOUBLE_LEFT) && !is_busy) {
                     if (GUI::page > 100)
                         GUI::page -= 100;
                     else
@@ -707,7 +705,7 @@ namespace BrowserTab {
                 ImGui::SameLine();
 
                 // 10⏪
-                if (ImGui::Button("10" ICON_FA_ANGLE_DOUBLE_LEFT) && !is_searching) {
+                if (ImGui::Button("10" ICON_FA_ANGLE_DOUBLE_LEFT) && !is_busy) {
                     if (GUI::page > 10)
                         GUI::page -= 10;
                     else
@@ -719,7 +717,7 @@ namespace BrowserTab {
                 ImGui::SameLine();
 
                 // ⏴
-                if (ImGui::Button(" " ICON_FA_ANGLE_LEFT " ") && !is_searching) {
+                if (ImGui::Button(" " ICON_FA_ANGLE_LEFT " ") && !is_busy) {
                     if (GUI::page > 1)
                         --GUI::page;
                     search_stations();
@@ -744,7 +742,7 @@ namespace BrowserTab {
                 Disabled disable_last_page{is_last_page};
 
                 // ⏵
-                if (ImGui::Button(" " ICON_FA_ANGLE_RIGHT " ") && !is_searching) {
+                if (ImGui::Button(" " ICON_FA_ANGLE_RIGHT " ") && !is_busy) {
                     ++GUI::page;
                     search_stations();
                 }
@@ -753,7 +751,7 @@ namespace BrowserTab {
                 ImGui::SameLine();
 
                 // ⏩10
-                if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "10") && !is_searching) {
+                if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "10") && !is_busy) {
                     GUI::page += 10;
                     search_stations();
                 }
@@ -762,7 +760,7 @@ namespace BrowserTab {
                 ImGui::SameLine();
 
                 // ⏩100
-                if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "100") && !is_searching) {
+                if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "100") && !is_busy) {
                     GUI::page += 100;
                     search_stations();
                 }
@@ -819,7 +817,7 @@ namespace BrowserTab {
                     if (ImGui::Button(vote_label))
                         send_vote(station);
                     if (voted)
-                        ImGui::SetItemTooltip("%s", vote_record->second.message.data());
+                        ImGui::SetItemTooltip(vote_record->second.message);
                     else
                         ImGui::SetItemTooltip("Vote for this station.");
                 }
@@ -848,12 +846,9 @@ namespace BrowserTab {
                         ImGuiChildFlags_NavFlattened
                     }) {
 
-                    char click_text[32];
-                    std::snprintf(click_text, sizeof click_text,
-                                  ICON_FA_BAR_CHART " %" PRIu64 " (%+d)",
-                                  station->click_count,
-                                  station->click_trend);
-                    UI::show_boxed(click_text,
+                    UI::show_boxed(std::format(ICON_FA_BAR_CHART " {} ({:+d})",
+                                               station->click_count,
+                                               station->click_trend),
                                    "Daily total clicks and trend.");
 
                     if (station->bitrate) {
@@ -883,7 +878,7 @@ namespace BrowserTab {
     {
         using namespace ImGui::RAII;
 
-        Disabled if_searching{RadioBrowserAPI::is_searching()};
+        Disabled if_busy{RadioBrowserAPI::is_busy()};
 
         show_status();
 

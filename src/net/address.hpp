@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -9,9 +9,11 @@
 #define NET_ADDRESS_HPP
 
 #include <compare>
-#include <string>
-#include <vector>
+#include <format>
 #include <ostream>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #include <netinet/in.h> // in_addr_t, in_port_t
 #include <sys/socket.h> // sockaddr*
@@ -25,7 +27,7 @@ namespace net {
 
     struct address {
 
-        ::sockaddr_storage storage;
+        ::sockaddr_storage storage{};
 
 
         constexpr
@@ -100,12 +102,39 @@ namespace net {
     };
 
 
-    std::string to_string(const address& addr);
+    std::string
+    to_string(const address& addr);
 
 
-    std::ostream& operator <<(std::ostream& out, const address& addr);
-
+    std::ostream&
+    operator <<(std::ostream& out,
+                const address& addr);
 
 } // namespace net
+
+
+template<>
+struct std::hash<net::address> {
+
+    std::size_t
+    operator ()(const net::address& a)
+        const noexcept;
+
+}; // struct std::hash<net::address>
+
+
+template<typename CharT>
+struct std::formatter<net::address, CharT> : formatter<string_view, CharT> {
+
+    template<typename Ctx>
+    Ctx::iterator
+    format(const net::address& addr,
+           Ctx& ctx)
+        const
+    {
+        return formatter<string_view>::format(to_string(addr), ctx);
+    }
+
+};
 
 #endif

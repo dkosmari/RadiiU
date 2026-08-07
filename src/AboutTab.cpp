@@ -7,6 +7,7 @@
 
 #include <cctype>
 #include <exception>
+#include <format>
 #include <fstream>
 #include <string>
 #include <tuple>
@@ -62,13 +63,10 @@ namespace AboutTab {
         {
             SDL_version v;
             SDL_GetVersion(&v);
-            char buf[32];
-            std::snprintf(buf, sizeof buf,
-                          "%u.%u.%u",
-                          v.major,
-                          v.minor,
-                          v.patch);
-            return buf;
+            return std::format("{}.{}.{}",
+                               v.major,
+                               v.minor,
+                               v.patch);
         }
 
 
@@ -76,13 +74,10 @@ namespace AboutTab {
         get_sdl_img_version_str()
         {
             const SDL_version* v = IMG_Linked_Version();
-            char buf[32];
-            std::snprintf(buf, sizeof buf,
-                          "%u.%u.%u",
-                          v->major,
-                          v->minor,
-                          v->patch);
-            return buf;
+            return std::format("{}.{}.{}",
+                               v->major,
+                               v->minor,
+                               v->patch);
         }
 
 
@@ -95,13 +90,10 @@ namespace AboutTab {
                 FT_Int major, minor, patch;
                 FT_Library_Version(lib, &major, &minor, &patch);
                 FT_Done_FreeType(lib);
-                char buf[32];
-                std::snprintf(buf, sizeof buf,
-                              "%d.%d.%d",
-                              major,
-                              minor,
-                              patch);
-                return buf;
+                return std::format("{}.{}.{}",
+                                   major,
+                                   minor,
+                                   patch);
             }
             return "";
         }

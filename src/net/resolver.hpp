@@ -18,6 +18,7 @@
 #include "address.hpp"
 #include "socket.hpp"
 
+// TODO: use std::expected
 
 namespace net::resolver {
 

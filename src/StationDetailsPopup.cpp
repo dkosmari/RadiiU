@@ -156,7 +156,7 @@ namespace StationDetailsPopup {
                 break;
 
             case State::error:
-                ImGui::TextWrapped("Error: %s", error_msg.data());
+                ImGui::FormatTextWrapped("Error: {}", error_msg);
                 break;
 
             case State::done:

@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -12,6 +12,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include <curlxx/easy.hpp>
 #include <curlxx/multi.hpp>
@@ -66,6 +67,7 @@ struct http_client {
 private:
 
     std::vector<std::string> accepts;
+    std::vector<std::string> headers;
 
     std::size_t
     curl_write_callback(std::span<const char> buf);

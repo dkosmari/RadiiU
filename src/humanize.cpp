@@ -1,11 +1,11 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <cstdio>
+#include <format>
 
 #include "humanize.hpp"
 
@@ -66,6 +66,7 @@ namespace humanize {
     std::string
     duration_brief(std::chrono::seconds t)
     {
+        // TODO: use hh_mm_ss from chrono
         unsigned total = t.count();
         unsigned s = total % 60u;
         total /= 60u;
@@ -74,12 +75,10 @@ namespace humanize {
         unsigned h = total % 24;
         total /= 24;
         unsigned d = total;
-        char buf[64];
         if (d)
-            std::snprintf(buf, sizeof buf, "%ud %02u:%02u:%02u", d, h, m, s);
+            return std::format("{:}d {:02}:{:02}:{:02}", d, h, m, s);
         else
-            std::snprintf(buf, sizeof buf, "%02u:%02u:%02u", h, m, s);
-        return buf;
+            return std::format("{:02}:{:02}:{:02}", h, m, s);
     }
 
 
@@ -89,50 +88,41 @@ namespace humanize {
         if (x < 1'000u)
             return to_string(x);
 
-        char buf[32];
-
         if (x < 10'000u) {
             float fx = x / 1e3f;
-            std::snprintf(buf, sizeof buf, "%.1fk", fx);
-            return buf;
+            return std::format("{:.1f}k", fx);
         }
 
         if (x < 1'000'000u) {
             float fx = x / 1e3f;
-            std::snprintf(buf, sizeof buf, "%.0fk", fx);
-            return buf;
+            return std::format("{:.0f}k", fx);
         }
 
 
         if (x < 10'000'000u) {
             float fx = x / 1e6f;
-            std::snprintf(buf, sizeof buf, "%.1fM", fx);
-            return buf;
+            return std::format("{:.1f}M", fx);
         }
 
         if (x < 1'000'000'000u) {
             float fx = x / 1e6f;
-            std::snprintf(buf, sizeof buf, "%.0fM", fx);
-            return buf;
+            return std::format("{:0f}M", fx);
         }
 
 
         if (x < 10'000'000'000u) {
             float fx = x / 1e9f;
-            std::snprintf(buf, sizeof buf, "%.1fG", fx);
-            return buf;
+            return std::format("{:.1f}G", fx);
         }
 
 
         if (x < 1'000'000'000'000u) {
             float fx = x / 1e9f;
-            std::snprintf(buf, sizeof buf, "%.0fG", fx);
-            return buf;
+            return std::format("{:.0f}G", fx);
         }
 
         float fx = x / 1e12f;
-        std::snprintf(buf, sizeof buf, "%.1fT", fx);
-        return buf;
+        return std::format("{:.1f}T", fx);
     }
 
 } // namespace humanize

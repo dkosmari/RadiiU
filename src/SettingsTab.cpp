@@ -111,30 +111,32 @@ namespace SettingsTab {
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x
                                         - style.ItemSpacing.x
                                         - refresh_btn_width);
+                const std::string random_label = "(random)";
                 if (Combo server_combo{
-                        "##server",
+                        "##server"s,
                         cfg::state.server.empty()
-                        ? "(random)"
-                        : cfg::state.server.data()
+                        ? random_label
+                        : cfg::state.server
                     }) {
-                    if (ImGui::Selectable("(random)", cfg::state.server.empty())) {
+                    if (ImGui::Selectable(random_label, cfg::state.server.empty())) {
                         cfg::state.server.clear();
-                        RadioBrowserAPI::set_server("");
-                        RadioBrowserAPI::connect();
+                        RadioBrowserAPI::set_server(cfg::state.server);
                     }
-                    auto mirrors = RadioBrowserAPI::current_mirrors();
-                    for (const auto& name : mirrors)
-                        if (ImGui::Selectable(name, cfg::state.server == name)) {
-                            cfg::state.server = name;
-                            RadioBrowserAPI::set_server(name);
-                            RadioBrowserAPI::connect();
+                    RadioBrowserAPI::for_each_mirror(
+                        [](const std::string& server)
+                        {
+                            if (ImGui::Selectable(server, cfg::state.server == server)) {
+                                cfg::state.server = server;
+                                RadioBrowserAPI::set_server(cfg::state.server);
+                            }
                         }
+                    );
                 } // server_combo
 
                 ImGui::SameLine();
 
                 if (ImGui::Button(refresh_label))
-                    RadioBrowserAPI::get_mirrors();
+                    RadioBrowserAPI::update_mirrors();
 
                 /*-------------------*/
                 /* Browser page size */

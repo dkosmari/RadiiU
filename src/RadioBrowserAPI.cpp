@@ -12,10 +12,12 @@
 #include <queue>
 #include <random>
 #include <ranges>
+#include <set>
 #include <stdexcept>
 #include <stop_token>
 #include <thread>
 #include <unordered_set>
+#include <utility>
 
 #ifdef __WIIU__
 #include <coreinit/time.h>
@@ -33,7 +35,7 @@
 #include "net/address.hpp"
 #include "net/resolver.hpp"
 #include "rest.hpp"
-#include "thread_safe.hpp"
+// #include "thread_safe.hpp"
 #include "tracer.hpp"
 
 
@@ -126,12 +128,6 @@ namespace RadioBrowserAPI {
         /* Types */
         /*-------*/
 
-        enum class State {
-            disconnected,
-            connecting,
-            connected,
-        };
-
         struct StatusResponse {
             bool result;
             std::string response;
@@ -151,18 +147,17 @@ namespace RadioBrowserAPI {
         constexpr
         const glz::opts glz_options{ .error_on_unknown_keys = false, };
 
+        const string start_server = "all.api.radio-browser.info";
 
         /*-----------*/
         /* Variables */
         /*-----------*/
 
-        State state;
-        bool searching;
-        thread_safe<string> server;
-        thread_safe<std::minstd_rand> random_engine;
-        thread_safe<MirrorsVec> mirrors;     // TODO: consider not caching the mirrors.
-        std::jthread connect_thread;
-        std::jthread mirrors_thread;
+        bool busy;
+        string current_server;
+        std::minstd_rand random_engine;
+        MirrorsVec mirrors;
+        std::jthread fetch_mirrors_thread;
         async_queue<task_t> pending_tasks;
 
 
@@ -177,16 +172,20 @@ namespace RadioBrowserAPI {
                  Args&& ...args);
 
         void
-        connect_thread_func(std::stop_token stopper,
-                            result_function_t<> result_func,
-                            error_function_t error_func)
-            noexcept;
-
-        void
         dispatch_one_pending_task();
 
-        MirrorsVec
-        get_mirrors_sync(std::stop_token stopper);
+        void
+        fetch_mirrors_thread_function(std::stop_token stopper,
+                                      FetchMirrorsResultFunction result_func,
+                                      ErrorMsgFunction error_func)
+            noexcept;
+
+        rest::error_function_t
+        finish_exception(ExceptionFunction except_func);
+
+        template<typename F>
+        rest::json_success_function_t
+        finish_result(F&& result_func);
 
         std::minstd_rand
         make_random_engine();
@@ -194,12 +193,11 @@ namespace RadioBrowserAPI {
         string
         make_url(const string& endpoint);
 
-        // TODO: use std::expected
-        StatusResponse
-        test_server_sync(const std::string& srv);
+        bool
+        start_call();
 
-        string
-        to_string(State st);
+        void
+        throw_if_stopped(std::stop_token& stopper);
 
 
         /*----------------------*/
@@ -219,80 +217,6 @@ namespace RadioBrowserAPI {
 
 
         void
-        connect_thread_func(std::stop_token stopper,
-                            result_function_t<> result_func,
-                            error_function_t error_func)
-            noexcept
-        try {
-            auto srv = server.load();
-            if (srv.empty()) {
-                // No server set, use a random one from the mirrors list.
-                auto local_mirrors = mirrors.load();
-                if (local_mirrors.empty()) {
-                    // If no mirrors list yet, fetch it.
-                    local_mirrors = get_mirrors_sync(stopper);
-                    mirrors.store(local_mirrors);
-                }
-                bool success = false;
-                for (const auto& mirror : local_mirrors) {
-                    if (stopper.stop_requested())
-                        throw error{"stop requested"};
-                    auto [test_success, test_response] = test_server_sync(mirror);
-                    if (test_success) {
-                        server.store(mirror);
-                        success = true;
-                        break;
-                    }
-                }
-                if (!success)
-                    throw error{"no working mirror found"};
-                // Defer the result_func call, after updating the connection state.
-                add_task(
-                    [](result_function_t<> result_func)
-                    {
-                        state = State::connected;
-                        LOG_INFO("connection succeeded [1]");
-                        if (result_func)
-                            std::invoke(result_func);
-                    },
-                    std::move(result_func));
-            } else {
-                // We have a server.
-                auto [test_success, test_response] = test_server_sync(srv);
-                if (!test_success)
-                    throw error{"mirror "s + srv + " failed with:\n"s + test_response};
-
-                server.store(srv);
-                // Defer the result_func call, after updating the connection state.
-                add_task(
-                    [](result_function_t<> result_func)
-                    {
-                        state = State::connected;
-                        LOG_INFO("connection succeeded [2]");
-                        if (result_func)
-                            std::invoke(result_func);
-                    },
-                    std::move(result_func));
-            }
-        }
-        catch (std::exception& e) {
-            LOG_ERROR("{}", e.what());
-            // Defer the error_func call, after updating the connection state.
-            add_task(
-                [](error_function_t error_func,
-                   const error& e)
-                {
-                    state = State::disconnected;
-                    if (error_func)
-                        std::invoke(error_func, e);
-                },
-                std::move(error_func),
-                error{e}
-            );
-        }
-
-
-        void
         dispatch_one_pending_task()
         {
             if (auto task = pending_tasks.try_pop()) {
@@ -306,48 +230,53 @@ namespace RadioBrowserAPI {
         }
 
 
-        MirrorsVec
-        get_mirrors_sync(std::stop_token stopper)
-        {
-            std::vector<net::address> addresses;
-            std::unordered_set<string> mirrors_set; // this will eliminate dupes
-
-            // find all IP addresses
+        void
+        fetch_mirrors_thread_function(std::stop_token stopper,
+                                      FetchMirrorsResultFunction result_func,
+                                      ErrorMsgFunction error_func)
+            noexcept
+        try {
+            // Step 1: resolve all IP addresses
+            std::unordered_set<net::address> addresses;
+            LOG_DEBUG("Querying {}", start_server);
             {
                 net::resolver::address_resolver ar;
                 ar.param.type = net::socket::type::tcp;
-                string address = "all.api.radio-browser.info";
-                ar.process(address);
+                string server = start_server;
+                ar.process(server);
 
-                if (stopper.stop_requested())
-                    throw error{"stop requested"};
+                throw_if_stopped(stopper);
 
                 if (ar.error.message)
-                    throw error{"failed resolving \""
-                                + address
+                    throw Error{"failed resolving \""
+                                + server
                                 + "\": "
                                 + *ar.error.message};
                 for (const auto& entry : ar.result.entries)
-                    addresses.push_back(entry.addr);
+                    addresses.insert(entry.addr);
             }
 
-            LOG_INFO("Found {} mirrors.", addresses.size());
+            LOG_DEBUG("Found {} mirrors.", addresses.size());
 
-            // now find the canonical names for each IP address
+            throw_if_stopped(stopper);
+
+            // Step 2: find the canonical names for each IP
+            std::set<string> names;
             {
                 net::resolver::name_resolver nr;
                 for (const auto& addr : addresses) {
+                    throw_if_stopped(stopper);
+                    LOG_DEBUG("Querying canonical name for {}", addr);
                     try {
                         nr.process(addr);
-
-                        if (stopper.stop_requested())
-                            throw error{"stop requested"};
-
                         if (nr.error.message)
-                            throw error{"failed to look up name for \""
-                                        + to_string(addr) + "\""};
-                        if (nr.result.name)
-                            mirrors_set.insert(std::move(*nr.result.name));
+                            throw Error{"Failed name lookup for \""
+                                        + to_string(addr) + "\": "
+                                        + *nr.error.message};
+                        if (nr.result.name) {
+                            LOG_DEBUG("{} -> {:?}", addr, *nr.result.name);
+                            names.insert(std::move(*nr.result.name));
+                        }
                     }
                     catch (std::exception& e) {
                         LOG_ERROR("{}", e.what());
@@ -355,19 +284,54 @@ namespace RadioBrowserAPI {
                 }
             }
 
-            if (stopper.stop_requested())
-                throw error{"stop requested"};
+            LOG_DEBUG("Found {} servers.", names.size());
 
-            MirrorsVec result;
-            result.reserve(mirrors_set.size());
-            for (const auto& name : mirrors_set)
-                result.push_back(name);
+            throw_if_stopped(stopper);
 
-            // Make sure the result is randomized.
-            auto re = random_engine.lock();
-            std::ranges::shuffle(result, *re);
+            // Step 3: Invoke the result callback.
+            if (result_func) {
+                add_task(std::move(result_func),
+                         MirrorsVec{names.begin(), names.end()});
+            }
+        }
+        catch (std::exception& e) {
+            string msg = e.what();
+            LOG_ERROR("{}", msg);
+            if (error_func)
+                add_task(std::move(error_func),
+                         std::move(msg));
+        }
 
-            return result;
+
+        // Common code to clear the busy flag.
+        rest::error_function_t
+        finish_exception(ExceptionFunction except_func)
+        {
+            return
+                [except_func = std::move(except_func)]
+                (const std::exception& e)
+                    mutable
+                {
+                    busy = false;
+                    if (except_func)
+                        except_func(e);
+                };
+        }
+
+
+        // Common code to clear the busy flag.
+        template<typename F>
+        rest::json_success_function_t
+        finish_result(F&& result_func)
+        {
+            return
+                [result_func = std::forward<F>(result_func)]
+                (const string& json)
+                    mutable
+                {
+                    busy = false;
+                    result_func(json);
+                };
         }
 
 
@@ -394,191 +358,26 @@ namespace RadioBrowserAPI {
         string
         make_url(const string& endpoint)
         {
-            string current_server = server.load();
-            if (current_server.empty()) {
-                auto m = mirrors.lock();
-                if (m->empty())
-                    throw error{"no server, no mirrors to build URL"};
-                current_server = m->front();
-            }
-            return "http://"s + current_server + endpoint;
+            std::string server = current_server.empty() ? start_server : current_server;
+            return "http://"s + server + endpoint;
         }
 
 
-        StatusResponse
-        test_server_sync(const std::string& srv)
-        {
-            std::string result;
-            try {
-                result = rest::get_json_sync("https://" + srv + "/json/stats");
-                LOG_INFO("test_server_sync() got server stats:\n{}", glz::prettify_json(result));
-                return {true, std::move(result)};
-            }
-            catch (std::exception& e) {
-                LOG_ERROR("Failed to connect to {:?}: {}", srv, e.what());
-                return {false, std::move(result)};
-            }
-        }
-
-
-        [[maybe_unused]]
-        string
-        to_string(State st)
-        {
-            switch (st) {
-                using enum State;
-                case disconnected:
-                    return "disconnected";
-                case connecting:
-                    return "connecting";
-                case connected:
-                    return "connected";
-                default:
-                    return "<ERROR>";
-            }
-        }
-
-
-        struct shared_error_function_t {
-
-            std::shared_ptr<error_function_t> error_func;
-
-            shared_error_function_t(error_function_t error_func) :
-                error_func{std::make_shared<error_function_t>(std::move(error_func))}
-            {}
-
-            // Copy constructor.
-            shared_error_function_t(const shared_error_function_t& other)
-                noexcept = default;
-
-            // Move constructor.
-            shared_error_function_t(shared_error_function_t&& other)
-                noexcept = default;
-
-            // Copy assignment.
-            shared_error_function_t&
-            operator =(const shared_error_function_t& other)
-                noexcept = default;
-
-            // Move assignment.
-            shared_error_function_t&
-            operator =(shared_error_function_t&& other)
-                noexcept = default;
-
-            void
-            operator ()(const std::exception& e)
-            {
-                if (error_func && *error_func)
-                    (*error_func)(e);
-            }
-
-        }; // struct shared_error_function_t
-
-
-        /*
-         * This performs a connect() IF necessary, and then a given API call.
-         */
-        template<typename P,
-                 typename... R>
         void
-        when_connected(auto api_func,
-                       const P& params,
-                       result_function_t<R...> result_func,
-                       auto error_func)
+        throw_if_stopped(std::stop_token& stopper)
         {
-            switch (state) {
-                case State::connecting:
-                    // If in connecting state, just defer the call.
-                    add_task(std::move(api_func),
-                             params,
-                             std::move(result_func),
-                             std::move(error_func));
-                    break;
-                case State::disconnected: {
-                    // If disconnected, do a connect then call the handlers.
-
-                    // NOTE: error_func is move-only, so we move it into a shared_ptr in order
-                    // to use it twice.
-                    shared_error_function_t shared_error_func{std::move(error_func)};
-                    connect(
-                        [api_func,
-                         params,
-                         result_func = std::move(result_func),
-                         shared_error_func]
-                        mutable
-                        {
-                            std::invoke(api_func,
-                                        params,
-                                        std::move(result_func),
-                                        std::move(*shared_error_func.error_func));
-                        },
-                        shared_error_func);
-                    break;
-                }
-
-                case State::connected:
-                    // If connected: should not have called when_connected(), but let's
-                    // tolerate it.
-                    std::invoke(api_func,
-                                params,
-                                std::move(result_func),
-                                std::move(error_func));
-                    break;
-
-                default:
-                    std::abort();
-            }
+            if (stopper.stop_requested())
+                throw Error{"stop requested"};
         }
 
 
-        /*
-         * Overload when there are no params for the API call.
-         */
-        template<typename... R>
-        void
-        when_connected(auto api_func,
-                       result_function_t<R...> result_func,
-                       auto error_func)
+        bool
+        start_call()
         {
-            switch (state) {
-                case State::connecting:
-                    // If in connecting state, just defer the call.
-                    add_task(std::move(api_func),
-                             std::move(result_func),
-                             std::move(error_func));
-                    break;
-
-                case State::disconnected: {
-                    // If disconnected, do a connect then call the handlers.
-
-                    // NOTE: error_func is move-only, so we move it into a shared_ptr in order
-                    // to use it twice.
-                    shared_error_function_t shared_error_func{std::move(error_func)};
-                    connect(
-                        [api_func,
-                         result_func = std::move(result_func),
-                         shared_error_func]
-                        mutable
-                        {
-                            std::invoke(api_func,
-                                        std::move(result_func),
-                                        std::move(*shared_error_func.error_func));
-                        },
-                        shared_error_func);
-                    break;
-                }
-
-                case State::connected:
-                    // If connected: should not have called when_connected(), but let's
-                    // tolerate it.
-                    std::invoke(api_func,
-                                std::move(result_func),
-                                std::move(error_func));
-                    break;
-
-                default:
-                    std::abort();
-            }
+            if (busy)
+                return false;
+            busy = true;
+            return true;
         }
 
     } // namespace
@@ -588,63 +387,29 @@ namespace RadioBrowserAPI {
     /* Public functions. */
     /*-------------------*/
 
-    error::error(const std::exception& e) :
-        std::runtime_error{e.what()}
+    Error::Error(const string& msg) :
+        std::runtime_error{msg}
     {}
 
 
-    /*-----------------------------------------------------------------------------------------*
-     | This performs a connection "test" on a background thread: - if there's no server set: - |
-     | two DNS lookups are used to find a list of all mirrors.  - the list is randomized - a   |
-     | synchronous server stats call is done on each until one mirror succeeds.  - if there's  |
-     | a server: - a synchronous server stats call is done to see if it's online               |
-     |                                                                                         |
-     | Then, back on the main thread (during a RadioBrowser::process() call) either the        |
-     | `result_func' or the `error_func' is invoked.                                           |
-     *-----------------------------------------------------------------------------------------*/
     void
-    connect(result_function_t<> result_func,
-            error_function_t error_func)
+    initialize(const string& user_agent,
+    const string& server)
     {
         TRACE_FUNC;
 
-        // TODO: allow connect() again after it's already connected?
-        if (state == State::connected) {
-            if (result_func)
-                result_func();
-            return;
-        }
+        random_engine = make_random_engine();
 
-        if (state == State::connecting) {
-            if (error_func)
-                error_func(error{"connection in progress"});
-            return;
-        }
-
-        connect_thread = std::jthread{connect_thread_func,
-                                      std::move(result_func),
-                                      std::move(error_func)};
-    }
-
-
-    MirrorsVec
-    current_mirrors()
-    {
-        return mirrors.load();
-    }
-
-
-    void
-    initialize(const string& user_agent)
-    {
-        TRACE_FUNC;
-
-        random_engine.store(make_random_engine());
-
-        state = State::disconnected;
-        searching = false;
+        busy = false;
 
         rest::initialize(user_agent);
+
+        fetch_mirrors_thread = {};
+        current_server.clear();
+        if (!server.empty())
+            current_server = server;
+        else
+            update_mirrors_and_select_random();
     }
 
 
@@ -653,11 +418,7 @@ namespace RadioBrowserAPI {
     {
         TRACE_FUNC;
 
-        connect_thread = {};
-        mirrors_thread = {};
-
-        searching = false;
-        state = State::disconnected;
+        fetch_mirrors_thread = {};
 
         rest::finalize();
     }
@@ -672,86 +433,94 @@ namespace RadioBrowserAPI {
 
 
     bool
-    is_searching()
+    is_busy()
     {
-        return searching;
+        return busy;
     }
 
 
+
     void
-    set_server(const string& new_server)
+    set_server(const string& server)
     {
-        switch (state) {
-
-            case State::disconnected:
-                break;
-
-            case State::connecting:
-                connect_thread = {};
-                if (new_server.empty())
-                    state = State::disconnected;
-                else
-                    state = State::connected;
-                break;
-
-            default:
-                std::abort();
-
-            case State::connected:
-                if (new_server.empty())
-                    state = State::disconnected;
-                break;
-
-        }
-
-        auto s = server.lock();
-        *s = new_server;
+        current_server = server;
     }
 
 
     string
     get_server()
     {
-        return server.load();
+        return current_server.empty() ? start_server : current_server;
     }
 
 
     void
-    get_mirrors(result_function_t<> result_func,
-                error_function_t error_func)
+    fetch_mirrors(FetchMirrorsResultFunction result_func,
+                  ErrorMsgFunction error_func)
     {
         TRACE_FUNC;
 
-        mirrors_thread = std::jthread{
-            [](std::stop_token stopper,
-               result_function_t<> result_func,
-               error_function_t error_func)
+        fetch_mirrors_thread = std::jthread{fetch_mirrors_thread_function,
+                                            std::move(result_func),
+                                            std::move(error_func)};
+    }
+
+
+    void
+    update_mirrors()
+    {
+        fetch_mirrors(
+            [](MirrorsVec result)
             {
-                try {
-                    auto new_mirrors = get_mirrors_sync(stopper);
-                    mirrors.store(std::move(new_mirrors));
-                    add_task(std::move(result_func));
+                mirrors = std::move(result);
+            }
+        );
+    }
+
+
+    void
+    update_mirrors_and_select_random()
+    {
+        fetch_mirrors(
+            [](MirrorsVec result)
+            {
+                mirrors = std::move(result);
+                if (mirrors.empty())
+                    current_server.clear();
+                else {
+                    std::vector<string> samples(1);
+                    std::ranges::sample(mirrors,
+                                        samples.begin(),
+                                        1,
+                                        random_engine);
+                    current_server = std::move(samples[0]);
                 }
-                catch (std::exception& e) {
-                    add_task(std::move(error_func), error{e});
-                }
-            },
-            std::move(result_func),
-            std::move(error_func)
-        };
+            }
+        );
+    }
+
+
+    void
+    for_each_mirror(ForEachMirrorFunction func)
+    {
+        if (func)
+            for (const auto& server : mirrors)
+                func(server);
     }
 
 
     void
     get_codecs(const CodecParams& params,
-               result_function_t<CodecVec> result_func,
-               error_function_t error_func)
-    {
-        if (state != State::connected) {
-            when_connected(get_codecs,
-                           params,
-                           std::move(result_func),
-                           std::move(error_func));
+               GetCodecsResultFunction result_func,
+               ExceptionFunction except_func)
+        noexcept
+    try {
+        if (!start_call()) {
+            // defer until busy == false
+            add_task(get_codecs,
+                     params,
+                     std::move(result_func),
+                     std::move(except_func));
             return;
         }
 
@@ -761,28 +530,45 @@ namespace RadioBrowserAPI {
         rest::post_json_async(
             make_url("/json/codecs"),
             params_json,
-            [result_func = std::move(result_func)](const std::string& response)
-                mutable
-            {
-                CodecVec result;
-                glz::ex::read<glz_options>(result, response);
-                if (result_func)
-                    result_func(std::move(result));
-            },
-            std::move(error_func));
+            finish_result(
+                [result_func = std::move(result_func)]
+                (const string& json)
+                    mutable
+                {
+                    CodecVec result;
+                    glz::ex::read<glz_options>(result, json);
+                    if (result_func)
+                        result_func(std::move(result));
+                }
+            ),
+            finish_exception(std::move(except_func))
+        );
+    }
+    catch (std::exception& e) {
+        busy = false;
+        if (except_func)
+            except_func(e);
+    }
+    catch (...) {
+        busy = false;
+        LOG_ERROR("Caught unknown exception");
+        if (except_func)
+            except_func(std::logic_error{"Caught unknown exception"});
     }
 
 
     void
     get_countries(const CountryParams& params,
-                  result_function_t<CountryVec> result_func,
-                  error_function_t error_func)
-    {
-        if (state != State::connected) {
-            when_connected(get_countries,
-                           params,
-                           std::move(result_func),
-                           std::move(error_func));
+                  GetCountriesResultFunction result_func,
+                  ExceptionFunction except_func)
+        noexcept
+    try {
+        if (!start_call()) {
+            // defer until busy == false
+            add_task(get_countries,
+                     params,
+                     std::move(result_func),
+                     std::move(except_func));
             return;
         }
 
@@ -792,55 +578,95 @@ namespace RadioBrowserAPI {
         rest::post_json_async(
             make_url("/json/countries"),
             params_json,
-            [result_func = std::move(result_func)](const std::string& response)
-                mutable
-            {
-                CountryVec result;
-                glz::ex::read<glz_options>(result, response);
-                if (result_func)
-                    result_func(std::move(result));
-            },
-            std::move(error_func));
+            finish_result(
+                [result_func = std::move(result_func)]
+                (const std::string& json)
+                    mutable
+                {
+                    CountryVec result;
+                    glz::ex::read<glz_options>(result, json);
+                    if (result_func)
+                        result_func(std::move(result));
+                }
+            ),
+            finish_exception(
+                [except_func=std::move(except_func)]
+                (const std::exception& e)
+                    mutable
+                {
+                    if (except_func)
+                        except_func(e);
+                }
+            )
+        );
+    }
+    catch (std::exception& e) {
+        busy = false;
+        if (except_func)
+            except_func(e);
+    }
+    catch (...) {
+        busy = false;
+        LOG_ERROR("Caught unknown exception");
+        if (except_func)
+            except_func(std::logic_error{"Caught unknown exception"});
     }
 
 
     void
-    get_server_stats(result_function_t<ServerStats> result_func,
-                     error_function_t error_func)
-    {
-        if (state != State::connected) {
-            LOG_INFO("deferring call to get_server_stats()");
-            when_connected(get_server_stats,
-                           std::move(result_func),
-                           std::move(error_func));
+    get_server_stats(GetServerStatsResultFunction result_func,
+                     ExceptionFunction except_func)
+        noexcept
+    try {
+        if (!start_call()) {
+            // defer until busy == false
+            add_task(get_server_stats,
+                     std::move(result_func),
+                     std::move(except_func));
             return;
         }
 
         rest::get_json_async(
             make_url("/json/stats"),
             {},
-            [result_func = std::move(result_func)](const std::string& response)
-                mutable
-            {
-                ServerStats result;
-                glz::ex::read<glz_options>(result, response);
-                if (result_func)
-                    result_func(std::move(result));
-            },
-            std::move(error_func));
+            finish_result(
+                [result_func = std::move(result_func)](const std::string& json)
+                    mutable
+                {
+                    ServerStats result;
+                    glz::ex::read<glz_options>(result, json);
+                    if (result_func)
+                        result_func(std::move(result));
+                }
+            ),
+            finish_exception(std::move(except_func))
+        );
+    }
+    catch (std::exception& e) {
+        busy = false;
+        if (except_func)
+            except_func(e);
+    }
+    catch (...) {
+        busy = false;
+        LOG_ERROR("Caught unknown exception");
+        if (except_func)
+            except_func(std::logic_error{"Caught unknown exception"});
     }
 
 
     void
     get_station(const string& uuid,
-                result_function_t<Station> result_func,
-                error_function_t error_func)
-    {
-        if (state != State::connected) {
-            when_connected(get_station,
-                           uuid,
-                           std::move(result_func),
-                           std::move(error_func));
+                GetStationResultFunction result_func,
+                ExceptionFunction except_func)
+        noexcept
+    try {
+        if (!start_call()) {
+            // defer until busy == false
+            add_task(get_station,
+                     uuid,
+                     std::move(result_func),
+                     std::move(except_func));
             return;
         }
 
@@ -851,30 +677,46 @@ namespace RadioBrowserAPI {
         rest::post_json_async(
             make_url("/json/stations/byuuid"),
             params_json,
-            [result_func = std::move(result_func)](const std::string& response)
-                mutable
-            {
-                StationVec result;
-                glz::ex::read<glz_options>(result, response);
-                if (result.size() != 1)
-                    throw error{"incorrect array size: " + std::to_string(result.size())};
-                if (result_func)
-                    result_func(std::move(result[0]));
-            },
-            std::move(error_func));
+            finish_result(
+                [result_func = std::move(result_func)](const std::string& json)
+                    mutable
+                {
+                    StationVec result;
+                    glz::ex::read<glz_options>(result, json);
+                    if (result.size() != 1)
+                        throw Error{"incorrect array size: " + std::to_string(result.size())};
+                    if (result_func)
+                        result_func(std::move(result[0]));
+                }
+            ),
+            finish_exception(std::move(except_func))
+        );
+    }
+    catch (std::exception& e) {
+        busy = false;
+        if (except_func)
+            except_func(e);
+    }
+    catch (...) {
+        busy = false;
+        LOG_ERROR("Caught unknown exception");
+        if (except_func)
+            except_func(std::logic_error{"Caught unknown exception"});
     }
 
 
     void
     get_tags(const TagParams& params,
-             result_function_t<TagVec> result_func,
-             error_function_t error_func)
-    {
-        if (state != State::connected) {
-            when_connected(get_tags,
-                           params,
-                           std::move(result_func),
-                           std::move(error_func));
+             GetTagsResultFunction result_func,
+             ExceptionFunction except_func)
+        noexcept
+    try {
+        if (!start_call()) {
+            // defer until busy == false
+            add_task(get_tags,
+                     params,
+                     std::move(result_func),
+                     std::move(except_func));
             return;
         }
 
@@ -884,85 +726,91 @@ namespace RadioBrowserAPI {
         rest::post_json_async(
             make_url("/json/tags"),
             params_json,
-            [result_func=std::move(result_func)](const std::string& response)
-                mutable
-            {
-                TagVec result;
-                glz::ex::read<glz_options>(result, response);
-                if (result_func)
-                    result_func(std::move(result));
-            },
-            std::move(error_func));
+            finish_result(
+                [result_func=std::move(result_func)](const std::string& json)
+                    mutable
+                {
+                    TagVec result;
+                    glz::ex::read<glz_options>(result, json);
+                    if (result_func)
+                        result_func(std::move(result));
+                }
+            ),
+            finish_exception(std::move(except_func))
+        );
     }
-
-
-    void
-    reconnect()
-    {
-        state = State::disconnected;
-        connect();
+    catch (std::exception& e) {
+        busy = false;
+        if (except_func)
+            except_func(e);
+    }
+    catch (...) {
+        busy = false;
+        LOG_ERROR("Caught unknown exception");
+        if (except_func)
+            except_func(std::logic_error{"Caught unknown exception"});
     }
 
 
     void
     search_stations(const SearchStationParams& params,
-                    result_function_t<StationVec> result_func,
-                    error_function_t error_func)
-    {
-        if (searching) {
-            error e{"RadioBrowserAPI is searching"};
-            if (error_func)
-                error_func(e);
-            return;
-        }
-
-        if (state != State::connected) {
-            when_connected(search_stations,
-                           params,
-                           std::move(result_func),
-                           std::move(error_func));
+                    SearchStationsResultFunction result_func,
+                    ExceptionFunction except_func)
+        noexcept
+    try {
+        if (!start_call()) {
+            // defer until busy == false
+            add_task(search_stations,
+                     params,
+                     std::move(result_func),
+                     std::move(except_func));
             return;
         }
 
         std::string params_json;
         glz::ex::write_json(params, params_json);
 
-        searching = true;
         rest::post_json_async(
             make_url("/json/stations/search"),
             params_json,
-            [result_func=std::move(result_func)](const std::string& response)
-                mutable
-            {
-                searching = false;
-                StationVec result;
-                glz::ex::read<glz_options>(result, response);
-                if (result_func)
-                    result_func(std::move(result));
-            },
-            [error_func=std::move(error_func)](const std::exception& e)
-                mutable
-            {
-                searching = false;
-                if (error_func)
-                    error_func(e);
-            });
+            finish_result(
+                [result_func=std::move(result_func)](const std::string& json)
+                    mutable
+                {
+                    StationVec result;
+                    glz::ex::read<glz_options>(result, json);
+                    if (result_func)
+                        result_func(std::move(result));
+                }
+            ),
+            finish_exception(std::move(except_func))
+        );
+    }
+    catch (std::exception& e) {
+        busy = false;
+        if (except_func)
+            except_func(e);
+    }
+    catch (...) {
+        busy = false;
+        LOG_ERROR("Caught unknown exception");
+        if (except_func)
+            except_func(std::logic_error{"Caught unknown exception"});
     }
 
 
     void
     send_click(const string& uuid,
-               result_function_t<ClickResult> result_func,
-               error_function_t error_func)
-    {
-        if (uuid.empty())
-            return;
-
-        if (state != State::connected) {
-            when_connected(send_click,
-                           uuid,
-                           std::move(result_func),
-                           std::move(error_func));
+               SendClickResultFunction result_func,
+               ExceptionFunction except_func)
+        noexcept
+    try {
+        if (!start_call()) {
+            // defer until busy == false
+            add_task(send_click,
+                     uuid,
+                     std::move(result_func),
+                     std::move(except_func));
             return;
         }
 
@@ -970,31 +818,45 @@ namespace RadioBrowserAPI {
         rest::get_json_async(
             make_url("/json/url/" + uuid),
             {},
-            [result_func=std::move(result_func)](const std::string& response)
-                mutable
-            {
-                ClickResult result;
-                glz::ex::read<glz_options>(result, response);
-                if (result_func)
-                    result_func(std::move(result));
-            },
-            std::move(error_func));
+            finish_result(
+                [result_func=std::move(result_func)]
+                (const std::string& json)
+                    mutable
+                {
+                    ClickResult result;
+                    glz::ex::read<glz_options>(result, json);
+                    if (result_func)
+                        result_func(std::move(result));
+                }
+            ),
+            finish_exception(std::move(except_func))
+        );
+    }
+    catch (std::exception& e) {
+        busy = false;
+        if (except_func)
+            except_func(e);
+    }
+    catch (...) {
+        busy = false;
+        LOG_ERROR("Caught unknown exception");
+        if (except_func)
+            except_func(std::logic_error{"Caught unknown exception"});
     }
 
 
     void
     send_vote(const string& uuid,
-              result_function_t<VoteResult> result_func,
-              error_function_t error_func)
-    {
-        if (uuid.empty())
-            return;
-
-        if (state != State::connected) {
-            when_connected(send_vote,
-                           uuid,
-                           std::move(result_func),
-                           std::move(error_func));
+              SendVoteResultFunction result_func,
+              ExceptionFunction except_func)
+        noexcept
+    try {
+        if (!start_call()) {
+            // defer until busy == false
+            add_task(send_vote,
+                     uuid,
+                     std::move(result_func),
+                     std::move(except_func));
             return;
         }
 
@@ -1002,15 +864,30 @@ namespace RadioBrowserAPI {
         rest::get_json_async(
             make_url("/json/vote/" + uuid),
             {},
-            [result_func=std::move(result_func)](const std::string& response)
-                mutable
-            {
-                VoteResult result;
-                glz::ex::read<glz_options>(result, response);
-                if (result_func)
-                    result_func(std::move(result));
-            },
-            std::move(error_func));
+            finish_result(
+                [result_func=std::move(result_func)]
+                (const std::string& response)
+                    mutable
+                {
+                    VoteResult result;
+                    glz::ex::read<glz_options>(result, response);
+                    if (result_func)
+                        result_func(std::move(result));
+                }
+            ),
+            finish_exception(std::move(except_func))
+        );
+    }
+    catch (std::exception& e) {
+        busy = false;
+        if (except_func)
+            except_func(e);
+    }
+    catch (...) {
+        busy = false;
+        LOG_ERROR("Caught unknown exception");
+        if (except_func)
+            except_func(std::logic_error{"Caught unknown exception"});
     }
 
 } // namespace RadioBrowserAPI

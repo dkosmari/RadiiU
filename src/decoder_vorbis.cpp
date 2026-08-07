@@ -7,6 +7,7 @@
 
 #include <bit>
 #include <cerrno>
+#include <format>
 #include <string_view>
 
 #include "decoder_vorbis.hpp"
@@ -163,7 +164,7 @@ namespace decoder {
             bitrate = current_bitrate;
 
         if (bitrate)
-            result.bitrate = string_utils::cpp_sprintf("%.1f Kbps", bitrate / 1000.0f);
+            result.bitrate = std::format("{:.1f} Kbps", bitrate / 1000.0f);
 
         return result;
     }

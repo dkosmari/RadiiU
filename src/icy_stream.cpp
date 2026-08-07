@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -130,11 +130,13 @@ namespace icy {
         auto meta = icy::parse(meta_str);
 
         for (const auto& [k, v] : meta) {
+            LOG_DEBUG("icy meta key: {}", k);
             // TODO: check if there are more special keys
             // TODO: handle StreamArtwork
             if (k == "StreamTitle") {
                 current_meta.title = trimmed(v);
             } else if (k == "StreamUrl") {
+                // TODO: handle relative URLs.
                 current_meta.cover_art = trimmed(v);
             } else
                 current_meta.extra[k] = trimmed(v);

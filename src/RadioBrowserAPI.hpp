@@ -30,12 +30,9 @@ namespace RadioBrowserAPI {
     using opt_uint = std::optional<unsigned>;
 
 
-    struct error : std::runtime_error {
+    struct Error : std::runtime_error {
 
-        // Inherit constructors.
-        using std::runtime_error::runtime_error;
-
-        error(const std::exception& e);
+        Error(const string& msg);
 
     }; // struct error
 
@@ -279,17 +276,21 @@ namespace RadioBrowserAPI {
 
 
     template<typename... Args>
-    using result_function_sig = void (Args...);
+    using ResultCallbackSignature = void (Args...);
 
     template<typename... Args>
-    using result_function_t = std::move_only_function<result_function_sig<Args...>>;
+    using ResultFunction = std::move_only_function<ResultCallbackSignature<Args...>>;
 
-    using error_function_sig = void (const std::exception& err);
-    using error_function_t = std::move_only_function<error_function_sig>;
+    using ExceptionCallbackSignature = void (const std::exception&);
+    using ExceptionFunction = std::move_only_function<ExceptionCallbackSignature>;
+
+    using ErrorMsgCallbackSignature = void (const string&);
+    using ErrorMsgFunction = std::move_only_function<ErrorMsgCallbackSignature>;
 
 
     void
-    initialize(const string& user_agent);
+    initialize(const string& user_agent,
+               const string& server);
 
     void
     finalize();
@@ -299,82 +300,111 @@ namespace RadioBrowserAPI {
 
 
     bool
-    is_searching();
+    is_busy();
 
 
     void
-    set_server(const string& address);
+    set_server(const string& server);
 
 
     string
     get_server();
 
 
-    void
-    get_mirrors(result_function_t<> result_func = {},
-                error_function_t error_func = {});
-
-
     using MirrorsVec = std::vector<string>;
 
-    MirrorsVec
-    current_mirrors();
+    using FetchMirrorsResultFunction = ResultFunction<MirrorsVec>;
+    using FetchMirrorsErrorCallbackSignature = void(const string&);
+
+    void
+    fetch_mirrors(FetchMirrorsResultFunction result_func = {},
+                  ErrorMsgFunction error_func = {});
 
 
     void
-    connect(result_function_t<> result_func = {},
-            error_function_t error_func = {});
+    update_mirrors();
 
+
+    void
+    update_mirrors_and_select_random();
+
+
+    using ForEachMirrorSignature = void (const string& server);
+    using ForEachMirrorFunction = std::function<ForEachMirrorSignature>;
+
+    void
+    for_each_mirror(ForEachMirrorFunction func);
+
+
+    using GetCodecsResultFunction = ResultFunction<CodecVec>;
 
     void
     get_codecs(const CodecParams& params,
-               result_function_t<CodecVec> result_func,
-               error_function_t error_func = {});
+               GetCodecsResultFunction result_func,
+               ExceptionFunction except_func = {})
+        noexcept;
 
+
+    using GetCountriesResultFunction = ResultFunction<CountryVec>;
 
     void
     get_countries(const CountryParams& params,
-                  result_function_t<CountryVec> result_func,
-                  error_function_t error_func = {});
+                  GetCountriesResultFunction result_func,
+                  ExceptionFunction except_func = {})
+        noexcept;
 
+
+    using GetServerStatsResultFunction = ResultFunction<ServerStats>;
 
     void
-    get_server_stats(result_function_t<ServerStats> result_func,
-                     error_function_t error_func = {});
+    get_server_stats(GetServerStatsResultFunction result_func,
+                     ExceptionFunction except_func = {})
+        noexcept;
 
+
+    using GetStationResultFunction = ResultFunction<Station>;
 
     void
     get_station(const string& uuid,
-                result_function_t<Station> result_func,
-                error_function_t error_func = {});
+                GetStationResultFunction result_func,
+                ExceptionFunction except_func = {})
+        noexcept;
 
+
+    using GetTagsResultFunction = ResultFunction<TagVec>;
 
     void
     get_tags(const TagParams& params,
-             result_function_t<TagVec> result_func,
-             error_function_t error_func = {});
+             GetTagsResultFunction result_func,
+             ExceptionFunction except_func = {})
+        noexcept;
 
 
-    void
-    reconnect();
-
+    using SearchStationsResultFunction = ResultFunction<StationVec>;
 
     void
     search_stations(const SearchStationParams& params,
-                    result_function_t<StationVec> result_func,
-                    error_function_t error_func = {});
+                    SearchStationsResultFunction result_func,
+                    ExceptionFunction except_func = {})
+        noexcept;
 
+
+    using SendClickResultFunction = ResultFunction<ClickResult>;
 
     void
     send_click(const string& uuid,
-               result_function_t<ClickResult> result_func,
-               error_function_t error_func = {});
+               SendClickResultFunction result_func,
+               ExceptionFunction except_func = {})
+        noexcept;
 
+
+    using SendVoteResultFunction = ResultFunction<VoteResult>;
 
     void
     send_vote(const string& uuid,
-              result_function_t<VoteResult> result_func,
-              error_function_t error_func = {});
+              SendVoteResultFunction result_func,
+              ExceptionFunction except_func = {})
+        noexcept;
 
 } // namespace RadioBrowserAPI
 

@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <format>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -175,9 +176,7 @@ namespace App {
 
 #ifdef __WIIU__
         nn::act::Initialize();
-        char buf[256];
-        std::snprintf(buf, sizeof buf, "/vol/save/%08x", nn::act::GetPersistentId());
-        config_path = buf;
+        config_path = std::format("/vol/save/{:08x}", nn::act::GetPersistentId());
         SAVEInit();
         if (!exists(config_path)) {
             LOG_INFO("Creating save dir: {:?}", config_path.string());
@@ -410,7 +409,7 @@ namespace App {
         // Initialize modules.
         Styles::initialize();
         IconManager::initialize(res->renderer);
-        RadioBrowserAPI::initialize(get_user_agent());
+        RadioBrowserAPI::initialize(get_user_agent(), cfg::state.server);
         RadioBrowserAPI::set_server(cfg::state.server);
 
         // Initialize tabs.

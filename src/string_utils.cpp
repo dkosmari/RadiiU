@@ -34,41 +34,6 @@ namespace string_utils {
     }
 
 
-    std::string
-    cpp_vsprintf(const char* fmt,
-                 va_list args)
-    {
-        std::va_list args2;
-        va_copy(args2, args);
-        int size = std::vsnprintf(nullptr, 0, fmt, args2);
-        va_end(args2);
-        if (size < 0)
-            throw std::runtime_error{"vsnprintf() failed"};
-
-        std::string text(size, '\0');
-        std::vsnprintf(text.data(), text.size() + 1, fmt, args);
-        return text;
-    }
-
-
-    std::string
-    cpp_sprintf(const char* fmt,
-                ...)
-    {
-        std::va_list args;
-        va_start(args, fmt);
-        try {
-            auto result = cpp_vsprintf(fmt, args);
-            va_end(args);
-            return result;
-        }
-        catch (...) {
-            va_end(args);
-            throw;
-        }
-    }
-
-
     bool
     equal_case(std::string_view a,
                std::string_view b)
@@ -83,29 +48,6 @@ namespace string_utils {
         }
         return true;
     }
-
-
-    // Used by format()
-    namespace detail {
-
-        template<> const char* format_helper<char> = "c";
-
-        template<> const char* format_helper<std::int8_t>  = PRIi8;
-        template<> const char* format_helper<std::uint8_t> = PRIu8;
-
-        template<> const char* format_helper<std::int16_t>  = PRIi16;
-        template<> const char* format_helper<std::uint16_t> = PRIu16;
-
-        template<> const char* format_helper<std::int32_t>  = PRIi32;
-        template<> const char* format_helper<std::uint32_t> = PRIu32;
-
-        template<> const char* format_helper<std::int64_t>  = PRIi64;
-        template<> const char* format_helper<std::uint64_t> = PRIu64;
-
-        template<> const char* format_helper<char *>       = "s";
-        template<> const char* format_helper<const char *> = "s";
-
-    } // namespace detail
 
 
     std::vector<std::string>

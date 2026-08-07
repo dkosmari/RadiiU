@@ -141,7 +141,7 @@ radio_client::process_http_response_started()
 
     auto content_type = http.get_header("content-type");
     if (!content_type) {
-        LOG_ERROR("server provided no content-type");
+        LOG_ERROR("Server provided no content-type.");
         current_state = state::stopped;
         return;
     }

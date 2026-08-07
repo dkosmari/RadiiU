@@ -33,33 +33,9 @@ namespace string_utils {
 
 
     [[nodiscard]]
-    std::string
-    cpp_vsprintf(const char* fmt,
-                 va_list args)
-        __attribute__ (( __format__(__printf__, 1, 0) ));
-
-    [[nodiscard]]
-    std::string
-    cpp_sprintf(const char* fmt,
-                ...)
-        __attribute__ (( __format__(__printf__, 1, 2) ));
-
-
-    [[nodiscard]]
     bool
     equal_case(std::string_view a,
                std::string_view b);
-
-
-    // TODO: string_utils::format() is obsolete now
-    // Return the correct printf width fromatter for a given integer value.
-    template<typename T>
-    [[nodiscard]]
-    std::string
-    format(T&)
-    {
-        return detail::format_helper<std::remove_cv_t<T>>;
-    }
 
 
     [[nodiscard]]
@@ -102,6 +78,7 @@ namespace string_utils {
                const std::string_view& separator = ",",
                bool compress = true,
                std::string_view::size_type max_tokens = 0);
+
 
     [[nodiscard]]
     std::string
