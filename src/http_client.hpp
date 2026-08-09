@@ -47,14 +47,16 @@ struct http_client {
 
 
     void
-    add_accept(const std::string& mime);
-
-    void
     add_header(const std::string& hdr);
 
 
     void
     set_url(const std::string& url);
+
+
+    std::string
+    get_effective_url()
+        const;
 
 
     void
@@ -66,7 +68,6 @@ struct http_client {
 
 private:
 
-    std::vector<std::string> accepts;
     std::vector<std::string> headers;
 
     std::size_t

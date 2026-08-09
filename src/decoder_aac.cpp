@@ -172,10 +172,8 @@ namespace decoder {
                                       buf.data(),
                                       sz);
         if (frame.error) {
-            // TODO: check which errors should throw, which are harmless.
-            //throw error{"NeAACDecDecode() failed", frame.error};
-            LOG_ERROR("{}", NeAACDecGetErrorMessage(frame.error));
-            return {};
+            // TODO: throwing from here should stop playback?
+            throw error{"NeAACDecDecode() failed", frame.error};
         }
         stream.discard(frame.bytesconsumed);
         if (frame.samples == 0) {

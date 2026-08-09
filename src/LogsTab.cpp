@@ -54,7 +54,7 @@ namespace LogsTab {
         const ImVec4 log_tag_color{1.0f, 0.0f, 1.0f, 1.0f};
         const ImVec4 log_text_color{1.0f, 1.0f, 1.0f, 1.0f};
 
-        const float log_font_size = 20;
+        const float log_font_size = 24;
 
 
         /*-----------*/

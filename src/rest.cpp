@@ -12,7 +12,9 @@
 #include <utility>
 #include <vector>
 
-#include <curlxx/curl.hpp>
+#include <curlxx/easy.hpp>
+#include <curlxx/escape.hpp>
+#include <curlxx/multi.hpp>
 
 #include "rest.hpp"
 

@@ -368,12 +368,13 @@ namespace FavoritesTab {
                         ImGuiChildFlags_NavFlattened
                     }) {
 
-                    UI::show_play_button(station);
+                    UI::PlayButton(station);
 
                     {
                         Disabled disable_first_index{index == 0};
                         // ▲
-                        if (ImGui::Button(ICON_FA_CHEVRON_UP)) {
+                        if (ImGui::Button(ICON_FA_CHEVRON_UP,
+                                          UI::get_small_button_size())) {
                             move_operation.emplace();
                             move_operation->src = index;
                             move_operation->dst = index - 1;
@@ -386,7 +387,8 @@ namespace FavoritesTab {
                     {
                         Disabled disable_last_index{index + 1 >= stations.size()};
                         // ▼
-                        if (ImGui::Button(ICON_FA_CHEVRON_DOWN)) {
+                        if (ImGui::Button(ICON_FA_CHEVRON_DOWN,
+                                          UI::get_small_button_size())) {
                             move_operation.emplace();
                             move_operation->src = index;
                             move_operation->dst = index + 1;
@@ -395,7 +397,8 @@ namespace FavoritesTab {
                     }
 
                     // ✎
-                    if (ImGui::Button(ICON_FA_PENCIL))
+                    if (ImGui::Button(ICON_FA_PENCIL,
+                                      UI::get_small_button_size()))
                         ImGui::OpenPopup(popup_edit_title);
                     ImGui::SetItemTooltip("Edit this station.");
                     process_popup_edit(*station);
@@ -403,23 +406,24 @@ namespace FavoritesTab {
                     ImGui::SameLine();
 
                     // 🗑
-                    if (ImGui::Button(ICON_FA_TRASH_O))
+                    if (ImGui::Button(ICON_FA_TRASH_O,
+                                      UI::get_small_button_size()))
                         ImGui::OpenPopup(popup_delete_title);
                     ImGui::SetItemTooltip("Remove this station from favorites.");
                     process_popup_delete(*station, index);
 
-                } // actions_child
+                } // actions
 
                 ImGui::SameLine();
 
-                if (Child details_child{
+                if (Child details{
                         "details",
                         {0, 0},
                         ImGuiChildFlags_AutoResizeY |
                         ImGuiChildFlags_NavFlattened
                     }) {
 
-                    UI::show_favicon(*station);
+                    UI::FavIcon(*station);
 
                     ImGui::SameLine();
 
@@ -432,7 +436,7 @@ namespace FavoritesTab {
                             ImGuiChildFlags_NavFlattened
                         }) {
 
-                        UI::show_tags(station->tags);
+                        UI::TagsList(station->tags);
 
                     } // extra_info
 

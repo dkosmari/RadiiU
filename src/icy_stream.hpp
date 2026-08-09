@@ -31,6 +31,9 @@ namespace icy {
         stream_metadata initial_meta;
         stream_metadata current_meta;
 
+        std::string base_url;
+
+
         stream(http_client& hc);
 
 
@@ -47,6 +50,9 @@ namespace icy {
         void
         process_metadata();
 
+        std::string
+        resolve_url(const std::string& url)
+            noexcept;
 
     }; // struct stream
 

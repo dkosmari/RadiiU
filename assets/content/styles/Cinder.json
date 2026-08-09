@@ -42,7 +42,7 @@
         "TabDimmedSelected"         : [0.92, 0.18, 0.29, 0.50],
         "TabDimmedSelectedOverline" : [0.92, 0.18, 0.29, 0.50],
         "PlotLines"                 : [0.86, 0.93, 0.89, 0.63],
-        "PlotLinesHovered"          : [0.92, 0.18, 0.29, 1.00],
+        "PlotLinesHovered"          : [0.18, 0.61, 0.92, 1.00],
         "PlotHistogram"             : [0.86, 0.93, 0.89, 0.63],
         "PlotHistogramHovered"      : [0.92, 0.18, 0.29, 1.00],
         "TextLink"                  : [0.00, 0.63, 1.00, 1.00],

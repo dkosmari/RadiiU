@@ -45,21 +45,46 @@ using std::chrono::system_clock;
 using namespace std::literals;
 using namespace std::placeholders;
 
-using sdl::vec2;
-
 
 namespace PlayerTab {
 
-    struct TrackInfo {
-        system_clock::time_point when{};
-        std::string title{};
-    };
+    namespace {
 
-    struct State {
-        bool details_expanded{};
-        bool history_expanded{};
-        std::deque<TrackInfo> history{};
-    };
+        // Types
+
+        struct TrackInfo {
+            system_clock::time_point when{};
+            std::string title{};
+        };
+
+
+        struct State {
+            bool details_expanded{};
+            bool history_expanded{};
+            std::deque<TrackInfo> history{};
+        };
+
+
+        // Function declarations
+
+        void
+        show_meta_row(const std::string& label,
+                      const std::optional<std::string>& value);
+
+
+        // Function definitions
+
+        void
+        show_meta_row(const std::string& label,
+                      const std::optional<std::string>& value)
+        {
+            if (value)
+                UI::show_info_row(label, *value);
+        }
+
+    } // namespace
+
+
 
     State state;
 
@@ -121,13 +146,16 @@ namespace PlayerTab {
         {
             try {
                 radio.process();
-                if (auto meta = radio.get_metadata())
+
+                if (auto meta = radio.get_metadata()) {
                     if (meta->title) {
                         if (meta->artist)
                             history_add(*meta->artist + " - " + *meta->title);
                         else
                             history_add(*meta->title);
-                    }
+                    } else
+                        history_add({});
+                }
 
                 if (is_buffer_too_empty()) {
                     // LOG_DEBUG("buffer too empty");
@@ -295,13 +323,13 @@ namespace PlayerTab {
                     ImGuiChildFlags_NavFlattened
                 }) {
 
-                UI::show_play_button(station);
+                UI::PlayButton(station);
 
-                UI::show_favorite_button(*station);
+                UI::FavoriteButton(*station);
 
                 ImGui::SameLine();
 
-                if (StationDetailsPopup::show_button(station->stationuuid))
+                if (StationDetailsPopup::Button(station->stationuuid))
                     StationDetailsPopup::open(station->stationuuid);
 
             } // actions_child
@@ -315,7 +343,7 @@ namespace PlayerTab {
                     ImGuiChildFlags_NavFlattened
                 }) {
 
-                UI::show_favicon(*station);
+                UI::FavIcon(*station);
 
                 ImGui::SameLine();
 
@@ -347,6 +375,8 @@ namespace PlayerTab {
                 if (!res)
                     return;
 
+                Font smaller{nullptr, 24};
+
                 Indent indenter;
                 if (Table metadata_table{"metadata", 2}) {
 
@@ -354,34 +384,37 @@ namespace PlayerTab {
                     ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
 
                     if (const auto meta = res->radio.get_metadata()) {
-                        if (meta->title)
-                            UI::show_info_row("Title", *meta->title);
-                        if (meta->artist)
-                            UI::show_info_row("Artist", *meta->artist);
-                        if (meta->album)
-                            UI::show_info_row("Album", *meta->album);
-                        if (meta->genre)
-                            UI::show_info_row("Genre", *meta->genre);
+
+                        show_meta_row("Title", meta->title);
+                        show_meta_row("Artist", meta->artist);
+
                         if (meta->cover_art && !meta->cover_art->empty()) {
-                            auto art = ImageLoader::get(*meta->cover_art);
+                            auto available = ImGui::GetContentRegionAvail();
+                            const sdl::vec2 max_size = {
+                                static_cast<int>(available.x),
+                                0
+                            };
+                            auto art = ImageLoader::get(*meta->cover_art, max_size);
                             ImGui::TableNextRow();
                             ImGui::TableNextColumn();
                             UI::Label("Cover art");
                             ImGui::TableNextColumn();
-                            UI::show_image(*art);
+                            UI::Image(*art);
                             ImGui::SetItemTooltip(*meta->cover_art);
                         }
+
+                        show_meta_row("Album", meta->album);
+                        show_meta_row("Genre", meta->genre);
+                        show_meta_row("Date", meta->date);
+
                         for (auto& [k, v] : meta->extra)
                             UI::show_info_row(k, v);
+
                         // station metadata
-                        if (meta->station_name && !meta->station_name->empty())
-                            UI::show_info_row("Name", *meta->station_name);
-                        if (meta->station_genre && !meta->station_genre->empty())
-                            UI::show_info_row("Genre", *meta->station_genre);
-                        if (meta->station_description && !meta->station_description->empty())
-                            UI::show_info_row("Description", *meta->station_description);
-                        if (meta->station_url && !meta->station_url->empty())
-                            UI::show_link_row("URL", *meta->station_url);
+                        show_meta_row("Station Name", meta->station_name);
+                        show_meta_row("Station Genre", meta->station_genre);
+                        show_meta_row("Station Description", meta->station_description);
+                        show_meta_row("Station URL", meta->station_url);
                     }
 
                     if (const auto info = res->radio.get_decoder_info()) {
@@ -418,6 +451,7 @@ namespace PlayerTab {
             ImGui::SetNextItemOpen(state.history_expanded);
             if ((state.history_expanded = ImGui::CollapsingHeader("Track history"))) {
 
+                Font smaller{nullptr, 24};
                 Indent indenter;
 
                 if (Table table{"table",
@@ -486,7 +520,7 @@ namespace PlayerTab {
     void
     history_add(const std::string& title)
     {
-        if (!state.history.empty() && state.history.back().title == title)
+        if (state.history.back().title == title)
             return;
 
         state.history.emplace_back(system_clock::now(), title);

@@ -1,13 +1,13 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include "stream_metadata.hpp"
-
 #include <ostream>
+
+#include "stream_metadata.hpp"
 
 
 void
@@ -15,18 +15,31 @@ stream_metadata::merge(const stream_metadata& other)
 {
     if (other.title)
         title = other.title;
+
     if (other.artist)
         artist = other.artist;
+
     if (other.album)
         album = other.album;
+
     if (other.genre)
         genre = other.genre;
+
+    if (other.date)
+        date = other.date;
+
+    if (other.cover_art)
+        cover_art = other.cover_art;
+
     if (other.station_name)
         station_name = other.station_name;
+
     if (other.station_description)
         station_description = other.station_description;
+
     if (other.station_url)
         station_url = other.station_url;
+
     for (const auto& [k, v] : other.extra)
         if (!v.empty())
             extra[k] = v;
@@ -39,18 +52,31 @@ operator <<(std::ostream& out,
 {
     if (m.title)
         out << "Title: " << *m.title << '\n';
-    if (!m.artist)
+
+    if (m.artist)
         out << "Artist: " << *m.artist << '\n';
-    if (!m.album)
+
+    if (m.album)
         out << "Album: " << *m.album << '\n';
-    if (!m.genre)
+
+    if (m.genre)
         out << "Genre: " << *m.genre << '\n';
-    if (!m.station_name)
+
+    if (m.date)
+        out << "Date: " << *m.date << '\n';
+
+    if (m.cover_art)
+        out << "Cover Art: " << *m.cover_art << '\n';
+
+    if (m.station_name)
         out << "Station Name: " << *m.station_name << '\n';
+
     if (m.station_genre)
         out << "Station Genre: " << *m.station_genre << '\n';
+
     if (m.station_description)
         out << "Station Description: " << *m.station_description << '\n';
+
     if (m.station_url)
         out << "Station URL: " << *m.station_url << '\n';
 

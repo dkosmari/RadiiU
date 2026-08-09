@@ -5,7 +5,12 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <sstream>
 #include <stdexcept>
+#include <string_view>
+#include <utility>
+
+#include <curlxx/url.hpp>
 
 #include "icy_stream.hpp"
 
@@ -15,10 +20,53 @@
 #include "tracer.hpp"
 
 
+using namespace std::literals;
+
+
 namespace icy {
 
+    namespace {
+
+#if 0
+        bool
+        is_image_url(const std::string& url)
+        {
+            try {
+                curl::url parser{url};
+                auto path = parser.get_path();
+                auto ext_pos = path.find_last_of('.');
+                if (ext_pos == std::string::npos)
+                    return false;
+                auto ext = std::string_view(path.begin() + ext_pos, path.end());
+                using string_utils::equal_case;
+                if (equal_case(ext, ".png"sv) ||
+                    equal_case(ext, ".jpg"sv) ||
+                    equal_case(ext, ".jpeg"sv) ||
+                    equal_case(ext, ".webp"sv) ||
+                    equal_case(ext, ".gif"sv))
+                    return true;
+                return false;
+            }
+            catch (...) {
+                return false;
+            }
+        }
+#endif
+
+        std::optional<std::string>
+        if_not_empty(std::string input)
+        {
+            if (input.empty())
+                return {};
+            return {std::move(input)};
+        }
+
+    } // namespace
+
+
     stream::stream(http_client& hc) :
-        http(hc)
+        http(hc),
+        base_url{http.get_effective_url()}
     {
         TRACE_FUNC;
 
@@ -109,7 +157,13 @@ namespace icy {
                 if (meta_left == 0) {
                     // finished reading this chunk of metadata
                     data_left = interval;
-                    process_metadata();
+                    try {
+                        process_metadata();
+                    }
+                    catch (std::exception& e) {
+                        LOG_ERROR("Metadata error: {}", e.what());
+                        throw;
+                    }
                 }
             }
 
@@ -127,21 +181,73 @@ namespace icy {
         // Note: icy metadata is padded with null bytes.
         std::string meta_str = trimmed(meta_stream.read_str(), '\0');
 
-        auto meta = icy::parse(meta_str);
+        auto parsed_meta = icy::parse(meta_str);
 
-        for (const auto& [k, v] : meta) {
-            LOG_DEBUG("icy meta key: {}", k);
-            // TODO: check if there are more special keys
-            // TODO: handle StreamArtwork
-            if (k == "StreamTitle") {
-                current_meta.title = trimmed(v);
-            } else if (k == "StreamUrl") {
-                // TODO: handle relative URLs.
-                current_meta.cover_art = trimmed(v);
+        auto& meta = current_meta;
+
+        // TODO: should probably do case-insensitive key comparisons
+
+        for (const auto& [key, val_] : parsed_meta) {
+            auto val = trimmed(val_);
+            // LOG_DEBUG("icy meta key: {} = {:?}", key, val);
+            if (key == "StreamTitle"s) {
+                meta.title = if_not_empty(std::move(val));
+            } else if (key == "StreamUrl"s) {
+                auto url = resolve_url(val);
+                if (!parsed_meta.contains("StreamArtwork"s))
+                    meta.cover_art = if_not_empty(std::move(url));
+                else
+                    meta.station_url = if_not_empty(std::move(url));
+            } else if (key == "StreamArtwork"s) {
+                meta.cover_art = if_not_empty(resolve_url(val));
+            } else if (key == "StreamArtist"s) {
+                meta.artist = if_not_empty(std::move(val));
+            } else if (key == "StreamAlbum"s) {
+                meta.album = if_not_empty(std::move(val));
+            } else if (key == "StreamGenre"s) {
+                meta.genre = if_not_empty(std::move(val));
+            } else if (key == "StreamYear"s) {
+                meta.date = if_not_empty(std::move(val));
+            } else if (key == "StreamDate"s) {
+                meta.date = if_not_empty(std::move(val));
             } else
-                current_meta.extra[k] = trimmed(v);
+                /*
+                  Not handled:
+                  StreamComposer
+                  StreamPublisher
+                  StreamLabel
+                  StreamCover
+                  StreamCoverArt
+                  CoverArt
+                  CoverArtUrl
+                  Image
+                  ImageUrl
+                  AlbumArt
+                */
+                current_meta.extra[key] = std::move(val);
         }
 
+    }
+
+
+    std::string
+    stream::resolve_url(const std::string& url)
+        noexcept
+    {
+        try {
+            if (url.empty())
+                return {};
+            curl::url resolver{base_url};
+            resolver.set_url(url);
+            std::string result = resolver.get_url();
+            if (url != result)
+                LOG_DEBUG("Resolved URL: {} -> {}", url, result);
+            return result;
+        }
+        catch (std::exception& e) {
+            LOG_DEBUG("Failed to resolve {:?}: {}", url, e.what());
+            return {};
+        }
     }
 
 } // namespace icy

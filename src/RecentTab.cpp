@@ -103,13 +103,13 @@ namespace RecentTab {
                     ImGuiChildFlags_NavFlattened
                 }) {
 
-                UI::show_play_button(station);
+                UI::PlayButton(station);
 
-                UI::show_favorite_button(*station);
+                UI::FavoriteButton(*station);
 
                 ImGui::SameLine();
 
-                if (StationDetailsPopup::show_button(station->stationuuid))
+                if (StationDetailsPopup::Button(station->stationuuid))
                     StationDetailsPopup::open(station->stationuuid);
 
                 if (ImGui::Button(ICON_FA_TRASH_O)) // 🗑
@@ -120,27 +120,27 @@ namespace RecentTab {
 
             ImGui::SameLine();
 
-            if (Child details_child{
+            if (Child details{
                     "details",
                     {0, 0},
                     ImGuiChildFlags_AutoResizeY |
                     ImGuiChildFlags_NavFlattened
                 }) {
 
-                UI::show_favicon(*station);
+                UI::FavIcon(*station);
 
                 ImGui::SameLine();
 
                 UI::show_station_basic_info(*station);
 
-                if (Child extra_info_child{
+                if (Child extra_info{
                         "extra_info",
                         {0, 0},
                         ImGuiChildFlags_AutoResizeY |
                         ImGuiChildFlags_NavFlattened
                     }) {
 
-                    UI::show_tags(station->tags);
+                    UI::TagsList(station->tags);
 
                 }
 

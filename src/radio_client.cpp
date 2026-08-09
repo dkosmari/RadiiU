@@ -7,6 +7,8 @@
 
 #include <iostream>
 
+#include <curlxx/url.hpp>
+
 #include "radio_client.hpp"
 
 #include "cfg.hpp"
@@ -47,13 +49,13 @@ namespace {
 } // namespace
 
 
-radio_client::radio_client(const std::string& url,
-                           const std::string& url_resolved,
-                           const std::string& user_agent) :
-    url{url},
-    url_resolved{url_resolved},
-    user_agent{user_agent},
-    http{user_agent},
+radio_client::radio_client(const std::string& url_,
+                           const std::string& url_resolved_,
+                           const std::string& user_agent_) :
+    url{url_},
+    url_resolved{url_resolved_},
+    user_agent{user_agent_},
+    http{user_agent_},
     data_stream{&http.data_stream}
 {
     TRACE_FUNC;
@@ -65,10 +67,13 @@ radio_client::radio_client(const std::string& url,
     http.on_response_finished = [this] { process_http_response_finished(); };
     http.on_recv = [this] { process_http_recv(); };
 
-    if (!url_resolved.empty())
-        set_next_url(url_resolved);
-    else
-        set_next_url(url);
+    if (url_resolved.empty())
+        url_resolved = url;
+
+    if (!url_resolved.empty()) {
+        http.set_url(url_resolved);
+        current_state = state::started;
+    }
 }
 
 
@@ -124,13 +129,21 @@ radio_client::get_decoder_info()
 void
 radio_client::set_next_url(const std::string& next_url)
 {
+    TRACE_FUNC;
+
+    if (next_url.empty()) {
+        current_state = state::stopped;
+        return;
+    }
+
     icy_stream.reset();
 
-    http.set_url(next_url);
-    if (next_url.empty())
-        current_state = state::stopped;
-    else
-        current_state = state::started;
+    curl::url url_resolver{http.get_effective_url()};
+    url_resolver.set_url(next_url);
+    url_resolved = url_resolver.get_url();
+    LOG_DEBUG("Resolved URL: {:?}", url_resolved);
+    http.set_url(url_resolved);
+    current_state = state::started;
 }
 
 
@@ -198,7 +211,7 @@ radio_client::process_playlist()
 {
     // TRACE_FUNC;
 
-    url_resolved.clear();
+    std::string next_url;
 
     std::string data = data_stream->read_str();
 
@@ -206,7 +219,7 @@ radio_client::process_playlist()
         case playlist_type::m3u: {
             try {
                 auto pl = m3u::parse(data);
-                url_resolved = pl.at(0).url;
+                next_url = pl.at(0).url;
             }
             catch (std::exception& e) {
                 LOG_ERROR("{}\n<m3u>\n{}\n</m3u>", e.what(), data);
@@ -217,7 +230,7 @@ radio_client::process_playlist()
         case playlist_type::pls: {
             try {
                 auto pl = pls::parse(data);
-                url_resolved = pl.at(0).url;
+                next_url = pl.at(0).url;
             }
             catch (std::exception& e) {
                 LOG_ERROR("{}\n<pls>\n{}\n</pls>", e.what(), data);
@@ -227,10 +240,11 @@ radio_client::process_playlist()
 
         default:
             LOG_ERROR("BUG: should not invoke process_playlist() when no playlist exists");
+            return;
     } // switch (current_playlist)
 
-    LOG_INFO("url_resolved = {:?}", url_resolved);
-    set_next_url(url_resolved);
+    LOG_INFO("URL from playlist = {:?}", next_url);
+    set_next_url(next_url);
 }
 
 

@@ -37,47 +37,79 @@ using namespace std::literals;
 
 namespace UI {
 
+    namespace {
+
+        std::pair<double, double>
+        get_scales_for(const sdl::vec2& input,
+                       const sdl::vec2& limits)
+        {
+            double x_scale = double(limits.x) / input.x;
+            double y_scale = double(limits.y) / input.y;
+            return { x_scale, y_scale };
+        }
+
+    } // namespace
+
+
+    const ImVec2 play_button_size = {114, 114};
+
+
     const ImVec4&
     get_label_color()
         noexcept
     {
-        const ImVec4* colors = ImGui::GetStyle().Colors;
-        return colors[ImGuiCol_SeparatorActive];
+        return ImGui::GetStyleColorVec4(ImGuiCol_SeparatorActive);
+    }
+
+
+    const ImVec2
+    get_small_button_size()
+    {
+        const auto& style = ImGui::GetStyle();
+        float width = (play_button_size.x - style.ItemSpacing.x) / 2;
+        float height = ImGui::GetFrameHeight();
+        return { width, height };
     }
 
 
     void
-    show_favicon(const Station& station)
+    FavIcon(const Station& station)
     {
         using namespace ImGui::RAII;
         if (station.favicon.empty())
             return;
 
-        const sdl::vec2 max_size = {400, 128};
+        using sdl::vec2;
+
+        const vec2 max_size = {400, 128};
         auto icon = ImageLoader::get(station.favicon, max_size);
-        show_image(*icon);
+        vec2 icon_size = icon->get_size();
+        auto [scale_x, scale_y] = get_scales_for(icon_size, max_size);
+        auto scale = std::fmin(scale_x, scale_y);
+        vec2 display_size = vec2{ scale * sdl::vec2f{icon_size} };
+        Image(*icon, display_size);
         ImGui::SetItemTooltip(station.favicon);
     }
 
 
     void
-    show_favorite_button(const Station& station)
+    FavoriteButton(const Station& station)
     {
         if (FavoritesTab::contains(station)) {
-            if (ImGui::Button(ICON_FA_HEART)) // ♥
+            if (ImGui::Button(ICON_FA_HEART, get_small_button_size())) // ♥
                 FavoritesTab::remove(station);
         } else {
-            if (ImGui::Button(ICON_FA_HEART_O)) // ♡
+            if (ImGui::Button(ICON_FA_HEART_O, get_small_button_size())) // ♡
                 FavoritesTab::add(station);
         }
     }
 
 
     void
-    show_image(const sdl::texture& texture,
-               const sdl::vec2& size,
-               const sdl::vec2f& uv0,
-               const sdl::vec2f& uv1)
+    Image(const sdl::texture& texture,
+          const sdl::vec2& size,
+          const sdl::vec2f& uv0,
+          const sdl::vec2f& uv1)
     {
         ImGui::Image(reinterpret_cast<ImTextureID>(texture.data()),
                      ImGui::ToVec2(size),
@@ -87,16 +119,16 @@ namespace UI {
 
 
     void
-    show_image(const sdl::texture& texture,
-               const sdl::vec2f& uv0,
-               const sdl::vec2f& uv1)
+    Image(const sdl::texture& texture,
+          const sdl::vec2f& uv0,
+          const sdl::vec2f& uv1)
     {
-        show_image(texture, texture.get_size(), uv0, uv1);
+        Image(texture, texture.get_size(), uv0, uv1);
     }
 
 
     bool
-    show_image_button(const char* str_id,
+    ImageButton(const char* str_id,
                 const sdl::texture& texture,
                 const sdl::vec2& size,
                 const sdl::vec2f& uv0,
@@ -115,14 +147,14 @@ namespace UI {
 
 
     bool
-    show_image_button(const char* str_id,
+    ImageButton(const char* str_id,
                 const sdl::texture& texture,
                 const sdl::vec2f& uv0,
                 const sdl::vec2f& uv1,
                 sdl::color bg_color,
                 sdl::color tint_color)
     {
-        return show_image_button(str_id,
+        return ImageButton(str_id,
                            texture,
                            texture.get_size(),
                            uv0,
@@ -133,23 +165,23 @@ namespace UI {
 
 
     void
-    show_image_centered(const sdl::texture& texture,
-                        const sdl::vec2& size,
-                        const sdl::vec2f& uv0,
-                        const sdl::vec2f& uv1)
+    ImageCentered(const sdl::texture& texture,
+                  const sdl::vec2& size,
+                  const sdl::vec2f& uv0,
+                  const sdl::vec2f& uv1)
     {
         auto window_width = ImGui::GetContentRegionAvail().x;
         ImGui::SetCursorPosX(0.5f * (window_width - size.x));
-        show_image(texture, size, uv0, uv1);
+        Image(texture, size, uv0, uv1);
     }
 
 
     void
-    show_image_centered(const sdl::texture& texture,
-                        const sdl::vec2f& uv0,
-                        const sdl::vec2f& uv1)
+    ImageCentered(const sdl::texture& texture,
+                  const sdl::vec2f& uv0,
+                  const sdl::vec2f& uv1)
     {
-        show_image_centered(texture, texture.get_size(), uv0, uv1);
+        ImageCentered(texture, texture.get_size(), uv0, uv1);
     }
 
 
@@ -227,19 +259,18 @@ namespace UI {
 
 
     void
-    show_play_button(StationPtr& station)
+    PlayButton(StationPtr& station)
     {
         using namespace ImGui::RAII;
 
-        const ImVec2 button_size = {96, 96};
-        Font text{nullptr, 64};
+        Font font{nullptr, 64};
         if (PlayerTab::is_playing(*station)) {
-            // const auto& style = ImGui::GetStyle();
-            StyleColor text_color{ImGuiCol_Text, get_label_color()};
-            if (ImGui::Button(ICON_FA_STOP, button_size))
+            auto playing_color = ImGui::GetStyleColorVec4(ImGuiCol_PlotLinesHovered);
+            StyleColor text_color{ImGuiCol_Text, playing_color};
+            if (ImGui::Button(ICON_FA_STOP, play_button_size))
                 PlayerTab::stop();
         } else {
-            if (ImGui::Button(ICON_FA_PLAY, button_size)) {
+            if (ImGui::Button(ICON_FA_PLAY, play_button_size)) {
                 if (cfg::state.switch_to_player)
                     App::set_tab(TabID::player);
                 PlayerTab::play(station);
@@ -255,7 +286,7 @@ namespace UI {
     {
         using namespace ImGui::RAII;
 
-        if (Child basic_info_child{
+        if (Child child{
                 "basic_info",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeY |
@@ -267,45 +298,46 @@ namespace UI {
             if (!station.homepage.empty())
                 TextLinkOpenURL(station.homepage);
 
-            bool has_country = false;
+            Font font{nullptr, 28};
+
+            bool has_content = false;
             if (!station.countrycode.empty()) {
-                has_country = true;
+                has_content = true;
                 std::string tooltip = BrowserTab::get_country_name(station.countrycode);
-                show_boxed(ICON_FA_FLAG_O " " + station.countrycode, tooltip);
+                TextBoxed(ICON_FA_FLAG_O " " + station.countrycode, tooltip);
             }
 
-            if (!station.language.empty()) {
-                if (has_country)
+            for (auto& lang : station.language) {
+                if (has_content)
                     ImGui::SameLine();
-                for (auto& lang : station.language) {
-                    show_boxed(ICON_FA_LANGUAGE " " + lang,
-                               "Language spoken in this broadcast.");
-                    ImGui::SameLine();
-                }
-                ImGui::NewLine();
+                has_content = true;
+                TextBoxed(ICON_FA_LANGUAGE " " + lang,
+                          "Language spoken in this broadcast.");
             }
 
-        } // basic_info_child
+        }
     }
 
 
     void
-    show_tags(const std::vector<std::string>& tags)
+    TagsList(const std::vector<std::string>& tags)
     {
         if (tags.empty())
             return;
 
+        bool has_content = false;
         for (const auto& tag : tags) {
-            show_boxed(ICON_FA_TAG " " + tag, {});
-            ImGui::SameLine();
+            if (has_content)
+                ImGui::SameLine();
+            has_content = true;
+            TextBoxed(ICON_FA_TAG " " + tag);
         }
-        ImGui::NewLine();
     }
 
 
     void
-    show_boxed(const std::string& text,
-               const std::string& tooltip)
+    TextBoxed(const std::string& text,
+              const std::string& tooltip)
     {
         using namespace ImGui::RAII;
 
@@ -334,24 +366,15 @@ namespace UI {
     }
 
 
-    void
-    show_boxed(const std::string& text)
-    {
-        show_boxed(text, {});
-    }
-
-
     // DEBUG
     void
-    show_last_bounding_box()
+    BoundingBox()
     {
-        {
-            auto min = ImGui::GetItemRectMin();
-            auto max = ImGui::GetItemRectMax();
-            ImU32 col = ImGui::GetColorU32(ImVec4{1.0f, 0.0f, 0.0f, 0.5f});
-            auto draw_list = ImGui::GetWindowDrawList();
-            draw_list->AddRect(min, max, col);
-        }
+        auto min = ImGui::GetItemRectMin();
+        auto max = ImGui::GetItemRectMax();
+        ImU32 col = ImGui::GetColorU32(ImVec4{1.0f, 0.0f, 0.0f, 0.5f});
+        auto draw_list = ImGui::GetWindowDrawList();
+        draw_list->AddRect(min, max, col);
     }
 
 

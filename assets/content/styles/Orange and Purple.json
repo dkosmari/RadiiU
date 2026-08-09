@@ -43,7 +43,7 @@
         "TabDimmedSelected"         : [0.94, 0.38, 0.00, 1.00],
         "TabDimmedSelectedOverline" : [0.94, 0.38, 0.00, 0.10],
         "PlotLines"                 : [0.61, 0.61, 0.61, 1.00],
-        "PlotLinesHovered"          : [1.00, 0.43, 0.35, 1.00],
+        "PlotLinesHovered"          : [0.23, 1.00, 0.24, 1.00],
         "PlotHistogram"             : [0.90, 0.70, 0.00, 1.00],
         "PlotHistogramHovered"      : [1.00, 0.60, 0.00, 1.00],
         "TableHeaderBg"             : [0.19, 0.19, 0.20, 1.00],

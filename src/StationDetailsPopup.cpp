@@ -63,13 +63,13 @@ namespace StationDetailsPopup {
 
 
     bool
-    show_button(const std::string& uuid)
+    Button(const std::string& uuid)
     {
         using namespace ImGui::RAII;
 
         bool result = false;
         Disabled disable_no_uuid{uuid.empty()};
-        if (ImGui::Button(ICON_FA_INFO_CIRCLE)) // 🛈
+        if (ImGui::Button(ICON_FA_INFO_CIRCLE, UI::get_small_button_size())) // 🛈
             result = true;
         if (!uuid.empty())
             ImGui::SetItemTooltip("Request station details from RadioBrowser.");

@@ -28,8 +28,6 @@
 #include <imgui_raii.h>
 #include <imgui_stdlib.h>
 
-#include <curlxx/easy.hpp>
-
 #include <glaze/core/meta.hpp>
 
 #include "BrowserTab.hpp"
@@ -794,13 +792,13 @@ namespace BrowserTab {
                     ImGuiChildFlags_NavFlattened
                 }) {
 
-                UI::show_play_button(station);
+                UI::PlayButton(station);
 
-                UI::show_favorite_button(*station);
+                UI::FavoriteButton(*station);
 
                 ImGui::SameLine();
 
-                if (StationDetailsPopup::show_button(station->stationuuid))
+                if (StationDetailsPopup::Button(station->stationuuid))
                     StationDetailsPopup::open(station->stationuuid);
 
                 auto vote_record = votes_cast.find(station->stationuuid);
@@ -832,7 +830,7 @@ namespace BrowserTab {
                     ImGuiChildFlags_NavFlattened
                 }) {
 
-                UI::show_favicon(*station);
+                UI::FavIcon(*station);
 
                 ImGui::SameLine();
 
@@ -845,24 +843,24 @@ namespace BrowserTab {
                         ImGuiChildFlags_NavFlattened
                     }) {
 
-                    UI::show_boxed(std::format(ICON_FA_BAR_CHART " {} ({:+d})",
-                                               station->click_count,
-                                               station->click_trend),
-                                   "Daily total clicks and trend.");
+                    UI::TextBoxed(std::format(ICON_FA_BAR_CHART " {} ({:+d})",
+                                              station->click_count,
+                                              station->click_trend),
+                                  "Daily total clicks and trend.");
 
                     if (station->bitrate) {
                         ImGui::SameLine();
-                        UI::show_boxed(ICON_FA_HEADPHONES " "
-                                       + std::to_string(station->bitrate) + " kbps",
-                                       "The advertised stream quality.");
+                        UI::TextBoxed(std::format(ICON_FA_HEADPHONES " {} kbps",
+                                                  station->bitrate),
+                                      "The advertised stream quality.");
                     }
 
                     ImGui::SameLine();
 
-                    UI::show_boxed(ICON_FA_FLASK " " + station->codec,
-                                   "The codec used in this broadcast.");
+                    UI::TextBoxed(ICON_FA_FLASK " " + station->codec,
+                                  "The codec used in this broadcast.");
 
-                    UI::show_tags(station->tags);
+                    UI::TagsList(station->tags);
 
                 } // extra_info_child
 

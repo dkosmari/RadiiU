@@ -14,8 +14,6 @@
 #include <stdexcept>
 #include <string>
 
-#include <curlxx/easy.hpp>
-
 #include "mime_type.hpp"
 
 

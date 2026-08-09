@@ -12,7 +12,6 @@
 
 #include "LogManager.hpp"
 #include "LogManagerCurl.hpp"
-#include "string_utils.hpp"
 #include "tracer.hpp"
 
 
@@ -22,6 +21,8 @@ using namespace std::literals;
 http_client::http_client(const std::string& user_agent) :
     user_agent{user_agent}
 {
+    TRACE_FUNC;
+
     multi.set_max_total_connections(2);
 }
 
@@ -29,6 +30,8 @@ http_client::http_client(const std::string& user_agent) :
 http_client::~http_client()
     noexcept
 {
+    TRACE_FUNC;
+
     auto e = multi.try_remove(easy);
     if (!e)
         LOG_ERROR("BUG: removing easy handle failed: {}", e.error().what());
@@ -58,13 +61,6 @@ void
 http_client::add_header(const std::string& hdr)
 {
     headers.push_back(hdr);
-}
-
-
-void
-http_client::add_accept(const std::string& mime)
-{
-    accepts.push_back(mime);
 }
 
 
@@ -104,14 +100,20 @@ http_client::set_url(const std::string& url)
 }
 
 
+std::string
+http_client::get_effective_url()
+    const
+{
+    return easy.get_effective_url();
+}
+
+
 void
 http_client::process()
 {
     if (!request_prepared) {
         for (auto& hdr : headers)
             easy.append_http_header(hdr);
-        if (!accepts.empty())
-            easy.append_http_header("Accept: "s + string_utils::join(accepts, ","));
         request_prepared = true;
     }
 

@@ -388,12 +388,18 @@ namespace ImageLoader {
             if (size_limit.x > 0 && size_limit.y > 0) {
                 // Select the smaller of the two scales.
                 if (x_scale < y_scale) {
+                    // Only shrink.
+                    if (x_scale >= 1)
+                        return;
                     // Scale based on X limit.
                     int new_height = size.y * x_scale;
                     if (new_height < 1)
                         new_height = 1;
                     scaled_size = {size_limit.x, new_height};
                 } else {
+                    // Only shrink.
+                    if (y_scale >= 1)
+                        return;
                     // Scale based on Y limit.
                     int new_width = size.x * y_scale;
                     if (new_width < 1)
@@ -403,12 +409,18 @@ namespace ImageLoader {
             } else {
                 // Only one limit exists.
                 if (size_limit.x > 0) {
+                    // Only shrink.
+                    if (x_scale >= 1)
+                        return;
                     // Scale based on X limit.
                     int new_height = size.y * x_scale;
                     if (new_height < 1)
                         new_height = 1;
                     scaled_size = {size_limit.x, new_height};
                 } else {
+                    // Only shrink.
+                    if (y_scale >= 1)
+                        return;
                     // Scale based on Y limit.
                     int new_width = size.x * y_scale;
                     if (new_width < 1)

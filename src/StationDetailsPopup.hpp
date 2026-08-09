@@ -15,7 +15,7 @@ namespace StationDetailsPopup {
 
     [[nodiscard]]
     bool
-    show_button(const std::string& uuid);
+    Button(const std::string& uuid);
 
     void
     open(const std::string& uuiid);

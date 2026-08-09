@@ -25,33 +25,40 @@
 
 namespace UI {
 
+    extern const ImVec2 play_button_size;
+
+
     const ImVec4&
     get_label_color()
         noexcept;
 
 
-    void
-    show_favicon(const Station& station);
+    const ImVec2
+    get_small_button_size();
 
 
     void
-    show_favorite_button(const Station& station);
+    FavIcon(const Station& station);
 
 
     void
-    show_image(const sdl::texture& texture,
-               const sdl::vec2& size,
-               const sdl::vec2f& uv0 = {0, 0},
-               const sdl::vec2f& uv1 = {1, 1});
+    FavoriteButton(const Station& station);
+
 
     void
-    show_image(const sdl::texture& texture,
-               const sdl::vec2f& uv0 = {0, 0},
-               const sdl::vec2f& uv1 = {1, 1});
+    Image(const sdl::texture& texture,
+          const sdl::vec2& size,
+          const sdl::vec2f& uv0 = {0, 0},
+          const sdl::vec2f& uv1 = {1, 1});
+
+    void
+    Image(const sdl::texture& texture,
+          const sdl::vec2f& uv0 = {0, 0},
+          const sdl::vec2f& uv1 = {1, 1});
 
 
     bool
-    show_image_button(const char* str_id,
+    ImageButton(const char* str_id,
                       const sdl::texture& texture,
                       const sdl::vec2& size,
                       const sdl::vec2f& uv0 = {0, 0},
@@ -60,7 +67,7 @@ namespace UI {
                       sdl::color tint_color = sdl::color::white);
 
     bool
-    show_image_button(const char* str_id,
+    ImageButton(const char* str_id,
                       const sdl::texture& texture,
                       const sdl::vec2f& uv0 = {0, 0},
                       const sdl::vec2f& uv1 = {1, 1},
@@ -68,15 +75,15 @@ namespace UI {
                       sdl::color tint_color = sdl::color::white);
 
     void
-    show_image_centered(const sdl::texture& texture,
-                        const sdl::vec2& size,
-                        const sdl::vec2& uv0 = {0, 0},
-                        const sdl::vec2& uv1 = {1, 1});
+    ImageCentered(const sdl::texture& texture,
+                  const sdl::vec2& size,
+                  const sdl::vec2& uv0 = {0, 0},
+                  const sdl::vec2& uv1 = {1, 1});
 
     void
-    show_image_centered(const sdl::texture& texture,
-                        const sdl::vec2f& uv0 = {0, 0},
-                        const sdl::vec2f& uv1 = {1, 1});
+    ImageCentered(const sdl::texture& texture,
+                  const sdl::vec2f& uv0 = {0, 0},
+                  const sdl::vec2f& uv1 = {1, 1});
 
 
     void
@@ -101,7 +108,7 @@ namespace UI {
 
 
     void
-    show_play_button(StationPtr& station);
+    PlayButton(StationPtr& station);
 
 
     void
@@ -109,22 +116,17 @@ namespace UI {
 
 
     void
-    show_tags(const std::vector<std::string>& tags);
+    TagsList(const std::vector<std::string>& tags);
 
 
     void
-    show_boxed(const std::string& text,
-               const std::string& tooltip);
-
-    void
-    show_boxed(const std::string& text);
+    TextBoxed(const std::string& text,
+              const std::string& tooltip = "");
 
 
     void
-    show_last_bounding_box();
+    BoundingBox();
 
-
-    // ImGui-like functions
 
 
     // Align to the right, with label color

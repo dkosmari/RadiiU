@@ -560,12 +560,15 @@ namespace App {
         {
             /*
              * Main window:
-             * - Occupy the whole viewort.
+             * - Occupy the whole viewport.
              * - No decorations, no move.
              */
             auto viewport = ImGui::GetMainViewport();
             ImGui::SetNextWindowPos(viewport->WorkPos, ImGuiCond_Always);
             ImGui::SetNextWindowSize(viewport->WorkSize, ImGuiCond_Always);
+            std::optional<StyleVar> no_rounding{std::in_place,
+                                                ImGuiStyleVar_WindowRounding,
+                                                0};
             if (Window main_window{PACKAGE_STRING,
                                    nullptr,
                                    ImGuiWindowFlags_NoDecoration |
@@ -574,9 +577,13 @@ namespace App {
                 const auto content_begin = ImGui::GetCursorStartPos();
                 const auto content_end = content_begin + ImGui::GetContentRegionAvail();
 
+                no_rounding.reset();
+
                 // App name, centered
+                float title_height = 0;
                 {
-                    Font title_font{nullptr, 48};
+                    Font title_font{nullptr, 50};
+                    title_height = ImGui::GetTextLineHeight();
                     ImGui::TextAligned(0.5f, -1, PACKAGE_STRING);
                     // UI::show_last_bounding_box();
                 }
@@ -654,9 +661,10 @@ namespace App {
 
                 // Put an exit button on the top right
                 {
-                    Font font{nullptr, 28};
+                    Font exit_font{nullptr, 32};
                     const std::string label = ICON_FA_SIGN_OUT;
                     ImVec2 size = ImGui::CalcTextSize(label) + 2 * style.FramePadding;
+                    size.y = title_height;
                     const ImVec2 pos = { content_end.x - size.x, content_begin.y };
                     ImGui::SetCursorPos(pos);
                     if (ImGui::Button(label, size))

@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -9,8 +9,8 @@
 #define STREAM_METADATA_HPP
 
 #include <iosfwd>
-#include <string>
 #include <optional>
+#include <string>
 #include <unordered_map>
 
 
@@ -20,6 +20,7 @@ struct stream_metadata {
     std::optional<std::string> artist;
     std::optional<std::string> album;
     std::optional<std::string> genre;
+    std::optional<std::string> date;
     std::optional<std::string> cover_art;
     std::optional<std::string> station_name;
     std::optional<std::string> station_genre;

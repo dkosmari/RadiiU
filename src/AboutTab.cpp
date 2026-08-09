@@ -220,7 +220,7 @@ namespace AboutTab {
         if (Child about{"about"}) {
 
             auto radiiu_icon_tex = ImageLoader::get("content:/ui/radiiu-icon.png");
-            UI::show_image(*radiiu_icon_tex, sdl::vec2{128, 128});
+            UI::Image(*radiiu_icon_tex, sdl::vec2{128, 128});
             ImGui::SameLine();
 
             if (Table app_table{"app-details", 2}) {
