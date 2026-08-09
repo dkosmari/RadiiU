@@ -49,6 +49,8 @@ radiiu_elf_SOURCES = \
 	src/byte_stream.hpp \
 	src/cfg.cpp \
 	src/cfg.hpp \
+	src/ConfirmDeleteStationPopup.cpp \
+	src/ConfirmDeleteStationPopup.hpp \
 	src/ConfirmExitPopup.cpp \
 	src/ConfirmExitPopup.hpp \
 	src/decoder.cpp \
@@ -61,6 +63,8 @@ radiiu_elf_SOURCES = \
 	src/decoder_opus.hpp \
 	src/decoder_vorbis.cpp \
 	src/decoder_vorbis.hpp \
+	src/EditStationPopup.cpp \
+	src/EditStationPopup.hpp \
 	src/enumerator.hpp \
 	src/FavoritesTab.cpp \
 	src/FavoritesTab.hpp \

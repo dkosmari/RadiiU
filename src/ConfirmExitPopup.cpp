@@ -82,6 +82,7 @@ namespace ConfirmExitPopup {
         ImGui::Separator();
 
         ButtonHBox buttons;
+        buttons.expand = true;
         buttons.add(
             ICON_FA_TIMES " Cancel",
             ImGui::CloseCurrentPopup

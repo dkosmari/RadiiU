@@ -29,10 +29,12 @@ struct ButtonHBox {
 
     float halign = 0.5f;
     float valign = -1;
+    bool expand = false;
     std::vector<Button> buttons = {};
 
-    ImVec2 button_size = {}; // calculated
-    float total_width = 0; // calculated
+    ImVec2 button_size   = {};  // recalculated after each add()
+    float  buttons_width = 0;   // recalculated after each add()
+    float  total_width   = 0;   // recalculated after each add()
 
     void
     add(Button&& b);

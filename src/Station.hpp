@@ -33,11 +33,11 @@ struct Station {
     std::vector<std::string> tags; // special serialization needed
 
     // Volatile fields, never stored.
-    std::uint64_t votes = 0;
-    std::uint64_t click_count = 0;
-    int click_trend = 0;
-    unsigned bitrate = 0;
-    std::string codec;
+    mutable std::uint64_t votes = 0;
+    mutable std::uint64_t click_count = 0;
+    mutable int click_trend = 0;
+    mutable unsigned bitrate = 0;
+    mutable std::string codec;
 
 
     static

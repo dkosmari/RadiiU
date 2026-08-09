@@ -6,6 +6,7 @@
  */
 
 #include <algorithm>
+#include <functional>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -21,6 +22,8 @@
 
 #include "App.hpp"
 #include "cfg.hpp"
+#include "ConfirmDeleteStationPopup.hpp"
+#include "EditStationPopup.hpp"
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
 #include "Serializer.hpp"
@@ -30,9 +33,6 @@
 #include "tracer.hpp"
 #include "UI.hpp"
 
-
-using string_utils::from_csv;
-using string_utils::to_csv;
 
 namespace FavoritesTab {
 
@@ -48,55 +48,12 @@ namespace FavoritesTab {
         };
 
 
-        // When editing we need a string, not a vector of strings.
-        struct EditFields {
-
-            std::string old_uuid;
-            std::string language;
-            std::string tags;
-
-
-            EditFields();
-
-            EditFields(const Station& station);
-
-        }; // struct EditFields
-
-        /*-----------------------*/
-        /* Function declarations */
-        /*-----------------------*/
-
-        const std::string&
-        get_id(const StationPtr& st);
-
-        void
-        process_popup_create();
-
-        void
-        process_popup_delete(const Station& station,
-                             std::size_t index);
-
-        void
-        process_popup_edit(Station& station);
-
-        void
-        show_row(const std::string& label,
-                 std::string& value);
-
-        void
-        show_station(StationPtr& station,
-                     std::size_t index);
-
-        void
-        show_station_fields(Station& st);
-
         /*-----------*/
         /* Constants */
         /*-----------*/
 
         const std::string popup_delete_title = "Delete station?";
-        const std::string popup_edit_title = "Edit station";
-        const std::string popup_create_title = "Create station";
+
 
         /*-----------*/
         /* Variables */
@@ -106,23 +63,33 @@ namespace FavoritesTab {
         std::unordered_multiset<std::string> uuids;
         std::optional<MoveOp> move_operation;
         std::optional<std::size_t> scroll_to_station;
-        std::optional<std::size_t> station_index_to_remove;
-        std::optional<EditFields> edit_fields;
-        std::optional<Station> created_station;
+
+
+        /*-----------------------*/
+        /* Function declarations */
+        /*-----------------------*/
+
+        const std::string&
+        get_id(const StationPtr& st);
+
+        void
+        handle_station_add(Station station);
+
+        void
+        handle_station_delete(std::size_t index);
+
+        void
+        handle_station_edit(StationPtr old_station,
+                            Station new_station);
+
+        void
+        show_station(StationPtr& station,
+                     std::size_t index);
+
 
         /*----------------------*/
         /* Function definitions */
         /*----------------------*/
-
-        EditFields::EditFields() = default;
-
-
-        EditFields::EditFields(const Station& station) :
-            old_uuid{station.stationuuid},
-            language{to_csv(station.language)},
-            tags{to_csv(station.tags)}
-        {}
-
 
         const std::string&
         get_id(const StationPtr& st)
@@ -132,215 +99,45 @@ namespace FavoritesTab {
 
 
         void
-        process_popup_create()
+        handle_station_add(Station station)
         {
-            using namespace ImGui::RAII;
-
-            ImGui::SetNextWindowSize({1100, 700}, ImGuiCond_Appearing);
-            ImGui::SetNextWindowSizeConstraints({ 400, 400 },
-                                                { FLT_MAX, FLT_MAX });
-            if (PopupModal popup_create{
-                    popup_create_title,
-                    nullptr,
-                    ImGuiWindowFlags_NoSavedSettings
-                }) {
-
-                if (!created_station)
-                    created_station.emplace();
-
-                if (!edit_fields)
-                    edit_fields.emplace();
-
-                // Note: use a helper child window to push the response buttons to the bottom.
-                if (Child content_child{
-                        "content",
-                        {0, -ImGui::GetFrameHeightWithSpacing()},
-                        ImGuiChildFlags_NavFlattened
-                    })
-                    show_station_fields(*created_station);
-
-                auto content_size = ImGui::GetContentRegionAvail();
-
-                // Cancel button
-                {
-                    if (ImGui::Button(ICON_FA_TIMES " Cancel")) {
-                        ImGui::CloseCurrentPopup();
-                        edit_fields.reset();
-                        created_station.reset();
-                    }
-                    ImGui::SetItemTooltip("Cancel creating a new station.");
-                    ImGui::SetItemDefaultFocus();
+            if (!station.stationuuid.empty()) {
+                if (uuids.contains(station.stationuuid)) {
+                    // TODO: show error popup
+                    LOG_ERROR("Duplicated UUID: {}", station.stationuuid);
+                    return;
                 }
-
-                ImGui::SameLine();
-
-                // Create button
-                {
-                    // Line it up to the right of the window
-                    auto& style = ImGui::GetStyle();
-                    const std::string label = ICON_FA_CHECK " Create";
-                    ImVec2 btn_size = ImGui::CalcTextSize(label, true) + style.FramePadding * 2;
-                    float new_x = content_size.x - btn_size.x;
-                    float cur_x = ImGui::GetCursorPosX();
-                    if (new_x > cur_x) // avoid overlapping with Cancel button
-                        ImGui::SetCursorPosX(new_x);
-                    if (ImGui::Button(label)) {
-                        ImGui::CloseCurrentPopup();
-                        if (edit_fields) {
-                            created_station->language = from_csv(edit_fields->language);
-                            created_station->tags = from_csv(edit_fields->tags);
-                            edit_fields.reset();
-                            add(*created_station);
-                            created_station.reset();
-                        }
-                    }
-                    ImGui::SetItemTooltip("Confirm creating a new station.");
-                }
-
+                uuids.insert(station.stationuuid);
             }
+            stations.push_back(std::make_shared<Station>(std::move(station)));
         }
 
 
         void
-        process_popup_delete(const Station& station,
-                             std::size_t index)
+        handle_station_delete(std::size_t index)
         {
-            using namespace ImGui::RAII;
-
-            ImGui::SetNextWindowSize({800, 300}, ImGuiCond_Appearing);
-            ImGui::SetNextWindowSizeConstraints({ 400, 250 },
-                                                { FLT_MAX, FLT_MAX });
-            if (PopupModal popup_delete{
-                    popup_delete_title,
-                    nullptr,
-                    ImGuiWindowFlags_NoSavedSettings
-                }) {
-
-                auto window_size = ImGui::GetContentRegionAvail();
-
-                // Note: we use a helper child window to push the response buttons to the bottom.
-                if (Child content_child{
-                        "content",
-                        {0, -ImGui::GetFrameHeightWithSpacing()
-                        }})
-                    ImGui::TextWrapped(station.name);
-
-                // Cancel button
-                {
-                    if (ImGui::Button(ICON_FA_TIMES " Cancel"))
-                        ImGui::CloseCurrentPopup();
-                    ImGui::SetItemTooltip("Cancel deleting this station.");
-                    ImGui::SetItemDefaultFocus();
-                }
-
-                ImGui::SameLine();
-
-                // Delete button
-                {
-                    // Line it up to the right of the window
-                    auto& style = ImGui::GetStyle();
-                    const std::string label = ICON_FA_TRASH_O " Delete";
-                    ImVec2 btn_size = ImGui::CalcTextSize(label, true) + style.FramePadding * 2;
-                    float new_x = window_size.x - btn_size.x;
-                    float cur_x = ImGui::GetCursorPosX();
-                    if (new_x > cur_x) // avoid overlapping with Cancel button
-                        ImGui::SetCursorPosX(new_x);
-                    if (ImGui::Button(label)) {
-                        ImGui::CloseCurrentPopup();
-                        station_index_to_remove = index;
-                    }
-                    ImGui::SetItemTooltip("Confirm deleting this station.");
-                }
-
-            } // popup_delete
+            LOG_DEBUG("Removing favorite station index: {}", index);
+            remove(index);
         }
 
 
         void
-        process_popup_edit(Station& station)
+        handle_station_edit(StationPtr station,
+                            Station new_station)
         {
-            using namespace ImGui::RAII;
-
-            // TODO: add button for updating from Browser, if uuid is present
-
-            ImGui::SetNextWindowSize({1100, 700}, ImGuiCond_Appearing);
-            ImGui::SetNextWindowSizeConstraints({ 400, 400 },
-                                                { FLT_MAX, FLT_MAX });
-            if (PopupModal popup_edit{
-                    popup_edit_title,
-                    nullptr,
-                    ImGuiWindowFlags_NoSavedSettings
-                }) {
-
-                if (!edit_fields)
-                    edit_fields.emplace(station);
-
-                // Note: use a helper child window to push the response buttons to the bottom.
-                if (Child content_child{
-                        "content",
-                        {0, -ImGui::GetFrameHeightWithSpacing()},
-                        ImGuiChildFlags_NavFlattened
-                    })
-                    show_station_fields(station);
-
-                auto content_size = ImGui::GetContentRegionAvail();
-
-                // Cancel button
-                {
-                    if (ImGui::Button(ICON_FA_TIMES " Cancel")) {
-                        ImGui::CloseCurrentPopup();
-                        edit_fields.reset();
-                    }
-                    ImGui::SetItemTooltip("Cancel editing this station.");
-                    ImGui::SetItemDefaultFocus();
+            if (station->stationuuid != new_station.stationuuid) {
+                // UUID changed
+                if (uuids.contains(new_station.stationuuid)) {
+                    // TODO: show error popup
+                    LOG_ERROR("Duplicated UUID: {}", new_station.stationuuid);
+                    return;
                 }
-
-                ImGui::SameLine();
-
-                // Apply button
-                {
-                    // Line it up to the right of the window
-                    auto& style = ImGui::GetStyle();
-                    const std::string label = ICON_FA_CHECK " Apply";
-                    ImVec2 btn_size = ImGui::CalcTextSize(label, true) + style.FramePadding * 2;
-                    float new_x = content_size.x - btn_size.x;
-                    float cur_x = ImGui::GetCursorPosX();
-                    if (new_x > cur_x) // avoid overlapping with Cancel button
-                        ImGui::SetCursorPosX(new_x);
-                    if (ImGui::Button(label)) {
-                        ImGui::CloseCurrentPopup();
-                        if (edit_fields) {
-                            // If user changed UUID, update uuids set.
-                            if (edit_fields->old_uuid != station.stationuuid) {
-                                auto it = uuids.find(edit_fields->old_uuid);
-                                if (it != uuids.end())
-                                    uuids.erase(it);
-                                if (!station.stationuuid.empty())
-                                    uuids.insert(station.stationuuid);
-                            }
-                            station.language = from_csv(edit_fields->language);
-                            station.tags = from_csv(edit_fields->tags);
-                            edit_fields.reset();
-                        }
-                    }
-                    ImGui::SetItemTooltip("Confirm editing this station.");
-                }
-
+                if (!station->stationuuid.empty())
+                    uuids.erase(station->stationuuid);
             }
-        }
-
-
-        void
-        show_row(const std::string& label,
-                 std::string& value)
-        {
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            UI::Label(label);
-            ImGui::TableNextColumn();
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-            ImGui::InputText("##" + label, value);
+            *station = std::move(new_station);
+            if (!station->stationuuid.empty())
+                uuids.insert(station->stationuuid);
         }
 
 
@@ -397,20 +194,20 @@ namespace FavoritesTab {
                     }
 
                     // ✎
-                    if (ImGui::Button(ICON_FA_PENCIL,
-                                      UI::get_small_button_size()))
-                        ImGui::OpenPopup(popup_edit_title);
+                    if (ImGui::Button(ICON_FA_PENCIL, UI::get_small_button_size()))
+                        EditStationPopup::open(*station,
+                                               std::bind_front(handle_station_edit, station));
                     ImGui::SetItemTooltip("Edit this station.");
-                    process_popup_edit(*station);
 
                     ImGui::SameLine();
 
                     // 🗑
-                    if (ImGui::Button(ICON_FA_TRASH_O,
-                                      UI::get_small_button_size()))
-                        ImGui::OpenPopup(popup_delete_title);
+                    if (ImGui::Button(ICON_FA_TRASH_O, UI::get_small_button_size()))
+                        ConfirmDeleteStationPopup::open(
+                            station,
+                            std::bind_front(handle_station_delete, index)
+                        );
                     ImGui::SetItemTooltip("Remove this station from favorites.");
-                    process_popup_delete(*station, index);
 
                 } // actions
 
@@ -444,31 +241,6 @@ namespace FavoritesTab {
 
             } // station
 
-        }
-
-
-        void
-        show_station_fields(Station& st)
-        {
-            using namespace ImGui::RAII;
-
-            if (!edit_fields)
-                return;
-
-            if (Table fields_table{"fields", 2}) {
-                ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
-                ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
-
-                show_row("name",         st.name);
-                show_row("url",          st.url);
-                show_row("url_resolved", st.url_resolved);
-                show_row("homepage",     st.homepage);
-                show_row("favicon",      st.favicon);
-                show_row("tags",         edit_fields->tags);
-                show_row("countrycode",  st.countrycode);
-                show_row("language",     edit_fields->language);
-                show_row("stationuuid",  st.stationuuid);
-            }
         }
 
     } // namespace
@@ -557,12 +329,6 @@ namespace FavoritesTab {
             scroll_to_station = dst;
             move_operation.reset();
         }
-
-        // Handle pending delete
-        if (station_index_to_remove) {
-            remove(*station_index_to_remove);
-            station_index_to_remove.reset();
-        }
     }
 
 
@@ -571,7 +337,7 @@ namespace FavoritesTab {
     {
         using namespace ImGui::RAII;
 
-        if (Child toolbar_child{
+        if (Child toolbar{
                 "toolbar",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeY |
@@ -580,19 +346,18 @@ namespace FavoritesTab {
 
             // ➕
             if (ImGui::Button(ICON_FA_PLUS " Add"))
-                ImGui::OpenPopup(popup_create_title);
+                EditStationPopup::open(handle_station_add);
             ImGui::SetItemTooltip("Add a new station to favorites.");
-            process_popup_create();
 
             ImGui::SameLine();
 
             ImGui::AlignTextToFramePadding();
             ImGui::FormatTextAligned(1, -1, "{} stations", stations.size());
 
-        } // toolbar_child
+        } // toolbar
 
         // Note: flat navigation doesn't work well on child windows that scroll.
-        if (Child favorites_child{"favorites"}) {
+        if (Child favorites{"favorites"}) {
 
             for (std::size_t index = 0; index < stations.size(); ++index) {
                 show_station(stations[index], index);
@@ -602,15 +367,20 @@ namespace FavoritesTab {
                 }
             }
 
-        }
+        } // favorites
+
+        EditStationPopup::process_ui();
+        ConfirmDeleteStationPopup::process_ui();
     }
 
 
     void
     remove(std::size_t index)
     {
-        if (index >= stations.size())
+        if (index >= stations.size()) {
+            LOG_ERROR("BUG: attempting to remove invalid index: {}", index);
             return;
+        }
 
         auto it = uuids.find(stations[index]->stationuuid);
         if (it != uuids.end())

@@ -77,9 +77,17 @@ ButtonHBox::show()
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + empty_vspace * valign);
     }
 
+    float spacing = -1;
+    if (expand) {
+        const auto n = buttons.size();
+        spacing = (total_width - buttons_width) / (n - 1);
+    }
+
     for (auto [idx, b] : buttons | std::views::enumerate) {
-        if (idx > 0)
-            ImGui::SameLine();
+        if (idx > 0) {
+            ImGui::SameLine(0, spacing);
+        }
+
         if (ImGui::Button(b.label, button_size))
             if (b.on_click)
                 b.on_click();
@@ -102,5 +110,10 @@ ButtonHBox::update()
     button_size = max(button_size, size);
 
     const auto n = buttons.size();
-    total_width = n * button_size.x + (n - 1) * style.ItemSpacing.x;
+    buttons_width = n * button_size.x;
+
+    if (expand)
+        total_width = ImGui::GetContentRegionAvail().x;
+    else
+        total_width = buttons_width + (n - 1) * style.ItemSpacing.x;
 }

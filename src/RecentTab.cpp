@@ -112,7 +112,7 @@ namespace RecentTab {
                 if (StationDetailsPopup::Button(station->stationuuid))
                     StationDetailsPopup::open(station->stationuuid);
 
-                if (ImGui::Button(ICON_FA_TRASH_O)) // 🗑
+                if (ImGui::Button(ICON_FA_TRASH_O, UI::get_small_button_size())) // 🗑
                     pending_remove = index;
                 ImGui::SetItemTooltip("Remove station from recent history.");
 

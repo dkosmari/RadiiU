@@ -547,6 +547,9 @@ namespace App {
                 std::optional<StyleVar> no_rounding{std::in_place,
                                                     ImGuiStyleVar_WindowRounding,
                                                     0};
+                std::optional<StyleVar> thin_padding{std::in_place,
+                                                     ImGuiStyleVar_WindowPadding,
+                                                     ImVec2{6, 6}};
                 if (Window main_window{PACKAGE_STRING,
                                        nullptr,
                                        ImGuiWindowFlags_NoDecoration |
@@ -556,6 +559,7 @@ namespace App {
                     const auto content_end = content_begin + ImGui::GetContentRegionAvail();
 
                     no_rounding.reset();
+                    thin_padding.reset();
 
                     // App name, centered
                     float title_height = 0;
@@ -693,7 +697,7 @@ namespace App {
             style.FramePadding          = padding;
             style.ScrollbarPadding      = 4;
             style.SeparatorTextPadding  = { style.FontSizeBase, padding.y };
-            style.WindowPadding         = {6, 6};
+            style.WindowPadding         = {12, 12};
 
             // Rounding
             style.ChildRounding          = rounding;

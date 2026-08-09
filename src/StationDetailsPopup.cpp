@@ -36,8 +36,9 @@ namespace StationDetailsPopup {
 
         enum class State {
             hidden,
-            fetching,
-            done,
+            queued,
+            waiting,
+            success,
             error,
         };
 
@@ -53,7 +54,6 @@ namespace StationDetailsPopup {
         /* Variables */
         /*-----------*/
 
-        bool popup_queued;
         State state = State::hidden;
         std::string request_uuid;
         std::optional<Station> result;
@@ -83,7 +83,6 @@ namespace StationDetailsPopup {
         request_uuid.clear();
         error_msg.clear();
         result.reset();
-        state = State::hidden;
     }
 
 
@@ -92,29 +91,29 @@ namespace StationDetailsPopup {
     {
         TRACE_FUNC;
 
-        if (popup_queued)
-            return;
-
         if (uuid.empty()) {
             LOG_WARN("Should not be querying station details with empty UUID");
             return;
         }
 
         reset();
-        popup_queued = true;
+        state = State::queued;
         request_uuid = uuid;
-        state = State::fetching;
 
         RadioBrowserAPI::get_station(
             request_uuid,
             [](RadioBrowserAPI::Station rb_station)
             {
+                if (state == State::hidden)
+                    return;
+                state = State::success;
                 LOG_DEBUG("received station details");
                 result = Station::from_radio_browser(rb_station);
-                state = State::done;
             },
             [](const std::exception& e)
             {
+                if (state == State::hidden)
+                    return;
                 state = State::error;
                 error_msg = e.what();
                 if (auto ee = dynamic_cast<const rest::error*>(&e)) {
@@ -136,9 +135,9 @@ namespace StationDetailsPopup {
         if (state == State::hidden)
             return;
 
-        if (popup_queued) {
+        if (state == State::queued) {
+            state = State::waiting;
             ImGui::OpenPopup(popup_id);
-            popup_queued = false;
         }
 
         ImGui::SetNextWindowSize({1100, 600}, ImGuiCond_Always);
@@ -150,50 +149,61 @@ namespace StationDetailsPopup {
                     //ImGuiWindowFlags_AlwaysAutoResize |
                     ImGuiWindowFlags_NoMove};
         if (!popup) {
+            state = State::hidden;
             reset();
             return;
         }
 
         switch (state) {
-            case State::fetching:
-                ImGui::Text("Waiting for station details...");
+            case State::waiting:
+                ImGui::TextAligned(0.5f, -1, "Station Details");
+                ImGui::Separator();
+                if (Child content{"content"})
+                    ImGui::Text("Waiting for station details...");
                 break;
 
             case State::error:
-                ImGui::FormatTextWrapped("Error: {}", error_msg);
+                ImGui::TextAligned(0.5f, -1, "Station Details Error");
+                ImGui::Separator();
+                if (Child content{"content"})
+                    ImGui::TextWrapped(error_msg);
                 break;
 
-            case State::done:
-                if (Table fields_table{
-                        "fields",
-                        2,
-                        ImGuiTableFlags_None
-                    }) {
+            case State::success:
+                ImGui::TextAligned(0.5f, -1, "Station Details");
+                ImGui::Separator();
+                if (Child content{"content"}) {
+                    if (Table fields{
+                            "fields",
+                            2,
+                            ImGuiTableFlags_None
+                        }) {
 
-                    ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
-                    ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+                        ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
+                        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-                    if (!result)
-                        throw std::logic_error{"BUG: should not be done with no station"};
+                        if (!result)
+                            throw std::logic_error{"BUG: should not be done with no station"};
 
-                    const Station& st = *result;
-                    UI::show_info_row("name",         st.name);
-                    UI::show_link_row("url",          st.url);
-                    UI::show_link_row("url_resolved", st.url_resolved);
-                    UI::show_link_row("homepage",     st.homepage);
-                    UI::show_link_row("favicon",      st.favicon);
-                    UI::show_info_row("countrycode",  st.countrycode);
-                    UI::show_info_row("language",     st.language);
-                    UI::show_info_row("tags",         st.tags);
-                    UI::show_info_row("stationuuid",  st.stationuuid);
+                        const Station& st = *result;
+                        UI::show_info_row("name",         st.name);
+                        UI::show_link_row("url",          st.url);
+                        UI::show_link_row("url_resolved", st.url_resolved);
+                        UI::show_link_row("homepage",     st.homepage);
+                        UI::show_link_row("favicon",      st.favicon);
+                        UI::show_info_row("countrycode",  st.countrycode);
+                        UI::show_info_row("language",     st.language);
+                        UI::show_info_row("tags",         st.tags);
+                        UI::show_info_row("stationuuid",  st.stationuuid);
 
-                    UI::show_info_row("votes",        st.votes);
-                    UI::show_info_row("clickcount",   st.click_count);
-                    UI::show_info_row("clicktrend",   st.click_trend);
-                    UI::show_info_row("bitrate",      st.bitrate);
-                    UI::show_info_row("codec",        st.codec);
+                        UI::show_info_row("votes",        st.votes);
+                        UI::show_info_row("clickcount",   st.click_count);
+                        UI::show_info_row("clicktrend",   st.click_trend);
+                        UI::show_info_row("bitrate",      st.bitrate);
+                        UI::show_info_row("codec",        st.codec);
 
-                } // fields_table
+                    } // fields
+                }
                 break;
 
             default:
