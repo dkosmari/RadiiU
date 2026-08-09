@@ -43,10 +43,14 @@ radiiu_elf_SOURCES = \
 	src/async_queue.hpp \
 	src/BrowserTab.cpp \
 	src/BrowserTab.hpp \
+	src/ButtonHBox.cpp \
+	src/ButtonHBox.hpp \
 	src/byte_stream.cpp \
 	src/byte_stream.hpp \
 	src/cfg.cpp \
 	src/cfg.hpp \
+	src/ConfirmExitPopup.cpp \
+	src/ConfirmExitPopup.hpp \
 	src/decoder.cpp \
 	src/decoder.hpp \
 	src/decoder_aac.cpp \

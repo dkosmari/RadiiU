@@ -1,12 +1,12 @@
-* Plan for 0.4 [33%]
+* Plan for 0.4 [41%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
-- [-] General [2/4]
+- [-] General [3/4]
   - [ ] Scrensavers.
   - [X] Logs tab.
   - [X] Line up buttons better under Play button.
-  - [ ] Confirm exit dialog.
+  - [X] Confirm exit dialog.
 - [X] About [1/1]
   - [X] Show save path.
 - [ ] Favorites [0/2]

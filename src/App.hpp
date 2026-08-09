@@ -37,6 +37,9 @@ namespace App {
     run();
 
     void
+    quit();
+
+    void
     set_tab(TabID id);
 
 } // namespace App
