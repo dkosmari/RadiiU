@@ -55,9 +55,127 @@ namespace StationDetailsPopup {
         /*-----------*/
 
         State state = State::hidden;
-        std::string request_uuid;
-        std::optional<Station> result;
-        std::string error_msg;
+        std::string uuid;
+        std::optional<Station> station;
+        std::string error_message;
+        std::string error_content_type;
+        std::string error_response;
+
+
+        /*-----------------------*/
+        /* Function declarations */
+        /*-----------------------*/
+
+        void
+        handle_exception(const std::exception& e);
+
+        void
+        handle_success(RadioBrowserAPI::Station rb_station);
+
+        void
+        reset();
+
+
+        /*-----------------------*/
+        /* Function definitions; */
+        /*-----------------------*/
+
+        void
+        handle_exception(const std::exception& e)
+        {
+            TRACE_FUNC;
+
+            if (state != State::waiting)
+                return;
+
+            state = State::error;
+            error_message = e.what();
+            LOG_ERROR("{}", error_message);
+            if (auto ee = dynamic_cast<const rest::error*>(&e)) {
+                error_content_type = ee->content_type;
+                error_response = ee->response;
+                LOG_ERROR("Content-Type: {}", error_content_type);
+                LOG_ERROR("Response:\n<response>\n{}\n</response>", error_response);
+            }
+        }
+
+
+        void
+        handle_success(RadioBrowserAPI::Station rb_station)
+        {
+            TRACE_FUNC;
+
+            if (state != State::waiting)
+                return;
+
+            state = State::success;
+            LOG_DEBUG("received station details");
+            station = Station::from_radio_browser(rb_station);
+        }
+
+
+        void
+        reset()
+        {
+            uuid.clear();
+            error_message.clear();
+            error_content_type.clear();
+            error_response.clear();
+            station.reset();
+        }
+
+
+        void
+        show_error()
+        {
+            using namespace ImGui::RAII;
+
+            ImGui::Text("ERROR!");
+
+            Font smaller{nullptr, 24};
+            ImGui::TextWrapped(error_message);
+            if (!error_content_type.empty())
+                ImGui::FormatText("Content-Type: {}", error_content_type);
+            if (!error_response.empty())
+                ImGui::FormatTextWrapped("Response:\n{}", error_response);
+        }
+
+
+        void
+        show_success()
+        {
+            using namespace ImGui::RAII;
+
+            if (!station)
+                return;
+
+            Font smaller{nullptr, 24};
+
+            if (Table fields{"fields",
+                             2,
+                             ImGuiTableFlags_None}) {
+
+                ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
+                ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+
+                UI::InfoRow("name",         station->name);
+                UI::LinkRow("url",          station->url);
+                UI::LinkRow("url_resolved", station->url_resolved);
+                UI::LinkRow("homepage",     station->homepage);
+                UI::LinkRow("favicon",      station->favicon);
+                UI::InfoRow("countrycode",  station->countrycode);
+                UI::InfoRow("language",     station->language);
+                UI::InfoRow("tags",         station->tags);
+                UI::InfoRow("stationuuid",  station->stationuuid);
+
+                UI::InfoRow("codec", station->codec);
+                UI::FormatInfoRow("bitrate", "{}", station->bitrate);
+
+                UI::FormatInfoRow("votes",      "{}", station->votes);
+                UI::FormatInfoRow("clickcount", "{}", station->click_count);
+                UI::FormatInfoRow("clicktrend", "{}", station->click_trend);
+            } // fields
+        }
 
     } // namespace
 
@@ -78,52 +196,19 @@ namespace StationDetailsPopup {
 
 
     void
-    reset()
-    {
-        request_uuid.clear();
-        error_msg.clear();
-        result.reset();
-    }
-
-
-    void
-    open(const std::string& uuid)
+    open(const std::string& uuid_)
     {
         TRACE_FUNC;
 
-        if (uuid.empty()) {
-            LOG_WARN("Should not be querying station details with empty UUID");
+        if (uuid_.empty()) {
+            LOG_ERROR("Should not be querying station details with empty UUID");
             return;
         }
 
-        reset();
         state = State::queued;
-        request_uuid = uuid;
+        uuid = uuid_;
 
-        RadioBrowserAPI::get_station(
-            request_uuid,
-            [](RadioBrowserAPI::Station rb_station)
-            {
-                if (state == State::hidden)
-                    return;
-                state = State::success;
-                LOG_DEBUG("received station details");
-                result = Station::from_radio_browser(rb_station);
-            },
-            [](const std::exception& e)
-            {
-                if (state == State::hidden)
-                    return;
-                state = State::error;
-                error_msg = e.what();
-                if (auto ee = dynamic_cast<const rest::error*>(&e)) {
-                    if (!ee->content_type.empty())
-                        error_msg += "\nContent-Type: " + ee->content_type;
-                    if (!ee->response.empty())
-                        error_msg += "\n" + ee->response;
-                }
-                LOG_ERROR("{}", error_msg);
-            });
+        RadioBrowserAPI::get_station(uuid, handle_success, handle_exception);
     }
 
 
@@ -141,74 +226,42 @@ namespace StationDetailsPopup {
         }
 
         ImGui::SetNextWindowSize({1100, 600}, ImGuiCond_Always);
-        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(),
+        auto viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(viewport->GetWorkCenter(),
                                 ImGuiCond_Always,
                                 {0.5f, 0.5f});
         Popup popup{popup_id,
-                    ImGuiWindowFlags_NoSavedSettings |
-                    //ImGuiWindowFlags_AlwaysAutoResize |
-                    ImGuiWindowFlags_NoMove};
+                    ImGuiWindowFlags_NoMove |
+                    ImGuiWindowFlags_NoSavedSettings};
         if (!popup) {
             state = State::hidden;
             reset();
             return;
         }
 
-        switch (state) {
-            case State::waiting:
-                ImGui::TextAligned(0.5f, -1, "Station Details");
-                ImGui::Separator();
-                if (Child content{"content"})
+        ImGui::TextAligned(0.5f, -1, "Station Details");
+        ImGui::Separator();
+
+        if (Child content{"content"}) {
+
+            switch (state) {
+                case State::waiting:
                     ImGui::Text("Waiting for station details...");
-                break;
+                    break;
 
-            case State::error:
-                ImGui::TextAligned(0.5f, -1, "Station Details Error");
-                ImGui::Separator();
-                if (Child content{"content"})
-                    ImGui::TextWrapped(error_msg);
-                break;
+                case State::error:
+                    show_error();
+                    break;
 
-            case State::success:
-                ImGui::TextAligned(0.5f, -1, "Station Details");
-                ImGui::Separator();
-                if (Child content{"content"}) {
-                    if (Table fields{
-                            "fields",
-                            2,
-                            ImGuiTableFlags_None
-                        }) {
+                case State::success:
+                    show_success();
+                    break;
 
-                        ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
-                        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
-
-                        if (!result)
-                            throw std::logic_error{"BUG: should not be done with no station"};
-
-                        const Station& st = *result;
-                        UI::show_info_row("name",         st.name);
-                        UI::show_link_row("url",          st.url);
-                        UI::show_link_row("url_resolved", st.url_resolved);
-                        UI::show_link_row("homepage",     st.homepage);
-                        UI::show_link_row("favicon",      st.favicon);
-                        UI::show_info_row("countrycode",  st.countrycode);
-                        UI::show_info_row("language",     st.language);
-                        UI::show_info_row("tags",         st.tags);
-                        UI::show_info_row("stationuuid",  st.stationuuid);
-
-                        UI::show_info_row("votes",        st.votes);
-                        UI::show_info_row("clickcount",   st.click_count);
-                        UI::show_info_row("clicktrend",   st.click_trend);
-                        UI::show_info_row("bitrate",      st.bitrate);
-                        UI::show_info_row("codec",        st.codec);
-
-                    } // fields
-                }
-                break;
-
-            default:
-                ;
+                default:
+                    ;
+            }
         }
+
     }
 
 } // namespace StationDetailsPopup

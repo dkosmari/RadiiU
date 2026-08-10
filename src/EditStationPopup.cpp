@@ -80,6 +80,9 @@ namespace EditStationPopup {
         action_confirm();
 
         void
+        reset();
+
+        void
         show_field(const std::string& label,
                    std::string& value);
 
@@ -91,6 +94,8 @@ namespace EditStationPopup {
         void
         action_confirm()
         {
+            TRACE_FUNC;
+
             ImGui::CloseCurrentPopup();
 
             // Convert CSV back to a vector
@@ -99,6 +104,15 @@ namespace EditStationPopup {
 
             if (confirm_callback)
                 confirm_callback(std::move(*station));
+        }
+
+
+        void
+        reset()
+        {
+            confirm_callback = {};
+            station.reset();
+            editable.reset();
         }
 
 
@@ -174,9 +188,7 @@ namespace EditStationPopup {
                          ImGuiWindowFlags_NoSavedSettings};
         if (!popup) {
             state = State::hidden;
-            confirm_callback = {};
-            station.reset();
-            editable.reset();
+            reset();
             return;
         }
 

@@ -20,7 +20,7 @@ namespace ConfirmDeleteStationPopup {
 
 
     void
-    open(StationPtr station,
+    open(ConstStationPtr station,
          ConfirmFunction func);
 
     void

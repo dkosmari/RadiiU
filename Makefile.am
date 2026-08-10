@@ -107,6 +107,8 @@ radiiu_elf_SOURCES = \
 	src/rest.cpp \
 	src/rest.hpp \
 	src/Serializer.hpp \
+	src/ServerStatsPopup.cpp \
+	src/ServerStatsPopup.hpp \
 	src/SettingsTab.cpp \
 	src/SettingsTab.hpp \
 	src/Station.cpp \

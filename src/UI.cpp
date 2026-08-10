@@ -186,8 +186,8 @@ namespace UI {
 
 
     void
-    show_info_row(const std::string& label,
-                  const std::string& value)
+    InfoRow(const std::string& label,
+            const std::string& value)
     {
         ImGui::TableNextRow();
 
@@ -202,46 +202,15 @@ namespace UI {
 
 
     void
-    show_info_row(const std::string& label,
-                  const std::vector<std::string>& values)
+    InfoRow(const std::string& label,
+            const std::vector<std::string>& values)
     {
-        show_info_row(label, string_utils::to_csv(values));
+        InfoRow(label, string_utils::to_csv(values));
     }
 
 
-    template<std::integral T>
     void
-    show_info_row(const std::string& label,
-                  T value)
-    {
-        show_info_row(label, std::to_string(value));
-    }
-
-    /* ----------------------------------------------- */
-    /* Explicit instantiations for show_info_row<T>() */
-    /* ----------------------------------------------- */
-
-    template
-    void show_info_row<std::int8_t>(const std::string& label, std::int8_t value);
-    template
-    void show_info_row<std::int16_t>(const std::string& label, std::int16_t value);
-    template
-    void show_info_row<std::int32_t>(const std::string& label, std::int32_t value);
-    template
-    void show_info_row<std::int64_t>(const std::string& label, std::int64_t value);
-
-    template
-    void show_info_row<std::uint8_t>(const std::string& label, std::uint8_t value);
-    template
-    void show_info_row<std::uint16_t>(const std::string& label, std::uint16_t value);
-    template
-    void show_info_row<std::uint32_t>(const std::string& label, std::uint32_t value);
-    template
-    void show_info_row<std::uint64_t>(const std::string& label, std::uint64_t value);
-
-
-    void
-    show_link_row(const std::string& label,
+    LinkRow(const std::string& label,
                   const std::string& url)
     {
         using namespace ImGui::RAII;

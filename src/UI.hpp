@@ -87,24 +87,30 @@ namespace UI {
 
 
     void
-    show_info_row(const std::string& label,
-                  const std::string& value);
+    InfoRow(const std::string& label,
+            const std::string& value);
 
 
-    template<std::integral T>
+    template<typename... Args>
     void
-    show_info_row(const std::string& label,
-                  T value);
+    FormatInfoRow(const std::string& label,
+                  std::format_string<Args...> fmt,
+                  Args&&... args)
+    {
+        InfoRow(label,
+                std::format(std::move(fmt),
+                            std::forward<Args>(args)...));
+    }
 
 
     void
-    show_info_row(const std::string& label,
-                  const std::vector<std::string>& values);
+    InfoRow(const std::string& label,
+            const std::vector<std::string>& values);
 
 
     void
-    show_link_row(const std::string& label,
-                  const std::string& url);
+    LinkRow(const std::string& label,
+            const std::string& url);
 
 
     void

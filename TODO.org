@@ -1,16 +1,20 @@
-* Plan for 0.4 [41%]
+* Plan for 0.4 [58%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
 - [-] General [3/4]
-  - [ ] Scrensavers.
   - [X] Logs tab.
   - [X] Line up buttons better under Play button.
   - [X] Confirm exit dialog.
+  - [ ] Move Browser tab to the front.
 - [X] About [1/1]
   - [X] Show save path.
 - [ ] Favorites [0/2]
   - [ ] Option to filter by tag.
   - [ ] Option to update station details from RB.
-- [ ] Browser
-  - [ ] Dedicated server stats popup module.
+- [X] Browser
+  - [X] Dedicated server stats popup module.
+
+* Plan for 0.5 [0%]
+- [ ] General [0/1]
+  - [ ] Scrensavers.

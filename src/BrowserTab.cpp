@@ -43,6 +43,7 @@
 #include "RadioBrowserAPI.hpp"
 #include "rest.hpp"
 #include "Serializer.hpp"
+#include "ServerStatsPopup.hpp"
 #include "StationDetailsPopup.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
@@ -144,12 +145,6 @@ namespace BrowserTab {
     // TODO: allow votes to expire after 10 min.
     std::unordered_map<std::string, RadioBrowserAPI::VoteResult> votes_cast;
 
-
-    const std::string server_stats_popup_id = "info";
-
-    std::optional<RadioBrowserAPI::ServerStats> server_stats_result;
-    std::string server_stats_error;
-
     std::optional<std::vector<Country>> countries;
     std::optional<std::vector<std::string>> codecs;
     std::optional<std::vector<std::string>> tags;
@@ -179,9 +174,6 @@ namespace BrowserTab {
 
     void
     common_error_handler(const std::exception& e);
-
-    void
-    fetch_server_stats();
 
 
     std::string
@@ -394,64 +386,18 @@ namespace BrowserTab {
 
 
     void
-    process_server_stats_popup()
-    {
-        using namespace ImGui::RAII;
-
-        // ImGui::SetNextWindowSize({550, 0}, ImGuiCond_Always);
-        if (Popup server_stats{
-                server_stats_popup_id,
-                ImGuiWindowFlags_NoSavedSettings
-            }) {
-
-            auto server = RadioBrowserAPI::get_server();
-            ImGui::SeparatorText("Server status for " + server);
-
-            if (!server_stats_result) {
-
-                if (!server_stats_error.empty())
-                    ImGui::FormatTextWrapped("Error: {}", server_stats_error);
-                else
-                    ImGui::Text("Fetching server details...");
-
-            } else {
-
-                if (Table fields_table{
-                        "fields",
-                        2,
-                        ImGuiTableFlags_None
-                    }) {
-                    ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
-                    ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
-
-                    using UI::show_info_row;
-                    show_info_row("software_version", server_stats_result->software_version);
-                    show_info_row("stations",         server_stats_result->stations);
-                    show_info_row("stations_broken",  server_stats_result->stations_broken);
-                    show_info_row("tags",             server_stats_result->tags);
-                    show_info_row("clicks_last_hour", server_stats_result->clicks_last_hour);
-                    show_info_row("clicks_last_day",  server_stats_result->clicks_last_day);
-                    show_info_row("languages",        server_stats_result->languages);
-                    show_info_row("countries",        server_stats_result->countries);
-
-                }
-            }
-
-        }
-    }
-
-
-    void
     show_status()
     {
         using namespace ImGui::RAII;
 
-        if (Child status_child{
+        if (Child status{
                 "status",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeY |
                 ImGuiChildFlags_NavFlattened
             }) {
+
+            Disabled if_busy{RadioBrowserAPI::is_busy()};
 
             {
                 Disabled if_preferred_server{!cfg::state.server.empty()};
@@ -462,13 +408,9 @@ namespace BrowserTab {
 
             ImGui::SameLine();
 
-            if (ImGui::Button(ICON_FA_INFO_CIRCLE)) {
-                fetch_server_stats();
-                ImGui::OpenPopup(server_stats_popup_id);
-            }
+            if (ImGui::Button(ICON_FA_INFO_CIRCLE))
+                ServerStatsPopup::open();
             ImGui::SetItemTooltip("Show server details.");
-
-            process_server_stats_popup();
 
             ImGui::SameLine();
 
@@ -804,20 +746,31 @@ namespace BrowserTab {
                 auto vote_record = votes_cast.find(station->stationuuid);
                 const bool voted = vote_record != votes_cast.end();
                 bool ok = voted ? vote_record->second.ok : false;
+                std::string value_label = humanize::value(station->votes);
                 std::string vote_label = (ok
                                           ? ICON_FA_THUMBS_UP " "
                                           : ICON_FA_THUMBS_O_UP " ")
-                                         + humanize::value(station->votes);
+                                         + value_label;
 
                 {
-                    Disabled disable_voting{voted || !cfg::state.send_clicks};
-                    if (ImGui::Button(vote_label))
+                    ImVec2 size {
+                        UI::play_button_size.x,
+                        ImGui::GetFrameHeight()
+                    };
+                    std::optional<Font> smaller_font;
+                    if (value_label.size() > 3)
+                        smaller_font.emplace(nullptr, 24);
+                    Disabled if_cant_vote{!cfg::state.send_clicks || voted};
+                    if (ImGui::Button(vote_label, size))
                         send_vote(station);
-                    if (voted)
-                        ImGui::SetItemTooltip(vote_record->second.message);
-                    else
-                        ImGui::SetItemTooltip("Vote for this station.");
                 }
+                if (voted)
+                    ImGui::FormatSetItemTooltip("{} votes.\n{}",
+                                                value_label,
+                                                vote_record->second.message);
+                else
+                    ImGui::FormatSetItemTooltip("{} votes.\nClick to vote for this station.",
+                                                value_label);
 
             } // actions_child
 
@@ -917,6 +870,7 @@ namespace BrowserTab {
         } // stations_child
 
         StationDetailsPopup::process_ui();
+        ServerStatsPopup::process_ui();
     }
 
 
@@ -1032,28 +986,6 @@ namespace BrowserTab {
                 std::ranges::sort(*countries, {}, get_code);
             },
             common_error_handler);
-    }
-
-
-    void
-    fetch_server_stats()
-    {
-        TRACE_FUNC;
-
-        server_stats_result.reset();
-        server_stats_error.clear();
-
-        RadioBrowserAPI::get_server_stats(
-            [](RadioBrowserAPI::ServerStats stats)
-            {
-                LOG_INFO("Received server stats.");
-                server_stats_result = std::move(stats);
-            },
-            [](const std::exception& e)
-            {
-                server_stats_error = e.what();
-                LOG_ERROR("{}", server_stats_error);
-            });
     }
 
 

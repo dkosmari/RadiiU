@@ -16,6 +16,7 @@
 
 #include "ButtonHBox.hpp"
 #include "IconsFontAwesome4.h"
+#include "tracer.hpp"
 
 
 using namespace std::literals;
@@ -48,7 +49,7 @@ namespace ConfirmDeleteStationPopup {
 
         State state;
         ConfirmFunction confirm_callback;
-        StationPtr station;
+        ConstStationPtr station;
 
 
         /*-----------------------*/
@@ -57,6 +58,9 @@ namespace ConfirmDeleteStationPopup {
 
         void
         action_confirm();
+
+        void
+        reset();
 
 
         /*----------------------*/
@@ -67,11 +71,20 @@ namespace ConfirmDeleteStationPopup {
         void
         action_confirm()
         {
+            TRACE_FUNC;
+
             ImGui::CloseCurrentPopup();
             if (confirm_callback)
                 confirm_callback();
         }
 
+
+        void
+        reset()
+        {
+            confirm_callback = {};
+            station.reset();
+        }
 
     } // namespace
 
@@ -81,9 +94,11 @@ namespace ConfirmDeleteStationPopup {
     /*------------------*/
 
     void
-    open(StationPtr station_,
+    open(ConstStationPtr station_,
          ConfirmFunction func)
     {
+        TRACE_FUNC;
+
         if (!station_)
             return;
 
@@ -115,8 +130,7 @@ namespace ConfirmDeleteStationPopup {
                          ImGuiWindowFlags_NoSavedSettings};
         if (!popup) {
             state = State::hidden;
-            confirm_callback = {};
-            station.reset();
+            reset();
             return;
         }
 

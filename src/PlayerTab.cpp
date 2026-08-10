@@ -79,7 +79,7 @@ namespace PlayerTab {
                       const std::optional<std::string>& value)
         {
             if (value)
-                UI::show_info_row(label, *value);
+                UI::InfoRow(label, *value);
         }
 
     } // namespace
@@ -408,7 +408,7 @@ namespace PlayerTab {
                         show_meta_row("Date", meta->date);
 
                         for (auto& [k, v] : meta->extra)
-                            UI::show_info_row(k, v);
+                            UI::InfoRow(k, v);
 
                         // station metadata
                         show_meta_row("Station Name", meta->station_name);
@@ -419,9 +419,9 @@ namespace PlayerTab {
 
                     if (const auto info = res->radio.get_decoder_info()) {
                         if (!info->codec.empty())
-                            UI::show_info_row("Codec", info->codec);
+                            UI::InfoRow("Codec", info->codec);
                         if (!info->bitrate.empty())
-                            UI::show_info_row("Bitrate", info->bitrate);
+                            UI::InfoRow("Bitrate", info->bitrate);
                     }
 
                 }
@@ -469,7 +469,7 @@ namespace PlayerTab {
 #else
                         std::string label = humanize::duration_brief(t);
 #endif
-                        UI::show_info_row(label, title);
+                        UI::InfoRow(label, title);
 
                     }
 

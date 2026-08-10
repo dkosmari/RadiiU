@@ -16,6 +16,7 @@
 #include "App.hpp"
 #include "ButtonHBox.hpp"
 #include "IconsFontAwesome4.h"
+#include "tracer.hpp"
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -48,6 +49,8 @@ namespace ConfirmExitPopup {
     void
     open()
     {
+        TRACE_FUNC;
+
         state = State::queued;
     }
 

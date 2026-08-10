@@ -34,6 +34,7 @@
 #include "App.hpp"
 #include "async_queue.hpp"
 #include "LogManager.hpp"
+#include "LogManagerCurl.hpp"
 #include "mime_type.hpp"
 #include "thread_safe.hpp"
 #include "tracer.hpp"
@@ -92,10 +93,11 @@ namespace ImageLoader {
             std::uint64_t last_use = 0;
             sdl::texture tex;
             sdl::surface img;
-            std::optional<curl::easy> easy;
+            curl::easy easy{nullptr};
             std::optional<std::vector<char>> raw_buf; // TODO: use byte_stream, implement rwops
             std::string location;
             vec2 size_limit;
+            bool checked_content_type = false;
 
             CacheEntry(std::uint64_t now,
                        const std::string& location,
@@ -121,6 +123,9 @@ namespace ImageLoader {
             start_download(const std::string& user_agent);
 
         private:
+
+            std::size_t
+            easy_write_callback(std::span<const char> buf);
 
             void
             enforce_size_limit();
@@ -189,7 +194,7 @@ namespace ImageLoader {
         /* Constants */
         /*-----------*/
 
-        const std::string content_prefix = "content:/";
+        const std::string content_prefix = "content:/"s;
         const std::size_t max_cache_size = 256;
 
         // Variables
@@ -273,7 +278,7 @@ namespace ImageLoader {
         void
         CacheEntry::finish_download()
         {
-            easy.reset();
+            easy.destroy();
         }
 
 
@@ -333,43 +338,49 @@ namespace ImageLoader {
         curl::easy&
         CacheEntry::start_download(const std::string& user_agent)
         {
-            easy.emplace();
-            easy->set_verbose(true);
-            easy->set_http_version(curl::easy::http_version::none);
-            easy->set_ssl_verify_peer(false);
+            easy.create();
             if (!user_agent.empty())
-                easy->set_user_agent(user_agent);
-            easy->set_url(location);
-            easy->set_follow_location(true);
-            easy->set_auto_referer(true);
-            easy->set_accept_encoding("");
-            easy->set_transfer_encoding(true);
-            easy->set_buffer_size(65536);
-            easy->set_tcp_no_delay(false);
-            easy->set_http_headers({ "Accept: image/*" });
-            easy->set_write_function(
-                [this](std::span<const char> buf) -> std::size_t
-                {
-                    auto content_type_header = easy->try_get_header("Content-Type");
-                    if (content_type_header) {
-                        std::string desired = "image/*";
-                        std::string received = content_type_header->value;
-                        if (!mime_type::match(received, desired)) {
-                            LOG_ERROR("Content-Type should be {:?} but received {:?}",
-                                      desired,
-                                      received);
-                            return CURL_READFUNC_ABORT;
-                        }
-                    }
+                easy.set_user_agent(user_agent);
+            easy.set_accept_encoding("");
+            easy.set_auto_referer(true);
+            easy.set_buffer_size(65536);
+            easy.set_follow_location(true);
+            easy.set_http_headers({ "Accept: image/*" });
+            easy.set_http_version(curl::easy::http_version::none);
+            easy.set_private(shared_from_this());
+            easy.set_ssl_verify_peer(false);
+            easy.set_tcp_no_delay(false);
+            easy.set_transfer_encoding(true);
+            easy.set_url(location);
+            easy.set_verbose(true);
+            easy.set_write_function(std::bind_front(&CacheEntry::easy_write_callback, this));
+            LogManagerCurl::capture_curl_debug(easy);
+            checked_content_type = false;
+            return easy;
+        }
 
-                    if (!raw_buf)
-                        raw_buf.emplace();
-                    raw_buf->append_range(buf);
-                    return buf.size();
+
+        std::size_t
+        CacheEntry::easy_write_callback(std::span<const char> buf)
+        {
+            if (!checked_content_type) {
+                checked_content_type = true;
+                if (auto content_type = easy.try_get_header("Content-Type")) {
+                    std::string desired = "image/*"s;
+                    std::string received = content_type->value;
+                    if (!mime_type::match(received, desired)) {
+                        LOG_ERROR("Content-Type should be {:?} but received {:?}",
+                                  desired,
+                                  received);
+                        return CURL_READFUNC_ABORT;
+                    }
                 }
-            );
-            easy->set_private(shared_from_this());
-            return *easy;
+            }
+
+            if (!raw_buf)
+                raw_buf.emplace();
+            raw_buf->append_range(buf);
+            return buf.size();
         }
 
 
@@ -538,7 +549,7 @@ namespace ImageLoader {
 
             for (auto& [location, entry] : cache)
                 if (entry->easy)
-                    multi.remove(*entry->easy);
+                    multi.remove(entry->easy);
         }
 
 
@@ -713,7 +724,7 @@ namespace ImageLoader {
                 if (entry->easy) {
                     LOG_DEBUG("prunning an active request");
                     // If removing an active request, make sure it's removed from the curl::multi.
-                    multi.remove(*entry->easy);
+                    multi.remove(entry->easy);
                 }
                 // unordered_map guarantees all other iterators remain valid
                 cache.erase(it);

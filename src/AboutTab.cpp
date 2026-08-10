@@ -228,16 +228,16 @@ namespace AboutTab {
                 ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
 
-                UI::show_link_row("Homepage", PACKAGE_URL);
-                UI::show_link_row("Bugs", PACKAGE_BUGREPORT);
-                UI::show_info_row("User Agent", App::get_user_agent());
+                UI::LinkRow("Homepage", PACKAGE_URL);
+                UI::LinkRow("Bugs", PACKAGE_BUGREPORT);
+                UI::InfoRow("User Agent", App::get_user_agent());
 #ifdef __WIIU__
                 if (!real_save_path.empty())
-                    UI::show_info_row("Save folder", real_save_path);
+                    UI::InfoRow("Save folder", real_save_path);
                 else
-                    UI::show_info_row("Save folder", App::get_config_path());
+                    UI::InfoRow("Save folder", App::get_config_path());
 #else
-                UI::show_info_row("Save folder", App::get_config_path());
+                UI::InfoRow("Save folder", App::get_config_path());
 #endif
 
             }
@@ -250,7 +250,7 @@ namespace AboutTab {
                 ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
 
                 for (const auto& [role, name] : credits)
-                    UI::show_info_row(role, name);
+                    UI::InfoRow(role, name);
 
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
@@ -270,37 +270,37 @@ namespace AboutTab {
                 ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
 
                 static const std::string sdl_version_str = get_sdl_version();
-                UI::show_info_row("SDL", sdl_version_str);
+                UI::InfoRow("SDL", sdl_version_str);
 
                 static const std::string sdl_img_version_str = get_sdl_img_version();
-                UI::show_info_row("SDL_image", sdl_img_version_str);
+                UI::InfoRow("SDL_image", sdl_img_version_str);
                 // TODO: show versions for all image libraries
 
-                UI::show_info_row("ImGui", IMGUI_VERSION);
+                UI::InfoRow("ImGui", IMGUI_VERSION);
 
 #ifdef IMGUI_ENABLE_FREETYPE
                 static const std::string ft_version_str = get_ft_version();
                 if (!ft_version_str.empty())
-                    UI::show_info_row("FreeType", ft_version_str);
+                    UI::InfoRow("FreeType", ft_version_str);
 #endif
 
                 static const std::string curl_version_str = curl_version();
-                UI::show_info_row("libcurl", curl_version_str);
+                UI::InfoRow("libcurl", curl_version_str);
 
                 static const std::string glaze_version_str = get_glaze_version();
-                UI::show_info_row("glaze", glaze_version_str);
+                UI::InfoRow("glaze", glaze_version_str);
 
                 static const std::string mpg123_version_str = MPG123_VERSION;
-                UI::show_info_row("mpg123", mpg123_version_str);
+                UI::InfoRow("mpg123", mpg123_version_str);
 
                 static const std::string opus_version_str = opus_get_version_string();
-                UI::show_info_row("Opus", opus_version_str);
+                UI::InfoRow("Opus", opus_version_str);
 
                 static const std::string vorbis_version_str = vorbis_version_string();
-                UI::show_info_row("Vorbis", vorbis_version_str);
+                UI::InfoRow("Vorbis", vorbis_version_str);
 
                 static const std::string faad2_version_str = get_faad2_version();
-                UI::show_info_row("FAAD2", faad2_version_str);
+                UI::InfoRow("FAAD2", faad2_version_str);
 
             }
         }

@@ -697,7 +697,7 @@ namespace App {
             style.FramePadding          = padding;
             style.ScrollbarPadding      = 4;
             style.SeparatorTextPadding  = { style.FontSizeBase, padding.y };
-            style.WindowPadding         = {12, 12};
+            style.WindowPadding         = {15, 15};
 
             // Rounding
             style.ChildRounding          = rounding;
