@@ -20,10 +20,10 @@ to_string(TabID tab)
 {
     switch (tab) {
         using enum TabID;
-        case favorites:
-            return "favorites"s;
         case browser:
             return "browser"s;
+        case favorites:
+            return "favorites"s;
         case recent:
             return "recent"s;
         case player:
@@ -48,10 +48,10 @@ to_label(TabID tab)
 {
     switch (tab) {
         using enum TabID;
-        case favorites:
-            return ICON_FA_HEART " Favorites"s;
         case browser:
             return ICON_FA_GLOBE " Browser"s;
+        case favorites:
+            return ICON_FA_HEART " Favorites"s;
         case recent:
             return ICON_FA_HISTORY " Recent"s;
         case player:

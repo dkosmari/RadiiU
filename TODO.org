@@ -1,12 +1,12 @@
-* Plan for 0.4 [58%]
+* Plan for 0.4 [75%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
-- [-] General [3/4]
+- [X] General [4/4]
   - [X] Logs tab.
   - [X] Line up buttons better under Play button.
   - [X] Confirm exit dialog.
-  - [ ] Move Browser tab to the front.
+  - [X] Move Browser tab to the front.
 - [X] About [1/1]
   - [X] Show save path.
 - [ ] Favorites [0/2]

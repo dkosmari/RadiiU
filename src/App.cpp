@@ -572,6 +572,14 @@ namespace App {
 
                     if (TabBar tab_bar{"main_tabs"}) {
 
+                        if (TabItem browser_tab{
+                                to_label(TabID::browser),
+                                nullptr,
+                                get_tab_item_flags_for(TabID::browser)}) {
+                            current_tab = TabID::browser;
+                            BrowserTab::process_ui();
+                        }
+
                         if (TabItem fav_tab{
                                 to_label(TabID::favorites),
                                 nullptr,
@@ -579,14 +587,6 @@ namespace App {
                             }) {
                             current_tab = TabID::favorites;
                             FavoritesTab::process_ui();
-                        }
-
-                        if (TabItem browser_tab{
-                                to_label(TabID::browser),
-                                nullptr,
-                                get_tab_item_flags_for(TabID::browser)}) {
-                            current_tab = TabID::browser;
-                            BrowserTab::process_ui();
                         }
 
                         if (TabItem recent_tab{

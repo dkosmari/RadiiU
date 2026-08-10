@@ -12,8 +12,8 @@
 
 
 enum class TabID : unsigned {
-    favorites,
     browser,
+    favorites,
     recent,
     player,
     settings,
