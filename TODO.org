@@ -1,4 +1,4 @@
-* Plan for 0.4 [75%]
+* Plan for 0.4 [100%]
 :PROPERTIES:
 :COOKIE_DATA: recursive
 :END:
@@ -9,12 +9,14 @@
   - [X] Move Browser tab to the front.
 - [X] About [1/1]
   - [X] Show save path.
-- [ ] Favorites [0/2]
-  - [ ] Option to filter by tag.
-  - [ ] Option to update station details from RB.
+- [X] Favorites [2/2]
+  - [X] Option to filter by tag.
+  - [X] Option to update station details from RB.
 - [X] Browser
   - [X] Dedicated server stats popup module.
 
 * Plan for 0.5 [0%]
 - [ ] General [0/1]
   - [ ] Scrensavers.
+- [ ] Settings [0/1]
+  - [ ] Enable curl verbosy output for images and radio connections.

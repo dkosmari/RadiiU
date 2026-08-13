@@ -17,8 +17,8 @@ template<>
 struct glz::meta<TabID> {
     using enum TabID;
     static constexpr
-    auto value = enumerate(favorites,
-                           browser,
+    auto value = enumerate(browser,
+                           favorites,
                            recent,
                            player,
                            settings,

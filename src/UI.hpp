@@ -13,6 +13,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <imgui.h> // ImVec4
@@ -118,16 +119,43 @@ namespace UI {
 
 
     void
-    show_station_basic_info(const Station& station);
+    StationInfo(const Station& station,
+                bool show_extra = false);
+
+
+    struct FramedSpec {
+        std::variant<std::monostate, int, std::string> id{};
+        float width = -1;
+    };
+
+    struct FramedItem {
+        std::string text;
+        std::string tooltip{};
+        FramedSpec spec = {};
+    };
+
+
+    ImVec2
+    CalcFramedTextSize(std::string_view text,
+                       float width = -1);
+
+    ImVec2
+    CalcFramedTextSize(const FramedItem& item);
 
 
     void
-    TagsList(const std::vector<std::string>& tags);
-
+    FramedText(std::string_view text,
+               std::string_view tooltip = {},
+               const FramedSpec& spec = {});
 
     void
-    TextBoxed(const std::string& text,
-              const std::string& tooltip = "");
+    FramedText(const FramedItem& item);
+
+
+    bool
+    FramedList(const std::vector<FramedItem>& items,
+               bool only_first_line);
+
 
 
     void

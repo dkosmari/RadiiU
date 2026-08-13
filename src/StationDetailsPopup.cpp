@@ -168,12 +168,12 @@ namespace StationDetailsPopup {
                 UI::InfoRow("tags",         station->tags);
                 UI::InfoRow("stationuuid",  station->stationuuid);
 
-                UI::InfoRow("codec", station->codec);
-                UI::FormatInfoRow("bitrate", "{}", station->bitrate);
+                UI::InfoRow("codec", station->codec.value_or(""));
+                UI::FormatInfoRow("bitrate", "{}", station->bitrate.value_or(0));
 
-                UI::FormatInfoRow("votes",      "{}", station->votes);
-                UI::FormatInfoRow("clickcount", "{}", station->click_count);
-                UI::FormatInfoRow("clicktrend", "{}", station->click_trend);
+                UI::FormatInfoRow("votes",      "{}", station->votes.value_or(0));
+                UI::FormatInfoRow("clickcount", "{}", station->click_count.value_or(0));
+                UI::FormatInfoRow("clicktrend", "{}", station->click_trend.value_or(0));
             } // fields
         }
 

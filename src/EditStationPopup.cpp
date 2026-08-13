@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <regex>
 #include <string>
 #include <optional>
 #include <utility>
@@ -17,6 +18,8 @@
 
 #include "ButtonHBox.hpp"
 #include "IconsFontAwesome4.h"
+#include "LogManager.hpp"
+#include "RadioBrowserAPI.hpp"
 #include "string_utils.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
@@ -70,6 +73,7 @@ namespace EditStationPopup {
         ConfirmFunction confirm_callback;
         std::optional<Station> station;
         std::optional<Editable> editable;
+        bool busy = false;
 
 
         /*-----------------------*/
@@ -85,6 +89,15 @@ namespace EditStationPopup {
         void
         show_field(const std::string& label,
                    std::string& value);
+
+        void
+        update_from_rb();
+
+        void
+        update_from_rb_exception(const std::exception& e);
+
+        void
+        update_from_rb_result(RadioBrowserAPI::Station rb_station);
 
 
         /*----------------------*/
@@ -104,6 +117,24 @@ namespace EditStationPopup {
 
             if (confirm_callback)
                 confirm_callback(std::move(*station));
+        }
+
+
+        bool
+        is_valid_uuid(const std::string& uuid)
+        {
+            static const std::regex uuid_re{
+                "[[:xdigit:]]{8}"
+                "-"
+                "[[:xdigit:]]{4}"
+                "-"
+                "[[:xdigit:]]{4}"
+                "-"
+                "[[:xdigit:]]{4}"
+                "-"
+                "[[:xdigit:]]{12}"
+            };
+            return std::regex_match(uuid, uuid_re);
         }
 
 
@@ -127,6 +158,39 @@ namespace EditStationPopup {
             ImGui::TableNextColumn();
             ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
             ImGui::InputText("##" + label, value);
+        }
+
+
+        void
+        update_from_rb()
+        {
+            busy = true;
+            RadioBrowserAPI::get_station(station->stationuuid,
+                                         update_from_rb_result,
+                                         update_from_rb_exception);
+        }
+
+
+        void
+        update_from_rb_exception(const std::exception& e)
+        {
+            busy = false;
+            LOG_ERROR("Could not fetch station {}: {}",
+                      station->stationuuid,
+                      e.what());
+        }
+
+
+        void
+        update_from_rb_result(RadioBrowserAPI::Station rb_station)
+        {
+            busy = false;
+            LOG_DEBUG("Updating favorite from RadioBrowser");
+            station = Station::from_radio_browser(rb_station);
+            editable.emplace(
+                to_csv(station->language),
+                to_csv(station->tags)
+            );
         }
 
     } // namespace
@@ -192,7 +256,6 @@ namespace EditStationPopup {
             return;
         }
 
-
         switch (mode) {
             case Mode::create:
                 ImGui::TextAligned(0.5f, -1, "Create new station");
@@ -204,6 +267,7 @@ namespace EditStationPopup {
 
         ImGui::Separator();
 
+        Disabled if_busy{busy};
 
         ButtonHBox buttons;
         buttons.expand = true;
@@ -211,6 +275,15 @@ namespace EditStationPopup {
             ICON_FA_TIMES " Cancel",
             ImGui::CloseCurrentPopup
         );
+
+        if (is_valid_uuid(station->stationuuid)) {
+            // TODO: perform better UUID validation
+            buttons.add(ICON_FA_DOWNLOAD " Update",
+                        "Fetch station details from RadioBrowser",
+                        false,
+                        update_from_rb);
+        }
+
         buttons.add(
             (mode == Mode::create
              ? ICON_FA_CHECK " Create"
@@ -224,7 +297,8 @@ namespace EditStationPopup {
         const auto& style = ImGui::GetStyle();
         if (Child content{"content",
                           {0, - (style.ItemSpacing.y + buttons.button_size.y)},
-                          ImGuiChildFlags_NavFlattened}) {
+                          ImGuiChildFlags_NavFlattened,
+                          ImGuiWindowFlags_NoSavedSettings}) {
 
             if (Table fields_table{"fields", 2}) {
                 ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
@@ -240,6 +314,10 @@ namespace EditStationPopup {
                 show_field("language",     editable->language);
                 show_field("stationuuid",  station->stationuuid);
             }
+
+            // Always scroll to the top when the window is first shown.
+            if (ImGui::IsWindowAppearing())
+                ImGui::SetScrollY(0);
         }
 
         buttons.show();

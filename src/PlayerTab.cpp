@@ -343,11 +343,7 @@ namespace PlayerTab {
                     ImGuiChildFlags_NavFlattened
                 }) {
 
-                UI::FavIcon(*station);
-
-                ImGui::SameLine();
-
-                UI::show_station_basic_info(*station);
+                UI::StationInfo(*station, true);
 
             } // details_child
 

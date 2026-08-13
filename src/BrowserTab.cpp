@@ -579,6 +579,7 @@ namespace BrowserTab {
 
                 ImGui::SameLine();
 
+                // TODO: use a vertical button box helper.
                 if (Child buttons{
                         "buttons",
                         {0, 0},
@@ -592,6 +593,7 @@ namespace BrowserTab {
                     ImGui::SetItemTooltip("Reset browser options to default.");
 
                     if (ImGui::Button("Search")) {
+                        GUI::page = 1;
                         search_stations();
                     }
                     ImGui::SetItemTooltip("Search with the selected options.");
@@ -746,11 +748,12 @@ namespace BrowserTab {
                 auto vote_record = votes_cast.find(station->stationuuid);
                 const bool voted = vote_record != votes_cast.end();
                 bool ok = voted ? vote_record->second.ok : false;
-                std::string value_label = humanize::value(station->votes);
-                std::string vote_label = (ok
-                                          ? ICON_FA_THUMBS_UP " "
-                                          : ICON_FA_THUMBS_O_UP " ")
-                                         + value_label;
+                std::string vote_label = ok ? ICON_FA_THUMBS_UP : ICON_FA_THUMBS_O_UP;
+                std::string value_label;
+                if (station->votes) {
+                    value_label = humanize::value(*station->votes);
+                    vote_label += " " + value_label;
+                }
 
                 {
                     ImVec2 size {
@@ -758,7 +761,7 @@ namespace BrowserTab {
                         ImGui::GetFrameHeight()
                     };
                     std::optional<Font> smaller_font;
-                    if (value_label.size() > 3)
+                    if (value_label.size() >= 3)
                         smaller_font.emplace(nullptr, 24);
                     Disabled if_cant_vote{!cfg::state.send_clicks || voted};
                     if (ImGui::Button(vote_label, size))
@@ -783,39 +786,7 @@ namespace BrowserTab {
                     ImGuiChildFlags_NavFlattened
                 }) {
 
-                UI::FavIcon(*station);
-
-                ImGui::SameLine();
-
-                UI::show_station_basic_info(*station);
-
-                if (Child extra_info_child{
-                        "extra_info",
-                        {0, 0},
-                        ImGuiChildFlags_AutoResizeY |
-                        ImGuiChildFlags_NavFlattened
-                    }) {
-
-                    UI::TextBoxed(std::format(ICON_FA_BAR_CHART " {} ({:+d})",
-                                              station->click_count,
-                                              station->click_trend),
-                                  "Daily total clicks and trend.");
-
-                    if (station->bitrate) {
-                        ImGui::SameLine();
-                        UI::TextBoxed(std::format(ICON_FA_HEADPHONES " {} kbps",
-                                                  station->bitrate),
-                                      "The advertised stream quality.");
-                    }
-
-                    ImGui::SameLine();
-
-                    UI::TextBoxed(ICON_FA_FLASK " " + station->codec,
-                                  "The codec used in this broadcast.");
-
-                    UI::TagsList(station->tags);
-
-                } // extra_info_child
+                UI::StationInfo(*station, true);
 
             } // details_child
 

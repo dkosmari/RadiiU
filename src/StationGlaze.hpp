@@ -8,7 +8,7 @@
 #ifndef STATION_GLAZE_HPP
 #define STATION_GLAZE_HPP
 
-#include <glaze/core/meta.hpp>
+#include <glaze/core/common.hpp>
 
 #include "string_utils.hpp"
 
@@ -16,16 +16,18 @@
 template<>
 struct glz::meta<Station> {
 
+    using T = Station;
+
     static constexpr
     auto read_language =
-        [](Station& self, const std::string& arg)
+        [](T& self, const std::string& arg)
         {
             self.language = string_utils::from_csv(arg);
         };
 
     static constexpr
     auto write_language =
-        [](const Station& self) -> std::string
+        [](const T& self) -> std::string
         {
             return string_utils::to_csv(self.language);
         };
@@ -33,39 +35,37 @@ struct glz::meta<Station> {
 
     static constexpr
     auto read_tags =
-        [](Station& self, const std::string& arg)
+        [](T& self, const std::string& arg)
         {
             self.tags = string_utils::from_csv(arg);
         };
 
     static constexpr
     auto write_tags =
-        [](const Station& self) -> std::string
+        [](const T& self) -> std::string
         {
             return string_utils::to_csv(self.tags);
         };
 
 
+    // NOTE: since we have 7 automatic serializations and 6 skips, it's shorter to do an
+    // explicit serialization instead of calling skip().
+
     static constexpr
-    auto modify = object(
-        "language", glz::custom<read_language, write_language>,
-        "tags", glz::custom<read_tags, write_tags>
+    auto value = object(
+        "stationuuid",  &T::stationuuid,
+        "name",         &T::name,
+        "url",          &T::url,
+        "url_resolved", &T::url_resolved,
+        "homepage",     &T::homepage,
+        "favicon",      &T::favicon,
+        "countrycode",  &T::countrycode,
+
+        "language", custom<read_language, write_language>,
+        "tags",     custom<read_tags, write_tags>
+
+        // The other fields are intentionally ignored.
     );
-
-
-    static constexpr
-    bool
-    skip(const std::string_view key,
-         const meta_context&) {
-        using namespace std::literals;
-        if (key == "votes"sv ||
-            key == "click_count"sv ||
-            key == "click_trend"sv ||
-            key == "bitrate"sv ||
-            key == "codec"sv)
-            return true;
-        return false;
-    }
 
 }; // struct glz::meta<Station>
 

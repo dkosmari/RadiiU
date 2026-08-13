@@ -27,11 +27,11 @@ Station::from_radio_browser(const RadioBrowserAPI::Station& st)
         .countrycode  = st.countrycode,
         .language     = string_utils::from_csv(st.language),
         .tags         = string_utils::from_csv(st.tags),
+        .codec        = st.codec,
+        .bitrate      = st.bitrate,
         .votes        = st.votes,
         .click_count  = st.clickcount,
         .click_trend  = st.clicktrend,
-        .bitrate      = st.bitrate,
-        .codec        = st.codec,
     };
 }
 

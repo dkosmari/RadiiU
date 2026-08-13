@@ -172,6 +172,7 @@ libglaze_la_SOURCES = \
 	glaze/include/glaze/net/cors.hpp \
 	glaze/include/glaze/net/http.hpp \
 	glaze/include/glaze/net/http_client.hpp \
+	glaze/include/glaze/net/http_headers.hpp \
 	glaze/include/glaze/net/http_router.hpp \
 	glaze/include/glaze/net/http_server.hpp \
 	glaze/include/glaze/net/openapi.hpp \
@@ -192,9 +193,11 @@ libglaze_la_SOURCES = \
 	glaze/include/glaze/rpc/repe/repe_registry_impl.hpp \
 	glaze/include/glaze/rpc/repe/repe_to_jsonrpc.hpp \
 	glaze/include/glaze/simd/avx.hpp \
+	glaze/include/glaze/simd/backends.hpp \
 	glaze/include/glaze/simd/neon.hpp \
 	glaze/include/glaze/simd/simd.hpp \
 	glaze/include/glaze/simd/sse.hpp \
+	glaze/include/glaze/simd/utf8_validation.hpp \
 	glaze/include/glaze/stencil/stencil.hpp \
 	glaze/include/glaze/stencil/stencilcount.hpp \
 	glaze/include/glaze/thread/async.hpp \
@@ -215,6 +218,7 @@ libglaze_la_SOURCES = \
 	glaze/include/glaze/trace/trace.hpp \
 	glaze/include/glaze/tuplet/tuple.hpp \
 	glaze/include/glaze/util/atoi.hpp \
+	glaze/include/glaze/util/attributes.hpp \
 	glaze/include/glaze/util/bit.hpp \
 	glaze/include/glaze/util/bit_array.hpp \
 	glaze/include/glaze/util/buffer_pool.hpp \

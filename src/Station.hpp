@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -33,12 +34,14 @@ struct Station {
     std::vector<std::string> tags; // special serialization needed
 
     // Volatile fields, never stored.
-    mutable std::uint64_t votes = 0;
-    mutable std::uint64_t click_count = 0;
-    mutable int click_trend = 0;
-    mutable unsigned bitrate = 0;
-    mutable std::string codec;
+    mutable std::optional<std::string> codec;
+    mutable std::optional<unsigned> bitrate;
+    mutable std::optional<std::uint64_t> votes;
+    mutable std::optional<std::uint64_t> click_count;
+    mutable std::optional<int> click_trend;
 
+    // UI-related fields, never stored.
+    mutable bool expanded = false;
 
     static
     Station

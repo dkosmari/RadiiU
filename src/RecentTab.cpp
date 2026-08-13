@@ -127,22 +127,7 @@ namespace RecentTab {
                     ImGuiChildFlags_NavFlattened
                 }) {
 
-                UI::FavIcon(*station);
-
-                ImGui::SameLine();
-
-                UI::show_station_basic_info(*station);
-
-                if (Child extra_info{
-                        "extra_info",
-                        {0, 0},
-                        ImGuiChildFlags_AutoResizeY |
-                        ImGuiChildFlags_NavFlattened
-                    }) {
-
-                    UI::TagsList(station->tags);
-
-                }
+                UI::StationInfo(*station, true);
 
             }
 

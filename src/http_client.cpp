@@ -79,10 +79,12 @@ http_client::set_url(const std::string& url)
     easy.set_accept_encoding("");
     easy.set_auto_referer(true);
     easy.set_buffer_size(1 * 1024 * 1024);
+    easy.set_fail_on_error(true);
     easy.set_follow_location(true);
     easy.set_forbid_reuse(false);
+    easy.set_http_09_allowed(true);
+    easy.set_http_200_aliases({"ICY 200 OK"});
     easy.set_http_version(curl::easy::http_version::none);
-    easy.set_fail_on_error(true);
     easy.set_ssl_verify_peer(false);
     easy.set_tcp_no_delay(false);
     easy.set_transfer_encoding(true);

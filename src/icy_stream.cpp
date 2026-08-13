@@ -109,6 +109,8 @@ namespace icy {
         if (auto hdr = http.get_header("icy-pub"))
             ++icy_num;
 
+        // TODO: process icy-noticeN headers.
+
         if (!icy_num)
             throw std::runtime_error{"not an icecast stream"};
 

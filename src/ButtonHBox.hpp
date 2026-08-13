@@ -5,8 +5,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#ifndef BUTTONHBOX_HPP
-#define BUTTONHBOX_HPP
+#ifndef BUTTON_H_BOX_HPP
+#define BUTTON_H_BOX_HPP
 
 #include <functional>
 #include <string>

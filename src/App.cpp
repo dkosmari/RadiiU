@@ -501,6 +501,7 @@ namespace App {
 
                     case window:
                         switch (event.window.event) {
+
                             case SDL_WINDOWEVENT_SHOWN:
                             case SDL_WINDOWEVENT_EXPOSED:
                             case SDL_WINDOWEVENT_RESTORED:
@@ -508,6 +509,13 @@ namespace App {
                             case SDL_WINDOWEVENT_ENTER:
                                 last_activity = now;
                                 break;
+
+                            case SDL_WINDOWEVENT_SIZE_CHANGED:
+                                res->renderer.set_logical_size(event.window.data1,
+                                                               event.window.data2);
+                                last_activity = now;
+                                break;
+
                         }
                         break;
 
@@ -700,7 +708,7 @@ namespace App {
             style.WindowPadding         = {15, 15};
 
             // Rounding
-            style.ChildRounding          = rounding;
+            style.ChildRounding          = 0;
             style.DragDropTargetRounding = rounding;
             style.FrameRounding          = rounding;
             style.GrabRounding           = rounding;
@@ -778,8 +786,8 @@ namespace App {
     {
         TRACE_FUNC;
 
-        initialize_config_dir();
         LogManager::initialize();
+        initialize_config_dir();
         // Note: initialize cfg module early.
         cfg::initialize();
         set_tab(cfg::state.initial_tab);
@@ -810,7 +818,7 @@ namespace App {
         res->window.create(PACKAGE_STRING,
                            sdl::window::pos_centered,
                            {1280, 720},
-                           0);
+                           sdl::window::flag::resizable);
 
         res->renderer.create(res->window,
                              -1,
@@ -858,11 +866,14 @@ namespace App {
 
         // Finalize cfg module last.
         cfg::state.remember_tab = cfg::state.initial_tab == TabID::last_active;
-        if (cfg::state.remember_tab)
+        if (cfg::state.remember_tab) {
+            LOG_DEBUG("remembering last used tab: {}", to_string(current_tab));
             cfg::state.initial_tab = current_tab;
+        }
         cfg::finalize();
-        LogManager::finalize();
         finalize_config_dir();
+
+        LogManager::finalize();
 
         res.reset();
     }
@@ -900,8 +911,10 @@ namespace App {
     void
     set_tab(TabID id)
     {
-        if (id == TabID::last_active)
-            id = TabID::browser;
+        if (id == TabID::last_active || id == TabID::count) {
+            LOG_ERROR("set_tab({})", to_string(id));
+            id = TabID::about;
+        }
         next_tab = id;
     }
 

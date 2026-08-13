@@ -39,6 +39,42 @@ namespace UI {
 
     namespace {
 
+        /*-------*/
+        /* Types */
+        /*-------*/
+
+        struct FramedItemExt {
+            std::string_view text;
+            std::string_view tooltip;
+            std::variant<std::monostate, int, std::string> id;
+            float width = -1;
+            float x;
+        };
+
+
+        /*-----------*/
+        /* Constants */
+        /*-----------*/
+
+        const int favicon_height = 173;
+
+
+        /*-----------------------*/
+        /* Function declarations */
+        /*-----------------------*/
+
+        std::pair<double, double>
+        get_scales_for(const sdl::vec2& input,
+                       const sdl::vec2& limits);
+
+        void
+        show_one_framed_line(const std::vector<FramedItemExt>& line);
+
+
+        /*----------------------*/
+        /* Function definitions */
+        /*----------------------*/
+
         std::pair<double, double>
         get_scales_for(const sdl::vec2& input,
                        const sdl::vec2& limits)
@@ -48,11 +84,39 @@ namespace UI {
             return { x_scale, y_scale };
         }
 
+
+        void
+        show_one_framed_line(const std::vector<FramedItemExt>& line)
+        {
+            bool first = true;
+            for (auto& item : line) {
+                if (!first)
+                    ImGui::SameLine();
+                first = false;
+                FramedText(
+                    item.text,
+                    item.tooltip,
+                    {
+                        .id = item.id,
+                        .width = item.width
+                    }
+                );
+            }
+        }
+
     } // namespace
 
 
+    /*------------------*/
+    /* Public variables */
+    /*------------------*/
+
     const ImVec2 play_button_size = {114, 114};
 
+
+    /*------------------*/
+    /* Public functions */
+    /*------------------*/
 
     const ImVec4&
     get_label_color()
@@ -81,7 +145,7 @@ namespace UI {
 
         using sdl::vec2;
 
-        const vec2 max_size = {400, 128};
+        const vec2 max_size = {400, favicon_height};
         auto icon = ImageLoader::get(station.favicon, max_size);
         vec2 icon_size = icon->get_size();
         auto [scale_x, scale_y] = get_scales_for(icon_size, max_size);
@@ -251,91 +315,245 @@ namespace UI {
 
 
     void
-    show_station_basic_info(const Station& station)
+    StationInfo(const Station& station,
+                bool show_extra)
     {
         using namespace ImGui::RAII;
 
-        if (Child child{
-                "basic_info",
-                {0, 0},
-                ImGuiChildFlags_AutoResizeY |
-                ImGuiChildFlags_NavFlattened
-            }) {
+        if (Child favicon_and_name{"favicon_and_name",
+                                   {0, favicon_height},
+                                   ImGuiChildFlags_NavFlattened}) {
 
-            ImGui::TextWrapped(station.name);
+            if (!station.favicon.empty()) {
+                FavIcon(station);
+                ImGui::SameLine();
+            }
+
+            Group name_and_homepage;
+
+            if (ImGui::TextAligned(0.0f, -1, station.name)) {
+                if (ItemTooltip name_tooltip{}) {
+                    TextWrapPos wrap_at{900};
+                    ImGui::Text(station.name);
+                }
+            }
 
             if (!station.homepage.empty())
                 TextLinkOpenURL(station.homepage);
 
-            Font font{nullptr, 28};
+        }
 
-            bool has_content = false;
-            if (!station.countrycode.empty()) {
-                has_content = true;
-                std::string tooltip = BrowserTab::get_country_name(station.countrycode);
-                TextBoxed(ICON_FA_FLAG_O " " + station.countrycode, tooltip);
+        ImGuiChildFlags details_flags = ImGuiChildFlags_NavFlattened;
+        if (station.expanded)
+            details_flags |= ImGuiChildFlags_AutoResizeY;
+        if (Child details{"details",
+                          {0.0f, station.expanded ? 0 : ImGui::GetFrameHeight()},
+                          details_flags}) {
+
+            // Font font{nullptr, 28};
+
+            std::vector<FramedItem> items;
+            if (!station.countrycode.empty())
+                items.emplace_back(ICON_FA_FLAG_O " " + station.countrycode,
+                                   BrowserTab::get_country_name(station.countrycode));
+            for (auto& lang : station.language)
+                items.emplace_back(ICON_FA_LANGUAGE " " + lang,
+                                   "");
+
+            if (show_extra) {
+                if (station.click_count && station.click_trend)
+                    items.emplace_back(std::format(ICON_FA_BAR_CHART " {} ({:+d})",
+                                                   *station.click_count,
+                                                   *station.click_trend),
+                                       "Daily total clicks and trend.");
+
+                if (station.codec)
+                    items.emplace_back(ICON_FA_FLASK " " + *station.codec,
+                                       "The codec used in this broadcast.");
+
+                if (station.bitrate)
+                    items.emplace_back(std::format(ICON_FA_HEADPHONES " {} kbps",
+                                                   *station.bitrate),
+                                       "The advertised stream quality.");
             }
 
-            for (auto& lang : station.language) {
-                if (has_content)
-                    ImGui::SameLine();
-                has_content = true;
-                TextBoxed(ICON_FA_LANGUAGE " " + lang,
-                          "Language spoken in this broadcast.");
-            }
+            for (auto& tag : station.tags)
+                items.emplace_back(ICON_FA_TAG " " + tag);
 
+            station.expanded = FramedList(items, !station.expanded)
+                ? !station.expanded
+                : station.expanded;
         }
     }
 
 
-    void
-    TagsList(const std::vector<std::string>& tags)
+    ImVec2
+    CalcFramedTextSize(std::string_view text,
+                       float width)
     {
-        if (tags.empty())
-            return;
+        auto& style = ImGui::GetStyle();
+        auto size = ImGui::CalcTextSize(text) + 2 * style.FramePadding;
+        if (width > 0)
+            size.x = width;
+        return size;
+    }
 
-        bool has_content = false;
-        for (const auto& tag : tags) {
-            if (has_content)
-                ImGui::SameLine();
-            has_content = true;
-            TextBoxed(ICON_FA_TAG " " + tag);
-        }
+
+    ImVec2
+    CalcFramedTextSize(const FramedItem& item)
+    {
+        return CalcFramedTextSize(item.text, item.spec.width);
     }
 
 
     void
-    TextBoxed(const std::string& text,
-              const std::string& tooltip)
+    FramedText(std::string_view text,
+               std::string_view tooltip,
+               const FramedSpec& spec)
     {
         using namespace ImGui::RAII;
 
+        const auto& style = ImGui::GetStyle();
+        const float padding = 2 * style.FramePadding.x;
+
+        std::optional<ID> spec_id;
+        if (auto int_id = get_if<int>(&spec.id))
+            spec_id.emplace(*int_id);
+        else if (auto str_id = get_if<std::string>(&spec.id))
+            spec_id.emplace(*str_id);
+
         ID text_id{text};
 
-        const ImGuiStyle& style = ImGui::GetStyle();
-        const ImVec2 size = ImGui::CalcTextSize(text)
-            + 2 * style.FramePadding
-            + 2 * style.FrameBorderSize * ImVec2{1, 1};
-        const float spacing = style.ItemSpacing.x;
-        const ImVec2 available = ImGui::GetContentRegionAvail();
-        if (size.x + spacing > available.x)
-            ImGui::NewLine();
-
+        auto text_size = CalcFramedTextSize(text, spec.width);
         if (Child boxed_child{
                 "boxed",
-                size,
+                text_size,
                 ImGuiChildFlags_FrameStyle
             }) {
 
-            ImGui::Text(text);
-            if (!tooltip.empty())
-                ImGui::SetItemTooltip(tooltip);
+            if (spec.width > 0) {
+                if (spec.width > padding) {
+                    ImGui::TextAligned(0, spec.width - padding, text);
+                }
+            } else {
+                ImGui::Text(text);
+            }
 
         }
+        if (!tooltip.empty())
+            ImGui::SetItemTooltip(tooltip);
+
     }
 
 
-    // DEBUG
+    void
+    FramedText(const FramedItem& item)
+    {
+        FramedText(item.text, item.tooltip, item.spec);
+    }
+
+
+    bool
+    FramedList(const std::vector<FramedItem>& items,
+               bool only_first_line)
+    {
+        const std::string ellipsis = "…";
+        const float ellipsis_width = CalcFramedTextSize(ellipsis).x;
+        const auto& style = ImGui::GetStyle();
+        const float spacing = style.ItemSpacing.x;
+        float total_width = ImGui::GetContentRegionAvail().x;
+        const float frame_padding = 2 * style.FramePadding.x;
+
+        float cur_x = 0;
+        std::vector<FramedItemExt> line;
+        std::size_t idx;
+        bool stopped_early = false;
+
+        for (idx = 0; idx < items.size(); ++idx) {
+            auto& item = items[idx];
+            auto& [text, tooltip, spec] = item;
+            float width = CalcFramedTextSize(item).x;
+            line.emplace_back(text,
+                              tooltip,
+                              (holds_alternative<std::monostate>(spec.id)
+                               ? static_cast<int>(idx)
+                               : spec.id),
+                              width,
+                              cur_x);
+
+            cur_x += width + spacing;
+
+            if (cur_x >= total_width) {
+                // Next item will be out of bounds, so stop accumulating.
+                if (only_first_line) {
+                    stopped_early = true;
+                    break;
+                }
+
+                auto& last = line.back();
+                if (line.size() == 1) {
+                    // If only one item on this line, may need to truncate it.
+                    if (last.x + last.width > total_width)
+                        last.width = total_width - last.x;
+                } else {
+                    // Multiple items on this line, so it's safe to pop one.
+                    if (last.x + last.width > total_width) {
+                        line.pop_back();
+                        --idx;
+                    }
+                }
+
+
+                show_one_framed_line(line);
+
+                line.clear();
+                cur_x = 0;
+                total_width = ImGui::GetContentRegionAvail().x;
+            }
+        }
+
+        // The last line is handled here.
+
+        if (line.empty())
+            return false;
+
+        if (stopped_early) {
+            // Stopped early, so we show the ellipsis button.
+            // That means we need to pop items until the ellipsis fits.
+            while (!line.empty() &&
+                   line.back().x + frame_padding + spacing + ellipsis_width > total_width) {
+                line.pop_back();
+            }
+
+            // If there's at least one item, check if we need to shrink it to fit the ellipsis.
+            if (!line.empty()) {
+                auto& last = line.back();
+                const float room_left = total_width - last.x;
+                if (last.width + spacing + ellipsis_width > room_left) {
+                    // shrink last item
+                    last.width = room_left - spacing - ellipsis_width;
+                }
+            }
+        }
+
+        show_one_framed_line(line);
+
+        if (stopped_early) {
+            if (!line.empty())
+                ImGui::SameLine();
+            auto available = ImGui::GetContentRegionAvail();
+            float offset = available.x - ellipsis_width;
+            if (offset > 0)
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
+            bool result = ImGui::Button(ellipsis);
+            ImGui::SetItemTooltip("Show more.");
+            return result;
+        }
+
+        return false;
+    }
+
+
     void
     BoundingBox()
     {
@@ -356,7 +574,7 @@ namespace UI {
         if (offset > 0)
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
         ImGui::TextColored(get_label_color(), label);
-        // show_last_bounding_box();
+        // BoundingBox();
     }
 
 

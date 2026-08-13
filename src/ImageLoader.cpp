@@ -448,7 +448,6 @@ namespace ImageLoader {
         void
         CacheEntry::load_from_buffer()
         {
-            TRACE_FUNC;
             assert(raw_buf);
             sdl::rwops rw{std::span(*raw_buf)};
             img = sdl::img::load(rw);
@@ -460,7 +459,6 @@ namespace ImageLoader {
         void
         CacheEntry::load_from_file()
         {
-            TRACE_FUNC;
             img = sdl::img::load(location);
             LOG_DEBUG("Loaded file {:?}", location);
         }
@@ -530,8 +528,8 @@ namespace ImageLoader {
             error_icon.set_blend_mode(SDL_BLENDMODE_BLEND);
             loading_icon.set_blend_mode(SDL_BLENDMODE_BLEND);
 
-            multi.set_max_total_connections(10);
-            multi.set_max_connections(10);
+            multi.set_max_total_connections(4);
+            multi.set_max_connections(2);
 
             loader_thread = std::jthread{
                 std::bind_front(&Resources::loader_thread_func, this)

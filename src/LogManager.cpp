@@ -139,13 +139,16 @@ namespace LogManager {
         real_log(const Message& msg)
         {
             ++timestamp;
+
             // TODO: set ANSI colors for each level
-            std::println("[LOG:{}] [{}:{}] {}\n{}",
+            std::println(cout,
+                         "[LOG:{}] [{}:{}] {}\n{}",
                          msg.level,
                          msg.location.file_name(),
                          msg.location.line(),
                          msg.tag,
                          msg.text);
+
             auto messages = safe_messages.lock();
             messages->push_back(std::move(msg));
             trim_messages(*messages);

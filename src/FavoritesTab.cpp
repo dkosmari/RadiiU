@@ -34,6 +34,9 @@
 #include "UI.hpp"
 
 
+using namespace std::literals;
+
+
 namespace FavoritesTab {
 
     namespace {
@@ -63,6 +66,7 @@ namespace FavoritesTab {
         std::unordered_multiset<std::string> uuids;
         std::optional<MoveOp> move_operation;
         std::optional<std::size_t> scroll_to_station;
+        std::string tags_filter;
 
 
         /*-----------------------*/
@@ -83,8 +87,8 @@ namespace FavoritesTab {
                             Station new_station);
 
         void
-        show_station(StationPtr& station,
-                     std::size_t index);
+        show_station(std::size_t index,
+                     StationPtr& station);
 
 
         /*----------------------*/
@@ -142,22 +146,30 @@ namespace FavoritesTab {
 
 
         void
-        show_station(StationPtr& station,
-                     std::size_t index)
+        show_station(std::size_t index,
+                     StationPtr& station)
         {
             using namespace ImGui::RAII;
 
             ID station_id{std::to_string(index) + ":" + station->stationuuid};
 
-            if (Child station_child{
-                    "station",
-                    {0, 0},
-                    ImGuiChildFlags_AutoResizeY |
-                    ImGuiChildFlags_FrameStyle |
-                    ImGuiChildFlags_NavFlattened
-                }) {
+            const auto& style = ImGui::GetStyle();
 
-                if (Child actions_child{
+            float frame_height = station->expanded
+                ? 0
+                : 2 * style.FramePadding.y
+                + UI::play_button_size.y
+                + 2 * style.ItemSpacing.y
+                + 2 * UI::get_small_button_size().y;
+            ImGuiChildFlags frame_flags =
+                ImGuiChildFlags_FrameStyle |
+                ImGuiChildFlags_NavFlattened;
+            if (station->expanded)
+                frame_flags |= ImGuiChildFlags_AutoResizeY;
+
+            if (Child station_frame{"station_frame", {0, frame_height}, frame_flags}) {
+
+                if (Child actions{
                         "actions",
                         {0, 0},
                         ImGuiChildFlags_AutoResizeX |
@@ -213,33 +225,21 @@ namespace FavoritesTab {
 
                 ImGui::SameLine();
 
+                ImGuiChildFlags details_flags = ImGuiChildFlags_NavFlattened;
+                if (station->expanded)
+                    details_flags = ImGuiChildFlags_AutoResizeY;
+
+                // StyleColor details_bg{ImGuiCol_ChildBg, {0.0f, 0.75f, 0.0f, 0.5f}};
                 if (Child details{
                         "details",
                         {0, 0},
-                        ImGuiChildFlags_AutoResizeY |
-                        ImGuiChildFlags_NavFlattened
-                    }) {
+                        details_flags}) {
 
-                    UI::FavIcon(*station);
-
-                    ImGui::SameLine();
-
-                    UI::show_station_basic_info(*station);
-
-                    if (Child extra_info_child{
-                            "extra_info",
-                            {0, 0},
-                            ImGuiChildFlags_AutoResizeY |
-                            ImGuiChildFlags_NavFlattened
-                        }) {
-
-                        UI::TagsList(station->tags);
-
-                    } // extra_info
+                    UI::StationInfo(*station);
 
                 } // details
 
-            } // station
+            } // station_frame
 
         }
 
@@ -351,6 +351,11 @@ namespace FavoritesTab {
 
             ImGui::SameLine();
 
+            ImGui::SetNextItemWidth(300);
+            ImGui::InputTextWithHint("##tags_filter"s, "Filter by tag..."s, tags_filter);
+
+            ImGui::SameLine();
+
             ImGui::AlignTextToFramePadding();
             ImGui::FormatTextAligned(1, -1, "{} stations", stations.size());
 
@@ -360,7 +365,20 @@ namespace FavoritesTab {
         if (Child favorites{"favorites"}) {
 
             for (std::size_t index = 0; index < stations.size(); ++index) {
-                show_station(stations[index], index);
+                auto& station = stations[index];
+
+                if (!tags_filter.empty()) {
+                    bool match = false;
+                    for (auto& tag : station->tags)
+                        if (tag.contains(tags_filter)) {
+                            match = true;
+                            break;
+                        }
+                    if (!match)
+                        continue;
+                }
+
+                show_station(index, station);
                 if (scroll_to_station && *scroll_to_station == index) {
                     ImGui::SetScrollHereY();
                     scroll_to_station.reset();
