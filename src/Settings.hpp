@@ -5,8 +5,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#ifndef CFG_HPP
-#define CFG_HPP
+#ifndef SETTINGS_HPP
+#define SETTINGS_HPP
 
 #include <cstddef>
 #include <string>
@@ -15,9 +15,9 @@
 #include "TabID.hpp"
 
 
-namespace cfg {
+namespace Settings {
 
-    struct State {
+    struct Cfg {
         unsigned    browser_page_limit   = 20;
         bool        disable_apd          = true;
         bool        disable_swkbd        = false;
@@ -32,9 +32,13 @@ namespace cfg {
         std::string server               = {};
         std::string style                = {};
         bool        switch_to_player     = false;
+        bool        verbose_image_logs   = false;
+        bool        verbose_rest_logs    = false;
+        bool        verbose_stream_logs  = false;
     };
 
-    extern State state;
+
+    extern Cfg cfg;
 
 
     void
@@ -56,6 +60,6 @@ namespace cfg {
     void
     save();
 
-} // namespace cfg
+} // namespace Settings
 
 #endif

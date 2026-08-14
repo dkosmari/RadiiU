@@ -30,9 +30,6 @@ namespace BrowserTab {
     send_click(StationPtr& station);
 
     void
-    send_vote(StationPtr& station);
-
-    void
     update_station(StationPtr station);
 
     void

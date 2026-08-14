@@ -14,9 +14,9 @@
   - [X] Option to update station details from RB.
 - [X] Browser
   - [X] Dedicated server stats popup module.
+- [X] Settings [1/1]
+  - [X] Enable curl verbosy output for images and radio connections.
 
 * Plan for 0.5 [0%]
 - [ ] General [0/1]
   - [ ] Scrensavers.
-- [ ] Settings [0/1]
-  - [ ] Enable curl verbosy output for images and radio connections.

@@ -21,7 +21,6 @@
 #include "FavoritesTab.hpp"
 
 #include "App.hpp"
-#include "cfg.hpp"
 #include "ConfirmDeleteStationPopup.hpp"
 #include "EditStationPopup.hpp"
 #include "IconsFontAwesome4.h"

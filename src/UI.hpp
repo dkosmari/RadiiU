@@ -110,6 +110,11 @@ namespace UI {
 
 
     void
+    InfoRowOpt(const std::string& label,
+               const std::optional<std::string>& value);
+
+
+    void
     LinkRow(const std::string& label,
             const std::string& url);
 

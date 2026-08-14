@@ -11,7 +11,7 @@
 #include <filesystem>
 #include <optional>
 
-#include "cfg.hpp"
+#include "Settings.hpp"
 
 #include "App.hpp"
 #include "LogManager.hpp"
@@ -23,14 +23,14 @@
 using std::string;
 
 
-namespace cfg {
+namespace Settings {
 
-    State state;
+    Cfg cfg;
 
     void
     load_defaults()
     {
-        state = {};
+        cfg = {};
     }
 
 
@@ -57,7 +57,7 @@ namespace cfg {
         TRACE_FUNC;
         try {
             auto filename = App::get_config_path() / "settings.json";
-            Serializer::load(state, filename);
+            Serializer::load(cfg, filename);
         }
         catch (std::exception& e) {
             LOG_ERROR("load(): {}", e.what());
@@ -71,11 +71,11 @@ namespace cfg {
         TRACE_FUNC;
         try {
             auto filename = App::get_config_path() / "settings.json";
-            Serializer::save(state, filename);
+            Serializer::save(cfg, filename);
         }
         catch (std::exception& e) {
             LOG_ERROR("save(): {}", e.what());
         }
     }
 
-} // namespace cfg
+} // namespace Settings

@@ -20,19 +20,21 @@
 
 #include "App.hpp"
 #include "BrowserTab.hpp"
-#include "cfg.hpp"
 #include "FavoritesTab.hpp"
-#include "ImageLoader.hpp"
 #include "IconsFontAwesome4.h"
+#include "ImageLoader.hpp"
 #include "LogManager.hpp"
 #include "PlayerTab.hpp"
 #include "RadioBrowserAPI.hpp"
+#include "Settings.hpp"
 #include "Station.hpp"
 #include "string_utils.hpp"
 #include "TabID.hpp"
 
 
 using namespace std::literals;
+
+using Settings::cfg;
 
 
 namespace UI {
@@ -274,6 +276,15 @@ namespace UI {
 
 
     void
+    InfoRowOpt(const std::string& label,
+               const std::optional<std::string>& value)
+    {
+        if (value)
+            InfoRow(label, *value);
+    }
+
+
+    void
     LinkRow(const std::string& label,
                   const std::string& url)
     {
@@ -304,7 +315,7 @@ namespace UI {
                 PlayerTab::stop();
         } else {
             if (ImGui::Button(ICON_FA_PLAY, play_button_size)) {
-                if (cfg::state.switch_to_player)
+                if (cfg.switch_to_player)
                     App::set_tab(TabID::player);
                 PlayerTab::play(station);
                 // TODO: call RadioBrowserAPI directly.

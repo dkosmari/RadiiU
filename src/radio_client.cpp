@@ -11,16 +11,18 @@
 
 #include "radio_client.hpp"
 
-#include "cfg.hpp"
 #include "m3u.hpp"
 #include "mime_type.hpp"
 #include "pls.hpp"
+#include "Settings.hpp"
 #include "tracer.hpp"
 
 #include "LogManager.hpp"
 
 
 using namespace std::literals;
+
+using Settings::cfg;
 
 
 namespace {
@@ -71,7 +73,7 @@ radio_client::radio_client(const std::string& url_,
         url_resolved = url;
 
     if (!url_resolved.empty()) {
-        http.set_url(url_resolved);
+        http.set_url(url_resolved, cfg.verbose_stream_logs);
         current_state = state::started;
     }
 }
@@ -142,7 +144,7 @@ radio_client::set_next_url(const std::string& next_url)
     url_resolver.set_url(next_url);
     url_resolved = url_resolver.get_url();
     LOG_DEBUG("Resolved URL: {:?}", url_resolved);
-    http.set_url(url_resolved);
+    http.set_url(url_resolved, cfg.verbose_stream_logs);
     current_state = state::started;
 }
 
@@ -258,7 +260,7 @@ radio_client::process_audio()
         metadata = icy_stream->get_metadata();
 
     if (!dec) {
-        if (data_stream->size() < cfg::state.player_buffer_size * 1024)
+        if (data_stream->size() < cfg.player_buffer_size * 1024)
             return; // don't bother creating a decoder when too little data
         try {
             // try to create a decoder

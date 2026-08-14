@@ -45,18 +45,19 @@
 
 #include "AboutTab.hpp"
 #include "BrowserTab.hpp"
-#include "cfg.hpp"
 #include "ConfirmExitPopup.hpp"
 #include "FavoritesTab.hpp"
 #include "FontLoader.hpp"
-#include "ImageLoader.hpp"
 #include "IconsFontAwesome4.h"
+#include "ImageLoader.hpp"
 #include "LogManager.hpp"
 #include "LogsTab.hpp"
 #include "PlayerTab.hpp"
 #include "RadioBrowserAPI.hpp"
 #include "RecentTab.hpp"
+#include "Settings.hpp"
 #include "SettingsTab.hpp"
+#include "StationVoting.hpp"
 #include "Styles.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
@@ -73,6 +74,8 @@ using std::filesystem::path;
 
 using namespace std::literals;
 using namespace sdl::literals;
+
+using Settings::cfg;
 
 
 namespace App {
@@ -312,9 +315,9 @@ namespace App {
         process()
         {
 #ifdef __WIIU__
-            if (old_disable_swkbd != cfg::state.disable_swkbd) {
-                SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, cfg::state.disable_swkbd ? "0" : "1");
-                old_disable_swkbd = cfg::state.disable_swkbd;
+            if (old_disable_swkbd != cfg.disable_swkbd) {
+                SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, cfg.disable_swkbd ? "0" : "1");
+                old_disable_swkbd = cfg.disable_swkbd;
             }
 
             std::uint32_t dim_enabled = 0;
@@ -325,7 +328,7 @@ namespace App {
                 std::uint32_t dim_countdown = 0;
                 dim_error = IMGetTimeBeforeDimming(&dim_countdown);
                 if (!dim_error) {
-                    if (cfg::state.inactive_screen_off) {
+                    if (cfg.inactive_screen_off) {
                         // This is the logic to turn the gamepad LCD off when the system
                         // enters the dimmed state (screen burn-in protection.)
 
@@ -374,6 +377,7 @@ namespace App {
             FavoritesTab::process_logic();
             RecentTab::process_logic();
             PlayerTab::process_logic();
+            StationVoting::process_logic();
 
             ImageLoader::process();
 
@@ -385,8 +389,8 @@ namespace App {
 
                 case normal:
                     // normal -> fading
-                    if (cfg::state.screen_saver_timeout
-                        && (now - last_activity) > cfg::state.screen_saver_timeout * 1000) {
+                    if (cfg.screen_saver_timeout
+                        && (now - last_activity) > cfg.screen_saver_timeout * 1000) {
                         LOG_DEBUG("Fading out...");
                         screen_state = fading;
                         fade_start = now;
@@ -408,7 +412,7 @@ namespace App {
 
             // any user activity forces it back to normal state
             if (screen_state != ScreenState::normal)
-                if ((now - last_activity) <= cfg::state.screen_saver_timeout * 1000) {
+                if ((now - last_activity) <= cfg.screen_saver_timeout * 1000) {
                     LOG_DEBUG("Returned to normal.");
                     screen_state = ScreenState::normal;
                 }
@@ -788,15 +792,15 @@ namespace App {
 
         LogManager::initialize();
         initialize_config_dir();
-        // Note: initialize cfg module early.
-        cfg::initialize();
-        set_tab(cfg::state.initial_tab);
-        if (cfg::state.remember_tab)
-            cfg::state.initial_tab = TabID::last_active;
+        // Note: initialize Settings module early.
+        Settings::initialize();
+        set_tab(cfg.initial_tab);
+        if (cfg.remember_tab)
+            cfg.initial_tab = TabID::last_active;
 
 #ifdef __WIIU__
-        old_disable_swkbd = cfg::state.disable_swkbd;
-        if (cfg::state.disable_swkbd) {
+        old_disable_swkbd = cfg.disable_swkbd;
+        if (cfg.disable_swkbd) {
             SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "0");
             // SDL_StartTextInput();
         }
@@ -831,8 +835,8 @@ namespace App {
         // Initialize modules.
         Styles::initialize();
         ImageLoader::initialize(res->renderer);
-        RadioBrowserAPI::initialize(get_user_agent(), cfg::state.server);
-        RadioBrowserAPI::set_server(cfg::state.server);
+        RadioBrowserAPI::initialize(get_user_agent(), cfg.server);
+        RadioBrowserAPI::set_server(cfg.server);
 
         // Initialize tabs.
         LogsTab::initialize();
@@ -864,13 +868,13 @@ namespace App {
 
         finalize_imgui();
 
-        // Finalize cfg module last.
-        cfg::state.remember_tab = cfg::state.initial_tab == TabID::last_active;
-        if (cfg::state.remember_tab) {
+        cfg.remember_tab = cfg.initial_tab == TabID::last_active;
+        if (cfg.remember_tab) {
             LOG_DEBUG("remembering last used tab: {}", to_string(current_tab));
-            cfg::state.initial_tab = current_tab;
+            cfg.initial_tab = current_tab;
         }
-        cfg::finalize();
+        // Finalize Settings module last.
+        Settings::finalize();
         finalize_config_dir();
 
         LogManager::finalize();

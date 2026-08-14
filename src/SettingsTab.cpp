@@ -12,15 +12,17 @@
 #include "SettingsTab.hpp"
 
 #include "BrowserTab.hpp"
-#include "cfg.hpp"
 #include "enumerator.hpp"
 #include "IconsFontAwesome4.h"
 #include "RadioBrowserAPI.hpp"
+#include "Settings.hpp"
 #include "Styles.hpp"
 #include "UI.hpp"
 
 
 using namespace std::literals;
+
+using Settings::cfg;
 
 
 namespace SettingsTab {
@@ -40,6 +42,7 @@ namespace SettingsTab {
                 ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
+
                 /*-------*/
                 /* Style */
                 /*-------*/
@@ -47,24 +50,23 @@ namespace SettingsTab {
                 ImGui::TableNextRow();
 
                 ImGui::TableNextColumn();
-
                 ImGui::AlignTextToFramePadding();
                 UI::Label("UI color style");
                 ImGui::SetItemTooltip("Select color style for user interface");
 
                 ImGui::TableNextColumn();
-
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                if (Combo styles_combo{"##style", cfg::state.style}) {
+                if (Combo styles_combo{"##style", cfg.style}) {
                     auto& styles = Styles::get_styles();
                     for (const auto& [type, name] : styles) {
                         std::string label = "("s + to_label(type) + ") "s + name;
-                        if (ImGui::Selectable(label, cfg::state.style == name)) {
-                            cfg::state.style = name;
+                        if (ImGui::Selectable(label, cfg.style == name)) {
+                            cfg.style = name;
                             Styles::load();
                         }
                     }
                 } // styles_combo
+
 
                 /*-------------*/
                 /* Initial tab */
@@ -73,23 +75,22 @@ namespace SettingsTab {
                 ImGui::TableNextRow();
 
                 ImGui::TableNextColumn();
-
                 ImGui::AlignTextToFramePadding();
                 UI::Label("Initial tab");
 
                 ImGui::TableNextColumn();
-
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 if (Combo initial_combo{
                         "##initial_tab",
-                        to_label(cfg::state.initial_tab)
+                        to_label(cfg.initial_tab)
                     }) {
                     for (auto tab : enumerator::enumerate<TabID>()) {
                         if (ImGui::Selectable(to_label(tab),
-                                              cfg::state.initial_tab == tab))
-                            cfg::state.initial_tab = tab;
+                                              cfg.initial_tab == tab))
+                            cfg.initial_tab = tab;
                     }
                 } // initial_combo
+
 
                 /*------------------*/
                 /* Preferred server */
@@ -98,12 +99,10 @@ namespace SettingsTab {
                 ImGui::TableNextRow();
 
                 ImGui::TableNextColumn();
-
                 ImGui::AlignTextToFramePadding();
                 UI::Label("Preferred server");
 
                 ImGui::TableNextColumn();
-
                 const char* refresh_label = ICON_FA_REFRESH;
                 float refresh_btn_width = 2 * style.FramePadding.x
                                         + 2 * style.FrameBorderSize
@@ -114,20 +113,20 @@ namespace SettingsTab {
                 const std::string random_label = "(random)";
                 if (Combo server_combo{
                         "##server"s,
-                        cfg::state.server.empty()
+                        cfg.server.empty()
                         ? random_label
-                        : cfg::state.server
+                        : cfg.server
                     }) {
-                    if (ImGui::Selectable(random_label, cfg::state.server.empty())) {
-                        cfg::state.server.clear();
-                        RadioBrowserAPI::set_server(cfg::state.server);
+                    if (ImGui::Selectable(random_label, cfg.server.empty())) {
+                        cfg.server.clear();
+                        RadioBrowserAPI::set_server(cfg.server);
                     }
                     RadioBrowserAPI::for_each_mirror(
                         [](const std::string& server)
                         {
-                            if (ImGui::Selectable(server, cfg::state.server == server)) {
-                                cfg::state.server = server;
-                                RadioBrowserAPI::set_server(cfg::state.server);
+                            if (ImGui::Selectable(server, cfg.server == server)) {
+                                cfg.server = server;
+                                RadioBrowserAPI::set_server(cfg.server);
                             }
                         }
                     );
@@ -138,6 +137,7 @@ namespace SettingsTab {
                 if (ImGui::Button(refresh_label))
                     RadioBrowserAPI::update_mirrors();
 
+
                 /*-------------------*/
                 /* Browser page size */
                 /*-------------------*/
@@ -145,19 +145,18 @@ namespace SettingsTab {
                 ImGui::TableNextRow();
 
                 ImGui::TableNextColumn();
-
                 ImGui::AlignTextToFramePadding();
                 UI::Label("Browser page size");
                 ImGui::SetItemTooltip("How many stations to show per page.");
 
                 ImGui::TableNextColumn();
-
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::Slider("##browser_page_limit",
-                              cfg::state.browser_page_limit,
+                              cfg.browser_page_limit,
                               10u, 50u);
                 if (ImGui::IsItemDeactivatedAfterEdit())
                     BrowserTab::search_stations();
+
 
                 /*-----------------------*/
                 /* Recent stations limit */
@@ -166,16 +165,15 @@ namespace SettingsTab {
                 ImGui::TableNextRow();
 
                 ImGui::TableNextColumn();
-
                 ImGui::AlignTextToFramePadding();
                 UI::Label("Recent stations limit");
 
                 ImGui::TableNextColumn();
-
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::Slider("##recent_limit",
-                              cfg::state.recent_limit,
+                              cfg.recent_limit,
                               10u, 50u);
+
 
                 /*------------------*/
                 /* Switch to player */
@@ -184,14 +182,12 @@ namespace SettingsTab {
                 ImGui::TableNextRow();
 
                 ImGui::TableNextColumn();
-
                 ImGui::AlignTextToFramePadding();
                 UI::Label("Switch to Player when playing");
 
                 ImGui::TableNextColumn();
-
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::Checkbox("##switch_to_player", &cfg::state.switch_to_player);
+                ImGui::Checkbox("##switch_to_player", cfg.switch_to_player);
 
 
                 /*--------------------*/
@@ -201,19 +197,19 @@ namespace SettingsTab {
                 ImGui::TableNextRow();
 
                 ImGui::TableNextColumn();
-
                 ImGui::AlignTextToFramePadding();
                 UI::Label("Player buffer size (KiB)");
-                ImGui::SetItemTooltip("Playback will only start after this many bytes are received.");
+                ImGui::SetItemTooltip("Playback will only start after this many bytes"
+                                      " are received.");
 
                 ImGui::TableNextColumn();
-
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::Slider("##player_buffer_size",
-                              cfg::state.player_buffer_size,
+                              cfg.player_buffer_size,
                               4u, 64u,
                               "",
                               ImGuiSliderFlags_Logarithmic);
+
 
                 /*----------------------*/
                 /* Player history limit */
@@ -222,16 +218,15 @@ namespace SettingsTab {
                 ImGui::TableNextRow();
 
                 ImGui::TableNextColumn();
-
                 ImGui::AlignTextToFramePadding();
                 UI::Label("Player track history limit");
 
                 ImGui::TableNextColumn();
-
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::Slider("##player_history_limit",
-                              cfg::state.player_history_limit,
+                              cfg.player_history_limit,
                               0u, 50u);
+
 
                 /*-------------*/
                 /* Disable APD */
@@ -240,15 +235,14 @@ namespace SettingsTab {
                 ImGui::TableNextRow();
 
                 ImGui::TableNextColumn();
-
                 ImGui::AlignTextToFramePadding();
                 UI::Label("Disable Auto Power-Down");
                 ImGui::SetItemTooltip("APD is only disabled while playing.");
 
                 ImGui::TableNextColumn();
-
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::Checkbox("##disable_apd", &cfg::state.disable_apd);
+                ImGui::Checkbox("##disable_apd", cfg.disable_apd);
+
 
                 /*---------------------*/
                 /* Inactive Screen Off */
@@ -257,15 +251,15 @@ namespace SettingsTab {
                 ImGui::TableNextRow();
 
                 ImGui::TableNextColumn();
-
                 ImGui::AlignTextToFramePadding();
                 UI::Label("Turn gamepad screen off on inactivity");
-                ImGui::SetItemTooltip("When the gamepad screen turns off, it also stops playing sounds.");
+                ImGui::SetItemTooltip("When the gamepad screen turns off,"
+                                      " it also stops playing sounds.");
 
                 ImGui::TableNextColumn();
-
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::Checkbox("##inactive_screen_off", &cfg::state.inactive_screen_off);
+                ImGui::Checkbox("##inactive_screen_off", cfg.inactive_screen_off);
+
 
                 /*----------------------*/
                 /* Screen Saver Timeout */
@@ -274,18 +268,17 @@ namespace SettingsTab {
                 ImGui::TableNextRow();
 
                 ImGui::TableNextColumn();
-
                 ImGui::AlignTextToFramePadding();
                 UI::Label("Screen saver timeout");
                 ImGui::SetItemTooltip("Time to wait to activate the screen saver, in seconds (0 = disable screen saver.");
 
                 ImGui::TableNextColumn();
-
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::Drag("##screen_saver_timeout"s,
-                            cfg::state.screen_saver_timeout,
+                            cfg.screen_saver_timeout,
                             1.0f / 8.0f,
                             {0u}, {600u});
+
 
                 /*---------------*/
                 /* Disable swkbd */
@@ -294,15 +287,14 @@ namespace SettingsTab {
                 ImGui::TableNextRow();
 
                 ImGui::TableNextColumn();
-
                 ImGui::AlignTextToFramePadding();
                 UI::Label("Disable SWKBD");
                 ImGui::SetItemTooltip("Use only USB keyboard for text input.");
 
                 ImGui::TableNextColumn();
-
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::Checkbox("##disable_swkbd", &cfg::state.disable_swkbd);
+                ImGui::Checkbox("##disable_swkbd", cfg.disable_swkbd);
+
 
                 /*-----------------------*/
                 /* Send clicks and votes */
@@ -311,15 +303,62 @@ namespace SettingsTab {
                 ImGui::TableNextRow();
 
                 ImGui::TableNextColumn();
-
                 ImGui::AlignTextToFramePadding();
                 UI::Label("Send clicks and votes");
                 ImGui::SetItemTooltip("Enable to send clicks and votes to radio-browser.info.");
 
                 ImGui::TableNextColumn();
-
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::Checkbox("##send_clicks", &cfg::state.send_clicks);
+                ImGui::Checkbox("##send_clicks", cfg.send_clicks);
+
+
+                /*--------------------*/
+                /* Verbose image logs */
+                /*--------------------*/
+
+                ImGui::TableNextRow();
+
+                ImGui::TableNextColumn();
+                ImGui::AlignTextToFramePadding();
+                UI::Label("Verbose image logs");
+                ImGui::SetItemTooltip("Show verbose CURL logs when downloading images.");
+
+                ImGui::TableNextColumn();
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                ImGui::Checkbox("##verbose_image_logs", cfg.verbose_image_logs);
+
+
+                /*-------------------*/
+                /* Verbose REST logs */
+                /*-------------------*/
+
+                ImGui::TableNextRow();
+
+                ImGui::TableNextColumn();
+                ImGui::AlignTextToFramePadding();
+                UI::Label("Verbose REST logs");
+                ImGui::SetItemTooltip("Show verbose CURL logs on REST requests.");
+
+                ImGui::TableNextColumn();
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                ImGui::Checkbox("##verbose_rest_logs", cfg.verbose_rest_logs);
+
+
+                /*---------------------*/
+                /* Verbose stream logs */
+                /*---------------------*/
+
+                ImGui::TableNextRow();
+
+                ImGui::TableNextColumn();
+                ImGui::AlignTextToFramePadding();
+                UI::Label("Verbose stream logs");
+                ImGui::SetItemTooltip("Show verbose CURL logs when streaming radio data.");
+
+                ImGui::TableNextColumn();
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                ImGui::Checkbox("##verbose_stream_logs", cfg.verbose_stream_logs);
+
 
                 /*-----------------*/
                 /* End of settings */
@@ -334,8 +373,8 @@ namespace SettingsTab {
                 ImGui::TableNextColumn();
 
                 if (ImGui::Button("Reset")) {
-                    cfg::load_defaults();
-                    cfg::save();
+                    Settings::load_defaults();
+                    Settings::save();
                 }
 
                 /////////////////

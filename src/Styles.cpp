@@ -24,14 +24,16 @@
 #include "Styles.hpp"
 
 #include "App.hpp"
-#include "cfg.hpp"
 #include "LogManager.hpp"
+#include "Settings.hpp"
 #include "tracer.hpp"
 
 
 using namespace std::literals;
 
 using ImGui::to_string;
+
+using Settings::cfg;
 
 
 template<>
@@ -220,21 +222,21 @@ namespace Styles {
     load()
     try {
 
-        if (cfg::state.style.empty()) {
+        if (cfg.style.empty()) {
             LOG_INFO("Applying style: {:?}", imgui_styles.front().name);
             imgui_styles.front().apply();
             return;
         }
 
         for (auto& st : imgui_styles) {
-            if (st.name == cfg::state.style) {
+            if (st.name == cfg.style) {
                 LOG_INFO("Applying style: {:?}", st.name);
                 st.apply();
                 return;
             }
         }
 
-        const std::string filename = "styles/" + cfg::state.style + ".json";
+        const std::string filename = "styles/" + cfg.style + ".json";
 
         // Prioritize user theme, in case of name clash.
         if (load_style_file(App::get_config_path() / filename))

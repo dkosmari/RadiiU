@@ -33,7 +33,6 @@
 #include "BrowserTab.hpp"
 
 #include "App.hpp"
-#include "cfg.hpp"
 #include "enumerator.hpp"
 #include "humanize.hpp"
 #include "IconsFontAwesome4.h"
@@ -44,7 +43,9 @@
 #include "rest.hpp"
 #include "Serializer.hpp"
 #include "ServerStatsPopup.hpp"
+#include "Settings.hpp"
 #include "StationDetailsPopup.hpp"
+#include "StationVoting.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
 
@@ -52,6 +53,8 @@
 using namespace std::literals;
 
 using sdl::vec2;
+
+using Settings::cfg;
 
 
 namespace BrowserTab::GUI {
@@ -128,7 +131,6 @@ namespace BrowserTab {
 
         std::optional<Filter> filter;
         std::optional<GUI::Order> order;
-        std::optional<unsigned> page;
     }; // struct State
 
 
@@ -141,9 +143,6 @@ namespace BrowserTab {
     std::regex tags_regex;
 
     std::vector<StationPtr> stations;
-
-    // TODO: allow votes to expire after 10 min.
-    std::unordered_map<std::string, RadioBrowserAPI::VoteResult> votes_cast;
 
     std::optional<std::vector<Country>> countries;
     std::optional<std::vector<std::string>> codecs;
@@ -335,7 +334,6 @@ namespace BrowserTab {
             GUI::filter_codec.clear();
         }
         GUI::order = state.order;
-        GUI::page = state.page.value_or(1u);
     }
     catch (std::exception& e) {
         LOG_ERROR("{}", e.what());
@@ -361,8 +359,6 @@ namespace BrowserTab {
         if (filter.name || filter.tag || filter.country || filter.codec)
             state.filter = std::move(filter);
         state.order = GUI::order;
-        if (GUI::page != 1u)
-            state.page = GUI::page;
 
         auto filename = App::get_config_path() / "browser.json";
         Serializer::save(state, filename);
@@ -400,7 +396,7 @@ namespace BrowserTab {
             Disabled if_busy{RadioBrowserAPI::is_busy()};
 
             {
-                Disabled if_preferred_server{!cfg::state.server.empty()};
+                Disabled if_preferred_server{!cfg.server.empty()};
                 if (ImGui::Button(ICON_FA_REFRESH))
                     RadioBrowserAPI::update_mirrors_and_select_random();
                 ImGui::SetItemTooltip("Switch to random mirror.");
@@ -414,7 +410,7 @@ namespace BrowserTab {
 
             ImGui::SameLine();
 
-            auto server = cfg::state.server;
+            auto server = cfg.server;
             ImGui::Text(server.empty() ? "(random)" : server);
             if (server.empty()) {
                 auto current_server = RadioBrowserAPI::get_server();
@@ -627,7 +623,7 @@ namespace BrowserTab {
             }) {
 
             const bool is_first_page = GUI::page == 1;
-            const bool is_last_page = stations.size() < cfg::state.browser_page_limit;
+            const bool is_last_page = stations.size() < cfg.browser_page_limit;
             const bool is_busy = RadioBrowserAPI::is_busy();
 
             {
@@ -745,35 +741,7 @@ namespace BrowserTab {
                 if (StationDetailsPopup::Button(station->stationuuid))
                     StationDetailsPopup::open(station->stationuuid);
 
-                auto vote_record = votes_cast.find(station->stationuuid);
-                const bool voted = vote_record != votes_cast.end();
-                bool ok = voted ? vote_record->second.ok : false;
-                std::string vote_label = ok ? ICON_FA_THUMBS_UP : ICON_FA_THUMBS_O_UP;
-                std::string value_label;
-                if (station->votes) {
-                    value_label = humanize::value(*station->votes);
-                    vote_label += " " + value_label;
-                }
-
-                {
-                    ImVec2 size {
-                        UI::play_button_size.x,
-                        ImGui::GetFrameHeight()
-                    };
-                    std::optional<Font> smaller_font;
-                    if (value_label.size() >= 3)
-                        smaller_font.emplace(nullptr, 24);
-                    Disabled if_cant_vote{!cfg::state.send_clicks || voted};
-                    if (ImGui::Button(vote_label, size))
-                        send_vote(station);
-                }
-                if (voted)
-                    ImGui::FormatSetItemTooltip("{} votes.\n{}",
-                                                value_label,
-                                                vote_record->second.message);
-                else
-                    ImGui::FormatSetItemTooltip("{} votes.\nClick to vote for this station.",
-                                                value_label);
+                StationVoting::Button(station);
 
             } // actions_child
 
@@ -831,7 +799,7 @@ namespace BrowserTab {
 
 #if 0
             // Disabled until ImGui fixes navigation.
-            if (stations.size() == cfg::state.browser_page_limit)
+            if (stations.size() == cfg.browser_page_limit)
                 if (ImGui::Button("Go to page " + std::to_string(page_index + 1 + 1) + " ⏵",
                                   {content_width, 0.0f})) {
                     ++page_index;
@@ -861,29 +829,6 @@ namespace BrowserTab {
                 if (!result.message.empty())
                     LOG_DEBUG("{}", result.message);
 
-                update_station(station);
-            },
-            common_error_handler);
-    }
-
-
-    void
-    send_vote(StationPtr& station)
-    {
-        TRACE_FUNC;
-
-        if (!station || station->stationuuid.empty())
-            return;
-
-        RadioBrowserAPI::send_vote(
-            station->stationuuid,
-            [station](RadioBrowserAPI::VoteResult result)
-            {
-                LOG_DEBUG("Result of vote: ", result.ok);
-                if (!result.message.empty())
-                    LOG_DEBUG("{}", result.message);
-                if (result.ok)
-                    votes_cast[station->stationuuid] = std::move(result);
                 update_station(station);
             },
             common_error_handler);
@@ -1025,8 +970,8 @@ namespace BrowserTab {
         GUI::scroll_to_top = true;
 
         RadioBrowserAPI::SearchStationParams params;
-        params.offset = (GUI::page - 1u) * cfg::state.browser_page_limit;
-        params.limit = cfg::state.browser_page_limit;
+        params.offset = (GUI::page - 1u) * cfg.browser_page_limit;
+        params.limit = cfg.browser_page_limit;
         params.hidebroken = true;
 
         if (GUI::order) {
@@ -1052,7 +997,7 @@ namespace BrowserTab {
                 stations.clear();
                 for (auto& st : rb_stations) {
                     // ensure the page size limit is respected
-                    if (stations.size() >= cfg::state.browser_page_limit)
+                    if (stations.size() >= cfg.browser_page_limit)
                         break;
                     stations.push_back(std::make_shared<Station>(Station::from_radio_browser(st)));
                 }

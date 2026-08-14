@@ -28,15 +28,17 @@
 #include "PlayerTab.hpp"
 
 #include "App.hpp"
-#include "cfg.hpp"
 #include "humanize.hpp"
-#include "ImageLoader.hpp"
 #include "IconsFontAwesome4.h"
+#include "ImageLoader.hpp"
 #include "LogManager.hpp"
 #include "radio_client.hpp"
+#include "RadioBrowserAPI.hpp"
 #include "RecentTab.hpp"
 #include "Serializer.hpp"
+#include "Settings.hpp"
 #include "StationDetailsPopup.hpp"
+#include "StationVoting.hpp"
 #include "UI.hpp"
 
 
@@ -44,6 +46,8 @@ using std::chrono::system_clock;
 
 using namespace std::literals;
 using namespace std::placeholders;
+
+using Settings::cfg;
 
 
 namespace PlayerTab {
@@ -63,24 +67,6 @@ namespace PlayerTab {
             bool history_expanded{};
             std::deque<TrackInfo> history{};
         };
-
-
-        // Function declarations
-
-        void
-        show_meta_row(const std::string& label,
-                      const std::optional<std::string>& value);
-
-
-        // Function definitions
-
-        void
-        show_meta_row(const std::string& label,
-                      const std::optional<std::string>& value)
-        {
-            if (value)
-                UI::InfoRow(label, *value);
-        }
 
     } // namespace
 
@@ -107,7 +93,7 @@ namespace PlayerTab {
                   const std::string& url_resolved) :
             radio{url, url_resolved, App::get_user_agent()}
         {
-            if (cfg::state.disable_apd) {
+            if (cfg.disable_apd) {
 #ifdef __WUT__
                 IMDisableAPD();
 #else
@@ -133,10 +119,10 @@ namespace PlayerTab {
         bool
         is_buffer_too_empty()
         {
-            // if (cfg::state.player_buffer_size == 0)
+            // if (cfg.player_buffer_size == 0)
             //     return false;
 
-            // return total_bytes_fed < cfg::state.player_buffer_size * 1024u;
+            // return total_bytes_fed < cfg.player_buffer_size * 1024u;
             return false;
         }
 
@@ -307,15 +293,15 @@ namespace PlayerTab {
             return;
         }
 
-        if (Child station_child{
-                "station",
+        if (Child station_frame{
+                "station_frame",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeY |
                 ImGuiChildFlags_FrameStyle |
                 ImGuiChildFlags_NavFlattened
             }) {
 
-            if (Child actions_child{
+            if (Child actions{
                     "actions",
                     {0, 0},
                     ImGuiChildFlags_AutoResizeX |
@@ -332,11 +318,13 @@ namespace PlayerTab {
                 if (StationDetailsPopup::Button(station->stationuuid))
                     StationDetailsPopup::open(station->stationuuid);
 
-            } // actions_child
+                StationVoting::Button(station);
+
+            } // actions
 
             ImGui::SameLine();
 
-            if (Child details_child{
+            if (Child details{
                     "details",
                     {0, 0},
                     ImGuiChildFlags_AutoResizeY |
@@ -345,9 +333,9 @@ namespace PlayerTab {
 
                 UI::StationInfo(*station, true);
 
-            } // details_child
+            } // details
 
-        } // station_child
+        } // station_frame
 
     }
 
@@ -381,8 +369,8 @@ namespace PlayerTab {
 
                     if (const auto meta = res->radio.get_metadata()) {
 
-                        show_meta_row("Title", meta->title);
-                        show_meta_row("Artist", meta->artist);
+                        UI::InfoRowOpt("Title", meta->title);
+                        UI::InfoRowOpt("Artist", meta->artist);
 
                         if (meta->cover_art && !meta->cover_art->empty()) {
                             auto available = ImGui::GetContentRegionAvail();
@@ -399,18 +387,18 @@ namespace PlayerTab {
                             ImGui::SetItemTooltip(*meta->cover_art);
                         }
 
-                        show_meta_row("Album", meta->album);
-                        show_meta_row("Genre", meta->genre);
-                        show_meta_row("Date", meta->date);
+                        UI::InfoRowOpt("Album", meta->album);
+                        UI::InfoRowOpt("Genre", meta->genre);
+                        UI::InfoRowOpt("Date", meta->date);
 
                         for (auto& [k, v] : meta->extra)
                             UI::InfoRow(k, v);
 
                         // station metadata
-                        show_meta_row("Station Name", meta->station_name);
-                        show_meta_row("Station Genre", meta->station_genre);
-                        show_meta_row("Station Description", meta->station_description);
-                        show_meta_row("Station URL", meta->station_url);
+                        UI::InfoRowOpt("Station Name", meta->station_name);
+                        UI::InfoRowOpt("Station Genre", meta->station_genre);
+                        UI::InfoRowOpt("Station Description", meta->station_description);
+                        UI::InfoRowOpt("Station URL", meta->station_url);
                     }
 
                     if (const auto info = res->radio.get_decoder_info()) {
@@ -521,9 +509,9 @@ namespace PlayerTab {
 
         state.history.emplace_back(system_clock::now(), title);
 
-        if (state.history.size() > cfg::state.player_history_limit)
+        if (state.history.size() > cfg.player_history_limit)
             state.history.erase(state.history.begin(),
-                                state.history.begin() + cfg::state.player_history_limit);
+                                state.history.begin() + cfg.player_history_limit);
     }
 
 } // namespace PlayerTab

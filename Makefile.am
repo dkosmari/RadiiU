@@ -47,8 +47,6 @@ radiiu_elf_SOURCES = \
 	src/ButtonHBox.hpp \
 	src/byte_stream.cpp \
 	src/byte_stream.hpp \
-	src/cfg.cpp \
-	src/cfg.hpp \
 	src/ConfirmDeleteStationPopup.cpp \
 	src/ConfirmDeleteStationPopup.hpp \
 	src/ConfirmExitPopup.cpp \
@@ -109,6 +107,8 @@ radiiu_elf_SOURCES = \
 	src/Serializer.hpp \
 	src/ServerStatsPopup.cpp \
 	src/ServerStatsPopup.hpp \
+	src/Settings.cpp \
+	src/Settings.hpp \
 	src/SettingsTab.cpp \
 	src/SettingsTab.hpp \
 	src/Station.cpp \
@@ -116,6 +116,8 @@ radiiu_elf_SOURCES = \
 	src/StationDetailsPopup.cpp \
 	src/StationDetailsPopup.hpp \
 	src/StationGlaze.hpp \
+	src/StationVoting.cpp \
+	src/StationVoting.hpp \
 	src/stream_metadata.cpp \
 	src/stream_metadata.hpp \
 	src/string_utils.cpp \

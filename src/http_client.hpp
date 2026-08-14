@@ -51,7 +51,8 @@ struct http_client {
 
 
     void
-    set_url(const std::string& url);
+    set_url(const std::string& url,
+            bool verbose);
 
 
     std::string

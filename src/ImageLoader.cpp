@@ -36,13 +36,15 @@
 #include "LogManager.hpp"
 #include "LogManagerCurl.hpp"
 #include "mime_type.hpp"
-#include "thread_safe.hpp"
+#include "Settings.hpp"
 #include "tracer.hpp"
 
 
 using namespace std::literals;
 
 using sdl::vec2;
+
+using Settings::cfg;
 
 
 namespace ImageLoader {
@@ -214,10 +216,8 @@ namespace ImageLoader {
         std::size_t
         calc_hash(const T& val);
 
-#ifdef __WIIU__
         sdl::surface
         optimized(sdl::surface input);
-#endif
 
         template<std::ranges::random_access_range R,
                  typename Comp = std::ranges::less,
@@ -304,10 +304,10 @@ namespace ImageLoader {
                     load_from_buffer();
                 else
                     load_from_file();
-                enforce_size_limit();
-#ifdef __WIIU__
+
                 img = optimized(std::move(img));
-#endif
+
+                enforce_size_limit();
                 state = LoadState::loaded;
             }
             catch (std::exception& e) {
@@ -352,7 +352,7 @@ namespace ImageLoader {
             easy.set_tcp_no_delay(false);
             easy.set_transfer_encoding(true);
             easy.set_url(location);
-            easy.set_verbose(true);
+            easy.set_verbose(cfg.verbose_image_logs);
             easy.set_write_function(std::bind_front(&CacheEntry::easy_write_callback, this));
             LogManagerCurl::capture_curl_debug(easy);
             checked_content_type = false;
@@ -472,7 +472,6 @@ namespace ImageLoader {
         }
 
 
-#ifdef __WIIU__
         /*
          * NOTE: GX2 only supports a few texture formats, so this allows converting the image to
          * a supported format early.
@@ -509,7 +508,6 @@ namespace ImageLoader {
                     return sdl::surface(input, sdl::pixels::format_enum::rgba_32);
             }
         }
-#endif
 
 
         Resources::Resources(sdl::renderer& renderer_,

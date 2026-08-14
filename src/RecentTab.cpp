@@ -16,16 +16,19 @@
 #include "RecentTab.hpp"
 
 #include "App.hpp"
-#include "cfg.hpp"
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
 #include "Serializer.hpp"
+#include "Settings.hpp"
 #include "StationDetailsPopup.hpp"
 #include "StationGlaze.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
 
 // TODO: process add and remove using future
+
+using Settings::cfg;
+
 
 namespace RecentTab {
 
@@ -194,8 +197,8 @@ namespace RecentTab {
     void
     remove_excess()
     {
-        if (stations.size() > cfg::state.recent_limit) {
-            std::size_t pending_remove = stations.size() - cfg::state.recent_limit;
+        if (stations.size() > cfg.recent_limit) {
+            std::size_t pending_remove = stations.size() - cfg.recent_limit;
             stations.erase(stations.begin(),
                            stations.begin() + pending_remove);
         }

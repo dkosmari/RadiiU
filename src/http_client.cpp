@@ -65,14 +65,15 @@ http_client::add_header(const std::string& hdr)
 
 
 void
-http_client::set_url(const std::string& url)
+http_client::set_url(const std::string& url,
+                     bool verbose)
 {
     // TRACE_FUNC;
 
     multi.remove(easy);
 
     easy.reset();
-    easy.set_verbose(true); // DEBUG
+    easy.set_verbose(verbose);
     LogManagerCurl::capture_curl_debug(easy);
     if (!user_agent.empty())
         easy.set_user_agent(user_agent);
