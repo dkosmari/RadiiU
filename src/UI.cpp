@@ -318,8 +318,6 @@ namespace UI {
                 if (cfg.switch_to_player)
                     App::set_tab(TabID::player);
                 PlayerTab::play(station);
-                // TODO: call RadioBrowserAPI directly.
-                BrowserTab::send_click(station);
             }
         }
     }
@@ -360,8 +358,6 @@ namespace UI {
         if (Child details{"details",
                           {0.0f, station.expanded ? 0 : ImGui::GetFrameHeight()},
                           details_flags}) {
-
-            // Font font{nullptr, 28};
 
             std::vector<FramedItem> items;
             if (!station.countrycode.empty())

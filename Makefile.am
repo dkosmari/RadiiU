@@ -118,6 +118,8 @@ radiiu_elf_SOURCES = \
 	src/StationGlaze.hpp \
 	src/StationVoting.cpp \
 	src/StationVoting.hpp \
+	src/StationClicking.cpp \
+	src/StationClicking.hpp \
 	src/stream_metadata.cpp \
 	src/stream_metadata.hpp \
 	src/string_utils.cpp \

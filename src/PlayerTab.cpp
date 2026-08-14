@@ -33,10 +33,10 @@
 #include "ImageLoader.hpp"
 #include "LogManager.hpp"
 #include "radio_client.hpp"
-#include "RadioBrowserAPI.hpp"
 #include "RecentTab.hpp"
 #include "Serializer.hpp"
 #include "Settings.hpp"
+#include "StationClicking.hpp"
 #include "StationDetailsPopup.hpp"
 #include "StationVoting.hpp"
 #include "UI.hpp"
@@ -246,6 +246,8 @@ namespace PlayerTab {
 
         // allocate and initialize resources here
         res.emplace(station->url, station->url_resolved);
+
+        StationClicking::click(station);
     }
 
 

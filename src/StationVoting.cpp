@@ -7,6 +7,7 @@
 
 #include <chrono>
 #include <exception>
+#include <functional>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -15,7 +16,6 @@
 #include <imgui.h>
 #include <imgui_raii.h>
 #include <imgui_stdlib.h>
-
 
 #include "StationVoting.hpp"
 
@@ -37,7 +37,7 @@ namespace StationVoting {
 
     namespace {
 
-        using clock = std::chrono::system_clock;
+        using std::chrono::system_clock;
 
 
         /*-------*/
@@ -45,7 +45,7 @@ namespace StationVoting {
         /*-------*/
 
         struct VoteRecord {
-            clock::time_point when;
+            system_clock::time_point when;
             RadioBrowserAPI::VoteResult result;
         };
 
@@ -54,7 +54,7 @@ namespace StationVoting {
         /* Constants */
         /*-----------*/
 
-        const clock::duration vote_duration = 10min;
+        const system_clock::duration vote_duration = 10min;
 
 
         /*-----------*/
@@ -106,11 +106,14 @@ namespace StationVoting {
         handle_vote_error(const ConstStationPtr& station,
                           const std::exception& e)
         {
-            LOG_ERROR("Failed to cast vote for {:?}: {}",
+            TRACE_FUNC;
+
+            LOG_ERROR("Failed to cast vote for {} ({:?}): {}",
+                      station->stationuuid,
                       station->name,
                       e.what());
             votes_cast[station->stationuuid] = {
-                .when = clock::now(),
+                .when = system_clock::now(),
                 .result{
                     .ok = false,
                     .message = e.what()
@@ -123,7 +126,12 @@ namespace StationVoting {
         handle_vote_result(const ConstStationPtr& station,
                            RadioBrowserAPI::VoteResult result)
         {
-            LOG_DEBUG("Result of vote: {}", result.ok);
+            TRACE_FUNC;
+
+            LOG_DEBUG("Result of vote for {} ({:?}): {}",
+                      station->stationuuid,
+                      station->name,
+                      result.ok);
 
             if (!result.message.empty())
                 LOG_DEBUG("{}", result.message);
@@ -138,7 +146,7 @@ namespace StationVoting {
             }
 
             votes_cast[station->stationuuid] = {
-                .when = clock::now(),
+                .when = system_clock::now(),
                 .result = std::move(result)
             };
         }
@@ -148,9 +156,7 @@ namespace StationVoting {
         handle_vote_update(const ConstStationPtr& station,
                            RadioBrowserAPI::Station rb_station)
         {
-            LOG_DEBUG("Updating station votes: {} -> {}",
-                      station->votes.value_or(0),
-                      rb_station.votes);
+            TRACE_FUNC;
             station->votes = rb_station.votes;
         }
 
@@ -166,7 +172,7 @@ namespace StationVoting {
     {
         std::vector<std::string> expired;
 
-        auto now = clock::now();
+        auto now = system_clock::now();
         for (const auto& [uuid, record] : votes_cast)
             if (now - record.when > vote_duration)
                 expired.push_back(uuid);

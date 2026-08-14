@@ -813,28 +813,6 @@ namespace BrowserTab {
     }
 
 
-    void
-    send_click(StationPtr& station)
-    {
-        TRACE_FUNC;
-
-        if (!station || station->stationuuid.empty())
-            return;
-
-        RadioBrowserAPI::send_click(
-            station->stationuuid,
-            [station](RadioBrowserAPI::ClickResult result)
-            {
-                LOG_DEBUG("Result of click: {}", result.ok);
-                if (!result.message.empty())
-                    LOG_DEBUG("{}", result.message);
-
-                update_station(station);
-            },
-            common_error_handler);
-    }
-
-
     // TODO: should display errors to the user
     void
     common_error_handler(const std::exception& e)

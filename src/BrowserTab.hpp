@@ -27,9 +27,6 @@ namespace BrowserTab {
     process_ui();
 
     void
-    send_click(StationPtr& station);
-
-    void
     update_station(StationPtr station);
 
     void

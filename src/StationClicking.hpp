@@ -5,20 +5,17 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#ifndef STATION_VOTING_HPP
-#define STATION_VOTING_HPP
+#ifndef STATION_CLICKING_HPP
+#define STATION_CLICKING_HPP
 
 #include "Station.hpp"
 
 
-namespace StationVoting {
+namespace StationClicking {
 
     void
-    process_logic();
+    click(const ConstStationPtr& station);
 
-    void
-    Button(ConstStationPtr station);
-
-} // namespace StationVoting
+} // namespace StationClicking
 
 #endif
