@@ -40,6 +40,7 @@ AX_PTHREAD([
 PKG_CHECK_MODULES([FAAD2], [faad2])
 PKG_CHECK_MODULES_STATIC([CURL], [libcurl])
 PKG_CHECK_MODULES([MPG123], [libmpg123])
+PKG_CHECK_MODULES([FT], [freetype2])
 PKG_CHECK_MODULES([SDL], [sdl2 SDL2_image])
 PKG_CHECK_MODULES_STATIC([OPUSFILE], [opusfile])
 PKG_CHECK_MODULES_STATIC([VORBISFILE], [vorbisfile])
@@ -51,21 +52,6 @@ AS_VAR_IF([enable_wiiu], [yes],
 AC_DEFINE_UNQUOTED([MPG123_VERSION],
                    ["`$PKG_CONFIG --modversion libmpg123`"],
                    [version of mpg123])
-
-AC_ARG_ENABLE([freetype],
-              [AS_HELP_STRING([--disable-freetype], [Build without FreeType2 backend.])],
-              [enable_freetype=$enableval],
-              [enable_freetype=yes])
-AM_CONDITIONAL([ENABLE_FREETYPE], [test x$enable_freetype = xyes])
-AS_VAR_IF([enable_freetype], [yes],
-          [PKG_CHECK_MODULES([FT], [freetype2])])
-
-AC_ARG_ENABLE([stb-ttf],
-              [AS_HELP_STRING([--enable-stb-ttf], [Build with STB TrueType backend.])],
-              [enable_stb_ttf=$enableval],
-              [enable_stb_ttf=no])
-AM_CONDITIONAL([ENABLE_STB_TRUETYPE], [test x$enable_stb_ttf = xyes])
-
 
 AX_SUBDIRS_CONFIGURE([external/curlxx],
                      [[--enable-static-libcurl],
@@ -110,5 +96,3 @@ AC_MSG_NOTICE([CFLAGS is "$CFLAGS"])
 AC_MSG_NOTICE([CXXFLAGS is "$CXXFLAGS"])
 AC_MSG_NOTICE([LDFLAGS is "$LDFLAGS"])
 AC_MSG_NOTICE([LIBS is "$LIBS"])
-AC_MSG_NOTICE([FreeType2 backend: $enable_freetype])
-AC_MSG_NOTICE([STB TrueType backend: $enable_stb_ttf])

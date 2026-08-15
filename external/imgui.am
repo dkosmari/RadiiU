@@ -3,8 +3,8 @@ noinst_LTLIBRARIES += libimgui.la
 
 libimgui_la_SOURCES = \
 	custom_imconfig.h \
-	imgui/backends/imgui_impl_sdl2.h \
 	imgui/backends/imgui_impl_sdl2.cpp \
+	imgui/backends/imgui_impl_sdl2.h \
 	imgui/backends/imgui_impl_sdlrenderer2.cpp \
 	imgui/backends/imgui_impl_sdlrenderer2.h \
 	imgui/imconfig.h \
@@ -19,7 +19,10 @@ libimgui_la_SOURCES = \
 	imgui/imstb_truetype.h \
 	imgui/misc/cpp/imgui_raii.h \
 	imgui/misc/cpp/imgui_stdlib.cpp \
-	imgui/misc/cpp/imgui_stdlib.h
+	imgui/misc/cpp/imgui_stdlib.h \
+	imgui/misc/freetype/imgui_freetype.cpp \
+	imgui/misc/freetype/imgui_freetype.h
+
 
 # Uncomment this to include Style Editor window.
 libimgui_la_SOURCES += imgui/imgui_demo.cpp
@@ -27,26 +30,10 @@ libimgui_la_SOURCES += imgui/imgui_demo.cpp
 
 libimgui_la_CPPFLAGS = \
 	$(AM_CPPFLAGS) \
+	$(FT_CFLAGS) \
 	-DIMGUI_USER_CONFIG='"$(srcdir)/custom_imconfig.h"' \
 	-I$(srcdir)/imgui \
+	-I$(srcdir)/plutosvg/source \
+	-I$(srcdir)/plutosvg/plutovg/include \
 	$(SDL_CFLAGS)
 
-
-if ENABLE_FREETYPE
-
-libimgui_la_SOURCES += \
-	imgui/misc/freetype/imgui_freetype.cpp \
-	imgui/misc/freetype/imgui_freetype.h
-
-libimgui_la_CPPFLAGS += \
-	-DIMGUI_ENABLE_FREETYPE \
-	$(FT_CFLAGS)
-
-endif ENABLE_FREETYPE
-
-
-if ENABLE_STB_TRUETYPE
-
-libimgui_la_CPPFLAGS += -DIMGUI_ENABLE_STB_TRUETYPE
-
-endif ENABLE_STB_TRUETYPE

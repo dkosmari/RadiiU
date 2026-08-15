@@ -4,6 +4,9 @@
 [submodule "external/curlxx"]
 	path = external/curlxx
 	url = https://github.com/dkosmari/curlxx.git
+[submodule "external/flag-icons"]
+	path = external/flag-icons
+	url = https://github.com/lipis/flag-icons.git
 [submodule "external/glaze"]
 	path = external/glaze
 	url = https://github.com/stephenberry/glaze.git
@@ -16,6 +19,9 @@
 [submodule "external/mpg123xx"]
 	path = external/mpg123xx
 	url = https://github.com/dkosmari/mpg123xx.git
+[submodule "external/plutosvg"]
+	path = external/plutosvg
+	url = https://github.com/sammycage/plutosvg.git
 [submodule "external/sdl2xx"]
 	path = external/sdl2xx
 	url = https://github.com/dkosmari/sdl2xx.git

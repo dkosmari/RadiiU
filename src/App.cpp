@@ -576,10 +576,10 @@ namespace App {
                     // App name, centered
                     float title_height = 0;
                     {
-                        Font title_font{nullptr, 50};
+                        Font title_font{nullptr, 64};
                         title_height = ImGui::GetTextLineHeight();
                         ImGui::TextAligned(0.5f, -1, PACKAGE_STRING);
-                        // UI::show_last_bounding_box();
+                        // UI::BoundingBox();
                     }
 
                     if (TabBar tab_bar{"main_tabs"}) {

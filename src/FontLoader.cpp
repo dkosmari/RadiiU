@@ -32,6 +32,8 @@
 using namespace std::literals;
 
 
+static_assert(sizeof(ImWchar) == 4, "ImWchar must be 32-bit");
+
 namespace FontLoader {
 
     namespace {
@@ -69,6 +71,10 @@ namespace FontLoader {
             config.Flags |= ImFontFlags_NoLoadError;
             config.EllipsisChar = U'…';
             config.FontDataOwnedByAtlas = false;
+#ifdef IMGUI_ENABLE_FREETYPE
+        config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
+        config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
+#endif
             config.MergeMode = merge;
 
             LOG_DEBUG("Loading {:?}", font_names.at(type));
@@ -267,6 +273,7 @@ namespace FontLoader {
         io.Fonts->FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
         io.Fonts->FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
 #endif
+        io.Fonts->TexDesiredFormat = ImTextureFormat_RGBA32;
 
         load_system_fonts();
     }
@@ -280,29 +287,34 @@ namespace FontLoader {
 
 
     void
-    load(const std::filesystem::path& font,
+    load(const std::filesystem::path& fontfile,
          bool merge)
     {
         TRACE_FUNC;
-        LOG_DEBUG("load({:?})", font.string());
+        LOG_DEBUG("load({:?})", fontfile.string());
 
         const auto& style = ImGui::GetStyle();
         ImFontConfig config;
         config.EllipsisChar = U'…';
         config.Flags |= ImFontFlags_NoLoadError;
+#ifdef IMGUI_ENABLE_FREETYPE
+        config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
+        config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
+#endif
         config.MergeMode = merge;
 
-        if (font.filename() == "fontawesome-webfont.ttf")
+        if (fontfile.filename() == "fontawesome-webfont.ttf")
             tweak_font_awesome(config);
 
 #ifndef __WIIU__
-        if (font.filename().string().starts_with("Cafe"))
+        if (fontfile.filename().string().starts_with("Cafe"))
             tweak_cafe(config);
 #endif
 
         auto& io = ImGui::GetIO();
-        if (!io.Fonts->AddFontFromFileTTF(font.c_str(), style.FontSizeBase, &config))
-            throw std::runtime_error{"Could not load \""s + font.string() + "\""s};
+        auto font = io.Fonts->AddFontFromFileTTF(fontfile, style.FontSizeBase, &config);
+        if (!font)
+            throw std::runtime_error{"Could not load \""s + fontfile.string() + "\""s};
     }
 
 
@@ -319,7 +331,7 @@ namespace FontLoader {
             if (!entry.is_regular_file())
                 continue;
             auto ext = to_lower(entry.path().extension().u32string());
-            if (ext != U".ttf" && ext != U".otf")
+            if (ext != U".ttf" && ext != U".otf" && ext != U".woff2")
                 continue;
             try {
                 load(entry);

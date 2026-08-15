@@ -14,11 +14,13 @@ AM_CXXFLAGS = \
 noinst_LTLIBRARIES =
 
 
-include $(srcdir)/imgui.am
-
 include $(srcdir)/glaze.am
 
+include $(srcdir)/imgui.am
+
 include $(srcdir)/librpxloader.am
+
+include $(srcdir)/plutosvg.am
 
 
 .PHONY: company

@@ -15,6 +15,9 @@ external/%:
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C external
 
 
+AM_CFLAGS = \
+	-Wall -Wextra -Werror
+
 AM_CXXFLAGS = \
 	-Wall -Wextra -Werror
 
@@ -140,6 +143,7 @@ radiiu_elf_SOURCES = \
 radiiu_elf_CPPFLAGS = \
 	$(AM_CPPFLAGS) \
 	$(CURL_CFLAGS) \
+	$(FT_CFLAGS) \
 	$(MPG123_CFLAGS) \
 	$(SDL_CFLAGS) \
 	$(FAAD2_CFLAGS) \
@@ -163,6 +167,7 @@ radiiu_elf_LDADD =  \
 	$(LDADD) \
 	external/curlxx/lib/libcurlxx.la \
 	external/libimgui.la \
+	external/libplutosvg.la \
 	external/mpg123xx/lib/libmpg123xx.la \
 	external/sdl2xx/lib/libsdl2xx_image.la \
 	external/sdl2xx/lib/libsdl2xx.la \
@@ -171,25 +176,8 @@ radiiu_elf_LDADD =  \
 	$(MPG123_LIBS) \
 	$(OPUSFILE_LIBS) \
 	$(VORBISFILE_LIBS) \
+	$(FT_LIBS) \
 	$(SDL_LIBS)
-
-
-if ENABLE_FREETYPE
-
-radiiu_elf_CPPFLAGS += \
-	-DIMGUI_ENABLE_FREETYPE \
-	$(FT_CFLAGS)
-
-radiiu_elf_LDADD += $(FT_LIBS)
-
-endif ENABLE_FREETYPE
-
-
-if ENABLE_STB_TRUETYPE
-
-radiiu_elf_CPPFLAGS += -DIMGUI_ENABLE_STB_TRUETYPE
-
-endif ENABLE_STB_TRUETYPE
 
 
 if ENABLE_WIIU
