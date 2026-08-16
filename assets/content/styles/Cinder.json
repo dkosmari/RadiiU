@@ -46,7 +46,6 @@
         "PlotHistogram"             : [0.86, 0.93, 0.89, 0.63],
         "PlotHistogramHovered"      : [0.92, 0.18, 0.29, 1.00],
         "TextLink"                  : [0.00, 0.63, 1.00, 1.00],
-        "TextSelectedBg"            : [0.92, 0.18, 0.29, 1.00],
-        "ModalWindowDarkening"      : [0.20, 0.22, 0.27, 0.73]
+        "TextSelectedBg"            : [0.92, 0.18, 0.29, 1.00]
     }
 }
