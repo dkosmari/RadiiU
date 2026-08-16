@@ -1,0 +1,39 @@
+noinst_LTLIBRARIES += libplutosvg.la
+
+libplutosvg_la_SOURCES = \
+	plutosvg/plutovg/include/plutovg.h \
+	plutosvg/plutovg/source/plutovg-blend.c \
+	plutosvg/plutovg/source/plutovg-canvas.c \
+	plutosvg/plutovg/source/plutovg-font.c \
+	plutosvg/plutovg/source/plutovg-ft-math.c \
+	plutosvg/plutovg/source/plutovg-ft-math.h \
+	plutosvg/plutovg/source/plutovg-ft-raster.c \
+	plutosvg/plutovg/source/plutovg-ft-raster.h \
+	plutosvg/plutovg/source/plutovg-ft-stroker.c \
+	plutosvg/plutovg/source/plutovg-ft-stroker.h \
+	plutosvg/plutovg/source/plutovg-ft-types.h \
+	plutosvg/plutovg/source/plutovg-matrix.c \
+	plutosvg/plutovg/source/plutovg-paint.c \
+	plutosvg/plutovg/source/plutovg-path.c \
+	plutosvg/plutovg/source/plutovg-private.h \
+	plutosvg/plutovg/source/plutovg-rasterize.c \
+	plutosvg/plutovg/source/plutovg-stb-image-write.h \
+	plutosvg/plutovg/source/plutovg-stb-image.h \
+	plutosvg/plutovg/source/plutovg-stb-truetype.h \
+	plutosvg/plutovg/source/plutovg-surface.c \
+	plutosvg/plutovg/source/plutovg-utils.h \
+	plutosvg/source/plutosvg-ft.h \
+	plutosvg/source/plutosvg.c \
+	plutosvg/source/plutosvg.h
+
+
+libplutosvg_la_CPPFLAGS = \
+	$(FT_CFLAGS) \
+	-I$(srcdir)/plutosvg/source \
+	-I$(srcdir)/plutosvg/plutovg/include \
+	-DPLUTOSVG_BUILD \
+	-DPLUTOSVG_BUILD_STATIC \
+	-DPLUTOVG_BUILD \
+	-DPLUTOVG_BUILD_STATIC \
+	-DPLUTOSVG_HAS_FREETYPE \
+	-DPLUTOVG_DISABLE_FONT_FACE_CACHE_LOAD

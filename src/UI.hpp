@@ -162,10 +162,8 @@ namespace UI {
                bool only_first_line);
 
 
-
     void
     BoundingBox();
-
 
 
     // Align to the right, with label color
@@ -184,6 +182,11 @@ namespace UI {
 
     bool
     TextLinkOpenURL(const std::string& url);
+
+
+    ImVec2
+    max(const ImVec2& a,
+        const ImVec2& b);
 
 } // namespace UI
 

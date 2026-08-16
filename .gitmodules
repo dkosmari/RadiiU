@@ -4,9 +4,6 @@
 [submodule "external/curlxx"]
 	path = external/curlxx
 	url = https://github.com/dkosmari/curlxx.git
-[submodule "external/flag-icons"]
-	path = external/flag-icons
-	url = https://github.com/lipis/flag-icons.git
 [submodule "external/glaze"]
 	path = external/glaze
 	url = https://github.com/stephenberry/glaze.git

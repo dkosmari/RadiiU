@@ -54,6 +54,8 @@ radiiu_elf_SOURCES = \
 	src/ConfirmDeleteStationPopup.hpp \
 	src/ConfirmExitPopup.cpp \
 	src/ConfirmExitPopup.hpp \
+	src/CountryFlagManager.cpp \
+	src/CountryFlagManager.hpp \
 	src/decoder.cpp \
 	src/decoder.hpp \
 	src/decoder_aac.cpp \
@@ -149,11 +151,11 @@ radiiu_elf_CPPFLAGS = \
 	$(FAAD2_CFLAGS) \
 	$(OPUSFILE_CFLAGS) \
 	$(VORBISFILE_CFLAGS) \
+	-DIMGUI_USER_CONFIG='"$(srcdir)/external/custom_imconfig.h"' \
+	-DGLZ_DISABLE_ALWAYS_INLINE \
 	-I$(srcdir)/external/cafe_glyphs/include \
 	-I$(srcdir)/external/curlxx/include \
-	-DIMGUI_USER_CONFIG='"$(srcdir)/external/custom_imconfig.h"' \
 	-I$(srcdir)/external/glaze/include \
-	-DGLZ_DISABLE_ALWAYS_INLINE \
 	-I$(srcdir)/external/imgui \
 	-I$(srcdir)/external/imgui/backends \
 	-I$(srcdir)/external/imgui/misc/cpp \

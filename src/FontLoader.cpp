@@ -32,11 +32,11 @@
 using namespace std::literals;
 
 
-static_assert(sizeof(ImWchar) == 4, "ImWchar must be 32-bit");
-
 namespace FontLoader {
 
     namespace {
+
+        // TODO: load tweaks from a .ini with the same stem name as the font.
 
         void
         tweak_cafe(ImFontConfig& config)

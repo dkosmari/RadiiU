@@ -439,7 +439,7 @@ namespace BrowserTab {
 
                 ImGui::Indent();
 
-                if (Child filters_guard{
+                if (Child filters{
                         "filters",
                         {0, 0},
                         ImGuiChildFlags_AutoResizeX |
@@ -546,7 +546,7 @@ namespace BrowserTab {
 
                 ImGui::SameLine();
 
-                if (Child sorting_child{
+                if (Child sorting{
                         "sorting",
                         {0, 0},
                         ImGuiChildFlags_AutoResizeX |
@@ -584,11 +584,20 @@ namespace BrowserTab {
                         ImGuiChildFlags_NavFlattened
                     }) {
 
-                    if (ImGui::Button("Reset"))
+                    const std::string reset_label = ICON_FA_ERASER " Reset";
+                    const auto reset_size = ImGui::CalcTextSize(reset_label);
+                    const std::string search_label = ICON_FA_BINOCULARS " Search";
+                    const auto search_size = ImGui::CalcTextSize(search_label);
+
+                    const auto& style = ImGui::GetStyle();
+                    const auto button_size = UI::max(reset_size, search_size)
+                        + 2 * style.FramePadding;
+
+                    if (ImGui::Button("Reset", button_size))
                         reset_options();
                     ImGui::SetItemTooltip("Reset browser options to default.");
 
-                    if (ImGui::Button("Search")) {
+                    if (ImGui::Button("Search", button_size)) {
                         GUI::page = 1;
                         search_stations();
                     }

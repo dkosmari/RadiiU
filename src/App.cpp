@@ -46,6 +46,7 @@
 #include "AboutTab.hpp"
 #include "BrowserTab.hpp"
 #include "ConfirmExitPopup.hpp"
+#include "CountryFlagManager.hpp"
 #include "FavoritesTab.hpp"
 #include "FontLoader.hpp"
 #include "IconsFontAwesome4.h"
@@ -220,6 +221,7 @@ namespace App {
             ImGui_ImplSDLRenderer2_Shutdown();
             ImGui_ImplSDL2_Shutdown();
 
+            CountryFlagManager::initialize();
             FontLoader::finalize();
 
             ImGui::DestroyContext();
@@ -304,6 +306,7 @@ namespace App {
             FontLoader::initialize(); // load system font(s)
             FontLoader::load_dir(get_content_path() / "fonts");
             FontLoader::load_dir(get_config_path() / "fonts");
+            CountryFlagManager::initialize();
 
             ImGui_ImplSDL2_InitForSDLRenderer(res->window.data(),
                                               res->renderer.data());

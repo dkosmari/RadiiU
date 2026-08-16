@@ -20,6 +20,7 @@
 
 #include "App.hpp"
 #include "BrowserTab.hpp"
+#include "CountryFlagManager.hpp"
 #include "FavoritesTab.hpp"
 #include "IconsFontAwesome4.h"
 #include "ImageLoader.hpp"
@@ -361,7 +362,7 @@ namespace UI {
 
             std::vector<FramedItem> items;
             if (!station.countrycode.empty())
-                items.emplace_back(ICON_FA_FLAG_O " " + station.countrycode,
+                items.emplace_back(CountryFlagManager::get_utf8(station.countrycode),
                                    BrowserTab::get_country_name(station.countrycode));
             for (auto& lang : station.language)
                 items.emplace_back(ICON_FA_LANGUAGE " " + lang,
@@ -638,5 +639,15 @@ namespace UI {
 #endif
     }
 
+
+    ImVec2
+    max(const ImVec2& a,
+        const ImVec2& b)
+    {
+        return {
+            std::fmax(a.x, b.x),
+            std::fmax(a.y, b.y)
+        };
+    }
 
 } // namespace UI
