@@ -42,15 +42,16 @@ namespace FontLoader {
         tweak_cafe(ImFontConfig& config)
         {
             LOG_DEBUG("Adjusting for Cafe font.");
-            config.GlyphOffset.y = -6;
+            config.GlyphOffset.y = -8;
+            config.ExtraSizeScale = 0.9f;
         }
 
         void
         tweak_font_awesome(ImFontConfig& config)
         {
             LOG_DEBUG("Adjusting for fontawesome.");
-            // font_size *= 33.0f / 40.0f;
-            config.GlyphOffset.y = -6;
+            config.GlyphOffset.y = -8;
+            config.ExtraSizeScale = 0.9f;
         }
 
 #ifdef __WIIU__

@@ -340,7 +340,7 @@ namespace CountryFlagManager {
     {
         auto it = flags.find(iso_code);
         if (it == flags.end())
-            return ICON_FA_FLAG_O + " "s + iso_code;
+            return ICON_FA_FLAG_O;
         return it->second.utf8;
     }
 

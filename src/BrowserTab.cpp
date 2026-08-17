@@ -33,6 +33,7 @@
 #include "BrowserTab.hpp"
 
 #include "App.hpp"
+#include "CountryFlagManager.hpp"
 #include "enumerator.hpp"
 #include "humanize.hpp"
 #include "IconsFontAwesome4.h"
@@ -460,14 +461,12 @@ namespace BrowserTab {
                     /*----------------*/
                     /* Filter by tag. */
                     /*----------------*/
-                    ImGui::SetNextWindowSizeConstraints({0, 0},
-                                                        {1200.0f, FLT_MAX});
                     if (Combo tag_combo{
                             "Tag",
                             GUI::filter_tag,
                             ImGuiComboFlags_HeightLargest
                         }) {
-                        static ImGuiTextFilter text_filter{GUI::filter_tag.data()};
+                        static ImGuiTextFilter text_filter;
                         if (ImGui::IsWindowAppearing()) {
                             ImGui::SetKeyboardFocusHere();
                             SDL_strlcpy(text_filter.InputBuf,
@@ -475,18 +474,29 @@ namespace BrowserTab {
                                         sizeof text_filter.InputBuf);
                             text_filter.Build();
                         }
-                        text_filter.Draw("##tag", 900);
-                        // Add empty entry for removing filter.
-                        if (ImGui::Selectable("##", GUI::filter_tag.empty()))
+                        text_filter.Draw("##text_filter", 800);
+
+                        if (ImGui::Selectable("(any tag)", GUI::filter_tag.empty()))
                             GUI::filter_tag.clear();
-                        // The rest of tags.
+
                         if (!tags)
                             fetch_tags();
-                        for (auto& tag : *tags) {
-                            const bool is_selected = GUI::filter_tag == tag;
-                            if (text_filter.PassFilter(tag.data()))
-                                if (ImGui::Selectable(tag, is_selected))
+
+                        // The rest of tags.
+                        if (Child list{"list",
+                                       {0.0f, 16 * ImGui::GetTextLineHeight()},
+                                       ImGuiChildFlags_NavFlattened}) {
+
+                            for (auto& tag : *tags) {
+                                if (!text_filter.PassFilter(tag.data()))
+                                    continue;
+                                const bool is_selected = GUI::filter_tag == tag;
+                                auto label = ICON_FA_TAG " " + tag;
+                                if (ImGui::Selectable(label, is_selected)) {
                                     GUI::filter_tag = tag;
+                                    ImGui::CloseCurrentPopup();
+                                }
+                            }
                         }
                     }
 
@@ -498,7 +508,7 @@ namespace BrowserTab {
                             GUI::filter_country,
                             ImGuiComboFlags_HeightLargest
                         }) {
-                        static ImGuiTextFilter text_filter{GUI::filter_country.data()};
+                        static ImGuiTextFilter text_filter;
                         if (ImGui::IsWindowAppearing()) {
                             ImGui::SetKeyboardFocusHere();
                             SDL_strlcpy(text_filter.InputBuf,
@@ -506,19 +516,34 @@ namespace BrowserTab {
                                         sizeof text_filter.InputBuf);
                             text_filter.Build();
                         }
-                        text_filter.Draw("##country");
-                        // Add empty entry for removing filter.
-                        if (ImGui::Selectable("##", GUI::filter_country.empty()))
+                        text_filter.Draw("##country", 1100);
+
+                        if (ImGui::Selectable("(any country)", GUI::filter_country.empty()))
                             GUI::filter_country.clear();
-                        // The rest of countries
+
                         if (!countries)
                             fetch_countries();
-                        for (const auto& [code, name] : *countries) {
-                            const bool is_selected = GUI::filter_country == code;
-                            auto label = code + " - " + name;
-                            if (text_filter.PassFilter(label.data()))
-                                if (ImGui::Selectable(label, is_selected))
+
+                        // The rest of countries
+                        if (Child list{"list",
+                                       {0.0f, 16 * ImGui::GetTextLineHeight()},
+                                       ImGuiChildFlags_NavFlattened}) {
+                            for (const auto& [code, name] : *countries) {
+                                if (!text_filter.PassFilter(code.data()) &&
+                                    !text_filter.PassFilter(name.data()))
+                                    continue;
+                                const bool is_selected = GUI::filter_country == code;
+                                auto label =
+                                    CountryFlagManager::get_utf8(code)
+                                    + " "s
+                                    + code
+                                    + " - "s
+                                    + name;
+                                if (ImGui::Selectable(label, is_selected)) {
                                     GUI::filter_country = code;
+                                    ImGui::CloseCurrentPopup();
+                                }
+                            }
                         }
                     }
 
@@ -531,9 +556,10 @@ namespace BrowserTab {
                             "Codec",
                             GUI::filter_codec
                         }) {
-                        // Add empty entry for removing filter.
-                        if (ImGui::Selectable("##", GUI::filter_codec.empty()))
+
+                        if (ImGui::Selectable("(any codec)", GUI::filter_codec.empty()))
                             GUI::filter_codec = "";
+
                         // The rest of codecs.
                         if (!codecs)
                             fetch_codecs();

@@ -6,13 +6,13 @@
  */
 
 #include <algorithm>
-#include <functional>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <stdexcept>
-#include <vector>
 #include <unordered_set>
+#include <vector>
 
 #include <imgui.h>
 #include <imgui_raii.h>
@@ -65,7 +65,8 @@ namespace FavoritesTab {
         std::unordered_multiset<std::string> uuids;
         std::optional<MoveOp> move_operation;
         std::optional<std::size_t> scroll_to_station;
-        std::string tags_filter;
+        std::string name_filter;
+        std::string tag_filter;
 
 
         /*-----------------------*/
@@ -351,7 +352,12 @@ namespace FavoritesTab {
             ImGui::SameLine();
 
             ImGui::SetNextItemWidth(300);
-            ImGui::InputTextWithHint("##tags_filter"s, "Filter by tag..."s, tags_filter);
+            ImGui::InputTextWithHint("##name_filter"s, "Filter by name..."s, name_filter);
+
+            ImGui::SameLine();
+
+            ImGui::SetNextItemWidth(300);
+            ImGui::InputTextWithHint("##tag_filter"s, "Filter by tag..."s, tag_filter);
 
             ImGui::SameLine();
 
@@ -366,10 +372,16 @@ namespace FavoritesTab {
             for (std::size_t index = 0; index < stations.size(); ++index) {
                 auto& station = stations[index];
 
-                if (!tags_filter.empty()) {
+                using string_utils::to_upper;
+
+                if (!name_filter.empty())
+                    if (!to_upper(station->name).contains(to_upper(name_filter)))
+                        continue;
+
+                if (!tag_filter.empty()) {
                     bool match = false;
                     for (auto& tag : station->tags)
-                        if (tag.contains(tags_filter)) {
+                        if (to_upper(tag).contains(to_upper(tag_filter))) {
                             match = true;
                             break;
                         }

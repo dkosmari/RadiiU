@@ -86,6 +86,11 @@ namespace string_utils {
            bool compress = true);
 
 
+    [[nodiscard]]
+    std::string
+    to_upper(std::string input);
+
+
     // equivalent to trimmed(..., std::isspace)
     [[nodiscard]]
     std::string

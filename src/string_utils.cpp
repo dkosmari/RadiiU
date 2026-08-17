@@ -239,6 +239,16 @@ namespace string_utils {
 
 
     std::string
+    to_upper(std::string input)
+    {
+        auto loc = std::locale::classic();
+        for (auto& c : input)
+            c = std::toupper(c, loc);
+        return input;
+    }
+
+
+    std::string
     trimmed(const std::string& input)
     {
         return trimmed(input, std::isspace);
