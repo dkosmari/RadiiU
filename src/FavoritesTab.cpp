@@ -351,12 +351,12 @@ namespace FavoritesTab {
 
             ImGui::SameLine();
 
-            ImGui::SetNextItemWidth(300);
+            ImGui::SetNextItemWidth(400);
             ImGui::InputTextWithHint("##name_filter"s, "Filter by name..."s, name_filter);
 
             ImGui::SameLine();
 
-            ImGui::SetNextItemWidth(300);
+            ImGui::SetNextItemWidth(400);
             ImGui::InputTextWithHint("##tag_filter"s, "Filter by tag..."s, tag_filter);
 
             ImGui::SameLine();
@@ -380,7 +380,7 @@ namespace FavoritesTab {
 
                 if (!tag_filter.empty()) {
                     bool match = false;
-                    for (auto& tag : station->tags)
+                    for (const auto& tag : station->tags)
                         if (to_upper(tag).contains(to_upper(tag_filter))) {
                             match = true;
                             break;

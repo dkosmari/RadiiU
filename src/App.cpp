@@ -684,7 +684,7 @@ namespace App {
 
             auto& style = ImGui::GetStyle();
 
-            style.FontSizeBase = 32;
+            style.FontSizeBase = 36;
 
             const ImVec2 padding = {9, 9};
             const float rounding = 9;

@@ -8,8 +8,6 @@
 #ifndef RECENT_TAB_HPP
 #define RECENT_TAB_HPP
 
-#include <memory>
-
 #include "Station.hpp"
 
 
@@ -31,7 +29,7 @@ namespace RecentTab {
 
 
     void
-    queue_add(ConstStationPtr& station);
+    add(ConstStationPtr station);
 
 } // namespace RecentTab
 

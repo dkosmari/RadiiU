@@ -63,6 +63,18 @@ namespace FontLoader {
             "CafeTw.ttf"s
         };
 
+
+        std::span<std::byte>
+        get_cafe_font(OSSharedDataType type)
+        {
+            std::byte* data= nullptr;
+            uint32_t size = 0;
+            if (!OSGetSharedData(type, 0, &data, &size))
+                throw std::runtime_error{"Could not find \"" + font_names.at(type) + "\""};
+            return std::span(data, size);
+        }
+
+
         void
         load_system_font(OSSharedDataType type,
                          bool merge = true)
@@ -81,15 +93,11 @@ namespace FontLoader {
             LOG_DEBUG("Loading {:?}", font_names.at(type));
             tweak_cafe(config);
 
-            void* blob = nullptr;
-            uint32_t blob_size = 0;
-            if (!OSGetSharedData(type, 0, &blob, &blob_size))
-                throw std::runtime_error{"Could not find \"" + font_names.at(type) + "\""};
-
             auto& io = ImGui::GetIO();
-            if (!io.Fonts->AddFontFromMemoryTTF(blob, blob_size,
-                                                style.FontSizeBase, &config))
-                    throw std::runtime_error{"Could not parse \"" + font_names.at(type) + "\""};
+            if (!io.Fonts->AddFontFromMemoryTTF(get_cafe_font(type),
+                                                style.FontSizeBase,
+                                                &config))
+                throw std::runtime_error{"Could not parse \"" + font_names.at(type) + "\""};
         }
 
 

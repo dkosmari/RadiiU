@@ -238,7 +238,7 @@ namespace PlayerTab {
 
         LOG_INFO("Starting playback of station {:?}", station->name);
 
-        RecentTab::queue_add(station);
+        RecentTab::add(station);
 
         LOG_INFO("Playing url={:?}, url_resolved={:?}",
                  station->url,
