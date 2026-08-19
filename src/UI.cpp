@@ -494,10 +494,11 @@ namespace UI {
                 ImGui::Text(text);
             }
 
+            // NOTE: can't use ImGui::SetItemTooltip() here because of messy hovered detection.
+            if (!tooltip.empty())
+                if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ForTooltip))
+                    ImGui::SetTooltip(tooltip);
         }
-        if (!tooltip.empty())
-            ImGui::SetItemTooltip(tooltip);
-
     }
 
 

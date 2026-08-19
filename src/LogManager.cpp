@@ -46,6 +46,15 @@ namespace LogManager {
 
         const MessageVec::size_type max_messages = 1024;
 
+        const std::array log_level_ansi_prefixes = {
+            "\e[3;93m",       // DEBUG
+            "\e[1;7;34m",       // INFO
+            "\e[1;7;33m",       // WARN
+            "\e[1;7;31"         // ERROR
+        };
+
+        const char* ansi_reset = "\e[0m";
+
 
         /*-----------*/
         /* Variables */
@@ -102,8 +111,10 @@ namespace LogManager {
         {
             // TODO: set ANSI colors for each level
             std::println(cout,
-                         "[LOG:{}] [{}:{}] {}\n{}",
+                         "{}{}{} [{}:{}] {}\n{}",
+                         log_level_ansi_prefixes.at(std::to_underlying(msg.level)),
                          msg.level,
+                         ansi_reset,
                          msg.location.file_name(),
                          msg.location.line(),
                          msg.tag,

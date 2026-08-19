@@ -10,6 +10,7 @@
 #include <deque>
 #include <optional>
 #include <string_view>
+#include <utility>
 
 #include <iostream> // DEBUG
 
@@ -207,7 +208,7 @@ namespace LogsTab {
                     if (!skip_header) {
 
                         {
-                            unsigned idx = static_cast<unsigned>(msg.level);
+                            auto idx = std::to_underlying(msg.level);
                             StyleColor text_color{ImGuiCol_Text, log_level_colors.at(idx)};
                             ImGui::TextAligned(0.0f, level_label_width, to_string(msg.level));
                         }
