@@ -242,7 +242,7 @@ namespace AboutTab {
 
             }
 
-            ImGui::SeparatorText("{Credits}");
+            ImGui::SeparatorText("Credits");
             static const auto credits = get_credits();
             if (Table credits_table{"credits", 2}) {
 
@@ -261,6 +261,7 @@ namespace AboutTab {
                 // auto rb_icon_tex = ImageLoader::get("https://www.radio-browser.info/favicon.ico");
                 // ImGui::Image(*rb_icon_tex, sdl::vec2{64, 64});
 
+                UI::InfoRow("Country flags", "GoSquared (http://www.gosquared.com/)");
             }
 
             ImGui::SeparatorText("Components");
