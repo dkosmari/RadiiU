@@ -27,6 +27,10 @@ namespace App {
     const std::filesystem::path&
     get_config_path();
 
+    [[nodiscard]]
+    float
+    get_default_font_size();
+
     void
     initialize();
 

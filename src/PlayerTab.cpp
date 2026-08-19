@@ -361,7 +361,7 @@ namespace PlayerTab {
                 if (!res)
                     return;
 
-                Font smaller{nullptr, 24};
+                Font smaller{nullptr, 0.8f * App::get_default_font_size()};
 
                 Indent indenter;
                 if (Table metadata_table{"metadata", 2}) {
@@ -437,7 +437,7 @@ namespace PlayerTab {
             ImGui::SetNextItemOpen(state.history_expanded);
             if ((state.history_expanded = ImGui::CollapsingHeader("Track history"))) {
 
-                Font smaller{nullptr, 24};
+                Font smaller{nullptr, 0.8f * App::get_default_font_size()};
                 Indent indenter;
 
                 if (Table table{"table",

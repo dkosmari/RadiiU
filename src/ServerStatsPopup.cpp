@@ -15,6 +15,7 @@
 
 #include "ServerStatsPopup.hpp"
 
+#include "App.hpp"
 #include "LogManager.hpp"
 #include "RadioBrowserAPI.hpp"
 #include "tracer.hpp"
@@ -121,7 +122,7 @@ namespace ServerStatsPopup {
             if (!stats)
                 return;
 
-            Font smaller{nullptr, 24};
+            Font smaller{nullptr, 0.8f * App::get_default_font_size()};
 
             if (Table fields_table{
                     "fields",

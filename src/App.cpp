@@ -658,9 +658,11 @@ namespace App {
 
                     // Put an exit button on the top right
                     {
-                        Font exit_font{nullptr, 32};
+                        Font exit_font{nullptr, 36};
                         const std::string label = ICON_FA_SIGN_OUT;
                         ImVec2 size = ImGui::CalcTextSize(label) + 2 * style.FramePadding;
+                        if (title_height > size.x)
+                            size.x = title_height;
                         size.y = title_height;
                         const ImVec2 pos = { content_end.x - size.x, content_begin.y };
                         ImGui::SetCursorPos(pos);
@@ -684,7 +686,7 @@ namespace App {
 
             auto& style = ImGui::GetStyle();
 
-            style.FontSizeBase = 36;
+            style.FontSizeBase = get_default_font_size();
 
             const ImVec2 padding = {9, 9};
             const float rounding = 9;
@@ -785,6 +787,13 @@ namespace App {
     get_config_path()
     {
         return config_path;
+    }
+
+
+    float
+    get_default_font_size()
+    {
+        return 42;
     }
 
 

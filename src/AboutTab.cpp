@@ -242,7 +242,7 @@ namespace AboutTab {
 
             }
 
-            ImGui::SeparatorText("Credits");
+            ImGui::SeparatorText("{Credits}");
             static const auto credits = get_credits();
             if (Table credits_table{"credits", 2}) {
 

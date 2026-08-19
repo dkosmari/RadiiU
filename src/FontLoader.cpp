@@ -36,23 +36,16 @@ namespace FontLoader {
 
     namespace {
 
+        // WORKAROUND: ImGui loads glyphs too large when the Bitmap flag is set.
+
+        const float cafe_extra_scale = 0.75f;
+        const float cafe_y_offset = -12.5f;
+
+        float global_extra_scale = 1;
+        float global_y_offset = 0;
+
         // TODO: load tweaks from a .ini with the same stem name as the font.
 
-        void
-        tweak_cafe(ImFontConfig& config)
-        {
-            LOG_DEBUG("Adjusting for Cafe font.");
-            config.GlyphOffset.y = -8;
-            config.ExtraSizeScale = 0.9f;
-        }
-
-        void
-        tweak_font_awesome(ImFontConfig& config)
-        {
-            LOG_DEBUG("Adjusting for fontawesome.");
-            config.GlyphOffset.y = -8;
-            config.ExtraSizeScale = 0.9f;
-        }
 
 #ifdef __WIIU__
 
@@ -69,7 +62,10 @@ namespace FontLoader {
         {
             std::byte* data= nullptr;
             uint32_t size = 0;
-            if (!OSGetSharedData(type, 0, reinterpret_cast<void**>(&data), &size))
+            if (!OSGetSharedData(type,
+                                 0,
+                                 reinterpret_cast<void**>(&data),
+                                 &size))
                 throw std::runtime_error{"Could not find \"" + font_names.at(type) + "\""};
             return std::span(data, size);
         }
@@ -79,19 +75,26 @@ namespace FontLoader {
         load_system_font(OSSharedDataType type,
                          bool merge = true)
         {
+            TRACE_FUNC;
+
+            LOG_DEBUG("Loading {:?}", font_names.at(type));
+
+            global_y_offset = cafe_y_offset;
+            global_extra_scale = cafe_extra_scale;
+
             const auto& style = ImGui::GetStyle();
             ImFontConfig config;
             config.Flags |= ImFontFlags_NoLoadError;
             config.EllipsisChar = U'…';
             config.FontDataOwnedByAtlas = false;
 #ifdef IMGUI_ENABLE_FREETYPE
-        config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
-        config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
+            config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
+            config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
 #endif
             config.MergeMode = merge;
+            config.ExtraSizeScale = global_extra_scale;
+            config.GlyphOffset.y = global_y_offset;
 
-            LOG_DEBUG("Loading {:?}", font_names.at(type));
-            tweak_cafe(config);
 
             auto& io = ImGui::GetIO();
             if (!io.Fonts->AddFontFromMemoryTTF(get_cafe_font(type),
@@ -300,7 +303,13 @@ namespace FontLoader {
          bool merge)
     {
         TRACE_FUNC;
-        LOG_DEBUG("load({:?})", fontfile.string());
+
+        LOG_DEBUG("Loading {:?}", fontfile.string());
+
+        if (fontfile.filename().string().starts_with("Cafe")) {
+            global_extra_scale = cafe_extra_scale;
+            global_y_offset = cafe_y_offset;
+        }
 
         const auto& style = ImGui::GetStyle();
         ImFontConfig config;
@@ -311,14 +320,8 @@ namespace FontLoader {
         config.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bitmap;
 #endif
         config.MergeMode = merge;
-
-        if (fontfile.filename() == "fontawesome-webfont.ttf")
-            tweak_font_awesome(config);
-
-#ifndef __WIIU__
-        if (fontfile.filename().string().starts_with("Cafe"))
-            tweak_cafe(config);
-#endif
+        config.ExtraSizeScale = global_extra_scale;
+        config.GlyphOffset.y = global_y_offset;
 
         auto& io = ImGui::GetIO();
         auto font = io.Fonts->AddFontFromFileTTF(fontfile, style.FontSizeBase, &config);
@@ -331,6 +334,7 @@ namespace FontLoader {
     load_dir(const std::filesystem::path& dir)
     {
         TRACE_FUNC;
+
         LOG_DEBUG("load_dir({:?})", dir.string());
 
         if (!exists(dir) || !is_directory(dir))

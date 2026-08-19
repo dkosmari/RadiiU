@@ -214,7 +214,7 @@ namespace StationVoting {
             };
             std::optional<Font> smaller_font;
             if (value_label.size() >= 3)
-                smaller_font.emplace(nullptr, 24);
+                smaller_font.emplace(nullptr, 32);
             Disabled if_cant_vote{
                 station->stationuuid.empty() ||
                 !cfg.send_clicks ||

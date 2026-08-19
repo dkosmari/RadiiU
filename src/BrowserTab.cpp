@@ -806,42 +806,46 @@ namespace BrowserTab {
 
         show_status();
 
+        bool hide_stations = GUI::search_options_visible;
+
         show_search_options();
 
-        show_navigation();
+        if (!hide_stations)  {
+            show_navigation();
 
-        // Note: flat navigation doesn't work well on child windows that scroll.
-        if (Child stations_child{"stations"}) {
+            // Note: flat navigation doesn't work well on child windows that scroll.
+            if (Child stations_child{"stations"}) {
 
-            if (GUI::scroll_to_top) {
-                ImGui::SetScrollY(0);
-                GUI::scroll_to_top = false;
-            }
+                if (GUI::scroll_to_top) {
+                    ImGui::SetScrollY(0);
+                    GUI::scroll_to_top = false;
+                }
 
 #if 0
-            // Disabled until ImGui fixes navigation.
-            const float content_width = ImGui::GetContentRegionAvail().x;
-            if (page_index > 0)
-                if (ImGui::Button("⏴ Go to page " + std::to_string(page_index - 1 + 1),
-                                  {content_width, 0.0f})) {
-                    --page_index;
-                    reload_stations();
-                }
+                // Disabled until ImGui fixes navigation.
+                const float content_width = ImGui::GetContentRegionAvail().x;
+                if (page_index > 0)
+                    if (ImGui::Button("⏴ Go to page " + std::to_string(page_index - 1 + 1),
+                                      {content_width, 0.0f})) {
+                        --page_index;
+                        reload_stations();
+                    }
 #endif
 
-            for (auto& station : stations)
-                show_station(station);
+                for (auto& station : stations)
+                    show_station(station);
 
 #if 0
-            // Disabled until ImGui fixes navigation.
-            if (stations.size() == cfg.browser_page_limit)
-                if (ImGui::Button("Go to page " + std::to_string(page_index + 1 + 1) + " ⏵",
-                                  {content_width, 0.0f})) {
-                    ++page_index;
-                    reload_stations();
-                }
+                // Disabled until ImGui fixes navigation.
+                if (stations.size() == cfg.browser_page_limit)
+                    if (ImGui::Button("Go to page " + std::to_string(page_index + 1 + 1) + " ⏵",
+                                      {content_width, 0.0f})) {
+                        ++page_index;
+                        reload_stations();
+                    }
 #endif
-        } // stations_child
+            } // stations_child
+        }
 
         StationDetailsPopup::process_ui();
         ServerStatsPopup::process_ui();

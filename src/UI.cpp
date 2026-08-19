@@ -308,7 +308,7 @@ namespace UI {
     {
         using namespace ImGui::RAII;
 
-        Font font{nullptr, 64};
+        Font font{nullptr, 76};
         if (PlayerTab::is_playing(*station)) {
             auto playing_color = ImGui::GetStyleColorVec4(ImGuiCol_PlotLinesHovered);
             StyleColor text_color{ImGuiCol_Text, playing_color};

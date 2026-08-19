@@ -14,6 +14,7 @@
 
 #include "StationDetailsPopup.hpp"
 
+#include "App.hpp"
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
 #include "RadioBrowserAPI.hpp"
@@ -132,7 +133,7 @@ namespace StationDetailsPopup {
 
             ImGui::Text("ERROR!");
 
-            Font smaller{nullptr, 24};
+            Font smaller{nullptr, 0.8f * App::get_default_font_size()};
             ImGui::TextWrapped(error_message);
             if (!error_content_type.empty())
                 ImGui::FormatText("Content-Type: {}", error_content_type);
@@ -149,7 +150,7 @@ namespace StationDetailsPopup {
             if (!station)
                 return;
 
-            Font smaller{nullptr, 24};
+            Font smaller{nullptr, 0.8f * App::get_default_font_size()};
 
             if (Table fields{"fields",
                              2,
