@@ -188,6 +188,26 @@ namespace UI {
     max(const ImVec2& a,
         const ImVec2& b);
 
+
+    void
+    SmoothScroll(float target_x,
+                 float target_y);
+
+    void
+    SmoothScroll(const ImVec2& target);
+
+
+    void
+    SmoothScrollItem();
+
+
+    void
+    DoSmoothScroll();
+
+
+    ImVec2
+    ScreenToLocal(const ImVec2& screen_pos);
+
 } // namespace UI
 
 #endif

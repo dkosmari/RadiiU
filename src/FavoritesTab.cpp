@@ -161,7 +161,7 @@ namespace FavoritesTab {
         {
             using namespace ImGui::RAII;
 
-            ID station_id{std::to_string(index) + ":" + station->stationuuid};
+            ID station_id{static_cast<const void*>(station.get())};
 
             const auto& style = ImGui::GetStyle();
 
@@ -386,10 +386,13 @@ namespace FavoritesTab {
                 }
 
                 show_station(index, station);
-                if (scroll_to_station && *scroll_to_station == index) {
-                    ImGui::SetScrollHereY();
+
+                if (scroll_to_station == index) {
                     scroll_to_station.reset();
+                    UI::SmoothScrollItem();
                 }
+                UI::DoSmoothScroll();
+
             }
 
         } // favorites

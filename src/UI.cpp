@@ -10,6 +10,7 @@
 #include <iostream>
 #include <optional>
 #include <stdexcept>
+#include <unordered_map>
 
 #include <imgui_raii.h>
 #include <imgui_stdlib.h>
@@ -31,7 +32,11 @@
 #include "Station.hpp"
 #include "string_utils.hpp"
 #include "TabID.hpp"
+#include "tracer.hpp"
 
+
+using std::cout;
+using std::endl;
 
 using namespace std::literals;
 
@@ -55,16 +60,38 @@ namespace UI {
         };
 
 
+        struct SmoothScrollState {
+            ImVec2 start_pos;
+            ImVec2 final_pos;
+            double start_time;
+        };
+
+
         /*-----------*/
         /* Constants */
         /*-----------*/
 
         const int favicon_height = 173;
 
+        const float smooth_scroll_duration = 0.5f;
+
+
+        // Variables
+
+        std::unordered_map<ImGuiID, SmoothScrollState> smooth_scroll_state;
+
 
         /*-----------------------*/
         /* Function declarations */
         /*-----------------------*/
+
+        template<typename Pt>
+        Pt
+        cubic_hermite_spline(const Pt& p0,
+                             const Pt& p1,
+                             const Pt& d0,
+                             const Pt& d1,
+                             float t);
 
         std::pair<double, double>
         get_scales_for(const sdl::vec2& input,
@@ -77,6 +104,26 @@ namespace UI {
         /*----------------------*/
         /* Function definitions */
         /*----------------------*/
+
+        template<typename Pt>
+        Pt
+        cubic_hermite_spline(const Pt& p0,
+                             const Pt& p1,
+                             const Pt& d0,
+                             const Pt& d1,
+                             float t)
+        {
+            if (t < 0)
+                return p0;
+            if (t > 1)
+                return p1;
+            Pt a =  2 * p0 - 2 * p1 +     d0 + d1;
+            Pt b = -3 * p0 + 3 * p1 - 2 * d0 - d1;
+            Pt c =                        d0;
+            Pt d =      p0;
+            return a * t*t*t + b * t*t + c * t + d;
+        }
+
 
         std::pair<double, double>
         get_scales_for(const sdl::vec2& input,
@@ -648,6 +695,128 @@ namespace UI {
             std::fmax(a.x, b.x),
             std::fmax(a.y, b.y)
         };
+    }
+
+
+    void
+    SmoothScroll(float target_x,
+                 float target_y)
+    {
+        SmoothScroll(ImVec2{target_x, target_y});
+    }
+
+
+    void
+    SmoothScroll(const ImVec2& target)
+    {
+        // LOG_WARN("SmoothScroll({}, {})", target.x, target.y);
+
+        auto id = ImGui::GetItemID();
+        ImVec2 old_pos = { ImGui::GetScrollX(), ImGui::GetScrollY() };
+        ImVec2 new_pos = {
+            target.x < 0 ? old_pos.x : target.x,
+            target.y < 0 ? old_pos.y : target.y
+        };
+        double now = ImGui::GetTime();
+        smooth_scroll_state[id] = {old_pos, new_pos, now};
+    }
+
+
+    void
+    SmoothScrollItem()
+    {
+        ImVec2 item_min = ScreenToLocal(ImGui::GetItemRectMin());
+        ImVec2 item_max = ScreenToLocal(ImGui::GetItemRectMax());
+
+        ImVec2 item_size = item_max - item_min;
+        ImVec2 scroll = { ImGui::GetScrollX(), ImGui::GetScrollY() };
+
+        ImVec2 win_padding = ImGui::GetCursorStartPos() + scroll;
+        ImVec2 win_size = ImGui::GetWindowSize();
+
+        const auto& style = ImGui::GetStyle();
+        ImVec2 scrollbar_size = {
+            ImGui::GetScrollMaxY() > 0 ? style.ScrollbarSize : 0.0f,
+            ImGui::GetScrollMaxX() > 0 ? style.ScrollbarSize : 0.0f
+        };
+        ImVec2 visible_size = win_size - 2 *  win_padding - scrollbar_size;
+
+        ImVec2 new_scroll = scroll;
+
+        if (item_size.x > visible_size.x) {
+            // Item is too large to fit.
+            // Make sure there's no empty space on the left.
+            if (item_min.x > scroll.x)
+                new_scroll.x = item_min.x;
+
+            // Make sure there's no empty space on the right.
+            if (item_max.x < scroll.x + visible_size.x)
+                new_scroll.x = item_max.x - visible_size.x;
+        } else {
+            // If left boundary is out of view.
+            if (item_min.x < scroll.x)
+                new_scroll.x = item_min.x;
+
+            // If right boundary is out of view.
+            if (item_max.x > scroll.x + visible_size.x)
+                new_scroll.x = item_max.x - visible_size.x;
+        }
+
+        if (item_size.y > visible_size.y) {
+            // Item is too large to fit.
+            // Make sure there's no empty space above.
+            if (item_min.y > scroll.y)
+                new_scroll.y = item_min.y;
+
+            // Make sure there's no empty space below.
+            if (item_max.y < scroll.y + visible_size.y)
+                new_scroll.y = item_max.y - visible_size.y;
+        } else {
+            // If top boundary is out of view
+            if (item_min.y < scroll.y)
+                new_scroll.y = item_min.y;
+
+            // If bottom boundary is out of view.
+            if (item_max.y > scroll.y + visible_size.y)
+                new_scroll.y = item_max.y - visible_size.y;
+        }
+
+        if (new_scroll != scroll)
+            SmoothScroll(new_scroll);
+    }
+
+
+    void
+    DoSmoothScroll()
+    {
+        auto id = ImGui::GetItemID();
+        if (!smooth_scroll_state.contains(id))
+            return;
+
+        auto& state = smooth_scroll_state.at(id);
+        double now = ImGui::GetTime();
+        float dt = (now - state.start_time) / smooth_scroll_duration;
+
+        auto pos = cubic_hermite_spline(state.start_pos,
+                                        state.final_pos,
+                                        ImVec2{0, 0},
+                                        ImVec2{0, 0},
+                                        dt);
+
+        ImGui::SetScrollX(pos.x);
+        ImGui::SetScrollY(pos.y);
+
+        if (dt >= 1)
+            smooth_scroll_state.erase(id);
+    }
+
+
+    ImVec2
+    ScreenToLocal(const ImVec2& screen_pos)
+    {
+        ImVec2 win_pos = ImGui::GetWindowPos();
+        ImVec2 scroll = { ImGui::GetScrollX(), ImGui::GetScrollY() };
+        return screen_pos - win_pos + scroll;
     }
 
 } // namespace UI
