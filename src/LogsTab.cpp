@@ -23,6 +23,7 @@
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
 #include "tracer.hpp"
+#include "UI.hpp"
 
 
 // Define this to inject log messages.
@@ -244,11 +245,11 @@ namespace LogsTab {
 
             auto new_timestamp = LogManager::get_timestamp();
             if (new_timestamp != timestamp) {
-                // Scroll to the bottom.
-                ImGui::SetScrollHereY(1.0f);
+                // Make sure last added line is visible.
+                UI::SmoothScrollItem();
                 timestamp = new_timestamp;
             }
-
+            UI::DoSmoothScroll();
         }
     }
 
