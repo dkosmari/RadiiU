@@ -484,7 +484,7 @@ namespace BrowserTab {
 
                         // The rest of tags.
                         if (Child list{"list",
-                                       {0.0f, 16 * ImGui::GetTextLineHeight()},
+                                       {0.0f, 12 * ImGui::GetTextLineHeight()},
                                        ImGuiChildFlags_NavFlattened}) {
 
                             for (auto& tag : *tags) {
@@ -526,7 +526,7 @@ namespace BrowserTab {
 
                         // The rest of countries
                         if (Child list{"list",
-                                       {0.0f, 16 * ImGui::GetTextLineHeight()},
+                                       {0.0f, 12 * ImGui::GetTextLineHeight()},
                                        ImGuiChildFlags_NavFlattened}) {
                             for (const auto& [code, name] : *countries) {
                                 if (!text_filter.PassFilter(code.data()) &&
