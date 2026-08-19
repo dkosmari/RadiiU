@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <cstdlib>
-#include <future>
 #include <memory>
 #include <queue>
 #include <random>
@@ -30,12 +29,11 @@
 
 #include "RadioBrowserAPI.hpp"
 
-#include "async_queue.hpp"
+#include "async_task_queue.hpp"
 #include "LogManager.hpp"
 #include "net/address.hpp"
 #include "net/resolver.hpp"
 #include "rest.hpp"
-// #include "thread_safe.hpp"
 #include "tracer.hpp"
 
 
@@ -134,12 +132,6 @@ namespace RadioBrowserAPI {
         };
 
 
-        /*--------------*/
-        /* Type aliases */
-        /*--------------*/
-
-        using task_t = std::future<void>;
-
         /*-----------*/
         /* Constants */
         /*-----------*/
@@ -148,6 +140,7 @@ namespace RadioBrowserAPI {
         const glz::opts glz_options{ .error_on_unknown_keys = false, };
 
         const string start_server = "all.api.radio-browser.info";
+
 
         /*-----------*/
         /* Variables */
@@ -158,21 +151,12 @@ namespace RadioBrowserAPI {
         std::minstd_rand random_engine;
         MirrorsVec mirrors;
         std::jthread fetch_mirrors_thread;
-        async_queue<task_t> pending_tasks;
+        async_task_queue pending_tasks;
 
 
         /*-----------------------*/
         /* Function declarations */
         /*-----------------------*/
-
-        template<typename F,
-                 typename... Args>
-        void
-        add_task(F&& func,
-                 Args&& ...args);
-
-        void
-        dispatch_one_pending_task();
 
         void
         fetch_mirrors_thread_function(std::stop_token stopper,
@@ -203,32 +187,6 @@ namespace RadioBrowserAPI {
         /*----------------------*/
         /* Function definitions */
         /*----------------------*/
-
-        template<typename F,
-                 typename... Args>
-        void
-        add_task(F&& func,
-                 Args&& ...args)
-        {
-            pending_tasks.push(std::async(std::launch::deferred,
-                                          std::forward<F>(func),
-                                          std::forward<Args>(args)...));
-        }
-
-
-        void
-        dispatch_one_pending_task()
-        {
-            if (auto task = pending_tasks.try_pop()) {
-                try {
-                    task->get();
-                }
-                catch (std::exception& e) {
-                    LOG_ERROR("{}", e.what());
-                }
-            }
-        }
-
 
         void
         fetch_mirrors_thread_function(std::stop_token stopper,
@@ -290,16 +248,16 @@ namespace RadioBrowserAPI {
 
             // Step 3: Invoke the result callback.
             if (result_func) {
-                add_task(std::move(result_func),
-                         MirrorsVec{names.begin(), names.end()});
+                pending_tasks.add(std::move(result_func),
+                                  MirrorsVec{names.begin(), names.end()});
             }
         }
         catch (std::exception& e) {
             string msg = e.what();
             LOG_ERROR("{}", msg);
             if (error_func)
-                add_task(std::move(error_func),
-                         std::move(msg));
+                pending_tasks.add(std::move(error_func),
+                                  std::move(msg));
         }
 
 
@@ -427,7 +385,13 @@ namespace RadioBrowserAPI {
     void
     process()
     {
-        dispatch_one_pending_task();
+        try {
+            pending_tasks.try_dispatch_one();
+        }
+        catch (std::exception& e) {
+            LOG_ERROR("Dispatching RadioBrowerAPI task: {}", e.what());
+        }
+
         rest::process();
     }
 
@@ -517,10 +481,10 @@ namespace RadioBrowserAPI {
     try {
         if (!start_call()) {
             // defer until busy == false
-            add_task(get_codecs,
-                     params,
-                     std::move(result_func),
-                     std::move(except_func));
+            pending_tasks.add(get_codecs,
+                              params,
+                              std::move(result_func),
+                              std::move(except_func));
             return;
         }
 
@@ -565,10 +529,10 @@ namespace RadioBrowserAPI {
     try {
         if (!start_call()) {
             // defer until busy == false
-            add_task(get_countries,
-                     params,
-                     std::move(result_func),
-                     std::move(except_func));
+            pending_tasks.add(get_countries,
+                              params,
+                              std::move(result_func),
+                              std::move(except_func));
             return;
         }
 
@@ -620,9 +584,9 @@ namespace RadioBrowserAPI {
     try {
         if (!start_call()) {
             // defer until busy == false
-            add_task(get_server_stats,
-                     std::move(result_func),
-                     std::move(except_func));
+            pending_tasks.add(get_server_stats,
+                              std::move(result_func),
+                              std::move(except_func));
             return;
         }
 
@@ -663,10 +627,10 @@ namespace RadioBrowserAPI {
     try {
         if (!start_call()) {
             // defer until busy == false
-            add_task(get_station,
-                     uuid,
-                     std::move(result_func),
-                     std::move(except_func));
+            pending_tasks.add(get_station,
+                              uuid,
+                              std::move(result_func),
+                              std::move(except_func));
             return;
         }
 
@@ -713,10 +677,10 @@ namespace RadioBrowserAPI {
     try {
         if (!start_call()) {
             // defer until busy == false
-            add_task(get_tags,
-                     params,
-                     std::move(result_func),
-                     std::move(except_func));
+            pending_tasks.add(get_tags,
+                              params,
+                              std::move(result_func),
+                              std::move(except_func));
             return;
         }
 
@@ -760,10 +724,10 @@ namespace RadioBrowserAPI {
     try {
         if (!start_call()) {
             // defer until busy == false
-            add_task(search_stations,
-                     params,
-                     std::move(result_func),
-                     std::move(except_func));
+            pending_tasks.add(search_stations,
+                              params,
+                              std::move(result_func),
+                              std::move(except_func));
             return;
         }
 
@@ -807,10 +771,10 @@ namespace RadioBrowserAPI {
     try {
         if (!start_call()) {
             // defer until busy == false
-            add_task(send_click,
-                     uuid,
-                     std::move(result_func),
-                     std::move(except_func));
+            pending_tasks.add(send_click,
+                              uuid,
+                              std::move(result_func),
+                              std::move(except_func));
             return;
         }
 
@@ -853,10 +817,10 @@ namespace RadioBrowserAPI {
     try {
         if (!start_call()) {
             // defer until busy == false
-            add_task(send_vote,
-                     uuid,
-                     std::move(result_func),
-                     std::move(except_func));
+            pending_tasks.add(send_vote,
+                              uuid,
+                              std::move(result_func),
+                              std::move(except_func));
             return;
         }
 

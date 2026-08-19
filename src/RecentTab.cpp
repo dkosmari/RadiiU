@@ -6,8 +6,6 @@
  */
 
 #include <deque>
-#include <functional>
-#include <future>
 #include <optional>
 #include <queue>
 #include <ranges>
@@ -27,6 +25,7 @@
 #include "StationDetailsPopup.hpp"
 #include "StationGlaze.hpp"
 #include "string_utils.hpp"
+#include "task_queue.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
 
@@ -39,20 +38,12 @@ namespace RecentTab {
 
     namespace {
 
-        /*--------------*/
-        /* Type aliases */
-        /*--------------*/
-
-        using Task = std::future<void>;
-        using TaskQueue = std::queue<Task>;
-
-
         /*-----------*/
         /* Variables */
         /*-----------*/
 
         std::deque<ConstStationPtr> stations;
-        TaskQueue pending_tasks;
+        task_queue pending_tasks;
         std::string name_filter;
         std::string tag_filter;
 
@@ -60,15 +51,6 @@ namespace RecentTab {
         /*-----------------------*/
         /* Function declarations */
         /*-----------------------*/
-
-        template<typename F,
-                 typename... Args>
-        void
-        add_task(F&& func,
-                 Args&&... args);
-
-        void
-        dispatch_tasks();
 
         void
         load();
@@ -93,33 +75,6 @@ namespace RecentTab {
         /*----------------------*/
         /* Function definitions */
         /*----------------------*/
-
-        template<typename F,
-                 typename... Args>
-        void
-        add_task(F&& func,
-                 Args&&... args)
-        {
-            pending_tasks.push(std::async(std::launch::deferred,
-                                          std::forward<F>(func),
-                                          std::forward<Args>(args)...));
-        }
-
-
-        void
-        dispatch_tasks()
-        {
-            while (!pending_tasks.empty()) {
-                try {
-                    pending_tasks.front().get();
-                }
-                catch (std::exception& e) {
-                    LOG_ERROR("Dispatching tasks for RecentTab: {}", e.what());
-                }
-                pending_tasks.pop();
-            }
-        }
-
 
         void
         load()
@@ -203,7 +158,7 @@ namespace RecentTab {
                         StationDetailsPopup::open(station->stationuuid);
 
                     if (ImGui::Button(ICON_FA_TRASH_O, UI::get_small_button_size())) // 🗑
-                        add_task(std::bind_front(real_remove, station));
+                        pending_tasks.add(real_remove, station);
                     ImGui::SetItemTooltip("Remove station from recent history.");
 
                 } // actions_frame
@@ -308,7 +263,13 @@ namespace RecentTab {
     void
     process_logic()
     {
-        dispatch_tasks();
+        try {
+            pending_tasks.dispatch_all();
+        }
+        catch (std::exception& e) {
+            LOG_ERROR("Dispatching RecentTab tasks: {}", e.what());
+        }
+
         remove_excess();
     }
 
@@ -316,7 +277,7 @@ namespace RecentTab {
     void
     add(ConstStationPtr station)
     {
-        add_task(std::bind_front(real_add, std::move(station)));
+        pending_tasks.add(real_add, std::move(station));
     }
 
 } // namespace RecentTab

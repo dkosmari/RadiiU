@@ -29,6 +29,7 @@
 #include "Station.hpp"
 #include "StationGlaze.hpp"
 #include "string_utils.hpp"
+#include "task_queue.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
 
@@ -40,33 +41,16 @@ namespace FavoritesTab {
 
     namespace {
 
-        /*-------*/
-        /* Types */
-        /*-------*/
-
-        struct MoveOp {
-            std::size_t src;
-            std::size_t dst;
-        };
-
-
-        /*-----------*/
-        /* Constants */
-        /*-----------*/
-
-        const std::string popup_delete_title = "Delete station?";
-
-
         /*-----------*/
         /* Variables */
         /*-----------*/
 
         std::vector<StationPtr> stations;
         std::unordered_multiset<std::string> uuids;
-        std::optional<MoveOp> move_operation;
         std::optional<std::size_t> scroll_to_station;
         std::string name_filter;
         std::string tag_filter;
+        task_queue pending_tasks;
 
 
         /*-----------------------*/
@@ -85,6 +69,12 @@ namespace FavoritesTab {
         void
         handle_station_edit(StationPtr old_station,
                             Station new_station);
+
+        void
+        move_down(std::size_t index);
+
+        void
+        move_up(std::size_t index);
 
         void
         show_station(std::size_t index,
@@ -146,6 +136,26 @@ namespace FavoritesTab {
 
 
         void
+        move_down(std::size_t index)
+        {
+            if (index >= stations.size() || index + 1 >= stations.size())
+                return;
+            std::swap(stations[index], stations[index + 1]);
+            scroll_to_station = index + 1;
+        }
+
+
+        void
+        move_up(std::size_t index)
+        {
+            if (index < 1 || index >= stations.size())
+                return;
+            std::swap(stations[index], stations[index - 1]);
+            scroll_to_station = index - 1;
+        }
+
+
+        void
         show_station(std::size_t index,
                      StationPtr& station)
         {
@@ -184,9 +194,7 @@ namespace FavoritesTab {
                         // ▲
                         if (ImGui::Button(ICON_FA_CHEVRON_UP,
                                           UI::get_small_button_size())) {
-                            move_operation.emplace();
-                            move_operation->src = index;
-                            move_operation->dst = index - 1;
+                            pending_tasks.add(move_up, index);
                         }
                         ImGui::SetItemTooltip("Move this station up.");
                     }
@@ -198,9 +206,7 @@ namespace FavoritesTab {
                         // ▼
                         if (ImGui::Button(ICON_FA_CHEVRON_DOWN,
                                           UI::get_small_button_size())) {
-                            move_operation.emplace();
-                            move_operation->src = index;
-                            move_operation->dst = index + 1;
+                            pending_tasks.add(move_down, index);
                         }
                         ImGui::SetItemTooltip("Move this station down.");
                     }
@@ -318,17 +324,7 @@ namespace FavoritesTab {
     void
     process_logic()
     {
-        // Handle any pending move
-        if (move_operation) {
-            auto [src, dst] = *move_operation;
-            assert(src < stations.size());
-            assert(dst < stations.size());
-            auto tmp = std::move(stations[src]);
-            stations.erase(stations.begin() + src);
-            stations.insert(stations.begin() + dst, std::move(tmp));
-            scroll_to_station = dst;
-            move_operation.reset();
-        }
+        pending_tasks.dispatch_all();
     }
 
 

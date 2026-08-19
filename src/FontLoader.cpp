@@ -69,7 +69,7 @@ namespace FontLoader {
         {
             std::byte* data= nullptr;
             uint32_t size = 0;
-            if (!OSGetSharedData(type, 0, &data, &size))
+            if (!OSGetSharedData(type, 0, reinterpret_cast<void**>(&data), &size))
                 throw std::runtime_error{"Could not find \"" + font_names.at(type) + "\""};
             return std::span(data, size);
         }

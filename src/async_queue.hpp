@@ -9,6 +9,7 @@
 #define ASYNC_QUEUE_HPP
 
 #include <condition_variable>
+#include <cstddef>
 #include <expected>
 #include <mutex>
 #include <queue>
@@ -28,14 +29,16 @@ template<typename T,
          typename Q = std::queue<T>>
 class async_queue {
 
-    M mutex;
+    mutable M mutex;
     std::condition_variable_any empty_cond;
     Q queue;
     bool should_stop = false;
 
 public:
 
-    async_queue() = default;
+    constexpr
+    async_queue()
+        noexcept = default;
 
 
     template<typename... Args>
@@ -43,6 +46,13 @@ public:
     async_queue(Args&&... args) :
         queue(std::forward<Args>(args)...)
     {}
+
+
+    ~async_queue()
+        noexcept
+    {
+        stop();
+    }
 
 
     // Makes the pool usable again after a stop().
@@ -83,11 +93,21 @@ public:
     }
 
 
+    std::size_t
+    size()
+        const noexcept
+    {
+        std::lock_guard guard{mutex};
+        return queue.size();
+    }
+
+
     void
     clear()
     {
         std::lock_guard guard{mutex};
-        queue.clear();
+        while (!queue.empty())
+            queue.pop();
     }
 
 

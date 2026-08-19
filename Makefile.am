@@ -44,6 +44,8 @@ radiiu_elf_SOURCES = \
 	src/App.cpp \
 	src/App.hpp \
 	src/async_queue.hpp \
+	src/async_task_queue.cpp \
+	src/async_task_queue.hpp \
 	src/BrowserTab.cpp \
 	src/BrowserTab.hpp \
 	src/ButtonHBox.cpp \
@@ -118,13 +120,13 @@ radiiu_elf_SOURCES = \
 	src/SettingsTab.hpp \
 	src/Station.cpp \
 	src/Station.hpp \
+	src/StationClicking.cpp \
+	src/StationClicking.hpp \
 	src/StationDetailsPopup.cpp \
 	src/StationDetailsPopup.hpp \
 	src/StationGlaze.hpp \
 	src/StationVoting.cpp \
 	src/StationVoting.hpp \
-	src/StationClicking.cpp \
-	src/StationClicking.hpp \
 	src/stream_metadata.cpp \
 	src/stream_metadata.hpp \
 	src/string_utils.cpp \
@@ -134,6 +136,8 @@ radiiu_elf_SOURCES = \
 	src/TabID.cpp \
 	src/TabID.hpp \
 	src/TabIDGlaze.hpp \
+	src/task_queue.cpp \
+	src/task_queue.hpp \
 	src/thread_safe.hpp \
 	src/tracer.cpp \
 	src/tracer.hpp \

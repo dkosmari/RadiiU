@@ -17,7 +17,7 @@
 #include "LogManager.hpp"
 
 #include "App.hpp"
-#include "async_queue.hpp"
+#include "async_task_queue.hpp"
 #include "thread_safe.hpp"
 #include "tracer.hpp"
 
@@ -36,7 +36,6 @@ namespace LogManager {
         /* Types */
         /*-------*/
 
-        using Task = std::future<void>;
         using MessageVec = std::deque<Message>;
         using SafeMessageVec = thread_safe<MessageVec, std::recursive_mutex>;
 
@@ -45,7 +44,7 @@ namespace LogManager {
         /* Constants */
         /*-----------*/
 
-        const MessageVec::size_type max_messages = 256;
+        const MessageVec::size_type max_messages = 1024;
 
 
         /*-----------*/
@@ -53,27 +52,16 @@ namespace LogManager {
         /*-----------*/
 
         Timestamp timestamp;
-
         SafeMessageVec safe_messages;
-
-        async_queue<Task> pending_tasks;
+        async_task_queue pending_tasks;
 
 
         /*-----------------------*/
         /* Function declarations */
         /*-----------------------*/
 
-        template<typename F,
-                 typename... Args>
-        void
-        add_task(F&& func,
-                 Args&&... args);
-
         std::string
         create_log_filename();
-
-        void
-        dispatch_pending_tasks();
 
         void
         real_clear();
@@ -89,18 +77,6 @@ namespace LogManager {
         /* Function definitions */
         /*----------------------*/
 
-        template<typename F,
-                 typename... Args>
-        void
-        add_task(F&& func,
-                 Args&&... args)
-        {
-            pending_tasks.push(std::async(std::launch::deferred,
-                                          std::forward<F>(func),
-                                          std::forward<Args>(args)...));
-        }
-
-
         std::string
         create_log_filename()
         {
@@ -113,24 +89,10 @@ namespace LogManager {
 
 
         void
-        dispatch_pending_tasks()
-        {
-            while (auto t = pending_tasks.try_pop())
-                try {
-                    t->get();
-                }
-                catch (std::exception& e) {
-                    cerr << "ERROR in LogManager::dispatch_pending_tasks(): "
-                         << e.what()
-                         << endl;
-                }
-        }
-
-
-        void
         real_clear()
         {
-            safe_messages.lock()->clear();
+            auto messages = safe_messages.lock();
+            messages->clear();
             timestamp = 0;
         }
 
@@ -138,8 +100,6 @@ namespace LogManager {
         void
         real_log(const Message& msg)
         {
-            ++timestamp;
-
             // TODO: set ANSI colors for each level
             std::println(cout,
                          "[LOG:{}] [{}:{}] {}\n{}",
@@ -151,6 +111,7 @@ namespace LogManager {
 
             auto messages = safe_messages.lock();
             messages->push_back(std::move(msg));
+            ++timestamp;
             trim_messages(*messages);
         }
 
@@ -189,7 +150,7 @@ namespace LogManager {
     void
     clear()
     {
-        add_task(real_clear);
+        pending_tasks.add(real_clear);
     }
 
 
@@ -221,14 +182,19 @@ namespace LogManager {
     void
     log(Message msg)
     {
-        add_task(real_log, std::move(msg));
+        pending_tasks.add(real_log, std::move(msg));
     }
 
 
     void
     process()
     {
-        dispatch_pending_tasks();
+        try {
+            pending_tasks.dispatch_all();
+        }
+        catch (std::exception& e) {
+            cerr << "ERROR dispatching LogManager task: "<< e.what() << endl;
+        }
     }
 
 
