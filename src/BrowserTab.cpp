@@ -431,7 +431,6 @@ namespace BrowserTab {
                 "search_options",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeY |
-                ImGuiChildFlags_FrameStyle |
                 ImGuiChildFlags_NavFlattened
             }) {
 
@@ -445,7 +444,7 @@ namespace BrowserTab {
                         {0, 0},
                         ImGuiChildFlags_AutoResizeX |
                         ImGuiChildFlags_AutoResizeY |
-                        ImGuiChildFlags_FrameStyle |
+                        ImGuiChildFlags_Borders |
                         ImGuiChildFlags_NavFlattened
                     }) {
 
@@ -461,11 +460,9 @@ namespace BrowserTab {
                     /*----------------*/
                     /* Filter by tag. */
                     /*----------------*/
-                    if (Combo tag_combo{
-                            "Tag",
-                            GUI::filter_tag,
-                            ImGuiComboFlags_HeightLargest
-                        }) {
+                    if (Combo tag_combo{"Tag",
+                                        GUI::filter_tag,
+                                        ImGuiComboFlags_HeightLargest}) {
                         static ImGuiTextFilter text_filter;
                         if (ImGui::IsWindowAppearing()) {
                             ImGui::SetKeyboardFocusHere();
@@ -503,11 +500,9 @@ namespace BrowserTab {
                     /*--------------------*/
                     /* Filter by country. */
                     /*--------------------*/
-                    if (Combo country_combo{
-                            "Country",
-                            GUI::filter_country,
-                            ImGuiComboFlags_HeightLargest
-                        }) {
+                    if (Combo country_combo{"Country",
+                                            GUI::filter_country,
+                                            ImGuiComboFlags_HeightLargest}) {
                         static ImGuiTextFilter text_filter;
                         if (ImGui::IsWindowAppearing()) {
                             ImGui::SetKeyboardFocusHere();
@@ -552,10 +547,9 @@ namespace BrowserTab {
                     /*------------------*/
                     /* Filter by codec. */
                     /*------------------*/
-                    if (Combo codec_combo{
-                            "Codec",
-                            GUI::filter_codec
-                        }) {
+                    if (Combo codec_combo{"Codec",
+                                          GUI::filter_codec,
+                                          ImGuiComboFlags_HeightLarge}) {
 
                         if (ImGui::Selectable("(any codec)", GUI::filter_codec.empty()))
                             GUI::filter_codec = "";
@@ -577,18 +571,17 @@ namespace BrowserTab {
                         {0, 0},
                         ImGuiChildFlags_AutoResizeX |
                         ImGuiChildFlags_AutoResizeY |
-                        ImGuiChildFlags_FrameStyle |
+                        ImGuiChildFlags_Borders |
                         ImGuiChildFlags_NavFlattened
                     }) {
 
                     ImGui::TextUnformatted(ICON_FA_SORT " Order");
 
                     ImGui::SetNextItemWidth(280);
-                    if (Combo order_combo{
-                            "##order",
-                            to_label(GUI::order),
-                            ImGuiComboFlags_HeightLargest}) {
-                        if (ImGui::Selectable("##", !GUI::order))
+                    if (Combo order_combo{"##order",
+                                          to_label(GUI::order),
+                                          ImGuiComboFlags_HeightLargest}) {
+                        if (ImGui::Selectable("(no preferred order)", !GUI::order))
                             GUI::order.reset();
                         for (auto o : enumerator::enumerate<GUI::Order>()) {
                             if (ImGui::Selectable(to_label(o),

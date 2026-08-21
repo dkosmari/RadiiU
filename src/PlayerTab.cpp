@@ -351,7 +351,6 @@ namespace PlayerTab {
                 "stream",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeY |
-                ImGuiChildFlags_FrameStyle |
                 ImGuiChildFlags_NavFlattened
             }) {
 
@@ -430,7 +429,6 @@ namespace PlayerTab {
                 "history",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeY |
-                ImGuiChildFlags_FrameStyle |
                 ImGuiChildFlags_NavFlattened
             }) {
 

@@ -176,7 +176,7 @@ namespace ServerStatsPopup {
             ImGui::OpenPopup(popup_id);
         }
 
-        ImGui::SetNextWindowSize({650, 500}, ImGuiCond_Always);
+        ImGui::SetNextWindowSize({650, 580}, ImGuiCond_Always);
         auto viewport = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(viewport->GetWorkCenter(),
                                 ImGuiCond_Always,

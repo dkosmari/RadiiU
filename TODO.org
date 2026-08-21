@@ -16,7 +16,8 @@
   - [X] Dedicated server stats popup module.
 - [X] Settings [1/1]
   - [X] Enable curl verbosy output for images and radio connections.
-
+- [X] Fix size of server stats popup.
+  
 * Plan for 0.5 [0%]
 - [ ] General [0/1]
   - [ ] Scrensavers.

@@ -172,7 +172,7 @@ namespace UI {
     get_label_color()
         noexcept
     {
-        return ImGui::GetStyleColorVec4(ImGuiCol_SeparatorActive);
+        return ImGui::GetStyleColorVec4(ImGuiCol_CheckMark);
     }
 
 
