@@ -199,7 +199,10 @@ namespace ImageLoader {
         const std::string content_prefix = "content:/"s;
         const std::size_t max_cache_size = 256;
 
-        // Variables
+
+        /*-----------*/
+        /* Variables */
+        /*-----------*/
 
         std::optional<Resources> res;
 

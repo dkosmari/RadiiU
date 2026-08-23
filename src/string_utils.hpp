@@ -8,6 +8,7 @@
 #ifndef STRING_UTILS_HPP
 #define STRING_UTILS_HPP
 
+#include <compare>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -16,14 +17,6 @@
 
 
 namespace string_utils {
-
-    namespace detail {
-
-        template<typename T>
-        extern const char* format_helper;
-
-    } // detail
-
 
     [[nodiscard]]
     std::string
@@ -36,6 +29,18 @@ namespace string_utils {
     bool
     equal_case(std::string_view a,
                std::string_view b);
+
+
+    [[nodiscard]]
+    bool
+    less_case(std::string_view a,
+              std::string_view b);
+
+
+    [[nodiscard]]
+    std::strong_ordering
+    spaceship_case(std::string_view a,
+                   std::string_view b);
 
 
     [[nodiscard]]

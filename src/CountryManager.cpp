@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <algorithm>
 #include <exception>
 #include <filesystem>
 #include <flat_map>
@@ -26,8 +27,9 @@
 #include "App.hpp"
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
-#include "tracer.hpp"
 #include "RadioBrowserAPI.hpp"
+#include "string_utils.hpp"
+#include "tracer.hpp"
 
 
 using namespace std::literals;
@@ -153,7 +155,8 @@ namespace CountryManager {
             countries.emplace();
 
             RadioBrowserAPI::CountryParams params;
-            params.order = RadioBrowserAPI::CountryParams::Order::name;
+            // NOTE: RadioBrowser does not respect order by name, it orders by code.
+            // params.order = RadioBrowserAPI::CountryParams::Order::name;
             params.hidebroken = true;
             params.limit = 1000;
 
@@ -167,6 +170,10 @@ namespace CountryManager {
                         countries->emplace_back(std::move(code),
                                                 std::move(name));
                     }
+
+                    std::ranges::sort(*countries,
+                                      string_utils::less_case,
+                                      &Country::name);
 
                     LOG_INFO("Received {} countries.", countries->size());
                 },

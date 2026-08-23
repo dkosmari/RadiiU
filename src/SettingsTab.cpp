@@ -35,7 +35,7 @@ namespace SettingsTab {
         const ImGuiStyle& style = ImGui::GetStyle();
 
         // Note: flat navigation doesn't work well on child windows that scroll.
-        if (Child settings_child{"settings"}) {
+        if (Child content{"content"}) {
 
             if (Table settings_table{"settings", 2}) {
 
@@ -57,14 +57,17 @@ namespace SettingsTab {
                 ImGui::TableNextColumn();
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 if (Combo styles_combo{"##style", cfg.style}) {
-                    auto& styles = Styles::get_styles();
-                    for (const auto& [type, name] : styles) {
-                        std::string label = "("s + to_label(type) + ") "s + name;
-                        if (ImGui::Selectable(label, cfg.style == name)) {
-                            cfg.style = name;
-                            Styles::load();
+                    Styles::for_each_style(
+                        [](const Styles::Info& info)
+                        {
+                            const auto& [group, name] = info;
+                            if (ImGui::Selectable(to_label(info),
+                                                  cfg.style == name)) {
+                                cfg.style = name;
+                                Styles::load();
+                            }
                         }
-                    }
+                    );
                 } // styles_combo
 
 
@@ -381,7 +384,7 @@ namespace SettingsTab {
 
             } // settings_table
 
-        } // settings_child
+        } // content
     }
 
 } // namespace SettingsTab

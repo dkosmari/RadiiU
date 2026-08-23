@@ -116,6 +116,13 @@ namespace BrowserSearchPopup {
         void
         fetch_tags();
 
+        void
+        load_tags_regex();
+
+        std::string
+        make_country_label(const std::string& code,
+                           const std::string& name);
+
         std::string
         to_label(Order order);
 
@@ -222,6 +229,48 @@ namespace BrowserSearchPopup {
         }
 
 
+        void
+        load_tags_regex()
+        try {
+            std::ifstream input;
+            if (!try_open_file(input, App::get_config_path() / "tags.ignore"))
+                if (!try_open_file(input, App::get_content_path() / "tags.ignore"))
+                    throw std::runtime_error{"could not find tags.ignore"};
+            std::string line;
+            std::string full_regex;
+            unsigned counter = 0;
+            while (getline(input, line)) {
+                if (line.empty())
+                    continue;
+                if (counter)
+                    full_regex += "|";
+                full_regex += "(?:" + line + ")";
+                ++counter;
+            }
+            tags_regex.assign(full_regex,
+                              std::regex_constants::ECMAScript |
+                              std::regex_constants::optimize);
+            LOG_INFO("Found {} rules in tags.ignore.", counter);
+            // LOG_DEBUG("{}", full_regex);
+        }
+        catch (std::exception& e) {
+            LOG_ERROR("{}", e.what());
+        }
+
+
+        std::string
+        make_country_label(const std::string& code,
+                           const std::string& name)
+        {
+            return CountryManager::get_utf8(code)
+                + " "s
+                + name
+                + " ("s
+                + code
+                + ")"s;
+        }
+
+
         std::string
         to_label(Order order)
         {
@@ -263,35 +312,6 @@ namespace BrowserSearchPopup {
                 return false;
             stream.open(filename);
             return stream.is_open();
-        }
-
-
-        void
-        load_tags_regex()
-        try {
-            std::ifstream input;
-            if (!try_open_file(input, App::get_config_path() / "tags.ignore"))
-                if (!try_open_file(input, App::get_content_path() / "tags.ignore"))
-                    throw std::runtime_error{"could not find tags.ignore"};
-            std::string line;
-            std::string full_regex;
-            unsigned counter = 0;
-            while (getline(input, line)) {
-                if (line.empty())
-                    continue;
-                if (counter)
-                    full_regex += "|";
-                full_regex += "(?:" + line + ")";
-                ++counter;
-            }
-            tags_regex.assign(full_regex,
-                              std::regex_constants::ECMAScript |
-                              std::regex_constants::optimize);
-            LOG_INFO("Found {} rules in tags.ignore.", counter);
-            // LOG_DEBUG("{}", full_regex);
-        }
-        catch (std::exception& e) {
-            LOG_ERROR("{}", e.what());
         }
 
     } // namespace
@@ -350,8 +370,7 @@ namespace BrowserSearchPopup {
         PopupModal search_modal{popup_id,
                                 nullptr,
                                 ImGuiWindowFlags_NoResize |
-                                ImGuiWindowFlags_NoMove |
-                                ImGuiWindowFlags_NoSavedSettings};
+                                ImGuiWindowFlags_NoMove};
         if (!search_modal) {
             state = State::hidden;
             confirm_func = {};
@@ -443,8 +462,15 @@ namespace BrowserSearchPopup {
                 /*--------------------*/
                 /* Filter by country. */
                 /*--------------------*/
+                std::string filter_country_label;
+                std::string filter_country_name = CountryManager::get_name(filter.country);
+                if (!filter_country_name.empty())
+                    filter_country_label = make_country_label(filter.country,
+                                                              filter_country_name);
+                else
+                    filter_country_label = filter.country;
                 if (Combo country_combo{"Country",
-                                        filter.country,
+                                        filter_country_label,
                                         ImGuiComboFlags_HeightLargest}) {
                     if (ImGui::IsWindowAppearing()) {
                         ImGui::SetKeyboardFocusHere();
@@ -472,13 +498,8 @@ namespace BrowserSearchPopup {
                                     return;
 
                                 const bool is_selected = filter.country == code;
-                                auto label =
-                                    CountryManager::get_utf8(code)
-                                    + " "s
-                                    + code
-                                    + " - "s
-                                    + name;
-                                if (ImGui::Selectable(label, is_selected)) {
+                                if (ImGui::Selectable(make_country_label(code, name),
+                                                      is_selected)) {
                                     filter.country = code;
                                     // NOTE: must explicitly close the popup because of the
                                     // nesting.

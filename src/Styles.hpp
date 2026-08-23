@@ -9,8 +9,8 @@
 #define STYLES_HPP
 
 #include <compare>
+#include <functional>
 #include <string>
-#include <vector>
 
 
 namespace Styles {
@@ -27,11 +27,20 @@ namespace Styles {
         Group group;
         std::string name;
 
-        std::strong_ordering
-        operator <=>(const Info& other)
+
+        bool
+        operator ==(const Info& other)
             const noexcept = default;
 
+        std::strong_ordering
+        operator <=>(const Info& other)
+            const noexcept;
+
     }; // struct Info
+
+
+    using StyleInfoCallbackSignature = void(const Info&);
+    using StyleInfoFunction = std::function<StyleInfoCallbackSignature>;
 
 
     void
@@ -40,15 +49,9 @@ namespace Styles {
     void
     finalize();
 
-    // void
-    // process_ui();
 
-
-
-
-    const std::vector<Info>&
-    get_styles()
-        noexcept;
+    void
+    for_each_style(const StyleInfoFunction& func);
 
 
     void
@@ -57,6 +60,10 @@ namespace Styles {
 
     std::string
     to_label(Group g);
+
+
+    std::string
+    to_label(const Info& info);
 
 } // namespace Styles
 

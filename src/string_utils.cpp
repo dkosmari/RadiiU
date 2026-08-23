@@ -14,7 +14,7 @@
 #include <ranges>
 #include <tuple>
 
-#include <iostream> // DEBUG
+#include <SDL_stdinc.h>
 
 #include "string_utils.hpp"
 
@@ -47,6 +47,34 @@ namespace string_utils {
                 return false;
         }
         return true;
+    }
+
+
+    bool
+    less_case(std::string_view a,
+              std::string_view b)
+    {
+        std::size_t size = std::min(a.size(), b.size());
+        int cmp = SDL_strncasecmp(a.data(), b.data(), size);
+        if (cmp)
+            return cmp < 0;
+        // strings match up to size characters, the length decides the ordering.
+        return a.size() < b.size();
+    }
+
+
+    std::strong_ordering
+    spaceship_case(std::string_view a,
+                   std::string_view b)
+    {
+        std::size_t size = std::min(a.size(), b.size());
+        int cmp = SDL_strncasecmp(a.data(), b.data(), size);
+        if (cmp < 0)
+            return std::strong_ordering::less;
+        if (cmp > 0)
+            return std::strong_ordering::greater;
+        // strings match up to size characters, the length decides the ordering.
+        return a.size() <=> b.size();
     }
 
 

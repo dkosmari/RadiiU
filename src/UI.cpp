@@ -76,7 +76,9 @@ namespace UI {
         const float smooth_scroll_duration = 0.5f;
 
 
-        // Variables
+        /*-----------*/
+        /* Variables */
+        /*-----------*/
 
         std::unordered_map<ImGuiID, SmoothScrollState> smooth_scroll_state;
 

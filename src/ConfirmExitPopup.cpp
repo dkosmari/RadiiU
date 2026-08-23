@@ -27,7 +27,9 @@ namespace ConfirmExitPopup {
 
     namespace {
 
-        // Types
+        /*-------*/
+        /* Types */
+        /*-------*/
 
         enum class State {
             hidden,
@@ -39,12 +41,19 @@ namespace ConfirmExitPopup {
         // Constants
         const std::string popup_id = "Confirm Exit";
 
-        // Variables
+
+        /*-----------*/
+        /* Variables */
+        /*-----------*/
 
         State state = State::hidden;
 
     } // namespace
 
+
+    /*------------------*/
+    /* Public functions */
+    /*------------------*/
 
     void
     open()

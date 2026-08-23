@@ -26,6 +26,7 @@
 #include "App.hpp"
 #include "LogManager.hpp"
 #include "Settings.hpp"
+#include "string_utils.hpp"
 #include "tracer.hpp"
 
 
@@ -46,28 +47,164 @@ struct glz::meta<ImVec4> {
 
 namespace Styles {
 
-    std::optional<unsigned>
-    color_name_to_index(const std::string& name)
-    {
-        for (unsigned i = 0; i < ImGuiCol_COUNT; ++i)
-            if (to_string(static_cast<ImGuiCol_>(i)) == name)
-                return i;
-        return {};
-    }
+    namespace {
+
+        /*--------------*/
+        /* Type aliases */
+        /*--------------*/
+
+        using ColorMap = std::unordered_map<std::string, ImVec4>;
 
 
-    using Colors = std::unordered_map<std::string, ImVec4>;
+        /*-------*/
+        /* Types */
+        /*-------*/
+
+        struct Style {
+
+            std::string name;
+            ColorMap colors;
 
 
-    struct Style {
+            void
+            apply()
+                const noexcept;
 
-        std::string name;
-        Colors colors;
+            static
+            Style
+            from_current_style(const std::string& name);
+
+        }; // struct Style
 
 
-        static
+        /*-----------*/
+        /* Constants */
+        /*-----------*/
+
+
+        /*-----------*/
+        /* Variables */
+        /*-----------*/
+
+        // dark, light, classic styles
+        std::array<Style, 3> imgui_styles;
+
+        // Cache all style names for rendering.
+        std::vector<Info> style_list;
+
+        std::optional<Style> current_style;
+
+
+        /*-----------------------*/
+        /* Function declarations */
+        /*-----------------------*/
+
+        std::optional<unsigned>
+        color_name_to_index(const std::string& name);
+
+        void
+        find_styles();
+
+        bool
+        load_style_file(const std::filesystem::path& filename);
+
+
+        /*----------------------*/
+        /* Function definitions */
+        /*----------------------*/
+
+        std::optional<unsigned>
+        color_name_to_index(const std::string& name)
+        {
+            for (unsigned i = 0; i < ImGuiCol_COUNT; ++i)
+                if (to_string(static_cast<ImGuiCol_>(i)) == name)
+                    return i;
+            return {};
+        }
+
+
+        void
+        find_styles()
+        try {
+            TRACE_FUNC;
+
+            style_list.clear();
+
+            for (auto& st : imgui_styles)
+                style_list.emplace_back(Group::imgui, st.name);
+
+            for (auto& entry :
+                     std::filesystem::directory_iterator{App::get_content_path() / "styles"}) {
+                if (!entry.is_regular_file())
+                    continue;
+                auto& path = entry.path();
+                if (path.extension() != ".json")
+                    continue;
+
+                style_list.emplace_back(Group::builtin, path.stem().string());
+            }
+
+
+            auto user_styles_path = App::get_config_path() / "styles";
+            if (exists(user_styles_path)) {
+                try {
+                    for (auto& entry :
+                             std::filesystem::directory_iterator{}) {
+                        if (!entry.is_regular_file())
+                            continue;
+                        auto& path = entry.path();
+                        if (path.extension() != ".json")
+                            continue;
+
+                        style_list.emplace_back(Group::user, path.stem().string());
+                    }
+                }
+                catch (std::exception& e) {
+                    LOG_ERROR("Trying to list user styles: {}", e.what());
+                }
+            }
+
+            std::ranges::sort(style_list);
+            // std::sort(style_list.begin(), style_list.end());
+
+            LOG_INFO("Found {} styles.", style_list.size());
+
+        }
+        catch (std::exception& e) {
+            LOG_ERROR("{}", e.what());
+        }
+
+
+        bool
+        load_style_file(const std::filesystem::path& filename)
+        {
+            if (!exists(filename))
+                return false;
+            Style st;
+            glz::ex::read_file_json(st, filename.c_str(), std::string{});
+            current_style.emplace(st);
+            current_style->apply();
+            return true;
+        }
+
+
+        void
+        Style::apply()
+            const noexcept
+        {
+            ImVec4* im_colors = ImGui::GetStyle().Colors;
+            for (auto [key, value] : colors) {
+                if (auto idx = color_name_to_index(key)) {
+                    im_colors[*idx] = value;
+                } else {
+                    LOG_ERROR("Style color name {:?} is invalid.", key);
+                }
+            }
+        }
+
+
         Style
-        from_current_style(const std::string& name)
+        Style::from_current_style(const std::string& name)
         {
             Style result;
             result.name = name;
@@ -83,36 +220,24 @@ namespace Styles {
             return result;
         }
 
-
-        void
-        apply()
-            const noexcept
-        {
-            ImVec4* im_colors = ImGui::GetStyle().Colors;
-            for (auto [key, value] : colors) {
-                if (auto idx = color_name_to_index(key)) {
-                    im_colors[*idx] = value;
-                } else {
-                    LOG_ERROR("Style color name {:?} is invalid.", key);
-                }
-            }
-        }
-
-    }; // struct Style
+    } // namespace
 
 
-    // dark, light, classic styles
-    std::array<Style, 3> imgui_styles;
+    /*------------------*/
+    /* Public functions */
+    /*------------------*/
 
 
-    // Cache all style names for rendering.
-    std::vector<Info> style_list;
+    std::strong_ordering
+    Info::operator <=>(const Info& other)
+        const noexcept
+    {
+        auto g = group <=> other.group;
+        if (g != std::strong_ordering::equal)
+            return g;
 
-    std::optional<Style> current_style;
-
-
-    void
-    find_styles();
+        return string_utils::spaceship_case(name, other.name);
+    }
 
 
     void
@@ -141,80 +266,11 @@ namespace Styles {
     }
 
 
-    // void
-    // process_ui()
-    // {}
-
-
-    const std::vector<Info>&
-    get_styles()
-        noexcept
-    {
-        return style_list;
-    }
-
-
     void
-    find_styles()
-    try {
-        TRACE_FUNC;
-
-        style_list.clear();
-
-        for (auto& st : imgui_styles)
-            style_list.emplace_back(Group::imgui, st.name);
-
-        for (auto& entry :
-                 std::filesystem::directory_iterator{App::get_content_path() / "styles"}) {
-            if (!entry.is_regular_file())
-                continue;
-            auto& path = entry.path();
-            if (path.extension() != ".json")
-                continue;
-
-            style_list.emplace_back(Group::builtin, path.stem().string());
-        }
-
-
-        auto user_styles_path = App::get_config_path() / "styles";
-        if (exists(user_styles_path)) {
-            try {
-                for (auto& entry :
-                         std::filesystem::directory_iterator{}) {
-                    if (!entry.is_regular_file())
-                        continue;
-                    auto& path = entry.path();
-                    if (path.extension() != ".json")
-                        continue;
-
-                    style_list.emplace_back(Group::user, path.stem().string());
-                }
-            }
-            catch (std::exception& e) {
-                LOG_ERROR("Trying to list user styles: {}", e.what());
-            }
-        }
-
-        std::ranges::sort(style_list);
-
-        LOG_INFO("Found {} styles.", style_list.size());
-
-    }
-    catch (std::exception& e) {
-        LOG_ERROR("{}", e.what());
-    }
-
-
-    bool
-    load_style_file(const std::filesystem::path& filename)
+    for_each_style(const StyleInfoFunction& func)
     {
-        if (!exists(filename))
-            return false;
-        Style st;
-        glz::ex::read_file_json(st, filename.c_str(), std::string{});
-        current_style.emplace(st);
-        current_style->apply();
-        return true;
+        for (const auto& info : style_list)
+            func(info);
     }
 
 
@@ -262,6 +318,12 @@ namespace Styles {
             default:
                 throw std::logic_error{"invalid group"};
         }
+    }
+
+    std::string
+    to_label(const Info& info)
+    {
+        return "("s + to_label(info.group) + ") "s + info.name;
     }
 
 } // namespace Styles
