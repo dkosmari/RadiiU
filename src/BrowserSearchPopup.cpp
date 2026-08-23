@@ -11,8 +11,6 @@
 #include <vector>
 #include <filesystem>
 
-// #include <glaze/core/meta.hpp>
-
 #include <SDL_stdinc.h>
 
 #include <imgui.h>
@@ -29,30 +27,10 @@
 #include "LogManager.hpp"
 #include "RadioBrowserAPI.hpp"
 #include "tracer.hpp"
+#include "UI.hpp"
 
 
 using namespace std::literals;
-
-
-#if 0
-template<>
-struct glz::meta<BrowserSearchPopup::Order> {
-    using enum BrowserSearchPopup::Order;
-    static constexpr
-    auto value = enumerate(name_asc,
-                           name_desc,
-                           country_asc,
-                           country_desc,
-                           language_asc,
-                           language_desc,
-                           votes_asc,
-                           votes_desc,
-                           clicks_asc,
-                           clicks_desc,
-                           random,
-                           count);
-};
-#endif
 
 
 namespace BrowserSearchPopup {
@@ -120,8 +98,17 @@ namespace BrowserSearchPopup {
         load_tags_regex();
 
         std::string
+        make_codec_label(const std::string& codec);
+
+        std::string
         make_country_label(const std::string& code,
-                           const std::string& name);
+                           std::string name = "");
+
+        std::string
+        make_tag_label(const std::string& tag);
+
+        void
+        show_filters();
 
         std::string
         to_label(Order order);
@@ -259,15 +246,194 @@ namespace BrowserSearchPopup {
 
 
         std::string
-        make_country_label(const std::string& code,
-                           const std::string& name)
+        make_codec_label(const std::string& codec)
         {
-            return CountryManager::get_utf8(code)
-                + " "s
-                + name
-                + " ("s
-                + code
-                + ")"s;
+            if (codec.empty())
+                return {};
+            return ICON_FA_FLASK " "s + codec;
+        }
+
+
+        std::string
+        make_country_label(const std::string& code,
+                           std::string name)
+        {
+            if (code.empty())
+                return {};
+            auto utf8 = CountryManager::get_utf8(code);
+            if (utf8.empty()) {
+                if (!name.empty())
+                    return name + " ("s + code + ")"s;
+                return code;
+            }
+            if (name.empty())
+                name = CountryManager::get_name(code);
+            return utf8 + " "s + name + " ("s + code + ")"s;
+        }
+
+
+        std::string
+        make_tag_label(const std::string& tag)
+        {
+            if (tag.empty())
+                return {};
+            return ICON_FA_TAG " "s + tag;
+        }
+
+
+        void
+        show_filters()
+        {
+            using namespace ImGui::RAII;
+
+            if (Child filters_group{"filters_group",
+                                    {0, 0},
+                                    ImGuiChildFlags_AutoResizeX |
+                                    ImGuiChildFlags_AutoResizeY |
+                                    ImGuiChildFlags_Borders |
+                                    ImGuiChildFlags_NavFlattened}) {
+
+                ImGui::TextUnformatted(ICON_FA_FILTER " Filters");
+
+                auto& filter = search_params.filter;
+
+                const std::string name_entry_label = "Name";
+                const std::string tag_combo_label = "Tag";
+                const std::string country_combo_label = "Country";
+                const std::string codec_combo_label = "Codec";
+                const float labels_width = UI::max_width({
+                        name_entry_label,
+                        tag_combo_label,
+                        country_combo_label,
+                        codec_combo_label
+                    });
+
+                ItemWidth items_width{500};
+
+                /*-----------------*/
+                /* Filter by name. */
+                /*-----------------*/
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextAligned(1.0f, labels_width, name_entry_label);
+                ImGui::SameLine();
+                ImGui::InputText("##name", filter.name);
+
+                /*----------------*/
+                /* Filter by tag. */
+                /*----------------*/
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextAligned(1.0f, labels_width, tag_combo_label);
+                ImGui::SameLine();
+                if (Combo tag_combo{"##tag",
+                                    make_tag_label(filter.tag),
+                                    ImGuiComboFlags_HeightLargest}) {
+                    if (ImGui::IsWindowAppearing()) {
+                        ImGui::SetKeyboardFocusHere();
+                        SDL_strlcpy(tag_text_filter.InputBuf,
+                                    filter.tag.data(),
+                                    sizeof tag_text_filter.InputBuf);
+                        tag_text_filter.Build();
+                    }
+                    tag_text_filter.Draw("##tag_text_filter", 800);
+
+                    if (ImGui::Selectable("(any tag)", filter.tag.empty()))
+                        filter.tag.clear();
+
+                    if (!tags)
+                        fetch_tags();
+
+                    // The rest of tags.
+                    if (Child list{"list",
+                                   {0.0f, 12 * ImGui::GetTextLineHeight()},
+                                   ImGuiChildFlags_NavFlattened}) {
+
+                        for (auto& tag : *tags) {
+                            if (!tag_text_filter.PassFilter(tag.data()))
+                                continue;
+                            const bool is_selected = filter.tag == tag;
+                            if (ImGui::Selectable(make_tag_label(tag), is_selected)) {
+                                filter.tag = tag;
+                                // NOTE: must explicitly close the popup because of the nesting.
+                                ImGui::CloseCurrentPopup();
+                            }
+                        }
+                    }
+                }
+
+                /*--------------------*/
+                /* Filter by country. */
+                /*--------------------*/
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextAligned(1.0, labels_width, country_combo_label);
+                ImGui::SameLine();
+                if (Combo country_combo{"##country",
+                                        make_country_label(filter.country),
+                                        ImGuiComboFlags_HeightLargest}) {
+                    if (ImGui::IsWindowAppearing()) {
+                        ImGui::SetKeyboardFocusHere();
+                        SDL_strlcpy(country_text_filter.InputBuf,
+                                    filter.country.data(),
+                                    sizeof country_text_filter.InputBuf);
+                        country_text_filter.Build();
+                    }
+                    country_text_filter.Draw("##country", 1100);
+
+                    if (ImGui::Selectable("(any country)", filter.country.empty()))
+                        filter.country.clear();
+
+                    // The rest of countries
+                    if (Child list{"list",
+                                   {0.0f, 12 * ImGui::GetTextLineHeight()},
+                                   ImGuiChildFlags_NavFlattened}) {
+                        CountryManager::for_each_country(
+                            [&filter](const CountryManager::Country& c)
+                            {
+                                const auto& [code, name] = c;
+
+                                if (!country_text_filter.PassFilter(code.data()) &&
+                                    !country_text_filter.PassFilter(name.data()))
+                                    return;
+
+                                const bool is_selected = filter.country == code;
+                                if (ImGui::Selectable(make_country_label(code, name),
+                                                      is_selected)) {
+                                    filter.country = code;
+                                    // NOTE: must explicitly close the popup because of the
+                                    // nesting.
+                                    ImGui::CloseCurrentPopup();
+                                }
+                            }
+                        );
+                    }
+                }
+
+                // TODO: add language filter
+
+                /*------------------*/
+                /* Filter by codec. */
+                /*------------------*/
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextAligned(1.0, labels_width, codec_combo_label);
+                ImGui::SameLine();
+                if (Combo codec_combo{"##codec",
+                                      make_codec_label(filter.codec),
+                                      ImGuiComboFlags_HeightLarge}) {
+
+                    if (ImGui::Selectable("(any codec)", filter.codec.empty()))
+                        filter.codec = "";
+
+                    // The rest of codecs.
+                    if (!codecs)
+                        fetch_codecs();
+
+                    for (const auto& codec : *codecs)
+                        if (ImGui::Selectable(make_codec_label(codec),
+                                              filter.codec == codec))
+                            filter.codec = codec;
+                }
+
+            }
+
         }
 
 
@@ -401,137 +567,7 @@ namespace BrowserSearchPopup {
                           ImGuiChildFlags_NavFlattened,
                           ImGuiWindowFlags_NoSavedSettings}) {
 
-            if (Child filters_group{"filters_group",
-                                    {0, 0},
-                                    ImGuiChildFlags_AutoResizeX |
-                                    ImGuiChildFlags_AutoResizeY |
-                                    ImGuiChildFlags_Borders |
-                                    ImGuiChildFlags_NavFlattened}) {
-
-                auto& filter = search_params.filter;
-
-                ItemWidth filters_width{500};
-
-                ImGui::TextUnformatted(ICON_FA_FILTER " Filters");
-
-                /*-----------------*/
-                /* Filter by name. */
-                /*-----------------*/
-                ImGui::InputText("Name", filter.name);
-
-                /*----------------*/
-                /* Filter by tag. */
-                /*----------------*/
-                if (Combo tag_combo{"Tag",
-                                    filter.tag,
-                                    ImGuiComboFlags_HeightLargest}) {
-                    if (ImGui::IsWindowAppearing()) {
-                        ImGui::SetKeyboardFocusHere();
-                        SDL_strlcpy(tag_text_filter.InputBuf,
-                                    filter.tag.data(),
-                                    sizeof tag_text_filter.InputBuf);
-                        tag_text_filter.Build();
-                    }
-                    tag_text_filter.Draw("##tag_text_filter", 800);
-
-                    if (ImGui::Selectable("(any tag)", filter.tag.empty()))
-                        filter.tag.clear();
-
-                    if (!tags)
-                        fetch_tags();
-
-                    // The rest of tags.
-                    if (Child list{"list",
-                                   {0.0f, 12 * ImGui::GetTextLineHeight()},
-                                   ImGuiChildFlags_NavFlattened}) {
-
-                        for (auto& tag : *tags) {
-                            if (!tag_text_filter.PassFilter(tag.data()))
-                                continue;
-                            const bool is_selected = filter.tag == tag;
-                            auto label = ICON_FA_TAG " " + tag;
-                            if (ImGui::Selectable(label, is_selected)) {
-                                filter.tag = tag;
-                                // NOTE: must explicitly close the popup because of the nesting.
-                                ImGui::CloseCurrentPopup();
-                            }
-                        }
-                    }
-                }
-
-                /*--------------------*/
-                /* Filter by country. */
-                /*--------------------*/
-                std::string filter_country_label;
-                std::string filter_country_name = CountryManager::get_name(filter.country);
-                if (!filter_country_name.empty())
-                    filter_country_label = make_country_label(filter.country,
-                                                              filter_country_name);
-                else
-                    filter_country_label = filter.country;
-                if (Combo country_combo{"Country",
-                                        filter_country_label,
-                                        ImGuiComboFlags_HeightLargest}) {
-                    if (ImGui::IsWindowAppearing()) {
-                        ImGui::SetKeyboardFocusHere();
-                        SDL_strlcpy(country_text_filter.InputBuf,
-                                    filter.country.data(),
-                                    sizeof country_text_filter.InputBuf);
-                        country_text_filter.Build();
-                    }
-                    country_text_filter.Draw("##country", 1100);
-
-                    if (ImGui::Selectable("(any country)", filter.country.empty()))
-                        filter.country.clear();
-
-                    // The rest of countries
-                    if (Child list{"list",
-                                   {0.0f, 12 * ImGui::GetTextLineHeight()},
-                                   ImGuiChildFlags_NavFlattened}) {
-                        CountryManager::for_each_country(
-                            [&filter](const CountryManager::Country& c)
-                            {
-                                const auto& [code, name] = c;
-
-                                if (!country_text_filter.PassFilter(code.data()) &&
-                                    !country_text_filter.PassFilter(name.data()))
-                                    return;
-
-                                const bool is_selected = filter.country == code;
-                                if (ImGui::Selectable(make_country_label(code, name),
-                                                      is_selected)) {
-                                    filter.country = code;
-                                    // NOTE: must explicitly close the popup because of the
-                                    // nesting.
-                                    ImGui::CloseCurrentPopup();
-                                }
-                            }
-                        );
-                    }
-                }
-
-                // TODO: add language filter
-
-                /*------------------*/
-                /* Filter by codec. */
-                /*------------------*/
-                if (Combo codec_combo{"Codec",
-                                      filter.codec,
-                                      ImGuiComboFlags_HeightLarge}) {
-
-                    if (ImGui::Selectable("(any codec)", filter.codec.empty()))
-                        filter.codec = "";
-
-                    // The rest of codecs.
-                    if (!codecs)
-                        fetch_codecs();
-
-                    for (const auto& codec : *codecs)
-                        if (ImGui::Selectable(codec, filter.codec == codec))
-                            filter.codec = codec;
-                }
-
-            }
+            show_filters();
 
             ImGui::SameLine();
 

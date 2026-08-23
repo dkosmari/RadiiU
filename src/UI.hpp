@@ -189,6 +189,10 @@ namespace UI {
         const ImVec2& b);
 
 
+    float
+    max_width(std::initializer_list<std::string> labels);
+
+
     void
     SmoothScroll(float target_x,
                  float target_y);

@@ -214,9 +214,11 @@ namespace UI {
         if (FavoritesTab::contains(station)) {
             if (ImGui::Button(ICON_FA_HEART, get_small_button_size())) // ♥
                 FavoritesTab::remove(station);
+            ImGui::SetItemTooltip("Click to remove station from favorites.");
         } else {
             if (ImGui::Button(ICON_FA_HEART_O, get_small_button_size())) // ♡
                 FavoritesTab::add(station);
+            ImGui::SetItemTooltip("Click to add station to favorites.");
         }
     }
 
@@ -711,6 +713,16 @@ namespace UI {
             std::fmax(a.x, b.x),
             std::fmax(a.y, b.y)
         };
+    }
+
+
+    float
+    max_width(std::initializer_list<std::string> labels)
+    {
+        float result = 0;
+        for (auto label : labels)
+            result = std::fmax(result, ImGui::CalcTextSize(label).x);
+        return result;
     }
 
 
