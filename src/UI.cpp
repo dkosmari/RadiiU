@@ -350,7 +350,9 @@ namespace UI {
         Label(label);
 
         ImGui::TableNextColumn();
-        TextLinkOpenURL(url);
+
+        if (!url.empty())
+            TextLinkOpenURL(url);
     }
 
 
