@@ -63,7 +63,16 @@ ButtonHBox::add(const std::string& label,
 void
 ButtonHBox::show()
 {
+    if (buttons.empty())
+        return;
+
     const auto available = ImGui::GetContentRegionAvail();
+
+    // Special handling: for single button, expand is ignored.
+    if (expand && buttons.size() == 1) {
+        expand = false;
+        update();
+    }
 
     if (halign >= 0) {
         const float empty_hspace = available.x - total_width;

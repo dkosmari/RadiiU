@@ -8,7 +8,6 @@
 #include <exception>
 #include <filesystem>
 #include <limits>
-#include <tuple>
 #include <utility>
 
 #include <imgui.h>
@@ -47,6 +46,12 @@ namespace BrowserTab {
         /* Types */
         /*-------*/
 
+        struct OrderAndDir {
+            RadioBrowserAPI::SearchStationParams::Order orer;
+            bool reverse;
+        };
+
+
         /*---------*/
         /* Aliases */
         /*---------*/
@@ -62,6 +67,7 @@ namespace BrowserTab {
         unsigned page = 1;
         bool scroll_to_top = false;
         SearchParams search_params;
+        std::string error_message;
 
 
         /*-----------------------*/
@@ -74,8 +80,26 @@ namespace BrowserTab {
         void
         common_error_handler(const std::exception& e);
 
-        std::tuple<RadioBrowserAPI::SearchStationParams::Order, bool>
+        OrderAndDir
         get_order_dir(BrowserSearchPopup::Order o);
+
+        void
+        show_empty();
+
+        void
+        show_error_message();
+
+        void
+        show_navigation();
+
+        void
+        show_station(StationPtr& station);
+
+        void
+        show_stations();
+
+        void
+        show_toolbar();
 
 
         /*----------------------*/
@@ -94,21 +118,20 @@ namespace BrowserTab {
 
 
 
-        // TODO: should display errors to the user
         void
         common_error_handler(const std::exception& e)
         {
-            // TODO: should show errors in the UI.
             LOG_ERROR("{}", e.what());
             if (auto ee = dynamic_cast<const rest::error*>(&e)) {
                 LOG_ERROR("Content-Type: {}", ee->content_type);
                 LOG_ERROR("<response>\n{}\n</response>", ee->response);
             }
+
+            error_message = e.what();
         }
 
 
-        std::tuple<RadioBrowserAPI::SearchStationParams::Order,
-                   bool>
+        OrderAndDir
         get_order_dir(BrowserSearchPopup::Order o)
         {
             using RBOrder = RadioBrowserAPI::SearchStationParams::Order;
@@ -142,261 +165,224 @@ namespace BrowserTab {
             }
         }
 
-    } // namespace
 
+        void
+        show_empty()
+        {
+            using namespace ImGui::RAII;
 
-    /*------------------*/
-    /* Public functions */
-    /*------------------*/
+            if (Child content{"content",
+                              {0, 0},
+                              ImGuiChildFlags_None,
+                              ImGuiWindowFlags_NoSavedSettings}) {
 
-    void
-    initialize()
-    {
-        TRACE_FUNC;
+                ImGui::TextAligned(0.5f, -1, "Use the search button to find stations.");
 
-        BrowserSearchPopup::initialize();
-
-        // Changed after 0.3.0: no more browser.json
-        auto browser_json = App::get_config_path() / "browser.json";
-        try {
-            if (exists(browser_json))
-                remove(browser_json);
+                ButtonHBox buttons;
+                buttons.add(
+                    ICON_FA_BINOCULARS " Search...",
+                    true,
+                    []
+                    {
+                        BrowserSearchPopup::open(action_start_search);
+                    }
+                );
+                buttons.show();
+            }
         }
-        catch (std::exception& e) {
-            LOG_ERROR("Failed to remove {:?}: {}",
-                      browser_json.string(),
-                      e.what());
+
+
+        void
+        show_error_message()
+        {
+            using namespace ImGui::RAII;
+
+            if (Child content{"content",
+                              {0, 0},
+                              ImGuiChildFlags_None,
+                              ImGuiWindowFlags_NoSavedSettings}) {
+
+                ImGui::Text("ERROR!");
+
+                ImGui::TextWrapped(error_message);
+
+            } // content
         }
-    }
 
 
-    void
-    finalize()
-    {
-        TRACE_FUNC;
+        void
+        show_navigation()
+        {
+            using namespace ImGui::RAII;
 
-        BrowserSearchPopup::finalize();
-    }
-
-
-    void
-    show_toolbar()
-    {
-        using namespace ImGui::RAII;
-
-        if (Child toolbar{
-                "toolbar",
-                {0, 0},
-                ImGuiChildFlags_AutoResizeY |
-                ImGuiChildFlags_NavFlattened
-            }) {
-
-            Disabled if_busy{RadioBrowserAPI::is_busy()};
-
-            if (ImGui::Button(ICON_FA_BINOCULARS " Search..."))
-                BrowserSearchPopup::open(action_start_search);
-
-            ImGui::SameLine();
-
-            ImGui::FormatText("Server: {}",
-                              cfg.server.empty() ? "(random)"s : cfg.server);
-            if (cfg.server.empty()) {
-                std::string current_server = RadioBrowserAPI::get_server();
-                ImGui::SetItemTooltip(current_server);
-            }
-
-            ImGui::SameLine();
-
-            {
-                Disabled if_preferred_server{!cfg.server.empty()};
-                if (ImGui::Button(ICON_FA_REFRESH))
-                    RadioBrowserAPI::update_mirrors_and_select_random();
-                ImGui::SetItemTooltip("Switch to random mirror.");
-            }
-
-            ImGui::SameLine();
-
-            if (ImGui::Button(ICON_FA_INFO_CIRCLE))
-                ServerStatsPopup::open();
-            ImGui::SetItemTooltip("Show server details.");
-
-        }
-    }
-
-
-    void
-    show_navigation()
-    {
-        using namespace ImGui::RAII;
-
-        const float parent_width = ImGui::GetContentRegionAvail().x;
-        const ImVec2 global_pos = ImGui::GetCursorScreenPos();
-        ImGui::SetNextWindowPos({global_pos.x + parent_width / 2.0f, global_pos.y + 0.0f},
-                                ImGuiCond_Always,
-                                {0.5f, 0.0f});
-        if (Child navigation_child{
-                "navigation",
-                {0, 0},
-                ImGuiChildFlags_AutoResizeX |
-                ImGuiChildFlags_AutoResizeY |
-                ImGuiChildFlags_NavFlattened
-            }) {
-
-            const bool is_first_page = page == 1;
-            const bool is_last_page = stations.size() < cfg.browser_page_limit;
-            const bool is_busy = RadioBrowserAPI::is_busy();
-
-            {
-                Disabled disable_first_page{is_first_page};
-
-                // 100⏪
-                if (ImGui::Button("100" ICON_FA_ANGLE_DOUBLE_LEFT) && !is_busy) {
-                    if (page > 100)
-                        page -= 100;
-                    else
-                        page = 1;
-                    perform_search();
-                }
-                ImGui::SetItemTooltip("Go back 100 pages.");
-
-                ImGui::SameLine();
-
-                // 10⏪
-                if (ImGui::Button("10" ICON_FA_ANGLE_DOUBLE_LEFT) && !is_busy) {
-                    if (page > 10)
-                        page -= 10;
-                    else
-                        page = 1;
-                    perform_search();
-                }
-                ImGui::SetItemTooltip("Go back 10 pages.");
-
-                ImGui::SameLine();
-
-                // ⏴
-                if (ImGui::Button(" " ICON_FA_ANGLE_LEFT " ") && !is_busy) {
-                    if (page > 1)
-                        --page;
-                    perform_search();
-                }
-                ImGui::SetItemTooltip("Go back one page.");
-            }
-
-            ImGui::SameLine();
-
-            const float page_width = 200;
-            ImGui::SetNextItemWidth(page_width);
-            unsigned max_page_num = std::numeric_limits<unsigned>::max();
-            if (is_last_page)
-                max_page_num = page;
-            ImGui::Drag<unsigned>("##page"s, page, 0.05f, 1u, max_page_num);
-            if (ImGui::IsItemDeactivatedAfterEdit())
-                perform_search();
-
-            ImGui::SameLine();
-
-            {
-                Disabled disable_last_page{is_last_page};
-
-                // ⏵
-                if (ImGui::Button(" " ICON_FA_ANGLE_RIGHT " ") && !is_busy) {
-                    ++page;
-                    perform_search();
-                }
-                ImGui::SetItemTooltip("Advance one page.");
-
-                ImGui::SameLine();
-
-                // ⏩10
-                if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "10") && !is_busy) {
-                    page += 10;
-                    perform_search();
-                }
-                ImGui::SetItemTooltip("Advance 10 pages.");
-
-                ImGui::SameLine();
-
-                // ⏩100
-                if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "100") && !is_busy) {
-                    page += 100;
-                    perform_search();
-                }
-                ImGui::SetItemTooltip("Advance 100 pages.");
-            }
-
-        } // navigation_child
-
-    }
-
-
-    void
-    show_station(StationPtr& station)
-    {
-        using namespace ImGui::RAII;
-
-        ID station_id{station.get()};
-
-        if (Child station_child{
-                "station",
-                {0, 0},
-                ImGuiChildFlags_AutoResizeY |
-                ImGuiChildFlags_FrameStyle |
-                ImGuiChildFlags_NavFlattened
-            }) {
-
-            if (Child actions_child{
-                    "actions",
+            const float parent_width = ImGui::GetContentRegionAvail().x;
+            const ImVec2 global_pos = ImGui::GetCursorScreenPos();
+            ImGui::SetNextWindowPos({global_pos.x + parent_width / 2.0f, global_pos.y + 0.0f},
+                                    ImGuiCond_Always,
+                                    {0.5f, 0.0f});
+            if (Child navigation{
+                    "navigation",
                     {0, 0},
                     ImGuiChildFlags_AutoResizeX |
                     ImGuiChildFlags_AutoResizeY |
-                    ImGuiChildFlags_NavFlattened
+                    ImGuiChildFlags_NavFlattened,
+                    ImGuiWindowFlags_NoSavedSettings
                 }) {
 
-                UI::PlayButton(station);
+                const bool is_first_page = page == 1;
+                const bool is_last_page = stations.size() < cfg.browser_page_limit;
+                const bool is_busy = RadioBrowserAPI::is_busy();
 
-                UI::FavoriteButton(*station);
+                {
+                    Disabled disable_first_page{is_first_page};
+
+                    // 100⏪
+                    if (ImGui::Button("100" ICON_FA_ANGLE_DOUBLE_LEFT) && !is_busy) {
+                        if (page > 100)
+                            page -= 100;
+                        else
+                            page = 1;
+                        perform_search();
+                    }
+                    ImGui::SetItemTooltip("Go back 100 pages.");
+
+                    ImGui::SameLine();
+
+                    // 10⏪
+                    if (ImGui::Button("10" ICON_FA_ANGLE_DOUBLE_LEFT) && !is_busy) {
+                        if (page > 10)
+                            page -= 10;
+                        else
+                            page = 1;
+                        perform_search();
+                    }
+                    ImGui::SetItemTooltip("Go back 10 pages.");
+
+                    ImGui::SameLine();
+
+                    // ⏴
+                    if (ImGui::Button(" " ICON_FA_ANGLE_LEFT " ") && !is_busy) {
+                        if (page > 1)
+                            --page;
+                        perform_search();
+                    }
+                    ImGui::SetItemTooltip("Go back one page.");
+                }
 
                 ImGui::SameLine();
 
-                if (StationDetailsPopup::Button(station->stationuuid))
-                    StationDetailsPopup::open(station->stationuuid);
+                const float page_width = 200;
+                ImGui::SetNextItemWidth(page_width);
+                unsigned max_page_num = std::numeric_limits<unsigned>::max();
+                if (is_last_page)
+                    max_page_num = page;
+                ImGui::Drag<unsigned>("##page"s, page, 0.05f, 1u, max_page_num);
+                if (ImGui::IsItemDeactivatedAfterEdit())
+                    perform_search();
 
-                StationVoting::Button(station);
+                ImGui::SameLine();
 
-            } // actions_child
+                {
+                    Disabled disable_last_page{is_last_page};
 
-            ImGui::SameLine();
+                    // ⏵
+                    if (ImGui::Button(" " ICON_FA_ANGLE_RIGHT " ") && !is_busy) {
+                        ++page;
+                        perform_search();
+                    }
+                    ImGui::SetItemTooltip("Advance one page.");
 
-            if (Child details_child{
-                    "details",
+                    ImGui::SameLine();
+
+                    // ⏩10
+                    if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "10") && !is_busy) {
+                        page += 10;
+                        perform_search();
+                    }
+                    ImGui::SetItemTooltip("Advance 10 pages.");
+
+                    ImGui::SameLine();
+
+                    // ⏩100
+                    if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "100") && !is_busy) {
+                        page += 100;
+                        perform_search();
+                    }
+                    ImGui::SetItemTooltip("Advance 100 pages.");
+                }
+
+            } // navigation
+        }
+
+
+        void
+        show_station(StationPtr& station)
+        {
+            using namespace ImGui::RAII;
+
+            ID station_id{station.get()};
+
+            if (Child station_frame{
+                    "station",
                     {0, 0},
                     ImGuiChildFlags_AutoResizeY |
-                    ImGuiChildFlags_NavFlattened
+                    ImGuiChildFlags_FrameStyle |
+                    ImGuiChildFlags_NavFlattened,
+                    ImGuiWindowFlags_NoSavedSettings
                 }) {
 
-                UI::StationInfo(*station, true);
+                if (Child actions{
+                        "actions",
+                        {0, 0},
+                        ImGuiChildFlags_AutoResizeX |
+                        ImGuiChildFlags_AutoResizeY |
+                        ImGuiChildFlags_NavFlattened,
+                        ImGuiWindowFlags_NoSavedSettings
+                    }) {
 
-            } // details_child
+                    UI::PlayButton(station);
 
-        } // station_child
-    }
+                    UI::FavoriteButton(*station);
+
+                    ImGui::SameLine();
+
+                    if (StationDetailsPopup::Button(station->stationuuid))
+                        StationDetailsPopup::open(station->stationuuid);
+
+                    StationVoting::Button(station);
+
+                } // actions
+
+                ImGui::SameLine();
+
+                if (Child details{
+                        "details",
+                        {0, 0},
+                        ImGuiChildFlags_AutoResizeY |
+                        ImGuiChildFlags_NavFlattened,
+                        ImGuiWindowFlags_NoSavedSettings
+                    }) {
+
+                    UI::StationInfo(*station, true);
+
+                } // details
+
+            } // station_frame
+        }
 
 
-    void
-    process_ui()
-    {
-        using namespace ImGui::RAII;
-
-        Disabled if_busy{RadioBrowserAPI::is_busy()};
-
-        show_toolbar();
-
-        if (!stations.empty()) {
-
-            show_navigation();
+        void
+        show_stations()
+        {
+            using namespace ImGui::RAII;
 
             // Note: flat navigation doesn't work well on child windows that scroll.
-            if (Child stations_list{"stations_list"}) {
+            if (Child stations_list{
+                    "stations_list",
+                    {0, 0},
+                    ImGuiChildFlags_None,
+                    ImGuiWindowFlags_NoSavedSettings
+                }) {
 
 #if 0
                 // Disabled until ImGui fixes navigation.
@@ -429,28 +415,113 @@ namespace BrowserTab {
                 UI::DoSmoothScroll();
 
             } // stations_list
-        } else {
+        }
 
-            if (Child empty_list{"empty_list", {0, 0}}) {
 
-                ImGui::TextAligned(0.5f, -1, "Use the search button to find stations.");
+        void
+        show_toolbar()
+        {
+            using namespace ImGui::RAII;
 
-                ButtonHBox buttons;
-                buttons.expand = true; // TODO: not working?
-                buttons.add(
-                    ICON_FA_BINOCULARS " Search...",
-                    true,
-                    []
-                    {
-                        BrowserSearchPopup::open(action_start_search);
-                    }
-                );
-                // buttons.add(
-                //     "dummy",
-                //     []{}
-                // );
-                buttons.show();
+            if (Child toolbar{
+                    "toolbar",
+                    {0, 0},
+                    ImGuiChildFlags_AutoResizeY |
+                    ImGuiChildFlags_NavFlattened,
+                    ImGuiWindowFlags_NoSavedSettings
+                }) {
+
+                Disabled if_busy{RadioBrowserAPI::is_busy()};
+
+                if (ImGui::Button(ICON_FA_BINOCULARS " Search..."))
+                    BrowserSearchPopup::open(action_start_search);
+
+                ImGui::SameLine();
+
+                ImGui::FormatText("Server: {}",
+                                  cfg.server.empty() ? "(random)"s : cfg.server);
+                if (cfg.server.empty()) {
+                    std::string current_server = RadioBrowserAPI::get_server();
+                    ImGui::SetItemTooltip(current_server);
+                }
+
+                ImGui::SameLine();
+
+                {
+                    Disabled if_preferred_server{!cfg.server.empty()};
+                    if (ImGui::Button(ICON_FA_REFRESH))
+                        RadioBrowserAPI::update_mirrors_and_select_random();
+                    ImGui::SetItemTooltip("Switch to random mirror.");
+                }
+
+                ImGui::SameLine();
+
+                if (ImGui::Button(ICON_FA_INFO_CIRCLE))
+                    ServerStatsPopup::open();
+                ImGui::SetItemTooltip("Show server details.");
+
             }
+        }
+
+    } // namespace
+
+
+    /*------------------*/
+    /* Public functions */
+    /*------------------*/
+
+    void
+    initialize()
+    {
+        TRACE_FUNC;
+
+        error_message.clear();
+
+        BrowserSearchPopup::initialize();
+
+        // Changed after 0.3.0: no more browser.json
+        auto browser_json = App::get_config_path() / "browser.json";
+        try {
+            if (exists(browser_json))
+                remove(browser_json);
+        }
+        catch (std::exception& e) {
+            LOG_ERROR("Failed to remove {:?}: {}",
+                      browser_json.string(),
+                      e.what());
+        }
+    }
+
+
+    void
+    finalize()
+    {
+        TRACE_FUNC;
+
+        BrowserSearchPopup::finalize();
+
+        error_message.clear();
+    }
+
+
+    void
+    process_ui()
+    {
+        using namespace ImGui::RAII;
+
+        Disabled if_busy{RadioBrowserAPI::is_busy()};
+
+        show_toolbar();
+
+        ImGui::Separator();
+
+        if (!error_message.empty()) {
+            show_error_message();
+        } else if (stations.empty()) {
+            show_empty();
+        } else {
+            show_navigation();
+            show_stations();
         }
 
         BrowserSearchPopup::process_ui();
@@ -463,6 +534,8 @@ namespace BrowserTab {
     perform_search()
     {
         TRACE_FUNC;
+
+        error_message.clear();
 
         scroll_to_top = true;
 

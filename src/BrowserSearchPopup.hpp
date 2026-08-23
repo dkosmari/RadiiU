@@ -42,7 +42,7 @@ namespace BrowserSearchPopup {
 
     struct SearchParams {
         Filter filter = {};
-        Order order = Order::name_asc;
+        Order order = Order::clicks_desc;
     };
 
 
