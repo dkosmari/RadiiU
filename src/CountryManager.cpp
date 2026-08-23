@@ -41,11 +41,30 @@ namespace CountryManager {
         /* Types */
         /*-------*/
 
+        struct ImageEntry {
+
+            int icon_size{};
+            std::filesystem::path file{};
+            sdl::surface image{nullptr};
+
+            void
+            load();
+
+        }; // struct ImageEntry
+
+
         struct FlagEntry {
+
+            using ImageMap = std::flat_map<int, ImageEntry>;
+
             std::string utf8 = {};
             char32_t codepoint = 0;
-            std::flat_map<int, std::filesystem::path> files = {};
-        };
+            ImageMap images = {};
+
+            ImageEntry*
+            find_image(int size);
+
+        }; // struct FlagEntry
 
 
         /*-----------*/
@@ -113,6 +132,10 @@ namespace CountryManager {
                                      ImFontGlyph* glyph,
                                      float* p_advance_x);
 
+        float
+        get_final_font_size(const ImFontConfig* config,
+                            const ImFontBaked* baked);
+
 
         /*----------------------*/
         /* Function definitions */
@@ -155,6 +178,18 @@ namespace CountryManager {
         }
 
 
+        ImageEntry*
+        FlagEntry::find_image(int size)
+        {
+            auto it = images.upper_bound(size);
+            if (it != images.begin())
+                --it;
+            if (it == images.end()) [[unlikely]]
+                return nullptr;
+            return &it->second;
+        }
+
+
         bool
         font_loader_src_init(ImFontAtlas*,
                              ImFontConfig*)
@@ -182,16 +217,21 @@ namespace CountryManager {
 
 
         bool
-        font_loader_baked_init([[maybe_unused]] ImFontAtlas* atlas,
-                               [[maybe_unused]] ImFontConfig* config,
-                               [[maybe_unused]] ImFontBaked* baked,
+        font_loader_baked_init(ImFontAtlas*,
+                               ImFontConfig* config,
+                               ImFontBaked* baked,
                                void*)
         {
-            // TRACE_FUNC;
-            // LOG_DEBUG("baked_init(): atlas={}, config={:?}, baked={}",
-            //           (void*)atlas,
-            //           config->Name,
-            //           (void*)baked);
+            float font_size = get_final_font_size(config, baked);
+
+            // Load all flags for this size.
+            for (auto& [code, flag_entry] : flags) {
+                auto image_entry = flag_entry.find_image(font_size);
+                if (!image_entry)
+                    continue;
+                image_entry->load();
+            }
+
             return true;
         }
 
@@ -225,21 +265,17 @@ namespace CountryManager {
 
                 // LOG_DEBUG("rasterizer_density: {}", rasterizer_density);
 
-                float font_size = baked->Size;
-                const float first_font_size = baked->OwnerFont->Sources[0]->SizePixels;
-                if (config->MergeMode && config->SizePixels != 0)
-                    font_size *= config->SizePixels / first_font_size;
-                font_size *= config->ExtraSizeScale;
+                float font_size = get_final_font_size(config, baked);
 
-                auto& entry = flags.at(codepoint_to_code.at(codepoint));
+                auto& flag_entry = flags.at(codepoint_to_code.at(codepoint));
 
-                auto it = entry.files.upper_bound(static_cast<int>(font_size));
-                if (it != entry.files.begin())
-                    --it;
-                if (it == entry.files.end()) [[unlikely]]
+                auto image_entry = flag_entry.find_image(font_size);
+                if (!image_entry) [[unlikely]]
                     return false; // if somehow there are no images for this flag
 
-                const auto& [icon_size, filename] = *it;
+                const auto& [icon_size, file, img] = *image_entry;
+                if (!img) // image didn't load
+                    return false;
 
                 const float raw_padding = font_size * (1.0f / 16.f);
                 const float raw_advance_x = font_size + 2 * raw_padding;
@@ -248,14 +284,6 @@ namespace CountryManager {
                     *p_advance_x = advance_x;
                     return true;
                 }
-
-                sdl::surface img = sdl::img::load_png(
-                    App::get_content_path() / "flags" / std::to_string(icon_size) / filename
-                );
-                // Convert to the correct format if necessary.
-                auto target_format = sdl::pixels::format_enum::rgba_32;
-                if (img.get_format_enum() != target_format)
-                    img = sdl::surface{std::move(img), target_format};
 
                 const auto [w, h] = img.get_size();
                 const int stride = img.get_pitch();
@@ -295,6 +323,39 @@ namespace CountryManager {
             }
         }
 
+
+        float
+        get_final_font_size(const ImFontConfig* config,
+                            const ImFontBaked* baked)
+        {
+            float font_size = baked->Size;
+            const float first_font_size = baked->OwnerFont->Sources[0]->SizePixels;
+            if (config->MergeMode && config->SizePixels != 0)
+                font_size *= config->SizePixels / first_font_size;
+            font_size *= config->ExtraSizeScale;
+            return font_size;
+        }
+
+
+        void
+        ImageEntry::load()
+        {
+            if (image)
+                return;
+            auto full_path = App::get_content_path() / "flags" / std::to_string(icon_size) / file;
+            try {
+                image = sdl::img::load_png(full_path);
+                // LOG_DEBUG("Loaded {}", full_path.string());
+            }
+            catch (std::exception& e) {
+                LOG_ERROR("Loading flag {}: {}", full_path.string(), e.what());
+                return;
+            }
+            auto target_format = sdl::pixels::format_enum::rgba_32;
+            if (image.get_format_enum() != target_format)
+                image = sdl::surface{std::move(image), target_format};
+        }
+
     } // namespace
 
 
@@ -307,16 +368,14 @@ namespace CountryManager {
     {
         TRACE_FUNC;
 
-        // TODO: preload all flags
-
         try {
             auto flags_root = App::get_content_path() / "flags";
             for (auto& size_entry : std::filesystem::directory_iterator{flags_root}) {
                 if (!size_entry.is_directory())
                     continue;
                 try {
-                    const int size = std::stoi(size_entry.path().filename());
-                    if (size < 16 || size > 64)
+                    const int icon_size = std::stoi(size_entry.path().filename());
+                    if (icon_size < 16 || icon_size > 64)
                         continue;
 
                     for (auto country_entry :
@@ -326,7 +385,16 @@ namespace CountryManager {
                             continue;
 
                         std::string country_code = country_entry.path().stem();
-                        flags[country_code].files[size] = country_entry.path().filename();
+                        auto& flag_entry = flags[country_code];
+                        auto& image_entry = flag_entry.images[icon_size];
+                        image_entry = {
+                            icon_size,
+                            country_entry.path().filename()
+                        };
+
+                        // Preload sizes 32 and 64
+                        if (icon_size == 32 || icon_size == 64)
+                            image_entry.load();
                     }
                 }
                 catch (...) {
