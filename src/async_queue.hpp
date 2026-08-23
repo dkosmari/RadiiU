@@ -121,6 +121,16 @@ public:
     }
 
 
+    template<typename... Args>
+    void
+    emplace(Args&&... args)
+    {
+        std::lock_guard guard{mutex};
+        queue.emplace(std::forward<Args>(args)...);
+        empty_cond.notify_one();
+    }
+
+
     template<typename U>
     bool
     try_push(U&& x)
@@ -130,6 +140,21 @@ public:
             return false;
 
         queue.push(std::forward<U>(x));
+        empty_cond.notify_one();
+        return true;
+    }
+
+
+    template<typename... Args>
+    bool
+    try_emplace(Args&&... args)
+    {
+        std::unique_lock guard{mutex, std::try_to_lock};
+        if (!guard)
+            return false;
+
+        queue.emplace(std::forward<Args>(args)...);
+        empty_cond.notify_one();
         return true;
     }
 

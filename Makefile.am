@@ -46,6 +46,8 @@ radiiu_elf_SOURCES = \
 	src/async_queue.hpp \
 	src/async_task_queue.cpp \
 	src/async_task_queue.hpp \
+	src/BrowserSearchPopup.cpp \
+	src/BrowserSearchPopup.hpp \
 	src/BrowserTab.cpp \
 	src/BrowserTab.hpp \
 	src/ButtonHBox.cpp \
@@ -56,8 +58,8 @@ radiiu_elf_SOURCES = \
 	src/ConfirmDeleteStationPopup.hpp \
 	src/ConfirmExitPopup.cpp \
 	src/ConfirmExitPopup.hpp \
-	src/CountryFlagManager.cpp \
-	src/CountryFlagManager.hpp \
+	src/CountryManager.cpp \
+	src/CountryManager.hpp \
 	src/decoder.cpp \
 	src/decoder.hpp \
 	src/decoder_aac.cpp \

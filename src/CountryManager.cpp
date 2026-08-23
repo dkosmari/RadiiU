@@ -21,22 +21,25 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
-#include "CountryFlagManager.hpp"
+#include "CountryManager.hpp"
 
 #include "App.hpp"
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
 #include "tracer.hpp"
+#include "RadioBrowserAPI.hpp"
 
 
 using namespace std::literals;
 
 
-namespace CountryFlagManager {
+namespace CountryManager {
 
     namespace {
 
-        // Types
+        /*-------*/
+        /* Types */
+        /*-------*/
 
         struct FlagEntry {
             std::string utf8 = {};
@@ -45,23 +48,36 @@ namespace CountryFlagManager {
         };
 
 
-        // Constants
+        /*-----------*/
+        /* Constants */
+        /*-----------*/
 
         const char32_t first_codepoint = 0xe200;
 
 
-        // Variables
+        /*-----------*/
+        /* Variables */
+        /*-----------*/
 
         ImFontLoader font_loader;
         ImFontConfig font_config;
 
         std::unordered_map<std::string, FlagEntry> flags;
-        std::unordered_map<char32_t, std::string> codepoint_to_iso_code;
+        std::unordered_map<char32_t, std::string> codepoint_to_code;
+        std::unordered_map<std::string, std::string> code_to_name;
+        std::unordered_map<std::string, std::string> name_to_code;
 
         char32_t last_codepoint;
 
+        std::optional<std::vector<Country>> countries;
 
-        // Function declarations
+
+        /*-----------------------*/
+        /* Function declarations */
+        /*-----------------------*/
+
+        void
+        fetch_countries();
 
         bool
         font_loader_src_init(ImFontAtlas*,
@@ -98,7 +114,46 @@ namespace CountryFlagManager {
                                      float* p_advance_x);
 
 
-        // Function definitions
+        /*----------------------*/
+        /* Function definitions */
+        /*----------------------*/
+
+        void
+        fetch_countries()
+        {
+            TRACE_FUNC;
+
+            // TODO: when RB errors out, it should be possible to try again
+            if (countries)
+                return;
+
+            countries.emplace();
+
+            RadioBrowserAPI::CountryParams params;
+            params.order = RadioBrowserAPI::CountryParams::Order::name;
+            params.hidebroken = true;
+            params.limit = 1000;
+
+            RadioBrowserAPI::get_countries(
+                {},
+                [](RadioBrowserAPI::CountryVec rb_countries)
+                {
+                    for (auto& [name, code, count] : rb_countries) {
+                        code_to_name[code] = name;
+                        name_to_code[name] = code;
+                        countries->emplace_back(std::move(code),
+                                                std::move(name));
+                    }
+
+                    LOG_INFO("Received {} countries.", countries->size());
+                },
+                [](const std::exception& e)
+                {
+                    LOG_ERROR("Fetching countries: {}", e.what());
+                }
+            );
+        }
+
 
         bool
         font_loader_src_init(ImFontAtlas*,
@@ -176,7 +231,7 @@ namespace CountryFlagManager {
                     font_size *= config->SizePixels / first_font_size;
                 font_size *= config->ExtraSizeScale;
 
-                auto& entry = flags.at(codepoint_to_iso_code.at(codepoint));
+                auto& entry = flags.at(codepoint_to_code.at(codepoint));
 
                 auto it = entry.files.upper_bound(static_cast<int>(font_size));
                 if (it != entry.files.begin())
@@ -243,10 +298,16 @@ namespace CountryFlagManager {
     } // namespace
 
 
+    /*-------------------*/
+    /* Public functions. */
+    /*-------------------*/
+
     void
     initialize()
     {
         TRACE_FUNC;
+
+        // TODO: preload all flags
 
         try {
             auto flags_root = App::get_content_path() / "flags";
@@ -279,10 +340,10 @@ namespace CountryFlagManager {
 
         // Fill in the custom codepoints, and the utf8 representation.
         for (auto [idx, item] : flags | std::views::enumerate) {
-            auto& [iso_code, entry] = item;
+            auto& [code, entry] = item;
             entry.codepoint = idx + first_codepoint;
             last_codepoint = entry.codepoint;
-            codepoint_to_iso_code[entry.codepoint] = iso_code;
+            codepoint_to_code[entry.codepoint] = code;
             sdl::unique_ptr<char> str{
                 SDL_iconv_string("UTF-8",
                                  "UTF-32",
@@ -292,7 +353,7 @@ namespace CountryFlagManager {
             if (str)
                 entry.utf8 = str.get();
             else
-                LOG_ERROR("UTF-8 conversion for {:?} failed!", iso_code);
+                LOG_ERROR("UTF-8 conversion for {:?} failed!", code);
         }
 
 
@@ -321,14 +382,14 @@ namespace CountryFlagManager {
         TRACE_FUNC;
 
         flags.clear();
-        codepoint_to_iso_code.clear();
+        codepoint_to_code.clear();
     }
 
 
     char32_t
-    get_codepoint(const std::string& iso_code)
+    get_codepoint(const std::string& code)
     {
-        auto it = flags.find(iso_code);
+        auto it = flags.find(code);
         if (it == flags.end())
             return 0;
         return it->second.codepoint;
@@ -336,12 +397,57 @@ namespace CountryFlagManager {
 
 
     std::string
-    get_utf8(const std::string& iso_code)
+    get_utf8(const std::string& code)
     {
-        auto it = flags.find(iso_code);
+        auto it = flags.find(code);
         if (it == flags.end())
             return ICON_FA_FLAG_O;
         return it->second.utf8;
     }
 
-} // namespace CountryFlagManager
+
+    std::string
+    get_code(const std::string& name)
+    {
+        if (name.empty())
+            return {};
+
+        if (!countries) {
+            fetch_countries();
+            return {};
+        }
+
+        auto it = name_to_code.find(name);
+        if (it == name_to_code.end())
+            return {};
+        return it->second;
+    }
+
+
+    std::string
+    get_name(const std::string& code)
+    {
+        if (code.empty())
+            return {};
+
+        if (!countries)
+            fetch_countries();
+
+        auto it = code_to_name.find(code);
+        if (it == code_to_name.end())
+            return {};
+        return it->second;
+    }
+
+
+    void
+    for_each_country(const CountryFunction& func)
+    {
+        if (!countries)
+            fetch_countries();
+
+        for (const auto& c : *countries)
+            func(c);
+    }
+
+} // namespace CountryManager

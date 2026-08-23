@@ -8,11 +8,26 @@
 #include "async_task_queue.hpp"
 
 
+async_task_queue::error::error(const std::string& name_,
+                               const char* message) :
+    std::runtime_error{message},
+    name{name_}
+{}
+
+
+async_task_queue::error::error(const std::string& name_,
+                               const std::string& message) :
+    std::runtime_error{message},
+    name{name_}
+{}
+
+
 void
 async_task_queue::clear()
     noexcept
 {
-    queue.clear();
+    tasks.clear();
+    deferred_tasks.clear();
 }
 
 
@@ -20,7 +35,7 @@ bool
 async_task_queue::empty()
     const noexcept
 {
-    return queue.empty();
+    return tasks.empty() && deferred_tasks.empty();
 }
 
 
@@ -28,18 +43,31 @@ std::size_t
 async_task_queue::size()
     const noexcept
 {
-    return queue.size();
+    return tasks.size() + deferred_tasks.size();
 }
 
 
 bool
 async_task_queue::dispatch_one()
 {
-    if (!empty()) {
-        auto task = queue.pop();
-        task.get();
+    if (!tasks.empty()) {
+        auto t = tasks.pop();
+
+        try {
+            if (t.function)
+                t.function();
+        }
+        catch (call_again&) {
+            deferred_tasks.push(std::move(t));
+        }
+        catch (std::exception& e) {
+            throw error{t.name, e.what()};
+        }
+
         return true;
-    }
+    } else
+        promote_deferred_tasks();
+
     return false;
 }
 
@@ -47,11 +75,24 @@ async_task_queue::dispatch_one()
 bool
 async_task_queue::dispatch_one(std::stop_token& stopper)
 {
-    if (!empty()) {
-        auto task = queue.pop(stopper);
-        task.get();
+    if (!tasks.empty()) {
+        auto t = tasks.pop(stopper);
+
+        try {
+            if (t.function)
+                t.function();
+        }
+        catch (call_again&) {
+            deferred_tasks.push(std::move(t));
+        }
+        catch (std::exception& e) {
+            throw error{t.name, e.what()};
+        }
+
         return true;
-    }
+    } else
+        promote_deferred_tasks();
+
     return false;
 }
 
@@ -59,10 +100,21 @@ async_task_queue::dispatch_one(std::stop_token& stopper)
 bool
 async_task_queue::try_dispatch_one()
 {
-    if (auto task = queue.try_pop()) {
-        task->get();
+    if (auto t = tasks.try_pop()) {
+        try {
+            if (t->function)
+                t->function();
+        }
+        catch (call_again&) {
+            deferred_tasks.push(std::move(*t));
+        }
+        catch (std::exception& e) {
+            throw error{t->name, e.what()};
+        }
         return true;
-    }
+    } else if (t.error() == async_queue_error::empty)
+        promote_deferred_tasks();
+
     return false;
 }
 
@@ -94,4 +146,13 @@ async_task_queue::try_dispatch_all()
     while (try_dispatch_one())
         ++result;
     return result;
+}
+
+
+void
+async_task_queue::promote_deferred_tasks()
+{
+    // When no more tasks, transfer deferred_tasks to tasks
+    while (auto t = deferred_tasks.try_pop())
+        tasks.push(std::move(*t));
 }

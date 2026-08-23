@@ -80,10 +80,6 @@ namespace LogManager {
 
 
     void
-    process();
-
-
-    void
     save();
 
 } // namespace LogManager

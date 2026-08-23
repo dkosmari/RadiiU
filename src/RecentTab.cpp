@@ -25,7 +25,6 @@
 #include "StationDetailsPopup.hpp"
 #include "StationGlaze.hpp"
 #include "string_utils.hpp"
-#include "task_queue.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
 
@@ -43,7 +42,6 @@ namespace RecentTab {
         /*-----------*/
 
         std::deque<ConstStationPtr> stations;
-        task_queue pending_tasks;
         std::string name_filter;
         std::string tag_filter;
 
@@ -56,12 +54,6 @@ namespace RecentTab {
         load();
 
         void
-        real_add(ConstStationPtr station);
-
-        void
-        real_remove(ConstStationPtr station);
-
-        void
         remove_excess();
 
         void
@@ -70,6 +62,12 @@ namespace RecentTab {
         void
         show_station(std::size_t index,
                      ConstStationPtr& station);
+
+        void
+        task_add(ConstStationPtr& station);
+
+        void
+        task_remove(std::size_t idx);
 
 
         /*----------------------*/
@@ -89,26 +87,12 @@ namespace RecentTab {
 
 
         void
-        real_add(ConstStationPtr station)
-        {
-            stations.push_back(std::move(station));
-        }
-
-
-        void
-        real_remove(ConstStationPtr station)
-        {
-            std::erase(stations, station);
-        }
-
-
-        void
         remove_excess()
         {
             if (stations.size() > cfg.recent_limit) {
                 std::size_t excess = stations.size() - cfg.recent_limit;
-                stations.erase(stations.begin(),
-                               stations.begin() + excess);
+                stations.erase(stations.end() - excess,
+                               stations.end());
             }
         }
 
@@ -158,7 +142,9 @@ namespace RecentTab {
                         StationDetailsPopup::open(station->stationuuid);
 
                     if (ImGui::Button(ICON_FA_TRASH_O, UI::get_small_button_size())) // 🗑
-                        pending_tasks.add(real_remove, station);
+                        App::add_task("RecentTab::task_remove()",
+                                      task_remove,
+                                      index);
                     ImGui::SetItemTooltip("Remove station from recent history.");
 
                 } // actions_frame
@@ -179,6 +165,25 @@ namespace RecentTab {
             } // station_frame
         }
 
+
+        void
+        task_add(ConstStationPtr& station)
+        {
+            if (station == stations.front())
+                return;
+            if (*station == *stations.front())
+                return;
+            stations.push_front(std::move(station));
+        }
+
+
+        void
+        task_remove(std::size_t idx)
+        {
+            if (idx < stations.size())
+                stations.erase(stations.begin() + idx);
+        }
+
     } // namespace
 
 
@@ -190,7 +195,10 @@ namespace RecentTab {
     initialize()
     {
         TRACE_FUNC;
+
         load();
+
+        App::add_callback(remove_excess);
     }
 
 
@@ -198,6 +206,7 @@ namespace RecentTab {
     finalize()
     {
         TRACE_FUNC;
+
         save();
     }
 
@@ -261,23 +270,11 @@ namespace RecentTab {
 
 
     void
-    process_logic()
-    {
-        try {
-            pending_tasks.dispatch_all();
-        }
-        catch (std::exception& e) {
-            LOG_ERROR("Dispatching RecentTab tasks: {}", e.what());
-        }
-
-        remove_excess();
-    }
-
-
-    void
     add(ConstStationPtr station)
     {
-        pending_tasks.add(real_add, std::move(station));
+        App::add_task("RecentTab::task_add()",
+                      task_add,
+                      std::move(station));
     }
 
 } // namespace RecentTab

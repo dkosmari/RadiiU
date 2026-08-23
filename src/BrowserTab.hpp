@@ -27,13 +27,7 @@ namespace BrowserTab {
     process_ui();
 
     void
-    update_station(StationPtr station);
-
-    void
-    search_stations();
-
-    std::string
-    get_country_name(const std::string& code);
+    perform_search();
 
 } // namespace BrowserTab
 

@@ -21,7 +21,7 @@
 
 #include "App.hpp"
 #include "BrowserTab.hpp"
-#include "CountryFlagManager.hpp"
+#include "CountryManager.hpp"
 #include "FavoritesTab.hpp"
 #include "IconsFontAwesome4.h"
 #include "ImageLoader.hpp"
@@ -409,8 +409,8 @@ namespace UI {
 
             std::vector<FramedItem> items;
             if (!station.countrycode.empty())
-                items.emplace_back(CountryFlagManager::get_utf8(station.countrycode),
-                                   BrowserTab::get_country_name(station.countrycode));
+                items.emplace_back(CountryManager::get_utf8(station.countrycode),
+                                   CountryManager::get_name(station.countrycode));
             for (auto& lang : station.language)
                 items.emplace_back(ICON_FA_LANGUAGE " " + lang,
                                    "");
@@ -513,8 +513,10 @@ namespace UI {
     FramedList(const std::vector<FramedItem>& items,
                bool only_first_line)
     {
-        const std::string ellipsis = "…";
-        const float ellipsis_width = CalcFramedTextSize(ellipsis).x;
+        //const std::string more_label = "…";
+        const std::string more_label = ICON_FA_PLUS_SQUARE;
+        const std::string less_label = ICON_FA_MINUS_SQUARE;
+        const float more_width = CalcFramedTextSize(more_label).x;
         const auto& style = ImGui::GetStyle();
         const float spacing = style.ItemSpacing.x;
         float total_width = ImGui::GetContentRegionAvail().x;
@@ -524,6 +526,7 @@ namespace UI {
         std::vector<FramedItemExt> line;
         std::size_t idx;
         bool stopped_early = false;
+        unsigned num_lines = 0;
 
         for (idx = 0; idx < items.size(); ++idx) {
             auto& item = items[idx];
@@ -561,6 +564,7 @@ namespace UI {
 
 
                 show_one_framed_line(line);
+                ++num_lines;
 
                 line.clear();
                 cur_x = 0;
@@ -574,36 +578,45 @@ namespace UI {
             return false;
 
         if (stopped_early) {
-            // Stopped early, so we show the ellipsis button.
-            // That means we need to pop items until the ellipsis fits.
+            // Stopped early, so we show the more button.
+            // That means we need to pop items until the more button fits.
             while (!line.empty() &&
-                   line.back().x + frame_padding + spacing + ellipsis_width > total_width) {
+                   line.back().x + frame_padding + spacing + more_width > total_width) {
                 line.pop_back();
             }
 
-            // If there's at least one item, check if we need to shrink it to fit the ellipsis.
+            // If there's at least one item, check if we need to shrink it to fit the more
+            // button.
             if (!line.empty()) {
                 auto& last = line.back();
                 const float room_left = total_width - last.x;
-                if (last.width + spacing + ellipsis_width > room_left) {
+                if (last.width + spacing + more_width > room_left) {
                     // shrink last item
-                    last.width = room_left - spacing - ellipsis_width;
+                    last.width = room_left - spacing - more_width;
                 }
             }
         }
 
         show_one_framed_line(line);
+        ++num_lines;
 
         if (stopped_early) {
             if (!line.empty())
                 ImGui::SameLine();
             auto available = ImGui::GetContentRegionAvail();
-            float offset = available.x - ellipsis_width;
+            float offset = available.x - more_width;
             if (offset > 0)
                 ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
-            bool result = ImGui::Button(ellipsis);
+            bool result = ImGui::Button(more_label);
             ImGui::SetItemTooltip("Show more.");
             return result;
+        } else {
+            if (num_lines > 1) {
+                ImGui::SameLine();
+                bool result = ImGui::Button(less_label);
+                ImGui::SetItemTooltip("Show less.");
+                return result;
+            }
         }
 
         return false;

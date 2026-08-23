@@ -19,6 +19,7 @@
 
 #include "StationVoting.hpp"
 
+#include "App.hpp"
 #include "humanize.hpp"
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
@@ -82,6 +83,9 @@ namespace StationVoting {
         void
         handle_vote_update(const ConstStationPtr& station,
                            RadioBrowserAPI::Station rb_station);
+
+        void
+        process_logic();
 
 
         /*----------------------*/
@@ -160,6 +164,21 @@ namespace StationVoting {
             station->votes = rb_station.votes;
         }
 
+
+        void
+        process_logic()
+        {
+            std::vector<std::string> expired;
+
+            auto now = system_clock::now();
+            for (const auto& [uuid, record] : votes_cast)
+                if (now - record.when > vote_duration)
+                    expired.push_back(uuid);
+
+            for (const auto& uuid : expired)
+                votes_cast.erase(uuid);
+        }
+
     } // namespace
 
 
@@ -168,17 +187,17 @@ namespace StationVoting {
     /*------------------*/
 
     void
-    process_logic()
+    initialize()
     {
-        std::vector<std::string> expired;
+        TRACE_FUNC;
+        App::add_callback(process_logic);
+    }
 
-        auto now = system_clock::now();
-        for (const auto& [uuid, record] : votes_cast)
-            if (now - record.when > vote_duration)
-                expired.push_back(uuid);
 
-        for (const auto& uuid : expired)
-            votes_cast.erase(uuid);
+    void
+    finalize()
+    {
+        TRACE_FUNC;
     }
 
 

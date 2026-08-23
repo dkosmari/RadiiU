@@ -14,7 +14,11 @@
 namespace StationVoting {
 
     void
-    process_logic();
+    initialize();
+
+    void
+    finalize();
+
 
     void
     Button(ConstStationPtr station);

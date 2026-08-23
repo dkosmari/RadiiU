@@ -341,8 +341,7 @@ namespace RadioBrowserAPI {
     void
     get_codecs(const CodecParams& params,
                GetCodecsResultFunction result_func,
-               ExceptionFunction except_func = {})
-        noexcept;
+               ExceptionFunction except_func = {});
 
 
     using GetCountriesResultFunction = ResultFunction<CountryVec>;
@@ -350,16 +349,14 @@ namespace RadioBrowserAPI {
     void
     get_countries(const CountryParams& params,
                   GetCountriesResultFunction result_func,
-                  ExceptionFunction except_func = {})
-        noexcept;
+                  ExceptionFunction except_func = {});
 
 
     using GetServerStatsResultFunction = ResultFunction<ServerStats>;
 
     void
     get_server_stats(GetServerStatsResultFunction result_func,
-                     ExceptionFunction except_func = {})
-        noexcept;
+                     ExceptionFunction except_func = {});
 
 
     using GetStationResultFunction = ResultFunction<Station>;
@@ -367,8 +364,7 @@ namespace RadioBrowserAPI {
     void
     get_station(const string& uuid,
                 GetStationResultFunction result_func,
-                ExceptionFunction except_func = {})
-        noexcept;
+                ExceptionFunction except_func = {});
 
 
     using GetTagsResultFunction = ResultFunction<TagVec>;
@@ -376,8 +372,7 @@ namespace RadioBrowserAPI {
     void
     get_tags(const TagParams& params,
              GetTagsResultFunction result_func,
-             ExceptionFunction except_func = {})
-        noexcept;
+             ExceptionFunction except_func = {});
 
 
     using SearchStationsResultFunction = ResultFunction<StationVec>;
@@ -385,8 +380,7 @@ namespace RadioBrowserAPI {
     void
     search_stations(const SearchStationParams& params,
                     SearchStationsResultFunction result_func,
-                    ExceptionFunction except_func = {})
-        noexcept;
+                    ExceptionFunction except_func = {});
 
 
     using SendClickResultFunction = ResultFunction<ClickResult>;
@@ -394,8 +388,7 @@ namespace RadioBrowserAPI {
     void
     send_click(const string& uuid,
                SendClickResultFunction result_func,
-               ExceptionFunction except_func = {})
-        noexcept;
+               ExceptionFunction except_func = {});
 
 
     using SendVoteResultFunction = ResultFunction<VoteResult>;
@@ -403,8 +396,7 @@ namespace RadioBrowserAPI {
     void
     send_vote(const string& uuid,
               SendVoteResultFunction result_func,
-              ExceptionFunction except_func = {})
-        noexcept;
+              ExceptionFunction except_func = {});
 
 } // namespace RadioBrowserAPI
 

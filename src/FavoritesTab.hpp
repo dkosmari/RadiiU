@@ -35,9 +35,6 @@ namespace FavoritesTab {
     load();
 
     void
-    process_logic();
-
-    void
     process_ui();
 
     void

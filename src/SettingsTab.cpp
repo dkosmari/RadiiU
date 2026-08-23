@@ -155,7 +155,7 @@ namespace SettingsTab {
                               cfg.browser_page_limit,
                               10u, 50u);
                 if (ImGui::IsItemDeactivatedAfterEdit())
-                    BrowserTab::search_stations();
+                    BrowserTab::perform_search();
 
 
                 /*-----------------------*/

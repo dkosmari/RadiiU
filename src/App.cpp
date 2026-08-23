@@ -44,9 +44,10 @@
 #include "App.hpp"
 
 #include "AboutTab.hpp"
+#include "async_task_queue.hpp"
 #include "BrowserTab.hpp"
 #include "ConfirmExitPopup.hpp"
-#include "CountryFlagManager.hpp"
+#include "CountryManager.hpp"
 #include "FavoritesTab.hpp"
 #include "FontLoader.hpp"
 #include "IconsFontAwesome4.h"
@@ -60,6 +61,7 @@
 #include "SettingsTab.hpp"
 #include "StationVoting.hpp"
 #include "Styles.hpp"
+#include "task_queue.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
 
@@ -101,6 +103,10 @@ namespace App {
             sdl::renderer renderer;
 
             sdl::vector<sdl::game_controller::device> controllers;
+
+            std::vector<Callback> callbacks;
+            task_queue tasks;
+            async_task_queue async_tasks;
 
         }; // struct Resources
 
@@ -221,7 +227,7 @@ namespace App {
             ImGui_ImplSDLRenderer2_Shutdown();
             ImGui_ImplSDL2_Shutdown();
 
-            CountryFlagManager::initialize();
+            CountryManager::initialize();
             FontLoader::finalize();
 
             ImGui::DestroyContext();
@@ -306,7 +312,7 @@ namespace App {
             FontLoader::initialize(); // load system font(s)
             FontLoader::load_dir(get_content_path() / "fonts");
             FontLoader::load_dir(get_config_path() / "fonts");
-            CountryFlagManager::initialize();
+            CountryManager::initialize();
 
             ImGui_ImplSDL2_InitForSDLRenderer(res->window.data(),
                                               res->renderer.data());
@@ -375,14 +381,25 @@ namespace App {
             if (!running)
                 return;
 
-            RadioBrowserAPI::process();
 
-            FavoritesTab::process_logic();
-            RecentTab::process_logic();
-            PlayerTab::process_logic();
-            StationVoting::process_logic();
+            try {
+                res->tasks.dispatch_all();
+            }
+            catch (task_queue::error& e) {
+                LOG_ERROR("Dispatching task {}: {}", e.name, e.what());
+            }
 
-            ImageLoader::process();
+            try {
+                res->async_tasks.dispatch_all();
+            }
+            catch (async_task_queue::error& e) {
+                LOG_ERROR("Dispatching async task {}: {}", e.name, e.what());
+            }
+
+
+            for (auto& cb : res->callbacks)
+                if (cb)
+                    cb();
 
             Uint64 now = SDL_GetTicks64();
 
@@ -420,7 +437,6 @@ namespace App {
                     screen_state = ScreenState::normal;
                 }
 
-            LogManager::process();
 
             // ImGui frame processing
             ImGui_ImplSDLRenderer2_NewFrame();
@@ -851,13 +867,17 @@ namespace App {
         RadioBrowserAPI::initialize(get_user_agent(), cfg.server);
         RadioBrowserAPI::set_server(cfg.server);
 
+        add_callback(RadioBrowserAPI::process);
+        add_callback(ImageLoader::process);
+
         // Initialize tabs.
-        LogsTab::initialize();
         AboutTab::initialize();
-        FavoritesTab::initialize();
         BrowserTab::initialize();
-        RecentTab::initialize();
+        FavoritesTab::initialize();
+        LogsTab::initialize();
         PlayerTab::initialize();
+        RecentTab::initialize();
+        StationVoting::initialize();
     }
 
 
@@ -867,12 +887,13 @@ namespace App {
         TRACE_FUNC;
 
         // Finalize tabs.
-        PlayerTab::finalize();
+        StationVoting::finalize();
         RecentTab::finalize();
-        BrowserTab::finalize();
-        FavoritesTab::finalize();
-        AboutTab::finalize();
+        PlayerTab::finalize();
         LogsTab::finalize();
+        FavoritesTab::finalize();
+        BrowserTab::finalize();
+        AboutTab::finalize();
 
         // Finalize modules.
         RadioBrowserAPI::finalize();
@@ -933,6 +954,30 @@ namespace App {
             id = TabID::about;
         }
         next_tab = id;
+    }
+
+
+    void
+    add_callback(Callback c)
+    {
+        res->callbacks.push_back(std::move(c));
+    }
+
+
+    void
+    add_task_real(const std::string& name,
+                  Callback c)
+    {
+        res->tasks.add(name, std::move(c));
+    }
+
+
+
+    void
+    add_async_task_real(const std::string& name,
+                        Callback c)
+    {
+        res->async_tasks.add(name, std::move(c));
     }
 
 } // namespace App

@@ -5,44 +5,25 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <algorithm>
-#include <array>
-#include <atomic>
-#include <compare>
 #include <exception>
 #include <filesystem>
-#include <format>
-#include <fstream>
-#include <functional>
-#include <random>
-#include <regex>
-#include <span>
+#include <limits>
 #include <tuple>
-#include <unordered_map>
-#include <unordered_set>
 #include <utility>
-
-#include <SDL_stdinc.h>
 
 #include <imgui.h>
 #include <imgui_raii.h>
 #include <imgui_stdlib.h>
 
-#include <glaze/core/meta.hpp>
-
 #include "BrowserTab.hpp"
 
 #include "App.hpp"
-#include "CountryFlagManager.hpp"
-#include "enumerator.hpp"
-#include "humanize.hpp"
+#include "BrowserSearchPopup.hpp"
+#include "ButtonHBox.hpp"
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
-#include "net/address.hpp"
-#include "net/resolver.hpp"
 #include "RadioBrowserAPI.hpp"
 #include "rest.hpp"
-#include "Serializer.hpp"
 #include "ServerStatsPopup.hpp"
 #include "Settings.hpp"
 #include "StationDetailsPopup.hpp"
@@ -58,249 +39,134 @@ using sdl::vec2;
 using Settings::cfg;
 
 
-namespace BrowserTab::GUI {
-
-    // Convenience order enum, to combine both sorting and direction.
-    enum class Order : unsigned {
-        name_asc,
-        name_desc,
-        country_asc,
-        country_desc,
-        language_asc,
-        language_desc,
-        votes_asc,
-        votes_desc,
-        clicks_asc,
-        clicks_desc,
-        random,
-        count
-    };
-
-
-    std::string filter_name;
-    std::string filter_tag;
-    std::string filter_country;
-    // Country* selected_country;
-    std::string filter_codec;
-    std::optional<Order> order;
-    unsigned page = 1;
-    bool search_options_visible = true;
-    bool scroll_to_top = false;
-
-    std::string
-    to_label(Order order);
-
-    std::string
-    to_label(const std::optional<Order>& order);
-
-    std::tuple<RadioBrowserAPI::SearchStationParams::Order,
-               bool>
-    get_order_dir(Order o);
-
-} // namespace BrowserTab::GUI
-
-
-template<>
-struct glz::meta<BrowserTab::GUI::Order> {
-    using enum BrowserTab::GUI::Order;
-    static constexpr
-    auto value = enumerate(name_asc,
-                           name_desc,
-                           country_asc,
-                           country_desc,
-                           language_asc,
-                           language_desc,
-                           votes_asc,
-                           votes_desc,
-                           clicks_asc,
-                           clicks_desc,
-                           random,
-                           count);
-};
-
 namespace BrowserTab {
 
-    // Persistent state that's saved in browser.json
+    namespace {
 
-    struct State {
-        struct Filter {
-            std::optional<std::string> name    = {};
-            std::optional<std::string> tag     = {};
-            std::optional<std::string> country = {};
-            std::optional<std::string> codec   = {};
-        }; // struct StateFilter
+        /*-------*/
+        /* Types */
+        /*-------*/
 
-        std::optional<Filter> filter;
-        std::optional<GUI::Order> order;
-    }; // struct State
+        /*---------*/
+        /* Aliases */
+        /*---------*/
+
+        using BrowserSearchPopup::SearchParams;
 
 
-    struct Country {
-        std::string code;
-        std::string name;
-    };
+        /*-----------*/
+        /* Variables */
+        /*-----------*/
+
+        std::vector<StationPtr> stations;
+        unsigned page = 1;
+        bool scroll_to_top = false;
+        SearchParams search_params;
 
 
-    std::regex tags_regex;
+        /*-----------------------*/
+        /* Function declarations */
+        /*-----------------------*/
 
-    std::vector<StationPtr> stations;
+        void
+        action_start_search(const SearchParams& params);
 
-    std::optional<std::vector<Country>> countries;
-    std::optional<std::vector<std::string>> codecs;
-    std::optional<std::vector<std::string>> tags;
+        void
+        common_error_handler(const std::exception& e);
 
-
-    void
-    fetch_codecs();
-
-    void
-    fetch_countries();
-
-    void
-    fetch_tags();
-
-    void
-    load();
-
-    void
-    save();
+        std::tuple<RadioBrowserAPI::SearchStationParams::Order, bool>
+        get_order_dir(BrowserSearchPopup::Order o);
 
 
-    const std::string&
-    get_code(const Country& c);
+        /*----------------------*/
+        /* Function definitions */
+        /*----------------------*/
 
-    const std::string&
-    get_name(const Country& c);
+        void
+        action_start_search(const SearchParams& params)
+        {
+            TRACE_FUNC;
 
-    void
-    common_error_handler(const std::exception& e);
-
-
-    std::string
-    GUI::to_label(Order order)
-    {
-        switch (order) {
-            using enum Order;
-            case name_asc:
-                return "Name " ICON_FA_SORT_ALPHA_ASC;
-            case name_desc:
-                return "Name " ICON_FA_SORT_ALPHA_DESC;
-            case country_asc:
-                return "Country " ICON_FA_SORT_ALPHA_ASC;
-            case country_desc:
-                return "Country " ICON_FA_SORT_ALPHA_DESC;
-            case language_asc:
-                return "Language " ICON_FA_SORT_ALPHA_ASC;
-            case language_desc:
-                return "Language " ICON_FA_SORT_ALPHA_DESC;
-            case clicks_desc:
-                return "Clicks " ICON_FA_SORT_AMOUNT_DESC;
-            case clicks_asc:
-                return "Clicks " ICON_FA_SORT_AMOUNT_ASC;
-            case votes_desc:
-                return "Votes " ICON_FA_SORT_AMOUNT_DESC;
-            case votes_asc:
-                return "Votes " ICON_FA_SORT_AMOUNT_ASC;
-            case random:
-                return "Random";
-            default:
-                return "ERROR";
+            search_params = params;
+            page = 1;
+            perform_search();
         }
-    }
 
 
-    std::string
-    GUI::to_label(const std::optional<Order>& order)
-    {
-        if (!order)
-            return "";
-        return to_label(*order);
-    }
 
-
-    std::tuple<RadioBrowserAPI::SearchStationParams::Order,
-               bool>
-    GUI::get_order_dir(Order o)
-    {
-        using RBOrder = RadioBrowserAPI::SearchStationParams::Order;
-
-        switch (o) {
-            using enum GUI::Order;
-
-            default:
-            case name_asc:
-                return {RBOrder::name, false};
-            case name_desc:
-                return {RBOrder::name, true};
-            case country_asc:
-                return {RBOrder::country, false};
-            case country_desc:
-                return {RBOrder::country, true};
-            case language_asc:
-                return {RBOrder::language, false};
-            case language_desc:
-                return {RBOrder::language, true};
-            case clicks_asc:
-                return {RBOrder::clickcount, false};
-            case clicks_desc:
-                return {RBOrder::clickcount, true};
-            case votes_asc:
-                return {RBOrder::votes, false};
-            case votes_desc:
-                return {RBOrder::votes, true};
-            case random:
-                return {RBOrder::random, false};
+        // TODO: should display errors to the user
+        void
+        common_error_handler(const std::exception& e)
+        {
+            // TODO: should show errors in the UI.
+            LOG_ERROR("{}", e.what());
+            if (auto ee = dynamic_cast<const rest::error*>(&e)) {
+                LOG_ERROR("Content-Type: {}", ee->content_type);
+                LOG_ERROR("<response>\n{}\n</response>", ee->response);
+            }
         }
-    }
 
 
-    bool
-    try_open_file(std::ifstream& stream,
-                  const std::filesystem::path& filename)
-    {
-        if (!exists(filename))
-            return false;
-        stream.open(filename);
-        return stream.is_open();
-    }
+        std::tuple<RadioBrowserAPI::SearchStationParams::Order,
+                   bool>
+        get_order_dir(BrowserSearchPopup::Order o)
+        {
+            using RBOrder = RadioBrowserAPI::SearchStationParams::Order;
 
+            switch (o) {
+                using enum BrowserSearchPopup::Order;
 
-    void
-    load_tags_regex()
-    try {
-        std::ifstream input;
-        if (!try_open_file(input, App::get_config_path() / "tags.ignore"))
-            if (!try_open_file(input, App::get_content_path() / "tags.ignore"))
-                throw std::runtime_error{"could not find tags.ignore"};
-        std::string line;
-        std::string full_regex;
-        unsigned counter = 0;
-        while (getline(input, line)) {
-            if (line.empty())
-                continue;
-            if (counter)
-                full_regex += "|";
-            full_regex += "(?:" + line + ")";
-            ++counter;
+                default:
+                case name_asc:
+                    return {RBOrder::name, false};
+                case name_desc:
+                    return {RBOrder::name, true};
+                case country_asc:
+                    return {RBOrder::country, false};
+                case country_desc:
+                    return {RBOrder::country, true};
+                case language_asc:
+                    return {RBOrder::language, false};
+                case language_desc:
+                    return {RBOrder::language, true};
+                case clicks_asc:
+                    return {RBOrder::clickcount, false};
+                case clicks_desc:
+                    return {RBOrder::clickcount, true};
+                case votes_asc:
+                    return {RBOrder::votes, false};
+                case votes_desc:
+                    return {RBOrder::votes, true};
+                case random:
+                    return {RBOrder::random, false};
+            }
         }
-        tags_regex.assign(full_regex,
-                          std::regex_constants::ECMAScript |
-                          std::regex_constants::optimize);
-        LOG_INFO("Found {} rules in tags.ignore.", counter);
-        // LOG_DEBUG("{}", full_regex);
-    }
-    catch (std::exception& e) {
-        LOG_ERROR("{}", e.what());
-    }
 
+    } // namespace
+
+
+    /*------------------*/
+    /* Public functions */
+    /*------------------*/
 
     void
     initialize()
     {
         TRACE_FUNC;
 
-        load_tags_regex();
-        load();
+        BrowserSearchPopup::initialize();
+
+        // Changed after 0.3.0: no more browser.json
+        auto browser_json = App::get_config_path() / "browser.json";
+        try {
+            if (exists(browser_json))
+                remove(browser_json);
+        }
+        catch (std::exception& e) {
+            LOG_ERROR("Failed to remove {:?}: {}",
+                      browser_json.string(),
+                      e.what());
+        }
     }
 
 
@@ -309,92 +175,37 @@ namespace BrowserTab {
     {
         TRACE_FUNC;
 
-        save();
+        BrowserSearchPopup::finalize();
     }
 
 
     void
-    load()
-    try {
-        TRACE_FUNC;
-
-        State state;
-        auto filename = App::get_config_path() / "browser.json";
-        Serializer::load(state, filename);
-
-        // Transfer state to gui variables.
-        if (state.filter) {
-            GUI::filter_name    = state.filter->name.value_or("");
-            GUI::filter_tag     = state.filter->tag.value_or("");
-            GUI::filter_country = state.filter->country.value_or("");
-            GUI::filter_codec   = state.filter->codec.value_or("");
-        } else {
-            GUI::filter_name.clear();
-            GUI::filter_tag.clear();
-            GUI::filter_country.clear();
-            GUI::filter_codec.clear();
-        }
-        GUI::order = state.order;
-    }
-    catch (std::exception& e) {
-        LOG_ERROR("{}", e.what());
-    }
-
-
-    void
-    save()
-    try {
-        TRACE_FUNC;
-
-        State state;
-        // Transfer gui variables to state.
-        State::Filter filter;
-        if (!GUI::filter_name.empty())
-            filter.name = GUI::filter_name;
-        if (!GUI::filter_tag.empty())
-            filter.tag = GUI::filter_tag;
-        if (!GUI::filter_country.empty())
-            filter.country = GUI::filter_country;
-        if (!GUI::filter_codec.empty())
-            filter.codec = GUI::filter_codec;
-        if (filter.name || filter.tag || filter.country || filter.codec)
-            state.filter = std::move(filter);
-        state.order = GUI::order;
-
-        auto filename = App::get_config_path() / "browser.json";
-        Serializer::save(state, filename);
-    }
-    catch (std::exception& e) {
-        LOG_ERROR("{}", e.what());
-    }
-
-
-    void
-    reset_options()
-    {
-        TRACE_FUNC;
-
-        GUI::filter_name.clear();
-        GUI::filter_tag.clear();
-        GUI::filter_country.clear();
-        GUI::order.reset();
-        GUI::page = 1;
-    }
-
-
-    void
-    show_status()
+    show_toolbar()
     {
         using namespace ImGui::RAII;
 
-        if (Child status{
-                "status",
+        if (Child toolbar{
+                "toolbar",
                 {0, 0},
                 ImGuiChildFlags_AutoResizeY |
                 ImGuiChildFlags_NavFlattened
             }) {
 
             Disabled if_busy{RadioBrowserAPI::is_busy()};
+
+            if (ImGui::Button(ICON_FA_BINOCULARS " Search..."))
+                BrowserSearchPopup::open(action_start_search);
+
+            ImGui::SameLine();
+
+            ImGui::FormatText("Server: {}",
+                              cfg.server.empty() ? "(random)"s : cfg.server);
+            if (cfg.server.empty()) {
+                std::string current_server = RadioBrowserAPI::get_server();
+                ImGui::SetItemTooltip(current_server);
+            }
+
+            ImGui::SameLine();
 
             {
                 Disabled if_preferred_server{!cfg.server.empty()};
@@ -408,225 +219,6 @@ namespace BrowserTab {
             if (ImGui::Button(ICON_FA_INFO_CIRCLE))
                 ServerStatsPopup::open();
             ImGui::SetItemTooltip("Show server details.");
-
-            ImGui::SameLine();
-
-            auto server = cfg.server;
-            ImGui::Text(server.empty() ? "(random)" : server);
-            if (server.empty()) {
-                auto current_server = RadioBrowserAPI::get_server();
-                ImGui::SetItemTooltip(current_server);
-            }
-
-        }
-    }
-
-
-    void
-    show_search_options()
-    {
-        using namespace ImGui::RAII;
-
-        if (Child options_child{
-                "search_options",
-                {0, 0},
-                ImGuiChildFlags_AutoResizeY |
-                ImGuiChildFlags_NavFlattened
-            }) {
-
-            ImGui::SetNextItemOpen(GUI::search_options_visible);
-            if ((GUI::search_options_visible = ImGui::CollapsingHeader("Search options"))) {
-
-                ImGui::Indent();
-
-                if (Child filters{
-                        "filters",
-                        {0, 0},
-                        ImGuiChildFlags_AutoResizeX |
-                        ImGuiChildFlags_AutoResizeY |
-                        ImGuiChildFlags_Borders |
-                        ImGuiChildFlags_NavFlattened
-                    }) {
-
-                    ItemWidth filters_width{500};
-
-                    ImGui::TextUnformatted(ICON_FA_FILTER " Filters");
-
-                    /*-----------------*/
-                    /* Filter by name. */
-                    /*-----------------*/
-                    ImGui::InputText("Name", GUI::filter_name);
-
-                    /*----------------*/
-                    /* Filter by tag. */
-                    /*----------------*/
-                    if (Combo tag_combo{"Tag",
-                                        GUI::filter_tag,
-                                        ImGuiComboFlags_HeightLargest}) {
-                        static ImGuiTextFilter text_filter;
-                        if (ImGui::IsWindowAppearing()) {
-                            ImGui::SetKeyboardFocusHere();
-                            SDL_strlcpy(text_filter.InputBuf,
-                                        GUI::filter_tag.data(),
-                                        sizeof text_filter.InputBuf);
-                            text_filter.Build();
-                        }
-                        text_filter.Draw("##text_filter", 800);
-
-                        if (ImGui::Selectable("(any tag)", GUI::filter_tag.empty()))
-                            GUI::filter_tag.clear();
-
-                        if (!tags)
-                            fetch_tags();
-
-                        // The rest of tags.
-                        if (Child list{"list",
-                                       {0.0f, 12 * ImGui::GetTextLineHeight()},
-                                       ImGuiChildFlags_NavFlattened}) {
-
-                            for (auto& tag : *tags) {
-                                if (!text_filter.PassFilter(tag.data()))
-                                    continue;
-                                const bool is_selected = GUI::filter_tag == tag;
-                                auto label = ICON_FA_TAG " " + tag;
-                                if (ImGui::Selectable(label, is_selected)) {
-                                    GUI::filter_tag = tag;
-                                    ImGui::CloseCurrentPopup();
-                                }
-                            }
-                        }
-                    }
-
-                    /*--------------------*/
-                    /* Filter by country. */
-                    /*--------------------*/
-                    if (Combo country_combo{"Country",
-                                            GUI::filter_country,
-                                            ImGuiComboFlags_HeightLargest}) {
-                        static ImGuiTextFilter text_filter;
-                        if (ImGui::IsWindowAppearing()) {
-                            ImGui::SetKeyboardFocusHere();
-                            SDL_strlcpy(text_filter.InputBuf,
-                                        GUI::filter_country.data(),
-                                        sizeof text_filter.InputBuf);
-                            text_filter.Build();
-                        }
-                        text_filter.Draw("##country", 1100);
-
-                        if (ImGui::Selectable("(any country)", GUI::filter_country.empty()))
-                            GUI::filter_country.clear();
-
-                        if (!countries)
-                            fetch_countries();
-
-                        // The rest of countries
-                        if (Child list{"list",
-                                       {0.0f, 12 * ImGui::GetTextLineHeight()},
-                                       ImGuiChildFlags_NavFlattened}) {
-                            for (const auto& [code, name] : *countries) {
-                                if (!text_filter.PassFilter(code.data()) &&
-                                    !text_filter.PassFilter(name.data()))
-                                    continue;
-                                const bool is_selected = GUI::filter_country == code;
-                                auto label =
-                                    CountryFlagManager::get_utf8(code)
-                                    + " "s
-                                    + code
-                                    + " - "s
-                                    + name;
-                                if (ImGui::Selectable(label, is_selected)) {
-                                    GUI::filter_country = code;
-                                    ImGui::CloseCurrentPopup();
-                                }
-                            }
-                        }
-                    }
-
-                    // TODO: add language filter
-
-                    /*------------------*/
-                    /* Filter by codec. */
-                    /*------------------*/
-                    if (Combo codec_combo{"Codec",
-                                          GUI::filter_codec,
-                                          ImGuiComboFlags_HeightLarge}) {
-
-                        if (ImGui::Selectable("(any codec)", GUI::filter_codec.empty()))
-                            GUI::filter_codec = "";
-
-                        // The rest of codecs.
-                        if (!codecs)
-                            fetch_codecs();
-                        for (const auto& codec : *codecs)
-                            if (ImGui::Selectable(codec, GUI::filter_codec == codec))
-                                GUI::filter_codec = codec;
-                    }
-
-                } // filters
-
-                ImGui::SameLine();
-
-                if (Child sorting{
-                        "sorting",
-                        {0, 0},
-                        ImGuiChildFlags_AutoResizeX |
-                        ImGuiChildFlags_AutoResizeY |
-                        ImGuiChildFlags_Borders |
-                        ImGuiChildFlags_NavFlattened
-                    }) {
-
-                    ImGui::TextUnformatted(ICON_FA_SORT " Order");
-
-                    ImGui::SetNextItemWidth(280);
-                    if (Combo order_combo{"##order",
-                                          to_label(GUI::order),
-                                          ImGuiComboFlags_HeightLargest}) {
-                        if (ImGui::Selectable("(no preferred order)", !GUI::order))
-                            GUI::order.reset();
-                        for (auto o : enumerator::enumerate<GUI::Order>()) {
-                            if (ImGui::Selectable(to_label(o),
-                                                  GUI::order && *GUI::order == o))
-                                GUI::order = o;
-                        }
-                    }
-
-                } // sorting
-
-                ImGui::SameLine();
-
-                // TODO: use a vertical button box helper.
-                if (Child buttons{
-                        "buttons",
-                        {0, 0},
-                        ImGuiChildFlags_AutoResizeX |
-                        ImGuiChildFlags_AutoResizeY |
-                        ImGuiChildFlags_NavFlattened
-                    }) {
-
-                    const std::string reset_label = ICON_FA_ERASER " Reset";
-                    const auto reset_size = ImGui::CalcTextSize(reset_label);
-                    const std::string search_label = ICON_FA_BINOCULARS " Search";
-                    const auto search_size = ImGui::CalcTextSize(search_label);
-
-                    const auto& style = ImGui::GetStyle();
-                    const auto button_size = UI::max(reset_size, search_size)
-                        + 2 * style.FramePadding;
-
-                    if (ImGui::Button("Reset", button_size))
-                        reset_options();
-                    ImGui::SetItemTooltip("Reset browser options to default.");
-
-                    if (ImGui::Button("Search", button_size)) {
-                        GUI::page = 1;
-                        search_stations();
-                    }
-                    ImGui::SetItemTooltip("Search with the selected options.");
-
-                } // buttons
-
-                ImGui::Unindent();
-
-            }
 
         }
     }
@@ -650,7 +242,7 @@ namespace BrowserTab {
                 ImGuiChildFlags_NavFlattened
             }) {
 
-            const bool is_first_page = GUI::page == 1;
+            const bool is_first_page = page == 1;
             const bool is_last_page = stations.size() < cfg.browser_page_limit;
             const bool is_busy = RadioBrowserAPI::is_busy();
 
@@ -659,11 +251,11 @@ namespace BrowserTab {
 
                 // 100⏪
                 if (ImGui::Button("100" ICON_FA_ANGLE_DOUBLE_LEFT) && !is_busy) {
-                    if (GUI::page > 100)
-                        GUI::page -= 100;
+                    if (page > 100)
+                        page -= 100;
                     else
-                        GUI::page = 1;
-                    search_stations();
+                        page = 1;
+                    perform_search();
                 }
                 ImGui::SetItemTooltip("Go back 100 pages.");
 
@@ -671,11 +263,11 @@ namespace BrowserTab {
 
                 // 10⏪
                 if (ImGui::Button("10" ICON_FA_ANGLE_DOUBLE_LEFT) && !is_busy) {
-                    if (GUI::page > 10)
-                        GUI::page -= 10;
+                    if (page > 10)
+                        page -= 10;
                     else
-                        GUI::page = 1;
-                    search_stations();
+                        page = 1;
+                    perform_search();
                 }
                 ImGui::SetItemTooltip("Go back 10 pages.");
 
@@ -683,9 +275,9 @@ namespace BrowserTab {
 
                 // ⏴
                 if (ImGui::Button(" " ICON_FA_ANGLE_LEFT " ") && !is_busy) {
-                    if (GUI::page > 1)
-                        --GUI::page;
-                    search_stations();
+                    if (page > 1)
+                        --page;
+                    perform_search();
                 }
                 ImGui::SetItemTooltip("Go back one page.");
             }
@@ -694,12 +286,12 @@ namespace BrowserTab {
 
             const float page_width = 200;
             ImGui::SetNextItemWidth(page_width);
-            unsigned max_page_num = UINT_MAX;
+            unsigned max_page_num = std::numeric_limits<unsigned>::max();
             if (is_last_page)
-                max_page_num = GUI::page;
-            ImGui::Drag<unsigned>("##page"s, GUI::page, 0.05f, 1u, max_page_num);
+                max_page_num = page;
+            ImGui::Drag<unsigned>("##page"s, page, 0.05f, 1u, max_page_num);
             if (ImGui::IsItemDeactivatedAfterEdit())
-                search_stations();
+                perform_search();
 
             ImGui::SameLine();
 
@@ -708,8 +300,8 @@ namespace BrowserTab {
 
                 // ⏵
                 if (ImGui::Button(" " ICON_FA_ANGLE_RIGHT " ") && !is_busy) {
-                    ++GUI::page;
-                    search_stations();
+                    ++page;
+                    perform_search();
                 }
                 ImGui::SetItemTooltip("Advance one page.");
 
@@ -717,8 +309,8 @@ namespace BrowserTab {
 
                 // ⏩10
                 if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "10") && !is_busy) {
-                    GUI::page += 10;
-                    search_stations();
+                    page += 10;
+                    perform_search();
                 }
                 ImGui::SetItemTooltip("Advance 10 pages.");
 
@@ -726,8 +318,8 @@ namespace BrowserTab {
 
                 // ⏩100
                 if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "100") && !is_busy) {
-                    GUI::page += 100;
-                    search_stations();
+                    page += 100;
+                    perform_search();
                 }
                 ImGui::SetItemTooltip("Advance 100 pages.");
             }
@@ -797,22 +389,14 @@ namespace BrowserTab {
 
         Disabled if_busy{RadioBrowserAPI::is_busy()};
 
-        show_status();
+        show_toolbar();
 
-        bool hide_stations = GUI::search_options_visible;
+        if (!stations.empty()) {
 
-        show_search_options();
-
-        if (!hide_stations)  {
             show_navigation();
 
             // Note: flat navigation doesn't work well on child windows that scroll.
-            if (Child stations_child{"stations"}) {
-
-                if (GUI::scroll_to_top) {
-                    ImGui::SetScrollY(0);
-                    GUI::scroll_to_top = false;
-                }
+            if (Child stations_list{"stations_list"}) {
 
 #if 0
                 // Disabled until ImGui fixes navigation.
@@ -837,167 +421,69 @@ namespace BrowserTab {
                         reload_stations();
                     }
 #endif
-            } // stations_child
+
+                if (scroll_to_top) {
+                    scroll_to_top = false;
+                    UI::SmoothScroll(-1, 0);
+                }
+                UI::DoSmoothScroll();
+
+            } // stations_list
+        } else {
+
+            if (Child empty_list{"empty_list", {0, 0}}) {
+
+                ImGui::TextAligned(0.5f, -1, "Use the search button to find stations.");
+
+                ButtonHBox buttons;
+                buttons.expand = true; // TODO: not working?
+                buttons.add(
+                    ICON_FA_BINOCULARS " Search...",
+                    true,
+                    []
+                    {
+                        BrowserSearchPopup::open(action_start_search);
+                    }
+                );
+                // buttons.add(
+                //     "dummy",
+                //     []{}
+                // );
+                buttons.show();
+            }
         }
 
+        BrowserSearchPopup::process_ui();
         StationDetailsPopup::process_ui();
         ServerStatsPopup::process_ui();
     }
 
 
-    // TODO: should display errors to the user
     void
-    common_error_handler(const std::exception& e)
-    {
-        // TODO: should show a notification-like message, that goes away after a while.
-        LOG_ERROR("{}", e.what());
-        if (auto ee = dynamic_cast<const rest::error*>(&e)) {
-            LOG_ERROR("Content-Type: {}", ee->content_type);
-            LOG_ERROR("<response>\n{}\n</response>", ee->response);
-        }
-    }
-
-
-    void
-    fetch_codecs()
+    perform_search()
     {
         TRACE_FUNC;
 
-        // TODO: when RB errors out, it should be possible to try again
-        if (codecs)
-            return;
-
-        codecs.emplace();
-
-        RadioBrowserAPI::CodecParams params;
-        params.order = RadioBrowserAPI::CodecParams::Order::name;
-        params.hidebroken = true;
-
-        RadioBrowserAPI::get_codecs(
-            params,
-            [](RadioBrowserAPI::CodecVec rb_codecs)
-            {
-                for (auto& [name, stationcount] : rb_codecs)
-                    codecs->push_back(std::move(name));
-                LOG_INFO("Received {} codecs.", codecs->size());
-            },
-            common_error_handler);
-    }
-
-
-    void
-    fetch_countries()
-    {
-        TRACE_FUNC;
-
-        // TODO: when RB errors out, it should be possible to try again
-        if (countries)
-            return;
-
-        countries.emplace();
-
-        RadioBrowserAPI::CountryParams params;
-        params.order = RadioBrowserAPI::CountryParams::Order::name;
-        params.hidebroken = true;
-        params.limit = 1000;
-
-        RadioBrowserAPI::get_countries(
-            {},
-            [](RadioBrowserAPI::CountryVec rb_countries)
-            {
-                for (auto& [name, code, count] : rb_countries)
-                    countries->emplace_back(std::move(code),
-                                            std::move(name));
-                LOG_INFO("Received {} countries.", countries->size());
-                std::ranges::sort(*countries, {}, get_code);
-            },
-            common_error_handler);
-    }
-
-
-    void
-    fetch_tags()
-    {
-        TRACE_FUNC;
-
-        // TODO: when RB errors out, it should be possible to try again
-        if (tags)
-            return;
-
-        tags.emplace();
-
-        RadioBrowserAPI::TagParams params;
-        params.order = RadioBrowserAPI::TagParams::Order::name;
-        params.limit = 20000;
-        params.hidebroken = true;
-
-        RadioBrowserAPI::get_tags(
-            params,
-            [](RadioBrowserAPI::TagVec rb_tags)
-            {
-                std::smatch matches;
-                for (auto& [name, stationcount] : rb_tags) {
-                    // ignore some bogus tags
-                    if (name.size() < 2 || name.size() > 32)
-                        continue;
-                    if (regex_search(name, matches, tags_regex) &&
-                        matches.length() > 0) {
-                        // LOG_DEBUG("Ignored tag: {} (from {})", name, matches.str());
-                        continue;
-                    }
-                    tags->push_back(std::move(name));
-                }
-                LOG_INFO("Received {} tags.", tags->size());
-            },
-            common_error_handler);
-    }
-
-
-    void
-    update_station(StationPtr station)
-    {
-        TRACE_FUNC;
-
-        if (!station || station->stationuuid.empty())
-            return;
-
-        RadioBrowserAPI::get_station(
-            station->stationuuid,
-            [station](RadioBrowserAPI::Station rb_station)
-            {
-                *station = Station::from_radio_browser(rb_station);
-            },
-            common_error_handler);
-    }
-
-
-    void
-    search_stations()
-    {
-        TRACE_FUNC;
-
-        GUI::search_options_visible = false;
-        GUI::scroll_to_top = true;
+        scroll_to_top = true;
 
         RadioBrowserAPI::SearchStationParams params;
-        params.offset = (GUI::page - 1u) * cfg.browser_page_limit;
+        params.offset = (page - 1u) * cfg.browser_page_limit;
         params.limit = cfg.browser_page_limit;
         params.hidebroken = true;
 
-        if (GUI::order) {
-            auto [order, reverse] = get_order_dir(*GUI::order);
-            params.order = order;
-            params.reverse = reverse;
-        }
+        auto [order, reverse] = get_order_dir(search_params.order);
+        params.order = order;
+        params.reverse = reverse;
 
-        if (!GUI::filter_name.empty())
-            params.name = GUI::filter_name;
-        if (!GUI::filter_tag.empty())
-            params.tag = GUI::filter_tag;
-        if (!GUI::filter_country.empty())
-            params.countrycode = GUI::filter_country;
-        if (!GUI::filter_codec.empty())
-            params.codec = GUI::filter_codec;
+        const auto& filter = search_params.filter;
+        if (!filter.name.empty())
+            params.name = filter.name;
+        if (!filter.tag.empty())
+            params.tag = filter.tag;
+        if (!filter.country.empty())
+            params.countrycode = filter.country;
+        if (!filter.codec.empty())
+            params.codec = filter.codec;
 
         RadioBrowserAPI::search_stations(
             params,
@@ -1009,45 +495,13 @@ namespace BrowserTab {
                     // ensure the page size limit is respected
                     if (stations.size() >= cfg.browser_page_limit)
                         break;
-                    stations.push_back(std::make_shared<Station>(Station::from_radio_browser(st)));
+                    stations.push_back(
+                        std::make_shared<Station>(Station::from_radio_browser(st))
+                    );
                 }
             },
-            common_error_handler);
-    }
-
-
-    std::string
-    get_country_name(const std::string& code)
-    {
-        if (code.empty())
-            return {};
-
-        // TODO: when RB errors out, it should be possible to try again
-        if (!countries) {
-            fetch_countries();
-            return {};
-        }
-
-        auto it = std::ranges::lower_bound(*countries, code, {}, get_code);
-        if (it == countries->end())
-            return {};
-        if (it->code != code)
-            return {};
-        return it->name;
-    }
-
-
-    const std::string&
-    get_code(const Country& c)
-    {
-        return c.code;
-    }
-
-
-    const std::string&
-    get_name(const Country& c)
-    {
-        return c.name;
+            common_error_handler
+        );
     }
 
 } // namespace BrowserTab

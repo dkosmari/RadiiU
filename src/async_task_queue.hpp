@@ -9,9 +9,10 @@
 #define ASYNC_TASK_QUEUE_HPP
 
 #include <cstddef>
-#include <future>
-#include <utility>
+#include <functional>
+#include <stdexcept>
 #include <stop_token>
+#include <string>
 #include <utility>
 
 #include "async_queue.hpp"
@@ -19,8 +20,33 @@
 
 struct async_task_queue {
 
-    using task_t = std::future<void>;
-    using queue_t = async_queue<task_t>;
+    struct error : std::runtime_error {
+
+        std::string name;
+
+        error(const std::string& name,
+              const char* message);
+
+        error(const std::string& name,
+              const std::string& message);
+
+    }; // struct error
+
+
+    struct call_again {};
+
+
+    struct task_type {
+
+        using function_type = std::move_only_function<void()>;
+
+        std::string name;
+        function_type function;
+
+    }; // struct task_type
+
+
+    using queue_type = async_queue<task_type>;
 
 
     async_task_queue()
@@ -29,7 +55,7 @@ struct async_task_queue {
     template<typename... Args>
     explicit
     async_task_queue(Args&&... args) :
-        queue(std::forward<Args>(args)...)
+        tasks(std::forward<Args>(args)...)
     {}
 
 
@@ -51,12 +77,21 @@ struct async_task_queue {
     template<typename F,
              typename... Args>
     void
-    add(F&& func,
+    add(const std::string& name,
+        F&& func,
         Args&&... args)
     {
-        queue.push(std::async(std::launch::deferred,
-                              std::forward<F>(func),
-                              std::forward<Args>(args)...));
+        tasks.emplace(
+            name,
+            [
+                func = std::forward<F>(func),
+                ... args = std::forward<Args>(args)
+            ]
+                mutable
+            {
+                std::invoke(func, args...);
+            }
+        );
     }
 
 
@@ -84,7 +119,12 @@ struct async_task_queue {
 
 private:
 
-    queue_t queue;
+    queue_type tasks;
+    queue_type deferred_tasks;
+
+
+    void
+    promote_deferred_tasks();
 
 }; // task_queue
 

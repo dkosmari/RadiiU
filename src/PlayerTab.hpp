@@ -28,10 +28,6 @@ namespace PlayerTab {
 
 
     void
-    process_logic();
-
-
-    void
     play();
 
     void

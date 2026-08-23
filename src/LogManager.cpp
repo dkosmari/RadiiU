@@ -17,7 +17,6 @@
 #include "LogManager.hpp"
 
 #include "App.hpp"
-#include "async_task_queue.hpp"
 #include "thread_safe.hpp"
 #include "tracer.hpp"
 
@@ -50,7 +49,7 @@ namespace LogManager {
             "\e[3;93m",       // DEBUG
             "\e[1;7;34m",       // INFO
             "\e[1;7;33m",       // WARN
-            "\e[1;7;31"         // ERROR
+            "\e[1;7;31m"         // ERROR
         };
 
         const char* ansi_reset = "\e[0m";
@@ -62,7 +61,6 @@ namespace LogManager {
 
         Timestamp timestamp;
         SafeMessageVec safe_messages;
-        async_task_queue pending_tasks;
 
 
         /*-----------------------*/
@@ -73,10 +71,10 @@ namespace LogManager {
         create_log_filename();
 
         void
-        real_clear();
+        task_clear();
 
         void
-        real_log(const Message& msg);
+        task_log(Message& msg);
 
         void
         trim_messages(MessageVec& messages);
@@ -98,7 +96,7 @@ namespace LogManager {
 
 
         void
-        real_clear()
+        task_clear()
         {
             auto messages = safe_messages.lock();
             messages->clear();
@@ -107,7 +105,7 @@ namespace LogManager {
 
 
         void
-        real_log(const Message& msg)
+        task_log(Message& msg)
         {
             // TODO: set ANSI colors for each level
             std::println(cout,
@@ -161,7 +159,8 @@ namespace LogManager {
     void
     clear()
     {
-        pending_tasks.add(real_clear);
+        App::add_task("LogManager::task_clear()",
+                      task_clear);
     }
 
 
@@ -193,19 +192,9 @@ namespace LogManager {
     void
     log(Message msg)
     {
-        pending_tasks.add(real_log, std::move(msg));
-    }
-
-
-    void
-    process()
-    {
-        try {
-            pending_tasks.dispatch_all();
-        }
-        catch (std::exception& e) {
-            cerr << "ERROR dispatching LogManager task: "<< e.what() << endl;
-        }
+        App::add_async_task("LogManager::task_log()",
+                            task_log,
+                            std::move(msg));
     }
 
 

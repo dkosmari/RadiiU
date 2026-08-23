@@ -25,10 +25,6 @@ namespace RecentTab {
 
 
     void
-    process_logic();
-
-
-    void
     add(ConstStationPtr station);
 
 } // namespace RecentTab

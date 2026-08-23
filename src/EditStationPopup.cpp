@@ -294,9 +294,8 @@ namespace EditStationPopup {
 
         // TODO: add button for updating from Browser, if uuid is present
 
-        const auto& style = ImGui::GetStyle();
         if (Child content{"content",
-                          {0, - (style.ItemSpacing.y + buttons.button_size.y)},
+                          {0, -buttons.get_height_with_spacing()},
                           ImGuiChildFlags_NavFlattened,
                           ImGuiWindowFlags_NoSavedSettings}) {
 

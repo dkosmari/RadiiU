@@ -24,6 +24,7 @@ using namespace std::literals;
 
 using Settings::cfg;
 
+// TODO: use tsdemux/TSDuck/demux-mpegts to demux MPEG-TS streams.
 
 namespace {
 
@@ -45,7 +46,7 @@ namespace {
     // Mime types for audio streams
     const std::vector<std::string> audio_mimes{
         "audio/*",
-        "application/ogg",
+        "application/ogg"
     };
 
 } // namespace

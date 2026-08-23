@@ -177,8 +177,47 @@ namespace RadioBrowserAPI {
         string
         make_url(const string& endpoint);
 
-        bool
+        void
         start_call();
+
+        void
+        task_get_codecs(const CodecParams& params,
+                        GetCodecsResultFunction& result_func,
+                        ExceptionFunction& except_func);
+
+        void
+        task_get_countries(const CountryParams& params,
+                           GetCountriesResultFunction& result_func,
+                           ExceptionFunction& except_func);
+
+        void
+        task_get_server_stats(GetServerStatsResultFunction& result_func,
+                              ExceptionFunction& except_func);
+
+        void
+        task_get_station(const string& uuid,
+                         GetStationResultFunction& result_func,
+                         ExceptionFunction& except_func);
+
+        void
+        task_get_tags(const TagParams& params,
+                      GetTagsResultFunction& result_func,
+                      ExceptionFunction& except_func);
+
+        void
+        task_search_stations(const SearchStationParams& params,
+                             SearchStationsResultFunction& result_func,
+                             ExceptionFunction& except_func);
+
+        void
+        task_send_click(const string& uuid,
+                        SendClickResultFunction& result_func,
+                        ExceptionFunction& except_func);
+
+        void
+        task_send_vote(const string& uuid,
+                       SendVoteResultFunction& result_func,
+                       ExceptionFunction& except_func);
 
         void
         throw_if_stopped(std::stop_token& stopper);
@@ -248,7 +287,8 @@ namespace RadioBrowserAPI {
 
             // Step 3: Invoke the result callback.
             if (result_func) {
-                pending_tasks.add(std::move(result_func),
+                pending_tasks.add("fetch_mirrors_thread()::result_func",
+                                  std::move(result_func),
                                   MirrorsVec{names.begin(), names.end()});
             }
         }
@@ -256,7 +296,8 @@ namespace RadioBrowserAPI {
             string msg = e.what();
             LOG_ERROR("{}", msg);
             if (error_func)
-                pending_tasks.add(std::move(error_func),
+                pending_tasks.add("fetch_mirrors_thread()::error_func",
+                                  std::move(error_func),
                                   std::move(msg));
         }
 
@@ -322,20 +363,246 @@ namespace RadioBrowserAPI {
 
 
         void
+        start_call()
+        {
+            if (busy)
+                throw async_task_queue::call_again{};
+            busy = true;
+        }
+
+
+        void
+        task_get_codecs(const CodecParams& params,
+                        GetCodecsResultFunction& result_func,
+                        ExceptionFunction& except_func)
+        {
+            start_call();
+
+            std::string params_json;
+            glz::ex::write_json(params, params_json);
+
+            rest::post_json_async(
+                make_url("/json/codecs"),
+                params_json,
+                finish_result(
+                    [result_func = std::move(result_func)]
+                    (const string& json)
+                        mutable
+                    {
+                        CodecVec result;
+                        glz::ex::read<glz_options>(result, json);
+                        if (result_func)
+                            result_func(std::move(result));
+                    }
+                ),
+                finish_exception(std::move(except_func))
+            );
+        }
+
+
+        void
+        task_get_countries(const CountryParams& params,
+                           GetCountriesResultFunction& result_func,
+                           ExceptionFunction& except_func)
+        {
+            start_call();
+
+            std::string params_json;
+            glz::ex::write_json(params, params_json);
+
+            rest::post_json_async(
+                make_url("/json/countries"),
+                params_json,
+                finish_result(
+                    [result_func = std::move(result_func)]
+                    (const std::string& json)
+                        mutable
+                    {
+                        CountryVec result;
+                        glz::ex::read<glz_options>(result, json);
+                        if (result_func)
+                            result_func(std::move(result));
+                    }
+                ),
+                finish_exception(std::move(except_func))
+            );
+        }
+
+
+        void
+        task_get_server_stats(GetServerStatsResultFunction& result_func,
+                              ExceptionFunction& except_func)
+        {
+            start_call();
+
+            rest::get_json_async(
+                make_url("/json/stats"),
+                {},
+                finish_result(
+                    [result_func = std::move(result_func)]
+                    (const std::string& json)
+                        mutable
+                    {
+                        ServerStats result;
+                        glz::ex::read<glz_options>(result, json);
+                        if (result_func)
+                            result_func(std::move(result));
+                    }
+                ),
+                finish_exception(std::move(except_func))
+            );
+        }
+
+
+        void
+        task_get_station(const string& uuid,
+                         GetStationResultFunction& result_func,
+                         ExceptionFunction& except_func)
+        {
+            start_call();
+
+            StationUUIDParams params { .uuids = uuid };
+            std::string params_json;
+            glz::ex::write_json(params, params_json);
+
+            rest::post_json_async(
+                make_url("/json/stations/byuuid"),
+                params_json,
+                finish_result(
+                    [result_func = std::move(result_func)]
+                    (const std::string& json)
+                        mutable
+                    {
+                        StationVec result;
+                        glz::ex::read<glz_options>(result, json);
+                        if (result.size() != 1)
+                            throw Error{"incorrect array size: " + std::to_string(result.size())};
+                        if (result_func)
+                            result_func(std::move(result[0]));
+                    }
+                ),
+                finish_exception(std::move(except_func))
+            );
+        }
+
+
+        void
+        task_get_tags(const TagParams& params,
+                      GetTagsResultFunction& result_func,
+                      ExceptionFunction& except_func)
+        {
+            start_call();
+
+            std::string params_json;
+            glz::ex::write_json(params, params_json);
+
+            rest::post_json_async(
+                make_url("/json/tags"),
+                params_json,
+                finish_result(
+                    [result_func = std::move(result_func)]
+                    (const std::string& json)
+                        mutable
+                    {
+                        TagVec result;
+                        glz::ex::read<glz_options>(result, json);
+                        if (result_func)
+                            result_func(std::move(result));
+                    }
+                ),
+                finish_exception(std::move(except_func))
+            );
+        }
+
+
+        void
+        task_search_stations(const SearchStationParams& params,
+                             SearchStationsResultFunction& result_func,
+                             ExceptionFunction& except_func)
+        {
+            start_call();
+
+            std::string params_json;
+            glz::ex::write_json(params, params_json);
+
+            rest::post_json_async(
+                make_url("/json/stations/search"),
+                params_json,
+                finish_result(
+                    [result_func = std::move(result_func)]
+                    (const std::string& json)
+                        mutable
+                    {
+                        StationVec result;
+                        glz::ex::read<glz_options>(result, json);
+                        if (result_func)
+                            result_func(std::move(result));
+                    }
+                ),
+                finish_exception(std::move(except_func))
+            );
+        }
+
+
+        void
+        task_send_click(const string& uuid,
+                        SendClickResultFunction& result_func,
+                        ExceptionFunction& except_func)
+        {
+            start_call();
+
+            // Note: clicking does not support GET/POST parameters.
+            rest::get_json_async(
+                make_url("/json/url/" + uuid),
+                {},
+                finish_result(
+                    [result_func = std::move(result_func)]
+                    (const std::string& json)
+                        mutable
+                    {
+                        ClickResult result;
+                        glz::ex::read<glz_options>(result, json);
+                        if (result_func)
+                            result_func(std::move(result));
+                    }
+                ),
+                finish_exception(std::move(except_func))
+            );
+        }
+
+
+        void
+        task_send_vote(const string& uuid,
+                       SendVoteResultFunction& result_func,
+                       ExceptionFunction& except_func)
+        {
+            start_call();
+
+            // NOTE: voting does not support GET/POST parameters.
+            rest::get_json_async(
+                make_url("/json/vote/" + uuid),
+                {},
+                finish_result(
+                    [result_func = std::move(result_func)]
+                    (const std::string& response)
+                        mutable
+                    {
+                        VoteResult result;
+                        glz::ex::read<glz_options>(result, response);
+                        if (result_func)
+                            result_func(std::move(result));
+                    }
+                ),
+                finish_exception(std::move(except_func))
+            );
+        }
+
+
+        void
         throw_if_stopped(std::stop_token& stopper)
         {
             if (stopper.stop_requested())
                 throw Error{"stop requested"};
-        }
-
-
-        bool
-        start_call()
-        {
-            if (busy)
-                return false;
-            busy = true;
-            return true;
         }
 
     } // namespace
@@ -352,7 +619,7 @@ namespace RadioBrowserAPI {
 
     void
     initialize(const string& user_agent,
-    const string& server)
+               const string& server)
     {
         TRACE_FUNC;
 
@@ -388,8 +655,8 @@ namespace RadioBrowserAPI {
         try {
             pending_tasks.try_dispatch_one();
         }
-        catch (std::exception& e) {
-            LOG_ERROR("Dispatching RadioBrowerAPI task: {}", e.what());
+        catch (async_task_queue::error& e) {
+            LOG_ERROR("Dispatching RadioBrowerAPI task {}: {}", e.name, e.what());
         }
 
         rest::process();
@@ -401,7 +668,6 @@ namespace RadioBrowserAPI {
     {
         return busy;
     }
-
 
 
     void
@@ -477,47 +743,12 @@ namespace RadioBrowserAPI {
     get_codecs(const CodecParams& params,
                GetCodecsResultFunction result_func,
                ExceptionFunction except_func)
-        noexcept
-    try {
-        if (!start_call()) {
-            // defer until busy == false
-            pending_tasks.add(get_codecs,
-                              params,
-                              std::move(result_func),
-                              std::move(except_func));
-            return;
-        }
-
-        std::string params_json;
-        glz::ex::write_json(params, params_json);
-
-        rest::post_json_async(
-            make_url("/json/codecs"),
-            params_json,
-            finish_result(
-                [result_func = std::move(result_func)]
-                (const string& json)
-                    mutable
-                {
-                    CodecVec result;
-                    glz::ex::read<glz_options>(result, json);
-                    if (result_func)
-                        result_func(std::move(result));
-                }
-            ),
-            finish_exception(std::move(except_func))
-        );
-    }
-    catch (std::exception& e) {
-        busy = false;
-        if (except_func)
-            except_func(e);
-    }
-    catch (...) {
-        busy = false;
-        LOG_ERROR("Caught unknown exception");
-        if (except_func)
-            except_func(std::logic_error{"Caught unknown exception"});
+    {
+        pending_tasks.add("task_get_codecs()",
+                          task_get_codecs,
+                          params,
+                          std::move(result_func),
+                          std::move(except_func));
     }
 
 
@@ -525,97 +756,23 @@ namespace RadioBrowserAPI {
     get_countries(const CountryParams& params,
                   GetCountriesResultFunction result_func,
                   ExceptionFunction except_func)
-        noexcept
-    try {
-        if (!start_call()) {
-            // defer until busy == false
-            pending_tasks.add(get_countries,
-                              params,
-                              std::move(result_func),
-                              std::move(except_func));
-            return;
-        }
-
-        std::string params_json;
-        glz::ex::write_json(params, params_json);
-
-        rest::post_json_async(
-            make_url("/json/countries"),
-            params_json,
-            finish_result(
-                [result_func = std::move(result_func)]
-                (const std::string& json)
-                    mutable
-                {
-                    CountryVec result;
-                    glz::ex::read<glz_options>(result, json);
-                    if (result_func)
-                        result_func(std::move(result));
-                }
-            ),
-            finish_exception(
-                [except_func=std::move(except_func)]
-                (const std::exception& e)
-                    mutable
-                {
-                    if (except_func)
-                        except_func(e);
-                }
-            )
-        );
-    }
-    catch (std::exception& e) {
-        busy = false;
-        if (except_func)
-            except_func(e);
-    }
-    catch (...) {
-        busy = false;
-        LOG_ERROR("Caught unknown exception");
-        if (except_func)
-            except_func(std::logic_error{"Caught unknown exception"});
+    {
+        pending_tasks.add("task_get_countries()",
+                          task_get_countries,
+                          params,
+                          std::move(result_func),
+                          std::move(except_func));
     }
 
 
     void
     get_server_stats(GetServerStatsResultFunction result_func,
                      ExceptionFunction except_func)
-        noexcept
-    try {
-        if (!start_call()) {
-            // defer until busy == false
-            pending_tasks.add(get_server_stats,
-                              std::move(result_func),
-                              std::move(except_func));
-            return;
-        }
-
-        rest::get_json_async(
-            make_url("/json/stats"),
-            {},
-            finish_result(
-                [result_func = std::move(result_func)](const std::string& json)
-                    mutable
-                {
-                    ServerStats result;
-                    glz::ex::read<glz_options>(result, json);
-                    if (result_func)
-                        result_func(std::move(result));
-                }
-            ),
-            finish_exception(std::move(except_func))
-        );
-    }
-    catch (std::exception& e) {
-        busy = false;
-        if (except_func)
-            except_func(e);
-    }
-    catch (...) {
-        busy = false;
-        LOG_ERROR("Caught unknown exception");
-        if (except_func)
-            except_func(std::logic_error{"Caught unknown exception"});
+    {
+        pending_tasks.add("task_get_server_stats()",
+                          task_get_server_stats,
+                          std::move(result_func),
+                          std::move(except_func));
     }
 
 
@@ -623,49 +780,12 @@ namespace RadioBrowserAPI {
     get_station(const string& uuid,
                 GetStationResultFunction result_func,
                 ExceptionFunction except_func)
-        noexcept
-    try {
-        if (!start_call()) {
-            // defer until busy == false
-            pending_tasks.add(get_station,
-                              uuid,
-                              std::move(result_func),
-                              std::move(except_func));
-            return;
-        }
-
-        StationUUIDParams params { .uuids = uuid };
-        std::string params_json;
-        glz::ex::write_json(params, params_json);
-
-        rest::post_json_async(
-            make_url("/json/stations/byuuid"),
-            params_json,
-            finish_result(
-                [result_func = std::move(result_func)](const std::string& json)
-                    mutable
-                {
-                    StationVec result;
-                    glz::ex::read<glz_options>(result, json);
-                    if (result.size() != 1)
-                        throw Error{"incorrect array size: " + std::to_string(result.size())};
-                    if (result_func)
-                        result_func(std::move(result[0]));
-                }
-            ),
-            finish_exception(std::move(except_func))
-        );
-    }
-    catch (std::exception& e) {
-        busy = false;
-        if (except_func)
-            except_func(e);
-    }
-    catch (...) {
-        busy = false;
-        LOG_ERROR("Caught unknown exception");
-        if (except_func)
-            except_func(std::logic_error{"Caught unknown exception"});
+    {
+        pending_tasks.add("task_get_station()",
+                          task_get_station,
+                          uuid,
+                          std::move(result_func),
+                          std::move(except_func));
     }
 
 
@@ -673,46 +793,12 @@ namespace RadioBrowserAPI {
     get_tags(const TagParams& params,
              GetTagsResultFunction result_func,
              ExceptionFunction except_func)
-        noexcept
-    try {
-        if (!start_call()) {
-            // defer until busy == false
-            pending_tasks.add(get_tags,
-                              params,
-                              std::move(result_func),
-                              std::move(except_func));
-            return;
-        }
-
-        std::string params_json;
-        glz::ex::write_json(params, params_json);
-
-        rest::post_json_async(
-            make_url("/json/tags"),
-            params_json,
-            finish_result(
-                [result_func=std::move(result_func)](const std::string& json)
-                    mutable
-                {
-                    TagVec result;
-                    glz::ex::read<glz_options>(result, json);
-                    if (result_func)
-                        result_func(std::move(result));
-                }
-            ),
-            finish_exception(std::move(except_func))
-        );
-    }
-    catch (std::exception& e) {
-        busy = false;
-        if (except_func)
-            except_func(e);
-    }
-    catch (...) {
-        busy = false;
-        LOG_ERROR("Caught unknown exception");
-        if (except_func)
-            except_func(std::logic_error{"Caught unknown exception"});
+    {
+        pending_tasks.add("task_get_tags()",
+                          task_get_tags,
+                          params,
+                          std::move(result_func),
+                          std::move(except_func));
     }
 
 
@@ -720,46 +806,12 @@ namespace RadioBrowserAPI {
     search_stations(const SearchStationParams& params,
                     SearchStationsResultFunction result_func,
                     ExceptionFunction except_func)
-        noexcept
-    try {
-        if (!start_call()) {
-            // defer until busy == false
-            pending_tasks.add(search_stations,
-                              params,
-                              std::move(result_func),
-                              std::move(except_func));
-            return;
-        }
-
-        std::string params_json;
-        glz::ex::write_json(params, params_json);
-
-        rest::post_json_async(
-            make_url("/json/stations/search"),
-            params_json,
-            finish_result(
-                [result_func=std::move(result_func)](const std::string& json)
-                    mutable
-                {
-                    StationVec result;
-                    glz::ex::read<glz_options>(result, json);
-                    if (result_func)
-                        result_func(std::move(result));
-                }
-            ),
-            finish_exception(std::move(except_func))
-        );
-    }
-    catch (std::exception& e) {
-        busy = false;
-        if (except_func)
-            except_func(e);
-    }
-    catch (...) {
-        busy = false;
-        LOG_ERROR("Caught unknown exception");
-        if (except_func)
-            except_func(std::logic_error{"Caught unknown exception"});
+    {
+        pending_tasks.add("task_search_stations()",
+                          task_search_stations,
+                          params,
+                          std::move(result_func),
+                          std::move(except_func));
     }
 
 
@@ -767,45 +819,12 @@ namespace RadioBrowserAPI {
     send_click(const string& uuid,
                SendClickResultFunction result_func,
                ExceptionFunction except_func)
-        noexcept
-    try {
-        if (!start_call()) {
-            // defer until busy == false
-            pending_tasks.add(send_click,
-                              uuid,
-                              std::move(result_func),
-                              std::move(except_func));
-            return;
-        }
-
-        // Note: clicking does not support GET/POST parameters.
-        rest::get_json_async(
-            make_url("/json/url/" + uuid),
-            {},
-            finish_result(
-                [result_func=std::move(result_func)]
-                (const std::string& json)
-                    mutable
-                {
-                    ClickResult result;
-                    glz::ex::read<glz_options>(result, json);
-                    if (result_func)
-                        result_func(std::move(result));
-                }
-            ),
-            finish_exception(std::move(except_func))
-        );
-    }
-    catch (std::exception& e) {
-        busy = false;
-        if (except_func)
-            except_func(e);
-    }
-    catch (...) {
-        busy = false;
-        LOG_ERROR("Caught unknown exception");
-        if (except_func)
-            except_func(std::logic_error{"Caught unknown exception"});
+    {
+        pending_tasks.add("task_send_click()",
+                          task_send_click,
+                          uuid,
+                          std::move(result_func),
+                          std::move(except_func));
     }
 
 
@@ -813,45 +832,12 @@ namespace RadioBrowserAPI {
     send_vote(const string& uuid,
               SendVoteResultFunction result_func,
               ExceptionFunction except_func)
-        noexcept
-    try {
-        if (!start_call()) {
-            // defer until busy == false
-            pending_tasks.add(send_vote,
-                              uuid,
-                              std::move(result_func),
-                              std::move(except_func));
-            return;
-        }
-
-        // NOTE: voting does not support GET/POST parameters.
-        rest::get_json_async(
-            make_url("/json/vote/" + uuid),
-            {},
-            finish_result(
-                [result_func=std::move(result_func)]
-                (const std::string& response)
-                    mutable
-                {
-                    VoteResult result;
-                    glz::ex::read<glz_options>(result, response);
-                    if (result_func)
-                        result_func(std::move(result));
-                }
-            ),
-            finish_exception(std::move(except_func))
-        );
-    }
-    catch (std::exception& e) {
-        busy = false;
-        if (except_func)
-            except_func(e);
-    }
-    catch (...) {
-        busy = false;
-        LOG_ERROR("Caught unknown exception");
-        if (except_func)
-            except_func(std::logic_error{"Caught unknown exception"});
+    {
+        pending_tasks.add("task_send_vote()",
+                          task_send_vote,
+                          uuid,
+                          std::move(result_func),
+                          std::move(except_func));
     }
 
 } // namespace RadioBrowserAPI

@@ -57,6 +57,10 @@ struct ButtonHBox {
     void
     show();
 
+    float
+    get_height_with_spacing()
+        const;
+
 private:
 
     void

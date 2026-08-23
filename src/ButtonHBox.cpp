@@ -98,6 +98,16 @@ ButtonHBox::show()
     }
 }
 
+
+float
+ButtonHBox::get_height_with_spacing()
+    const
+{
+    const auto& style = ImGui::GetStyle();
+    return style.ItemSpacing.y + button_size.y;
+}
+
+
 void
 ButtonHBox::update()
 {
