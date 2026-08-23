@@ -72,8 +72,9 @@ namespace PlayerTab {
 
         struct PlaybackResources {
 
-            radio_client radio;
             sdl::audio::device audio_dev;
+            std::vector<std::byte> samples_buffer;
+            radio_client radio;
 
             PlaybackResources(const std::string& url,
                               const std::string& url_resolved);
@@ -180,6 +181,7 @@ namespace PlayerTab {
 
         PlaybackResources::PlaybackResources(const std::string& url,
                   const std::string& url_resolved) :
+            samples_buffer(65536),
             radio{url, url_resolved, App::get_user_agent()}
         {
             if (cfg.disable_apd) {
@@ -217,15 +219,21 @@ namespace PlayerTab {
             try {
                 radio.process();
 
-                if (auto meta = radio.get_metadata()) {
-                    if (meta->title) {
-                        if (meta->artist)
-                            history_add(*meta->artist + " - " + *meta->title);
-                        else
-                            history_add(*meta->title);
-                    } else
-                        history_add({});
-                }
+                radio.with_metadata(
+                    [this](const radio_client::opt_stream_metadata& meta)
+                    {
+                        if (!meta)
+                            return;
+
+                        if (meta->title) {
+                            if (meta->artist)
+                                history_add(*meta->artist + " - " + *meta->title);
+                            else
+                                history_add(*meta->title);
+                        } else
+                            history_add({});
+                    }
+                );
 
                 if (is_buffer_too_empty()) {
                     // LOG_DEBUG("buffer too empty");
@@ -234,28 +242,34 @@ namespace PlayerTab {
 
                 if (!audio_dev) {
                     // see if we have enough bytes to initialize audio_dev properly.
-                    if (auto radio_spec = radio.get_spec()) {
-                        sdl::audio::spec spec;
-                        spec.freq     = radio_spec->rate;
-                        spec.channels = radio_spec->channels;
-                        spec.format   = radio_spec->format;
-                        spec.samples  = 8192;
-                        audio_dev.create(nullptr, false, spec);
-                        audio_dev.unpause();
-                    } else
-                        return;
+                    radio.with_decoder_spec(
+                        [this](const radio_client::opt_decoder_spec& radio_spec)
+                        {
+                            if (!radio_spec)
+                                return;
+                            sdl::audio::spec spec;
+                            spec.freq     = radio_spec->rate;
+                            spec.channels = radio_spec->channels;
+                            spec.format   = radio_spec->format;
+                            spec.samples  = 8192;
+                            audio_dev.create(nullptr, false, spec);
+                            audio_dev.unpause();
+                        }
+                    );
                 }
 
-                if (!audio_dev) {
-                    LOG_DEBUG("no audio dev yet");
+                if (!audio_dev)
                     return;
-                }
 
-                for (auto samples = radio.get_samples();
-                     !samples.empty();
-                     samples = radio.get_samples())
-                    audio_dev.play(samples);
-
+                radio.consume_samples(
+                    [this](byte_stream& stream)
+                    {
+                        while (!stream.empty()) {
+                            auto samples = stream.read(std::span(samples_buffer));
+                            audio_dev.play(samples);
+                        }
+                    }
+                );
             }
             catch (std::exception& e) {
                 LOG_ERROR("{}", e.what());
@@ -415,47 +429,55 @@ namespace PlayerTab {
                         ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
                         ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
 
-                        if (const auto meta = play_res->radio.get_metadata()) {
+                        play_res->radio.with_metadata(
+                            [](const radio_client::opt_stream_metadata& meta)
+                            {
+                                if (!meta)
+                                    return;
+                                UI::InfoRowOpt("Title", meta->title);
+                                UI::InfoRowOpt("Artist", meta->artist);
 
-                            UI::InfoRowOpt("Title", meta->title);
-                            UI::InfoRowOpt("Artist", meta->artist);
+                                if (meta->cover_art && !meta->cover_art->empty()) {
+                                    auto available = ImGui::GetContentRegionAvail();
+                                    const sdl::vec2 max_size = {
+                                        static_cast<int>(available.x),
+                                        0
+                                    };
+                                    auto art = ImageLoader::get(*meta->cover_art, max_size);
+                                    ImGui::TableNextRow();
+                                    ImGui::TableNextColumn();
+                                    UI::Label("Cover art");
+                                    ImGui::TableNextColumn();
+                                    UI::Image(*art);
+                                    ImGui::SetItemTooltip(*meta->cover_art);
+                                }
 
-                            if (meta->cover_art && !meta->cover_art->empty()) {
-                                auto available = ImGui::GetContentRegionAvail();
-                                const sdl::vec2 max_size = {
-                                    static_cast<int>(available.x),
-                                    0
-                                };
-                                auto art = ImageLoader::get(*meta->cover_art, max_size);
-                                ImGui::TableNextRow();
-                                ImGui::TableNextColumn();
-                                UI::Label("Cover art");
-                                ImGui::TableNextColumn();
-                                UI::Image(*art);
-                                ImGui::SetItemTooltip(*meta->cover_art);
+                                UI::InfoRowOpt("Album", meta->album);
+                                UI::InfoRowOpt("Genre", meta->genre);
+                                UI::InfoRowOpt("Date", meta->date);
+
+                                for (auto& [k, v] : meta->extra)
+                                    UI::InfoRow(k, v);
+
+                                // station metadata
+                                UI::InfoRowOpt("Station Name", meta->station_name);
+                                UI::InfoRowOpt("Station Genre", meta->station_genre);
+                                UI::InfoRowOpt("Station Description", meta->station_description);
+                                UI::InfoRowOpt("Station URL", meta->station_url);
                             }
+                        );
 
-                            UI::InfoRowOpt("Album", meta->album);
-                            UI::InfoRowOpt("Genre", meta->genre);
-                            UI::InfoRowOpt("Date", meta->date);
-
-                            for (auto& [k, v] : meta->extra)
-                                UI::InfoRow(k, v);
-
-                            // station metadata
-                            UI::InfoRowOpt("Station Name", meta->station_name);
-                            UI::InfoRowOpt("Station Genre", meta->station_genre);
-                            UI::InfoRowOpt("Station Description", meta->station_description);
-                            UI::InfoRowOpt("Station URL", meta->station_url);
-                        }
-
-                        if (const auto info = play_res->radio.get_decoder_info()) {
-                            if (!info->codec.empty())
-                                UI::InfoRow("Codec", info->codec);
-                            if (!info->bitrate.empty())
-                                UI::InfoRow("Bitrate", info->bitrate);
-                        }
-
+                        play_res->radio.with_decoder_info(
+                            [](const radio_client::opt_decoder_info& info)
+                            {
+                                if (!info)
+                                    return;
+                                if (!info->codec.empty())
+                                    UI::InfoRow("Codec", info->codec);
+                                if (!info->bitrate.empty())
+                                    UI::InfoRow("Bitrate", info->bitrate);
+                            }
+                        );
                     }
 
                 }

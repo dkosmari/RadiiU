@@ -141,6 +141,8 @@ radiiu_elf_SOURCES = \
 	src/task_queue.cpp \
 	src/task_queue.hpp \
 	src/thread_safe.hpp \
+	src/Timer.cpp \
+	src/Timer.hpp \
 	src/tracer.cpp \
 	src/tracer.hpp \
 	src/UI.cpp \

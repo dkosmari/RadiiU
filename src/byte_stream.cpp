@@ -65,8 +65,8 @@ std::string
 byte_stream::read_str(std::size_t count)
 {
     std::string result(count, '\0');
-    auto sz = read(std::span(result));
-    result.resize(sz);
+    auto occupied = read(std::span(result));
+    result.resize(occupied.size());
     return result;
 }
 
@@ -126,24 +126,11 @@ byte_stream::write(const void* buf,
 }
 
 
-#if 0
 std::size_t
 byte_stream::write(std::string_view sv)
 {
-    for (char c : sv)
-        data.push_back(std::byte{c});
-    return sv.size();
+    return write(sv.data(), sv.size());
 }
-
-
-std::size_t
-byte_stream::write(const std::string& s)
-{
-    for (char c : s)
-        data.push_back(std::byte{c});
-    return s.size();
-}
-#endif
 
 
 std::size_t

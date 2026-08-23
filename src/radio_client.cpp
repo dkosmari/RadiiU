@@ -5,8 +5,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <iostream>
-
 #include <curlxx/url.hpp>
 
 #include "radio_client.hpp"
@@ -92,40 +90,33 @@ radio_client::process()
 }
 
 
-std::optional<decoder::spec>
-radio_client::get_spec()
+void
+radio_client::consume_samples(const ConsumeSamplesFunction& func)
 {
-    if (!dec)
-        return {};
-    return dec->get_spec();
+    func(*decoder_output.lock());
 }
 
 
-std::span<const char>
-radio_client::get_samples()
-{
-    if (!dec)
-        return {};
-
-    return dec->decode();
-}
-
-
-const std::optional<stream_metadata>&
-radio_client::get_metadata()
+void
+radio_client::with_metadata(const MetadataFunction& func)
     const noexcept
 {
-    return metadata;
+    func(*safe_metadata.c_lock());
 }
 
 
-std::optional<decoder::info>
-radio_client::get_decoder_info()
-    const
+void
+radio_client::with_decoder_info(const DecoderInfoFunction& func)
+    const noexcept
 {
-    if (!dec)
-        return {};
-    return dec->get_info();
+    func(*safe_decoder_info.c_lock());
+}
+
+
+void
+radio_client::with_decoder_spec(const DecoderSpecFunction& func)
+{
+    func(*safe_decoder_spec.c_lock());
 }
 
 
@@ -178,7 +169,7 @@ radio_client::process_http_response_started()
             icy_stream = std::make_unique<icy::stream>(http);
             LOG_INFO("ICY stream created. ");
             data_stream = &icy_stream->data_stream;
-            metadata = icy_stream->get_metadata();
+            safe_metadata.store(icy_stream->get_metadata());
         }
         catch (std::exception& e) {
             LOG_ERROR("Could not create ICY stream: {}", e.what());
@@ -257,8 +248,14 @@ radio_client::process_audio()
     if (current_state != state::streaming_audio)
         LOG_ERROR("BUG: process_audio should only happen during streaming_audio state");
 
-    if (icy_stream)
-        metadata = icy_stream->get_metadata();
+    if (icy_stream) {
+        auto metadata_guard = safe_metadata.lock();
+        auto& metadata = *metadata_guard;
+        if (!metadata) // if not initialized yet
+            metadata = icy_stream->get_metadata();
+        else
+            metadata->merge(icy_stream->get_metadata());
+    }
 
     if (!dec) {
         if (data_stream->size() < cfg.player_buffer_size * 1024)
@@ -267,11 +264,17 @@ radio_client::process_audio()
             // try to create a decoder
             auto hdr_content_type = http.get_header("content-type");
             auto content_type = hdr_content_type ? *hdr_content_type : ""s;
-            std::vector<char> initial_buf(data_stream->size());
-            std::size_t initial_size = data_stream->peek(std::span{initial_buf});
-            dec = decoder::create(content_type, std::span{initial_buf.data(),
-                                                          initial_size});
-            data_stream->discard(initial_size);
+            network_to_decoder_input_buffer.resize(65536);
+            auto available = data_stream->peek(std::span{network_to_decoder_input_buffer});
+            dec = decoder::create(content_type, available);
+            data_stream->discard(available.size());
+
+            // All further decoding will happen in the decoder thread.
+            decoder_input_to_decoder_buffer.resize(65536);
+            decoder_thread = std::jthread{
+                std::bind_front(&radio_client::decoder_thread_function,
+                                this)
+            };
         }
         catch (std::exception& e) {
             LOG_ERROR("Failed to create decoder with {} bytes: {}",
@@ -279,16 +282,64 @@ radio_client::process_audio()
                       e.what());
         }
     }
-    if (!dec)
-        return;
 
-    dec->feed(data_stream->read_as<char>());
+    auto available = data_stream->read(std::span{network_to_decoder_input_buffer});
+    if (!available.empty()) {
+        std::lock_guard guard{decoder_input_mutex};
+        decoder_input.write(available);
+        empty_decoder_input.notify_one();
+    }
+}
 
-    if (auto dec_meta = dec->get_metadata()) {
-        if (metadata)
-            metadata->merge(*dec_meta);
-        else
-            metadata = std::move(dec_meta);
+
+void
+radio_client::decoder_thread_function(std::stop_token stopper)
+{
+    LOG_DEBUG("Decoder thread started.");
+
+    try {
+        while (!stopper.stop_requested()) {
+            {
+                std::unique_lock guard{decoder_input_mutex};
+                empty_decoder_input.wait(guard,
+                                         stopper,
+                                         [this] { return !decoder_input.empty(); });
+                if (stopper.stop_requested())
+                    break;
+
+                std::span buffer{decoder_input_to_decoder_buffer};
+                for (auto available = decoder_input.read(buffer);
+                     !available.empty();
+                     available = decoder_input.read(buffer))
+                    dec->feed(available);
+            }
+
+            for (auto samples = dec->decode();
+                 !samples.empty();
+                 samples = dec->decode()) {
+                auto output = decoder_output.lock();
+                output->write(samples);
+            }
+
+            if (auto dec_meta = dec->get_metadata()) {
+                auto metadata_guard = safe_metadata.lock();
+                auto& metadata = *metadata_guard;
+                if (metadata)
+                    metadata->merge(*dec_meta);
+                else
+                    metadata = std::move(dec_meta);
+            }
+
+            safe_decoder_info.store(dec->get_info());
+            safe_decoder_spec.store(dec->get_spec());
+        }
+    }
+    catch (std::exception& e) {
+        LOG_ERROR("Caught exception: {}", e.what());
+    }
+    catch (...) {
+        LOG_ERROR("Unknown exception.");
     }
 
+    LOG_DEBUG("Decoder thread stopped.");
 }

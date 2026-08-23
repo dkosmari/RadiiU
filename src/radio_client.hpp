@@ -1,22 +1,29 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #ifndef RADIO_CLIENT_HPP
 #define RADIO_CLIENT_HPP
 
+#include <condition_variable>
 #include <cstddef>
+#include <functional>
+#include <mutex>
 #include <span>
+#include <stop_token>
 #include <string>
+#include <thread>
 
 #include <sdl2xx/audio.hpp>
 
+#include "byte_stream.hpp"
 #include "decoder.hpp"
 #include "http_client.hpp"
 #include "icy_stream.hpp"
+#include "thread_safe.hpp"
 
 
 // This class is the high-level handler for internet radio streams.
@@ -30,7 +37,6 @@ struct radio_client {
         streaming_audio,
     };
 
-    state current_state = state::stopped;
 
     enum class playlist_type {
         none,
@@ -43,20 +49,27 @@ struct radio_client {
         xspf,                   // TODO application/xspf+xml
     };
 
+    using opt_stream_metadata = std::optional<stream_metadata>;
+    using opt_decoder_info = std::optional<decoder::info>;
+    using opt_decoder_spec = std::optional<decoder::spec>;
+
+    using ConsumeSamplesFunction = std::function<void(byte_stream& stream)>;
+    using MetadataFunction = std::function<void(const opt_stream_metadata&)>;
+    using DecoderInfoFunction = std::function<void(const opt_decoder_info&)>;
+    using DecoderSpecFunction = std::function<void(const opt_decoder_spec&)>;
+
+    state current_state = state::stopped;
+
     playlist_type current_playlist = playlist_type::none;
 
     std::string url;
     std::string url_resolved;
     std::string user_agent;
 
-    std::optional<stream_metadata> metadata;
-
     http_client http;
     std::unique_ptr<icy::stream> icy_stream;
 
     byte_stream* data_stream = nullptr;
-
-    std::unique_ptr<decoder::base> dec;
 
 
     radio_client(const std::string& url,
@@ -71,25 +84,39 @@ struct radio_client {
     process();
 
 
-    std::optional<decoder::spec>
-    get_spec();
+    void
+    consume_samples(const ConsumeSamplesFunction& func);
 
 
-    std::span<const char>
-    get_samples();
-
-
-    const std::optional<stream_metadata>&
-    get_metadata()
+    void
+    with_metadata(const MetadataFunction& func)
         const noexcept;
 
 
-    std::optional<decoder::info>
-    get_decoder_info()
-        const;
+    void
+    with_decoder_info(const DecoderInfoFunction& func)
+        const noexcept;
 
+
+    void
+    with_decoder_spec(const DecoderSpecFunction& func);
 
 private:
+
+    std::unique_ptr<decoder::base> dec;
+    std::vector<char> network_to_decoder_input_buffer;
+    std::vector<char> decoder_input_to_decoder_buffer;
+
+    thread_safe<opt_stream_metadata> safe_metadata;
+    thread_safe<opt_decoder_spec> safe_decoder_spec;
+    thread_safe<opt_decoder_info> safe_decoder_info;
+
+    std::mutex decoder_input_mutex;
+    std::condition_variable_any empty_decoder_input;
+    byte_stream decoder_input;
+    thread_safe<byte_stream> decoder_output;
+    std::jthread decoder_thread;
+
 
     void
     set_next_url(const std::string& next_url);
@@ -108,6 +135,9 @@ private:
 
     void
     process_audio();
+
+    void
+    decoder_thread_function(std::stop_token stopper);
 
 }; // struct radio_client
 

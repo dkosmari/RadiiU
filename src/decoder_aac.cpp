@@ -166,11 +166,11 @@ namespace decoder {
 
         NeAACDecFrameInfo frame;
         std::vector<unsigned char> buf(stream.size());
-        auto sz = stream.peek(std::span{buf});
+        auto available = stream.peek(std::span{buf});
         auto samples = NeAACDecDecode(handle,
                                       &frame,
                                       buf.data(),
-                                      sz);
+                                      available.size());
         if (frame.error) {
             // TODO: throwing from here should stop playback?
             throw error{"NeAACDecDecode() failed", frame.error};

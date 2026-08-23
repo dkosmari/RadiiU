@@ -14,6 +14,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 
@@ -41,38 +42,32 @@ public:
 
     template<typename T,
              std::size_t E>
-    std::size_t
+    requires(sizeof(T) == 1)
+    [[nodiscard]]
+    std::span<const T>
     read(std::span<T, E> buf)
-        noexcept
-    {
-        return read(buf.data(), buf.size_bytes());
-    }
+        noexcept;
 
-
+    [[nodiscard]]
     std::vector<std::byte>
     read();
 
+    [[nodiscard]]
     std::vector<std::byte>
     read(std::size_t count);
 
-    template<typename T>
-    requires(sizeof(T) == 1)
-    std::vector<T>
-    read_as(std::size_t count)
-    {
-        std::vector<T> result(count);
-        auto sz = read(std::span(result));
-        result.resize(sz);
-        return result;
-    }
 
     template<typename T>
     requires(sizeof(T) == 1)
+    [[nodiscard]]
     std::vector<T>
-    read_as()
-    {
-        return read_as<T>(size());
-    }
+    read_as(std::size_t count);
+
+    template<typename T>
+    requires(sizeof(T) == 1)
+    [[nodiscard]]
+    std::vector<T>
+    read_as();
 
 
     [[nodiscard]]
@@ -92,13 +87,11 @@ public:
 
     template<typename T,
              std::size_t E>
+    requires(sizeof(T) == 1)
     [[nodiscard]]
-    std::size_t
+    std::span<const T>
     peek(std::span<T, E> buf)
-        const noexcept
-    {
-        return peek(buf.data(), buf.size_bytes());
-    }
+        const noexcept;
 
 
     std::size_t
@@ -117,18 +110,11 @@ public:
     template<typename T,
              std::size_t E>
     std::size_t
-    write(std::span<T, E> buf)
-    {
-        return write(buf.data(), buf.size_bytes());
-    }
+    write(std::span<T, E> buf);
 
-    /*
     std::size_t
     write(std::string_view sv);
 
-    std::size_t
-    write(const std::string& s);
-    */
 
     std::size_t
     consume(byte_stream& other);
@@ -136,6 +122,69 @@ public:
     std::size_t
     consume(byte_stream& other, std::size_t count);
 
-};
+}; // class byte_stream
+
+
+/*--------------------*/
+/* Inline definitions */
+/*--------------------*/
+
+template<typename T,
+         std::size_t E>
+requires(sizeof(T) == 1)
+inline
+std::span<const T>
+byte_stream::read(std::span<T, E> buf)
+    noexcept
+{
+    std::size_t valid = read(buf.data(), buf.size_bytes());
+    return std::span{buf.data(), valid};
+}
+
+
+template<typename T>
+requires(sizeof(T) == 1)
+inline
+std::vector<T>
+byte_stream::read_as(std::size_t count)
+{
+    std::vector<T> result(count);
+    auto occupied = read(std::span(result));
+    result.resize(occupied.size());
+    return result;
+}
+
+
+template<typename T>
+requires(sizeof(T) == 1)
+inline
+std::vector<T>
+byte_stream::read_as()
+{
+    return read_as<T>(size());
+}
+
+
+template<typename T,
+         std::size_t E>
+requires(sizeof(T) == 1)
+inline
+std::span<const T>
+byte_stream::peek(std::span<T, E> buf)
+    const noexcept
+{
+    auto valid = peek(buf.data(), buf.size_bytes());
+    return std::span{buf.data(), valid};
+}
+
+
+template<typename T,
+         std::size_t E>
+inline
+std::size_t
+byte_stream::write(std::span<T, E> buf)
+{
+    return write(buf.data(), buf.size_bytes());
+}
 
 #endif
