@@ -39,7 +39,7 @@ namespace ConfirmExitPopup {
 
 
         // Constants
-        const std::string popup_id = "Confirm Exit";
+        const std::string popup_id = "Confirm exit program";
 
 
         /*-----------*/
@@ -79,7 +79,6 @@ namespace ConfirmExitPopup {
 
         PopupModal popup{popup_id,
                          nullptr,
-                         ImGuiWindowFlags_NoTitleBar |
                          ImGuiWindowFlags_NoResize |
                          ImGuiWindowFlags_NoMove |
                          ImGuiWindowFlags_AlwaysAutoResize |

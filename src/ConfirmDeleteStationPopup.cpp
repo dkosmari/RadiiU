@@ -40,7 +40,7 @@ namespace ConfirmDeleteStationPopup {
         /* Constants */
         /*-----------*/
 
-        const std::string popup_id = "ConfirmDeleteStationPopup";
+        const std::string popup_id = "Confirm delete favorite station";
 
 
         /*-----------*/
@@ -124,7 +124,6 @@ namespace ConfirmDeleteStationPopup {
         ImGui::SetNextWindowSize({800, 0}, ImGuiCond_Always);
         PopupModal popup{popup_id,
                          nullptr,
-                         ImGuiWindowFlags_NoTitleBar |
                          ImGuiWindowFlags_NoResize |
                          ImGuiWindowFlags_NoMove |
                          ImGuiWindowFlags_NoSavedSettings};
@@ -133,10 +132,6 @@ namespace ConfirmDeleteStationPopup {
             reset();
             return;
         }
-
-        ImGui::TextAligned(0.5f, -1, "Confirm delete");
-
-        ImGui::Separator();
 
         if (Child content{"content",
                           {0, 0},

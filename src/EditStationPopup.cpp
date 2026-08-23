@@ -61,7 +61,8 @@ namespace EditStationPopup {
         /* Constants */
         /*-----------*/
 
-        const std::string popup_id = "EditStationPopup";
+        const std::string create_popup_id = "Create new favorite station";
+        const std::string edit_popup_id = "Edit favorite station";
 
 
         /*-----------*/
@@ -82,6 +83,12 @@ namespace EditStationPopup {
 
         void
         action_confirm();
+
+        std::string
+        get_popup_id();
+
+        bool
+        is_valid_uuid(const std::string& uuid);
 
         void
         reset();
@@ -120,6 +127,23 @@ namespace EditStationPopup {
         }
 
 
+        std::string
+        get_popup_id()
+        {
+            switch (mode) {
+
+                case Mode::create:
+                    return create_popup_id;
+
+                case Mode::edit:
+                default:
+                    return edit_popup_id;
+
+            }
+        }
+
+
+        // TODO: belongs to RadioBrowerAPI module.
         bool
         is_valid_uuid(const std::string& uuid)
         {
@@ -239,14 +263,13 @@ namespace EditStationPopup {
             return;
 
         if (state == State::queued) {
-            ImGui::OpenPopup(popup_id);
+            ImGui::OpenPopup(get_popup_id());
             state = State::visible;
         }
 
         ImGui::SetNextWindowSize({1100, 600}, ImGuiCond_Always);
-        PopupModal popup{popup_id,
+        PopupModal popup{get_popup_id(),
                          nullptr,
-                         ImGuiWindowFlags_NoTitleBar |
                          ImGuiWindowFlags_NoResize |
                          ImGuiWindowFlags_NoMove |
                          ImGuiWindowFlags_NoSavedSettings};
@@ -255,17 +278,6 @@ namespace EditStationPopup {
             reset();
             return;
         }
-
-        switch (mode) {
-            case Mode::create:
-                ImGui::TextAligned(0.5f, -1, "Create new station");
-                break;
-            case Mode::edit:
-                ImGui::TextAligned(0.5f, -1, "Edit station");
-                break;
-        }
-
-        ImGui::Separator();
 
         Disabled if_busy{busy};
 
