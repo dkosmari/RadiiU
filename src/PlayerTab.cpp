@@ -112,6 +112,9 @@ namespace PlayerTab {
         history_add(const std::string& title);
 
         void
+        history_trim();
+
+        void
         load();
 
         void
@@ -137,11 +140,17 @@ namespace PlayerTab {
         void
         history_add(const std::string& title)
         {
-            if (state.history.back().title == title)
+            if (!state.history.empty() && state.history.front().title == title)
                 return;
 
             state.history.emplace_front(system_clock::now(), title);
+            history_trim();
+        }
 
+
+        void
+        history_trim()
+        {
             if (state.history.size() > cfg.player_history_limit) {
                 std::size_t excess = state.history.size() - cfg.player_history_limit;
                 state.history.erase(state.history.end() - excess,

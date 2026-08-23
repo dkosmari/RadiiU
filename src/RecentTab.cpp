@@ -54,9 +54,6 @@ namespace RecentTab {
         load();
 
         void
-        remove_excess();
-
-        void
         save();
 
         void
@@ -68,6 +65,9 @@ namespace RecentTab {
 
         void
         task_remove(std::size_t idx);
+
+        void
+        trim_excess();
 
 
         /*----------------------*/
@@ -83,17 +83,6 @@ namespace RecentTab {
         }
         catch (std::exception& e) {
             LOG_ERROR("{}", e.what());
-        }
-
-
-        void
-        remove_excess()
-        {
-            if (stations.size() > cfg.recent_limit) {
-                std::size_t excess = stations.size() - cfg.recent_limit;
-                stations.erase(stations.end() - excess,
-                               stations.end());
-            }
         }
 
 
@@ -169,11 +158,14 @@ namespace RecentTab {
         void
         task_add(ConstStationPtr& station)
         {
-            if (station == stations.front())
-                return;
-            if (*station == *stations.front())
-                return;
+            if (!stations.empty()) {
+                if (station == stations.front())
+                    return;
+                if (*station == *stations.front())
+                    return;
+            }
             stations.push_front(std::move(station));
+            trim_excess();
         }
 
 
@@ -182,6 +174,17 @@ namespace RecentTab {
         {
             if (idx < stations.size())
                 stations.erase(stations.begin() + idx);
+        }
+
+
+        void
+        trim_excess()
+        {
+            if (stations.size() > cfg.recent_limit) {
+                std::size_t excess = stations.size() - cfg.recent_limit;
+                stations.erase(stations.end() - excess,
+                               stations.end());
+            }
         }
 
     } // namespace
@@ -197,8 +200,6 @@ namespace RecentTab {
         TRACE_FUNC;
 
         load();
-
-        App::add_callback(remove_excess);
     }
 
 
