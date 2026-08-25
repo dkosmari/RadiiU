@@ -26,6 +26,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include <iostream> // DEBUG
+
 #include <curlxx/curl.hpp>
 #include <sdl2xx/img.hpp>
 
@@ -37,6 +39,7 @@
 #include "LogManagerCurl.hpp"
 #include "mime_type.hpp"
 #include "Settings.hpp"
+#include "Timer.hpp"
 #include "tracer.hpp"
 
 
@@ -346,7 +349,7 @@ namespace ImageLoader {
                 easy.set_user_agent(user_agent);
             easy.set_accept_encoding("");
             easy.set_auto_referer(true);
-            easy.set_buffer_size(65536);
+            easy.set_buffer_size(1024 * 1024);
             easy.set_follow_location(true);
             easy.set_http_headers({ "Accept: image/*" });
             easy.set_http_version(curl::easy::http_version::none);
@@ -366,6 +369,7 @@ namespace ImageLoader {
         std::size_t
         CacheEntry::easy_write_callback(std::span<const char> buf)
         {
+            TimerReporter timer{std::cout, "easy_write_callback()", 1ms};
             if (!checked_content_type) {
                 checked_content_type = true;
                 if (auto content_type = easy.try_get_header("Content-Type")) {
@@ -455,7 +459,7 @@ namespace ImageLoader {
             sdl::rwops rw{std::span(*raw_buf)};
             img = sdl::img::load(rw);
             raw_buf.reset();
-            LOG_DEBUG("Loaded URL {:?}", location);
+            // LOG_DEBUG("Loaded URL {:?}", location);
         }
 
 
@@ -463,7 +467,7 @@ namespace ImageLoader {
         CacheEntry::load_from_file()
         {
             img = sdl::img::load(location);
-            LOG_DEBUG("Loaded file {:?}", location);
+            // LOG_DEBUG("Loaded file {:?}", location);
         }
 
 
@@ -590,11 +594,11 @@ namespace ImageLoader {
                 } else {
                     // entry not found, queue it up to load
                     std::string real_location;
-                    LOG_DEBUG("Requested: {:?}", location);
+                    // LOG_DEBUG("Requested: {:?}", location);
                     if (location.starts_with(content_prefix)) {
                         real_location =
                             content_dir / location.substr(content_prefix.size());
-                        LOG_DEBUG("Content: {:?}", real_location);
+                        // LOG_DEBUG("Content: {:?}", real_location);
                     } else
                         real_location = location;
 
@@ -652,36 +656,60 @@ namespace ImageLoader {
         void
         Resources::process()
         {
+            TimerReporter timer{std::cout, "ImageLoader::Resources::process()", 5ms};
+
             ++timestamp;
 
-            multi.perform();
-            for (auto [easy, error_code] : multi.get_done()) {
-                auto entry = std::any_cast<CacheEntryPtr>(easy->get_private());
-                if (!entry) {
-                    LOG_ERROR("invalid download handle: {:p}",
-                              reinterpret_cast<void*>(easy));
-                    continue;
+            {
+                TimerReporter curl_timer{std::cout, "curl", 5ms};
+                {
+                    TimerReporter multi_timer{std::cout, "multi.perform()", 5ms};
+                    multi.perform();
                 }
 
-                multi.remove(*easy);
-                entry->finish_download();
+                for (auto [easy, error_code] : multi.get_done()) {
+                    auto entry = std::any_cast<CacheEntryPtr>(easy->get_private());
+                    if (!entry) {
+                        LOG_ERROR("invalid download handle: {:?}",
+                                  easy->get_effective_url());
+                        continue;
+                    }
+                    TimerReporter done_timer{
+                        std::cout,
+                        "done_timer " +
+                        std::to_string(reinterpret_cast<unsigned long long>(easy)),
+                        5ms
+                    };
 
-                try {
-                    if (error_code)
-                        throw curl::error{error_code};
+                    LOG_DEBUG(
+                        "{:?} took {} to lookup",
+                        easy->get_effective_url(),
+                        duration_cast<std::chrono::milliseconds>(easy->get_name_lookup_time())
+                    );
 
-                    load_queue.push(entry);
-                }
-                catch (std::exception& e) {
-                    LOG_ERROR("Processing finished download: {}", e.what());
-                    entry->state = LoadState::error;
+                    multi.remove(*easy);
+                    entry->finish_download();
+
+                    try {
+                        if (error_code)
+                            throw curl::error{error_code};
+
+                        load_queue.push(entry);
+                    }
+                    catch (std::exception& e) {
+                        LOG_ERROR("Processing finished download: {}", e.what());
+                        entry->state = LoadState::error;
+                    }
                 }
             }
 
-            // Convert at most one image into a texture.
-            if (auto value = convert_queue.try_pop()) {
-                auto& entry = *value;
-                entry->make_texture(renderer);
+            {
+                TimerReporter convert_timer{std::cout, "texture converter", 5ms};
+                // Convert at most one image into a texture.
+                if (auto value = convert_queue.try_pop()) {
+                    auto& entry = *value;
+                    entry->make_texture(renderer);
+                }
             }
 
             trim_cache();
@@ -691,6 +719,8 @@ namespace ImageLoader {
         void
         Resources::trim_cache()
         {
+            TimerReporter timer{std::cout, "ImageLoader::Resources::trim_cache()", 5ms};
+
             if (cache.size() <= max_cache_size)
                 return;
 

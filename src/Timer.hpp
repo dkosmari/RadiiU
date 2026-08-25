@@ -60,6 +60,7 @@ struct TimerReporter {
     std::ostream& out;
     Timer timer;
     Timer::duration threshold;
+    bool canceled = false;
 
 
     TimerReporter(std::ostream& out,
@@ -85,6 +86,11 @@ struct TimerReporter {
 
 
     ~TimerReporter();
+
+
+    void
+    cancel()
+        noexcept;
 
 }; // struct TimerReporter
 

@@ -39,6 +39,7 @@
 #include "StationDetailsPopup.hpp"
 #include "StationVoting.hpp"
 #include "UI.hpp"
+#include "humanize.hpp"
 
 
 using std::chrono::system_clock;
@@ -52,6 +53,9 @@ using Settings::cfg;
 namespace PlayerTab {
 
     namespace {
+
+        constexpr std::size_t queued_history_size = 5 * 60;
+
 
         /*-------*/
         /* Types */
@@ -73,8 +77,12 @@ namespace PlayerTab {
         struct PlaybackResources {
 
             sdl::audio::device audio_dev;
+            sdl::audio::spec audio_spec;
             std::vector<std::byte> samples_buffer;
             radio_client radio;
+            std::array<float, queued_history_size> queued_history;
+            std::size_t last_queued_history = 0;
+
 
             PlaybackResources(const std::string& url,
                               const std::string& url_resolved);
@@ -92,7 +100,18 @@ namespace PlayerTab {
             void
             process();
 
+
+            void
+            update_queued_history();
+
         }; // struct PlaybackResources
+
+
+        /*-----------*/
+        /* Constants */
+        /*-----------*/
+
+        const std::string details_popup_id = "AudioDetailsPopup";
 
 
         /*-----------*/
@@ -101,13 +120,14 @@ namespace PlayerTab {
 
         State state;
         ConstStationPtr station;
-
         std::optional<PlaybackResources> play_res;
-
 
         /*-----------------------*/
         /* Function declarations */
         /*-----------------------*/
+
+        std::string
+        format_to_string(sdl::audio::format fmt);
 
         void
         history_add(const std::string& title);
@@ -125,6 +145,9 @@ namespace PlayerTab {
         save();
 
         void
+        show_details_popup();
+
+        void
         show_history();
 
         void
@@ -133,10 +156,28 @@ namespace PlayerTab {
         void
         show_stream();
 
+        void
+        show_toolbar();
+
 
         /*----------------------*/
         /* Function definitions */
         /*----------------------*/
+
+        std::string
+        format_to_string(sdl::audio::format fmt)
+        {
+            auto sample_size   = SDL_AUDIO_BITSIZE(fmt);
+            bool is_float      = SDL_AUDIO_ISFLOAT(fmt);
+            bool is_big_endian = SDL_AUDIO_ISBIGENDIAN(fmt);
+            bool is_signed     = SDL_AUDIO_ISSIGNED(fmt);
+            return std::format("{}{}{}{}",
+                               is_signed ? "" : "u",
+                               is_float ? "float" : "int",
+                               sample_size,
+                               is_big_endian ? "be" : "le");
+        }
+
 
         void
         history_add(const std::string& title)
@@ -184,6 +225,8 @@ namespace PlayerTab {
             samples_buffer(65536),
             radio{url, url_resolved, App::get_user_agent()}
         {
+            queued_history.fill(0);
+
             if (cfg.disable_apd) {
 #ifdef __WUT__
                 IMDisableAPD();
@@ -219,6 +262,8 @@ namespace PlayerTab {
             try {
                 radio.process();
 
+                update_queued_history();
+
                 radio.with_metadata(
                     [this](const radio_client::opt_stream_metadata& meta)
                     {
@@ -247,12 +292,12 @@ namespace PlayerTab {
                         {
                             if (!radio_spec)
                                 return;
-                            sdl::audio::spec spec;
-                            spec.freq     = radio_spec->rate;
-                            spec.channels = radio_spec->channels;
-                            spec.format   = radio_spec->format;
-                            spec.samples  = 8192;
-                            audio_dev.create(nullptr, false, spec);
+                            sdl::audio::spec desired_spec;
+                            desired_spec.freq     = radio_spec->rate;
+                            desired_spec.channels = radio_spec->channels;
+                            desired_spec.format   = radio_spec->format;
+                            desired_spec.samples  = 8192;
+                            audio_dev.create(nullptr, false, desired_spec, audio_spec);
                             audio_dev.unpause();
                         }
                     );
@@ -270,10 +315,26 @@ namespace PlayerTab {
                         }
                     }
                 );
+
             }
             catch (std::exception& e) {
                 LOG_ERROR("{}", e.what());
             }
+        }
+
+
+        void
+        PlaybackResources::update_queued_history()
+        {
+            std::size_t queued_size = audio_dev ? audio_dev.get_queued_size() : 0z;
+            auto sample_size = SDL_AUDIO_BITSIZE(audio_spec.format);
+            float current =
+                queued_size
+                / float(sample_size * audio_spec.freq);
+
+            queued_history[last_queued_history++] = current;
+            if (last_queued_history >= queued_history.size())
+                last_queued_history = 0;
         }
 
 
@@ -285,6 +346,69 @@ namespace PlayerTab {
         }
         catch (std::exception& e) {
             LOG_ERROR("{}", e.what());
+        }
+
+
+        void
+        show_details_popup()
+        {
+            using namespace ImGui::RAII;
+
+            const auto& style = ImGui::GetStyle();
+            float width = queued_history_size * 3
+                + 2 * style.FramePadding.x
+                + 2 * style.WindowPadding.x;
+            ImGui::SetNextWindowSize({width, 500}, ImGuiCond_Always);
+            auto viewport = ImGui::GetMainViewport();
+            ImGui::SetNextWindowPos(viewport->GetWorkCenter(),
+                                    ImGuiCond_Always,
+                                    {0.5f, 0.5f});
+            Popup popup{details_popup_id};
+            if (!popup)
+                return;
+
+            if (!play_res) {
+                ImGui::CloseCurrentPopup();
+                return;
+            }
+
+            if (Child content{"content",
+                              {0, 0},
+                              ImGuiChildFlags_NavFlattened}) {
+
+                UI::Title("Playback stats");
+
+                Font smaller{nullptr, 0, 0.8f};
+
+                const auto& dev = play_res->audio_dev;
+                if (!dev) {
+                    ImGui::Text("Output audio device not initialized.");
+                } else {
+                    const auto& spec = play_res->audio_spec;
+                    if (Table table{"table", 2}) {
+                        ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed);
+                        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+
+                        try {
+                            auto [default_name, default_spec] = sdl::audio::get_default_info(false);
+                            UI::InfoRow("Device", default_name);
+                        }
+                        catch (...) {}
+                        UI::InfoRow("Status", to_string(dev.get_status()));
+                        UI::FormatInfoRow("Frequency", "{}Hz", humanize::value(spec.freq));
+                        UI::InfoRow("Sample format", format_to_string(spec.format));
+                    }
+
+                    auto available = ImGui::GetContentRegionAvail();
+                    ImGui::PlotHistogram("##queued_audio",
+                                         std::span{play_res->queued_history},
+                                         play_res->last_queued_history,
+                                         {},
+                                         0,
+                                         FLT_MAX,
+                                         available);
+                }
+            }
         }
 
 
@@ -305,7 +429,7 @@ namespace PlayerTab {
                 ImGui::SetNextItemOpen(state.history_expanded);
                 if ((state.history_expanded = ImGui::CollapsingHeader("Track history"))) {
 
-                    Font smaller{nullptr, 0.8f * App::get_default_font_size()};
+                    Font smaller{nullptr, 0, 0.8f};
                     Indent indenter;
 
                     if (Table table{"table",
@@ -421,7 +545,7 @@ namespace PlayerTab {
                     if (!play_res)
                         return;
 
-                    Font smaller{nullptr, 0.8f * App::get_default_font_size()};
+                    Font smaller{nullptr, 0, 0.8f};
 
                     Indent indenter;
                     if (Table metadata_table{"metadata", 2}) {
@@ -483,7 +607,33 @@ namespace PlayerTab {
                 }
 
             } // stream_child
+        }
 
+
+        void
+        show_toolbar()
+        {
+            using namespace ImGui::RAII;
+
+            ImGui::AlignTextToFramePadding();
+
+            if (play_res) {
+                if (ImGui::Button(ICON_FA_INFO_CIRCLE))
+                    ImGui::OpenPopup(details_popup_id);
+                ImGui::SetItemTooltip("Show output audio device properties.");
+                show_details_popup();
+
+                ImGui::SameLine();
+
+                if (const auto& dev = play_res->audio_dev) {
+                    ImGui::FormatText("Output audio device: {}",
+                                      to_string(dev.get_status()));
+                } else {
+                    ImGui::Text("Waiting for audio.");
+                }
+            } else {
+                ImGui::Text("Not playing.");
+            }
         }
 
     } // namespace
@@ -517,6 +667,7 @@ namespace PlayerTab {
                 ImGuiChildFlags_NavFlattened
             }) {
 
+            show_toolbar();
             show_station();
             show_stream();
             show_history();

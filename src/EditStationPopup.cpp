@@ -84,7 +84,7 @@ namespace EditStationPopup {
         void
         action_confirm();
 
-        std::string
+        const std::string&
         get_popup_id();
 
         bool
@@ -127,7 +127,7 @@ namespace EditStationPopup {
         }
 
 
-        std::string
+        const std::string&
         get_popup_id()
         {
             switch (mode) {
@@ -267,17 +267,21 @@ namespace EditStationPopup {
             state = State::visible;
         }
 
+        auto viewport = ImGui::GetMainViewport();
+        auto center = viewport->GetWorkCenter();
         ImGui::SetNextWindowSize({1100, 600}, ImGuiCond_Always);
-        PopupModal popup{get_popup_id(),
-                         nullptr,
-                         ImGuiWindowFlags_NoResize |
-                         ImGuiWindowFlags_NoMove |
-                         ImGuiWindowFlags_NoSavedSettings};
+        ImGui::SetNextWindowPos(center, ImGuiCond_Always, {0.5f, 0.5f});
+        Popup popup{get_popup_id(),
+                    ImGuiWindowFlags_NoResize |
+                    ImGuiWindowFlags_NoMove |
+                    ImGuiWindowFlags_NoSavedSettings};
         if (!popup) {
             state = State::hidden;
             reset();
             return;
         }
+
+        UI::Title(get_popup_id());
 
         Disabled if_busy{busy};
 

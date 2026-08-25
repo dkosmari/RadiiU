@@ -17,6 +17,7 @@
 #include "ButtonHBox.hpp"
 #include "IconsFontAwesome4.h"
 #include "tracer.hpp"
+#include "UI.hpp"
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -79,9 +80,9 @@ namespace ConfirmExitPopup {
 
         PopupModal popup{popup_id,
                          nullptr,
-                         ImGuiWindowFlags_NoResize |
-                         ImGuiWindowFlags_NoMove |
                          ImGuiWindowFlags_AlwaysAutoResize |
+                         ImGuiWindowFlags_NoMove |
+                         ImGuiWindowFlags_NoResize |
                          ImGuiWindowFlags_NoSavedSettings};
         if (!popup) {
             state = State::hidden;
@@ -90,7 +91,7 @@ namespace ConfirmExitPopup {
 
         ImGui::Text("Are you sure you want to quit " PACKAGE_NAME "?");
 
-        ImGui::Separator();
+        ImGui::Spacing();
 
         ButtonHBox buttons;
         buttons.expand = true;

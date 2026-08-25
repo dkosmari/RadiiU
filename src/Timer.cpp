@@ -21,7 +21,18 @@ Timer::print(std::ostream& out)
 
 TimerReporter::~TimerReporter()
 {
+    if (canceled)
+        return;
+
     auto diff = timer.stop();
     if (diff > threshold)
         timer.print(out) << std::endl;
+}
+
+
+void
+TimerReporter::cancel()
+    noexcept
+{
+    canceled = true;
 }

@@ -6,6 +6,7 @@
  */
 
 #include <algorithm>
+#include <chrono>
 #include <filesystem>
 #include <format>
 #include <iostream>
@@ -62,6 +63,7 @@
 #include "StationVoting.hpp"
 #include "Styles.hpp"
 #include "task_queue.hpp"
+#include "Timer.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
 
@@ -323,6 +325,8 @@ namespace App {
         void
         process()
         {
+            TimerReporter timer_process{cout, "App::process()", 10ms};
+
 #ifdef __WIIU__
             if (old_disable_swkbd != cfg.disable_swkbd) {
                 SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, cfg.disable_swkbd ? "0" : "1");
@@ -383,6 +387,7 @@ namespace App {
 
 
             try {
+                TimerReporter timer{cout, "tasks dispatch", 5ms};
                 res->tasks.dispatch_all();
             }
             catch (task_queue::error& e) {
@@ -390,6 +395,7 @@ namespace App {
             }
 
             try {
+                TimerReporter timer{cout, "async_tasks dispatch", 5ms};
                 res->async_tasks.dispatch_all();
             }
             catch (async_task_queue::error& e) {
@@ -397,9 +403,12 @@ namespace App {
             }
 
 
-            for (auto& cb : res->callbacks)
-                if (cb)
-                    cb();
+            {
+                TimerReporter timer{cout, "App callbacks", 5ms};
+                for (auto& cb : res->callbacks)
+                    if (cb)
+                        cb();
+            }
 
             Uint64 now = SDL_GetTicks64();
 
@@ -566,6 +575,8 @@ namespace App {
 
             const auto& style = ImGui::GetStyle();
 
+            TimerReporter timer_process_ui{cout, "App::process_ui()", 16ms};
+
             {
                 /*
                  * Main window:
@@ -703,7 +714,7 @@ namespace App {
 
             auto& style = ImGui::GetStyle();
 
-            style.FontSizeBase = get_default_font_size();
+            style.FontSizeBase = 42;
 
             const ImVec2 padding = {9, 9};
             const float rounding = 9;
@@ -804,13 +815,6 @@ namespace App {
     get_config_path()
     {
         return config_path;
-    }
-
-
-    float
-    get_default_font_size()
-    {
-        return 42;
     }
 
 

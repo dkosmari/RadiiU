@@ -532,40 +532,26 @@ namespace BrowserSearchPopup {
         }
 
 
-        ImGui::SetNextWindowSize({1100, 600}, ImGuiCond_Always);
-        PopupModal search_modal{popup_id,
-                                nullptr,
-                                ImGuiWindowFlags_NoResize |
-                                ImGuiWindowFlags_NoMove};
-        if (!search_modal) {
+        auto viewport = ImGui::GetMainViewport();
+        auto center = viewport->GetWorkCenter();
+        ImGui::SetNextWindowPos(center, ImGuiCond_Always, {0.5f, 0.5f});
+        Popup popup{popup_id,
+                    ImGuiWindowFlags_AlwaysAutoResize |
+                    ImGuiWindowFlags_NoResize |
+                    ImGuiWindowFlags_NoMove};
+        if (!popup) {
             state = State::hidden;
             confirm_func = {};
             return;
         }
 
-        ButtonHBox buttons;
-        buttons.expand = true;
-        buttons.add(
-            ICON_FA_TIMES " Cancel",
-            ImGui::CloseCurrentPopup
-        );
-        buttons.add(
-            ICON_FA_ERASER " Reset",
-            "Reset browser options to default.",
-            false,
-            action_reset_fields
-        );
-        buttons.add(
-            ICON_FA_BINOCULARS " Search",
-            "Search with the selected options.",
-            true,
-            action_confirm
-        );
+        UI::Title(popup_id);
 
         if (Child content{"content",
-                          {0, - buttons.get_height_with_spacing()},
-                          ImGuiChildFlags_NavFlattened,
-                          ImGuiWindowFlags_NoSavedSettings}) {
+                          {0, 0},
+                          ImGuiChildFlags_AutoResizeX |
+                          ImGuiChildFlags_AutoResizeY |
+                          ImGuiChildFlags_NavFlattened}) {
 
             show_filters();
 
@@ -597,8 +583,25 @@ namespace BrowserSearchPopup {
 
         } // content
 
+        ButtonHBox buttons;
+        buttons.expand = true;
+        buttons.add(
+            ICON_FA_TIMES " Cancel",
+            ImGui::CloseCurrentPopup
+        );
+        buttons.add(
+            ICON_FA_ERASER " Reset",
+            "Reset browser options to default.",
+            false,
+            action_reset_fields
+        );
+        buttons.add(
+            ICON_FA_BINOCULARS " Search",
+            "Search with the selected options.",
+            true,
+            action_confirm
+        );
         buttons.show();
-
     }
 
 } // namespace BrowserSearchPopup

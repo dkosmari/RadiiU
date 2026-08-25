@@ -17,6 +17,7 @@
 #include "ButtonHBox.hpp"
 #include "IconsFontAwesome4.h"
 #include "tracer.hpp"
+#include "UI.hpp"
 
 
 using namespace std::literals;
@@ -122,16 +123,17 @@ namespace ConfirmDeleteStationPopup {
         }
 
         ImGui::SetNextWindowSize({800, 0}, ImGuiCond_Always);
-        PopupModal popup{popup_id,
-                         nullptr,
-                         ImGuiWindowFlags_NoResize |
-                         ImGuiWindowFlags_NoMove |
-                         ImGuiWindowFlags_NoSavedSettings};
+        Popup popup{popup_id,
+                    ImGuiWindowFlags_NoResize |
+                    ImGuiWindowFlags_NoMove |
+                    ImGuiWindowFlags_NoSavedSettings};
         if (!popup) {
             state = State::hidden;
             reset();
             return;
         }
+
+        UI::Title(popup_id);
 
         if (Child content{"content",
                           {0, 0},

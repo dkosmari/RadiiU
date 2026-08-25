@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <chrono>
 #include <functional>
 #include <vector>
 
@@ -79,7 +80,7 @@ http_client::set_url(const std::string& url,
         easy.set_user_agent(user_agent);
     easy.set_accept_encoding("");
     easy.set_auto_referer(true);
-    easy.set_buffer_size(1 * 1024 * 1024);
+    easy.set_buffer_size(16 * 1024);
     easy.set_fail_on_error(true);
     easy.set_follow_location(true);
     easy.set_forbid_reuse(false);
@@ -91,6 +92,9 @@ http_client::set_url(const std::string& url,
     easy.set_transfer_encoding(true);
     easy.set_url(url);
     easy.set_write_function(std::bind_front(&http_client::curl_write_callback, this));
+    easy.set_tcp_keep_alive(true);
+    easy.set_tcp_keep_idle(120s);
+    easy.set_tcp_keep_intvl(60s);
 
     multi.add(easy);
 

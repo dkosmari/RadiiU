@@ -183,6 +183,72 @@ namespace AboutTab {
             return result;
         }
 
+        void
+        show_curl_info()
+        {
+            using namespace ImGui::RAII;
+
+            auto info = curl_version_info(CURLVERSION_NOW);
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            UI::Label("libcurl");
+
+            ImGui::TableNextColumn();
+
+            if (auto version_node = TreeNode::format("version",
+                                                     "{} ({})",
+                                                     info->version, info->host)) {
+
+                if (info->ssl_version)
+                    ImGui::FormatBulletText("SSL: {}", info->ssl_version);
+
+                if (info->libz_version)
+                    ImGui::FormatBulletText("libz: {}", info->libz_version);
+
+                if (info->ares)
+                    ImGui::FormatBulletText("ares: {}", info->ares);
+
+                if (info->libidn)
+                    ImGui::FormatBulletText("libidn: {}", info->libidn);
+
+                if (info->libssh_version)
+                    ImGui::FormatBulletText("libssh: {}", info->libssh_version);
+
+                if (info->brotli_version)
+                    ImGui::FormatBulletText("brotli: {}", info->brotli_version);
+
+                if (info->nghttp2_version)
+                    ImGui::FormatBulletText("nghttp2: {}", info->nghttp2_version);
+
+                if (info->zstd_version)
+                    ImGui::FormatBulletText("zstd: {}", info->zstd_version);
+
+                if (info->hyper_version)
+                    ImGui::FormatBulletText("hyper: {}", info->hyper_version);
+
+                if (info->gsasl_version)
+                    ImGui::FormatBulletText("gsasl: {}", info->gsasl_version);
+
+            }
+
+            if (TreeNode features_node{"features"}) {
+                for (int i = 0; info->feature_names[i]; ++i)
+                    ImGui::BulletText(info->feature_names[i]);
+            }
+
+            if (info->cainfo) {
+                ImGui::Bullet();
+                ImGui::FormatTextWrapped("cainfo: {}", info->cainfo);
+            }
+
+            if (info->capath) {
+                ImGui::Bullet();
+                ImGui::FormatTextWrapped("capath: {}", info->capath);
+            }
+
+        }
+
     } // namespace
 
 
@@ -285,8 +351,7 @@ namespace AboutTab {
                     UI::InfoRow("FreeType", ft_version_str);
 #endif
 
-                static const std::string curl_version_str = curl_version();
-                UI::InfoRow("libcurl", curl_version_str);
+                show_curl_info();
 
                 static const std::string glaze_version_str = get_glaze_version();
                 UI::InfoRow("glaze", glaze_version_str);

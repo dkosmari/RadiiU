@@ -212,6 +212,10 @@ namespace UI {
     ImVec2
     ScreenToLocal(const ImVec2& screen_pos);
 
+
+    void
+    Title(const std::string& text);
+
 } // namespace UI
 
 #endif

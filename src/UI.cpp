@@ -849,4 +849,15 @@ namespace UI {
         return screen_pos - win_pos + scroll;
     }
 
+
+    void
+    Title(const std::string& text)
+    {
+        using namespace ImGui::RAII;
+
+        Font bigger{nullptr, 0, 1.2f};
+        ImGui::TextAligned(0.5f, -1, text);
+        ImGui::Separator();
+    }
+
 } // namespace UI

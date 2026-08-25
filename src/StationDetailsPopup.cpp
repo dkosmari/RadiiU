@@ -133,7 +133,7 @@ namespace StationDetailsPopup {
 
             ImGui::Text("ERROR!");
 
-            Font smaller{nullptr, 0.8f * App::get_default_font_size()};
+            Font smaller{nullptr, 0, 0.8};
             ImGui::TextWrapped(error_message);
             if (!error_content_type.empty())
                 ImGui::FormatText("Content-Type: {}", error_content_type);
@@ -150,13 +150,13 @@ namespace StationDetailsPopup {
             if (!station)
                 return;
 
-            Font smaller{nullptr, 0.8f * App::get_default_font_size()};
+            Font smaller{nullptr, 0, 0.8f};
 
             if (Table fields{"fields",
                              2,
                              ImGuiTableFlags_None}) {
 
-                ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
+                ImGui::TableSetupColumn("Labels", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
                 UI::InfoRow("name",         station->name);

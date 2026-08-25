@@ -15,7 +15,6 @@
 
 #include "ServerStatsPopup.hpp"
 
-#include "App.hpp"
 #include "LogManager.hpp"
 #include "RadioBrowserAPI.hpp"
 #include "tracer.hpp"
@@ -122,14 +121,10 @@ namespace ServerStatsPopup {
             if (!stats)
                 return;
 
-            Font smaller{nullptr, 0.8f * App::get_default_font_size()};
+            Font smaller{nullptr, 0, 0.8f};
 
-            if (Table fields_table{
-                    "fields",
-                    2,
-                    ImGuiTableFlags_None
-                }) {
-                ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
+            if (Table table{"table", 2,}) {
+                ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
                 UI::InfoRow("server", server);
@@ -190,8 +185,7 @@ namespace ServerStatsPopup {
             return;
         }
 
-        ImGui::TextAligned(0.5f, -1, "Server Stats");
-        ImGui::Separator();
+        UI::Title("Server Stats");
 
         if (Child content{"content",
                           {0, 0},
