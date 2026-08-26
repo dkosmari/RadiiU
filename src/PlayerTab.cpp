@@ -661,13 +661,14 @@ namespace PlayerTab {
     {
         using namespace ImGui::RAII;
 
+        show_toolbar();
+
         if (Child player_child{
                 "player",
                 {0, 0},
                 ImGuiChildFlags_NavFlattened
             }) {
 
-            show_toolbar();
             show_station();
             show_stream();
             show_history();

@@ -441,9 +441,11 @@ namespace UI {
             for (auto& tag : station.tags)
                 items.emplace_back(ICON_FA_TAG " " + tag);
 
-            station.expanded = FramedList(items, !station.expanded)
-                ? !station.expanded
-                : station.expanded;
+            if (station.expanded)
+                station.expanded = !FramedListFull("items_full", items);
+            else
+                station.expanded = FramedListBrief("items_brief", items);
+
         }
     }
 
@@ -492,18 +494,26 @@ namespace UI {
                 ImGuiChildFlags_FrameStyle
             }) {
 
+            bool truncated = false;
             if (spec.width > 0) {
                 if (spec.width > padding) {
-                    ImGui::TextAligned(0, spec.width - padding, text);
+                    truncated = ImGui::TextAligned(0, spec.width - padding, text);
                 }
             } else {
                 ImGui::Text(text);
             }
 
-            // NOTE: can't use ImGui::SetItemTooltip() here because of messy hovered detection.
+            // When no explicit tooltip given, show the text that would be truncated.
+            std::string actual_tooltip;
             if (!tooltip.empty())
+                actual_tooltip = tooltip;
+            else if (truncated)
+                actual_tooltip = text;
+
+            // NOTE: can't use ImGui::SetItemTooltip() here because of messy hovered detection.
+            if (!actual_tooltip.empty())
                 if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ForTooltip))
-                    ImGui::SetTooltip(tooltip);
+                    ImGui::SetTooltip(actual_tooltip);
         }
     }
 
@@ -516,23 +526,29 @@ namespace UI {
 
 
     bool
-    FramedList(const std::vector<FramedItem>& items,
-               bool only_first_line)
+    FramedListBrief(const std::string& str_id,
+                    const std::vector<FramedItem>& items)
     {
-        //const std::string more_label = "…";
+        using namespace ImGui::RAII;
+
+        // Early out: no items.
+        if (items.empty())
+            return false;
+
+        ID id{str_id};
+
         const std::string more_label = ICON_FA_PLUS_SQUARE;
-        const std::string less_label = ICON_FA_MINUS_SQUARE;
         const float more_width = CalcFramedTextSize(more_label).x;
+
         const auto& style = ImGui::GetStyle();
         const float spacing = style.ItemSpacing.x;
+        const float framed_ellipsis_width = CalcFramedTextSize("…").x;
+        const float min_item_width = framed_ellipsis_width;
         float total_width = ImGui::GetContentRegionAvail().x;
-        const float frame_padding = 2 * style.FramePadding.x;
 
         float cur_x = 0;
         std::vector<FramedItemExt> line;
         std::size_t idx;
-        bool stopped_early = false;
-        unsigned num_lines = 0;
 
         for (idx = 0; idx < items.size(); ++idx) {
             auto& item = items[idx];
@@ -546,86 +562,150 @@ namespace UI {
                               width,
                               cur_x);
 
+            // NOTE: stop once the right side of the item is cut off
+            if (cur_x + width >= total_width)
+                break;
+
             cur_x += width + spacing;
-
-            if (cur_x >= total_width) {
-                // Next item will be out of bounds, so stop accumulating.
-                if (only_first_line) {
-                    stopped_early = true;
-                    break;
-                }
-
-                auto& last = line.back();
-                if (line.size() == 1) {
-                    // If only one item on this line, may need to truncate it.
-                    if (last.x + last.width > total_width)
-                        last.width = total_width - last.x;
-                } else {
-                    // Multiple items on this line, so it's safe to pop one.
-                    if (last.x + last.width > total_width) {
-                        line.pop_back();
-                        --idx;
-                    }
-                }
-
-
-                show_one_framed_line(line);
-                ++num_lines;
-
-                line.clear();
-                cur_x = 0;
-                total_width = ImGui::GetContentRegionAvail().x;
-            }
         }
 
-        // The last line is handled here.
+        // If not all items were added to the line.
+        bool need_more = idx + 1 < items.size();
 
-        if (line.empty())
-            return false;
+        // If last item is cut off.
+        if (!line.empty()
+            && line.back().x + line.back().width > total_width)
+            need_more = true;
 
-        if (stopped_early) {
-            // Stopped early, so we show the more button.
-            // That means we need to pop items until the more button fits.
-            while (!line.empty() &&
-                   line.back().x + frame_padding + spacing + more_width > total_width) {
+        // Exception: there's only one item in total, we never add a "more" button.
+        if (items.size() == 1)
+            need_more = false;
+
+        if (need_more) {
+            // Update total_width boundary to make room for the "more" button.
+            total_width -= spacing + more_width;
+
+            // Pop every item that would shrink too much to fit.
+            while (!line.empty()) {
+                const float left = line.back().x;
+                const float right = left + line.back().width;
+                const float min_right = left + min_item_width;
+                if (right <= total_width)
+                    break; // right side fits, we can stop
+                if (min_right <= total_width)
+                    break; // shrunk item fits,
                 line.pop_back();
             }
 
-            // If there's at least one item, check if we need to shrink it to fit the more
-            // button.
-            if (!line.empty()) {
-                auto& last = line.back();
-                const float room_left = total_width - last.x;
-                if (last.width + spacing + more_width > room_left) {
-                    // shrink last item
-                    last.width = room_left - spacing - more_width;
-                }
-            }
+        }
+
+        // The last item might need to be shrunk.
+        if (!line.empty()) {
+            const float left = line.back().x;
+            const float right = left + line.back().width;
+            if (right > total_width)
+                line.back().width = total_width - left;
         }
 
         show_one_framed_line(line);
-        ++num_lines;
 
-        if (stopped_early) {
-            if (!line.empty())
-                ImGui::SameLine();
-            auto available = ImGui::GetContentRegionAvail();
-            float offset = available.x - more_width;
+        if (need_more) {
+            ImGui::SameLine();
+            // Put the button all the way to the right.
+            const auto available = ImGui::GetContentRegionAvail();
+            const float offset = available.x - more_width;
             if (offset > 0)
                 ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
             bool result = ImGui::Button(more_label);
             ImGui::SetItemTooltip("Show more.");
             return result;
-        } else {
-            if (num_lines > 1) {
-                ImGui::SameLine();
-                bool result = ImGui::Button(less_label);
-                ImGui::SetItemTooltip("Show less.");
-                return result;
+        } else
+            return false;
+    }
+
+
+    bool
+    FramedListFull(const std::string& str_id,
+                   const std::vector<FramedItem>& items)
+    {
+        using namespace ImGui::RAII;
+
+        // Early out: no items.
+        if (items.empty())
+            return false;
+
+        ID id{str_id};
+
+        const std::string less_label = ICON_FA_MINUS_SQUARE;
+        const float less_width = CalcFramedTextSize(less_label).x;
+
+        const auto& style = ImGui::GetStyle();
+        const float spacing = style.ItemSpacing.x;
+        const float framed_ellipsis_width = CalcFramedTextSize("…").x;
+        const float min_item_width = framed_ellipsis_width;
+        float total_width = ImGui::GetContentRegionAvail().x;
+        float prev_total_width = total_width;
+
+        float cur_x = 0;
+        float last_line_right = 0;
+        std::vector<FramedItemExt> line;
+        std::size_t idx;
+        bool need_less = false;
+
+        for (idx = 0; idx < items.size(); ++idx) {
+            auto& item = items[idx];
+            auto& [text, tooltip, spec] = item;
+            float width = CalcFramedTextSize(item).x;
+            float right = cur_x + width;
+
+            line.emplace_back(text,
+                              tooltip,
+                              (holds_alternative<std::monostate>(spec.id)
+                               ? static_cast<int>(idx)
+                               : spec.id),
+                              width,
+                              cur_x);
+
+            cur_x += width + spacing;
+
+            // If last item extends beyond total_width, remove it, unless it's the only item.
+            if (right > total_width) {
+                if (line.size() > 1) {
+                    line.pop_back();
+                    --idx;
+                } else // if single item, just shrink it
+                    line.back().width = std::fmax(min_item_width, total_width);
+
+                // Show this line.
+                last_line_right = line.back().x + line.back().width;
+                show_one_framed_line(line);
+                line.clear();
+                cur_x = 0;
+                prev_total_width = total_width;
+                total_width = ImGui::GetContentRegionAvail().x;
+
+                // If there are more lines after this, we need the "less" button.
+                if (idx + 1 < items.size())
+                    need_less = true;
             }
         }
 
-        return false;
+        // We may have an incomplete line to show.
+        if (!line.empty()) {
+            last_line_right = line.back().x + line.back().width;
+            show_one_framed_line(line);
+            line.clear();
+        }
+
+        if (need_less) {
+            // If we can fit the "less" button, put it on the same line.
+            if (last_line_right + spacing + less_width < prev_total_width)
+                ImGui::SameLine();
+            bool result = ImGui::Button(less_label);
+            ImGui::SetItemTooltip("Show less.");
+            return result;
+        } else
+            return false;
     }
 
 

@@ -158,8 +158,12 @@ namespace UI {
 
 
     bool
-    FramedList(const std::vector<FramedItem>& items,
-               bool only_first_line);
+    FramedListBrief(const std::string& str_id,
+                    const std::vector<FramedItem>& items);
+
+    bool
+    FramedListFull(const std::string& str_id,
+                   const std::vector<FramedItem>& items);
 
 
     void

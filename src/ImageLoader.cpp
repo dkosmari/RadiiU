@@ -39,6 +39,7 @@
 #include "LogManagerCurl.hpp"
 #include "mime_type.hpp"
 #include "Settings.hpp"
+#include "thread_safe.hpp"
 #include "Timer.hpp"
 #include "tracer.hpp"
 
@@ -161,6 +162,9 @@ namespace ImageLoader {
             curl::multi multi;
             Cache cache;
 
+            async_queue<CacheEntryPtr> download_queue;
+            std::jthread downloader_thread;
+
             async_queue<CacheEntryPtr> load_queue;
             std::jthread loader_thread;
 
@@ -181,7 +185,10 @@ namespace ImageLoader {
                 const sdl::vec2& size_limit);
 
             void
-            loader_thread_func(std::stop_token stopper);
+            downloader_thread_function(std::stop_token stopper);
+
+            void
+            loader_thread_function(std::stop_token stopper);
 
             void
             prepare_load(CacheEntryPtr entry);
@@ -284,7 +291,7 @@ namespace ImageLoader {
         void
         CacheEntry::finish_download()
         {
-            easy.destroy();
+            easy.destroy(); // NOTE: drop ref count
         }
 
 
@@ -353,7 +360,7 @@ namespace ImageLoader {
             easy.set_follow_location(true);
             easy.set_http_headers({ "Accept: image/*" });
             easy.set_http_version(curl::easy::http_version::none);
-            easy.set_private(shared_from_this());
+            easy.set_private(shared_from_this()); // NOTE: increase ref count
             easy.set_ssl_verify_peer(false);
             easy.set_tcp_no_delay(false);
             easy.set_transfer_encoding(true);
@@ -536,8 +543,12 @@ namespace ImageLoader {
             multi.set_max_total_connections(4);
             multi.set_max_connections(2);
 
+            downloader_thread = std::jthread{
+                std::bind_front(&Resources::downloader_thread_function, this)
+            };
+
             loader_thread = std::jthread{
-                std::bind_front(&Resources::loader_thread_func, this)
+                std::bind_front(&Resources::loader_thread_function, this)
             };
         }
 
@@ -547,8 +558,13 @@ namespace ImageLoader {
         {
             TRACE_FUNC;
 
+            download_queue.stop();
             load_queue.stop();
             convert_queue.stop();
+
+            // Stop the threads
+            downloader_thread = {};
+            loader_thread = {};
 
             for (auto& [location, entry] : cache)
                 if (entry->easy)
@@ -616,7 +632,67 @@ namespace ImageLoader {
 
 
         void
-        Resources::loader_thread_func(std::stop_token stopper)
+        Resources::downloader_thread_function(std::stop_token stopper)
+        try {
+            while (!stopper.stop_requested()) {
+                unsigned work = 0; // keep track of any work, to detect we're idle
+
+                // Check if there are new download requests
+                while (auto maybe_entry = download_queue.try_pop()) {
+                    ++work;
+                    auto& entry = *maybe_entry;
+                    multi.add(entry->start_download(user_agent));
+                }
+
+                work += multi.perform();
+
+                for (auto [easy, error_code] : multi.get_done()) {
+                    ++work;
+                    auto entry = std::any_cast<CacheEntryPtr>(easy->get_private());
+                    if (!entry) {
+                        LOG_ERROR("invalid download handle: {:?}",
+                                  easy->get_effective_url());
+                        continue;
+                    }
+
+                    std::string url = easy->get_effective_url();
+                    // LOG_DEBUG(
+                    //     "{:?} took {} to lookup",
+                    //     url,
+                    //     duration_cast<std::chrono::milliseconds>(easy->get_name_lookup_time())
+                    // );
+
+                    multi.remove(*easy);
+                    entry->finish_download(); // NOTE: destroy the easy handle
+
+                    try {
+                        if (error_code)
+                            throw curl::error{error_code};
+
+                        load_queue.push(entry);
+                    }
+                    catch (std::exception& e) {
+                        LOG_ERROR("Processing finished download for {:?}: {}",
+                                  url,
+                                  e.what());
+                        entry->state = LoadState::error;
+                    }
+                }
+
+                // Slow down while idle.
+                if (!work) {
+                    // LOG_DEBUG("Idling download thread");
+                    std::this_thread::sleep_for(100ms);
+                }
+            }
+        }
+        catch (std::exception& e) {
+            LOG_ERROR("Resources::downloader_thread_function(): {}", e.what());
+        }
+
+
+        void
+        Resources::loader_thread_function(std::stop_token stopper)
         try {
             while (!stopper.stop_requested()) {
                 auto entry = load_queue.try_pop_block(stopper);
@@ -631,14 +707,14 @@ namespace ImageLoader {
                 } else if (stopper.stop_requested() ||
                            entry.error() == async_queue_error::stop) {
                     break;
-                } else if (entry.error() == async_queue_error::locked) {
+                } else if (entry.error() == async_queue_error::locked) [[unlikely]] {
                     LOG_ERROR("load_queue was locked");
                 }
                 // std::this_thread::sleep_for(50ms);
             }
         }
         catch (std::exception& e) {
-            LOG_ERROR("{}", e.what());
+            LOG_ERROR("Resources::loader_thread_function(): {}", e.what());
         }
 
 
@@ -647,7 +723,7 @@ namespace ImageLoader {
         {
             entry->state = LoadState::loading;
             if (entry->is_remote())
-                multi.add(entry->start_download(user_agent));
+                download_queue.push(std::move(entry));
             else
                 load_queue.push(std::move(entry));
         }
@@ -656,53 +732,10 @@ namespace ImageLoader {
         void
         Resources::process()
         {
+            // NOTE: we only do on the main thread what we must: convert images into textures.
+
             TimerReporter timer{std::cout, "ImageLoader::Resources::process()", 5ms};
-
             ++timestamp;
-
-            {
-                TimerReporter curl_timer{std::cout, "curl", 5ms};
-                {
-                    TimerReporter multi_timer{std::cout, "multi.perform()", 5ms};
-                    multi.perform();
-                }
-
-                for (auto [easy, error_code] : multi.get_done()) {
-                    auto entry = std::any_cast<CacheEntryPtr>(easy->get_private());
-                    if (!entry) {
-                        LOG_ERROR("invalid download handle: {:?}",
-                                  easy->get_effective_url());
-                        continue;
-                    }
-                    TimerReporter done_timer{
-                        std::cout,
-                        "done_timer " +
-                        std::to_string(reinterpret_cast<unsigned long long>(easy)),
-                        5ms
-                    };
-
-                    LOG_DEBUG(
-                        "{:?} took {} to lookup",
-                        easy->get_effective_url(),
-                        duration_cast<std::chrono::milliseconds>(easy->get_name_lookup_time())
-                    );
-
-                    multi.remove(*easy);
-                    entry->finish_download();
-
-                    try {
-                        if (error_code)
-                            throw curl::error{error_code};
-
-                        load_queue.push(entry);
-                    }
-                    catch (std::exception& e) {
-                        LOG_ERROR("Processing finished download: {}", e.what());
-                        entry->state = LoadState::error;
-                    }
-                }
-            }
-
             {
                 TimerReporter convert_timer{std::cout, "texture converter", 5ms};
                 // Convert at most one image into a texture.
@@ -711,7 +744,6 @@ namespace ImageLoader {
                     entry->make_texture(renderer);
                 }
             }
-
             trim_cache();
         }
 
