@@ -2,8 +2,8 @@
 #define TIMER_HPP
 
 #include <chrono>
-#include <iosfwd>
 #include <string>
+
 
 struct Timer {
 
@@ -23,6 +23,7 @@ struct Timer {
 
     Timer(const std::string& name);
 
+
     inline
     void
     start()
@@ -30,6 +31,7 @@ struct Timer {
     {
         start_time = clock_type::now();
     }
+
 
     inline
     duration
@@ -40,6 +42,7 @@ struct Timer {
         return elapsed();
     }
 
+
     [[nodiscard]]
     inline
     duration
@@ -49,48 +52,30 @@ struct Timer {
         return finish_time - start_time;
     }
 
-    std::ostream&
-    print(std::ostream& out);
+
+    void
+    report();
 
 }; // struct Timer
 
 
 struct TimerReporter {
 
-    std::ostream& out;
     Timer timer;
-    Timer::duration threshold;
-    bool canceled = false;
 
-
-    TimerReporter(std::ostream& out,
-                  Timer::duration threshold = Timer::duration{0})
-        noexcept :
-        out(out),
-        threshold{threshold}
-    {
-        timer.start();
-    }
-
-
-    TimerReporter(std::ostream& out,
-                  const std::string& name,
-                  Timer::duration threshold = Timer::duration{0})
+    TimerReporter(const std::string& name)
         noexcept:
-        out(out),
-        timer{name},
-        threshold{threshold}
+        timer{name}
     {
         timer.start();
     }
 
 
-    ~TimerReporter();
-
-
-    void
-    cancel()
-        noexcept;
+    ~TimerReporter()
+    {
+        timer.stop();
+        timer.report();
+    }
 
 }; // struct TimerReporter
 

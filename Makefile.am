@@ -101,14 +101,16 @@ radiiu_elf_SOURCES = \
 	src/main.cpp \
 	src/mime_type.cpp \
 	src/mime_type.hpp \
+	src/PerfWindow.cpp \
+	src/PerfWindow.hpp \
 	src/PlayerTab.cpp \
 	src/PlayerTab.hpp \
 	src/pls.cpp \
 	src/pls.hpp \
-	src/radio_client.cpp \
-	src/radio_client.hpp \
 	src/RadioBrowserAPI.cpp \
 	src/RadioBrowserAPI.hpp \
+	src/RadioClient.cpp \
+	src/RadioClient.hpp \
 	src/RecentTab.cpp \
 	src/RecentTab.hpp \
 	src/rest.cpp \
@@ -141,8 +143,12 @@ radiiu_elf_SOURCES = \
 	src/task_queue.cpp \
 	src/task_queue.hpp \
 	src/thread_safe.hpp \
-	src/Timer.cpp \
-	src/Timer.hpp \
+	src/TraceDuration.cpp \
+	src/TraceDuration.hpp \
+	src/TraceFunction.cpp \
+	src/TraceFunction.hpp \
+	src/TraceManager.cpp \
+	src/TraceManager.hpp \
 	src/tracer.cpp \
 	src/tracer.hpp \
 	src/UI.cpp \
@@ -193,8 +199,7 @@ radiiu_elf_LDADD =  \
 if ENABLE_WIIU
 
 radiiu_elf_SOURCES += \
-	external/wiiu-stdout/cpp/wiiu-stdout.cpp \
-	external/wiiu-stdout/cpp/wiiu-stderr.cpp
+	external/wiiu-stdout/wiiu-stdout.c
 
 radiiu_elf_LDFLAGS = \
 	$(AM_LDFLAGS) \

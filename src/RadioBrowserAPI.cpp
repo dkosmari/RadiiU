@@ -34,6 +34,9 @@
 #include "net/address.hpp"
 #include "net/resolver.hpp"
 #include "rest.hpp"
+#include "TraceDuration.hpp"
+#include "TraceFunction.hpp"
+#include "TraceManager.hpp"
 #include "tracer.hpp"
 
 
@@ -232,73 +235,87 @@ namespace RadioBrowserAPI {
                                       FetchMirrorsResultFunction result_func,
                                       ErrorMsgFunction error_func)
             noexcept
-        try {
-            // Step 1: resolve all IP addresses
-            std::unordered_set<net::address> addresses;
-            LOG_DEBUG("Querying {}", start_server);
-            {
-                net::resolver::address_resolver ar;
-                ar.param.type = net::socket::type::tcp;
-                string server = start_server;
-                ar.process(server);
+        {
+            TraceManager::thread_name("fetch_mirrors_thread"sv);
+
+            TraceFunction tf{"RadioBrowserAPI,fetch_mirrors_thread"sv};
+
+            try {
+                // Step 1: resolve all IP addresses
+                std::unordered_set<net::address> addresses;
+                LOG_DEBUG("Querying {}", start_server);
+                {
+                    TraceDuration duration_resolve_ip{
+                        "fetch_mirrors_thread_function()/resolving IPs"sv,
+                        "RadioBrowserAPI,fetch_mirrors_thread"sv
+                    };
+                    net::resolver::address_resolver ar;
+                    ar.param.type = net::socket::type::tcp;
+                    string server = start_server;
+                    ar.process(server);
+
+                    throw_if_stopped(stopper);
+
+                    if (ar.error.message)
+                        throw Error{"failed resolving \""
+                                    + server
+                                    + "\": "
+                                    + *ar.error.message};
+                    for (const auto& entry : ar.result.entries)
+                        addresses.insert(entry.addr);
+                }
+
+                LOG_DEBUG("Found {} mirrors.", addresses.size());
 
                 throw_if_stopped(stopper);
 
-                if (ar.error.message)
-                    throw Error{"failed resolving \""
-                                + server
-                                + "\": "
-                                + *ar.error.message};
-                for (const auto& entry : ar.result.entries)
-                    addresses.insert(entry.addr);
-            }
-
-            LOG_DEBUG("Found {} mirrors.", addresses.size());
-
-            throw_if_stopped(stopper);
-
-            // Step 2: find the canonical names for each IP
-            std::set<string> names;
-            {
-                net::resolver::name_resolver nr;
-                for (const auto& addr : addresses) {
-                    throw_if_stopped(stopper);
-                    LOG_DEBUG("Querying canonical name for {}", addr);
-                    try {
-                        nr.process(addr);
-                        if (nr.error.message)
-                            throw Error{"Failed name lookup for \""
-                                        + to_string(addr) + "\": "
-                                        + *nr.error.message};
-                        if (nr.result.name) {
-                            LOG_DEBUG("{} -> {:?}", addr, *nr.result.name);
-                            names.insert(std::move(*nr.result.name));
+                // Step 2: find the canonical names for each IP
+                std::set<string> names;
+                {
+                    TraceDuration trace_canonical{
+                        "fetch_mirrors_thread_function()/resolve canonical names"sv,
+                        "RadioBrowserAPI,fetch_mirrors_thread"sv
+                    };
+                    net::resolver::name_resolver nr;
+                    for (const auto& addr : addresses) {
+                        throw_if_stopped(stopper);
+                        LOG_DEBUG("Querying canonical name for {}", addr);
+                        try {
+                            nr.process(addr);
+                            if (nr.error.message)
+                                throw Error{"Failed name lookup for \""
+                                            + to_string(addr) + "\": "
+                                            + *nr.error.message};
+                            if (nr.result.name) {
+                                LOG_DEBUG("{} -> {:?}", addr, *nr.result.name);
+                                names.insert(std::move(*nr.result.name));
+                            }
+                        }
+                        catch (std::exception& e) {
+                            LOG_ERROR("{}", e.what());
                         }
                     }
-                    catch (std::exception& e) {
-                        LOG_ERROR("{}", e.what());
-                    }
+                }
+
+                LOG_DEBUG("Found {} servers.", names.size());
+
+                throw_if_stopped(stopper);
+
+                // Step 3: Invoke the result callback.
+                if (result_func) {
+                    pending_tasks.add("fetch_mirrors_thread()::result_func",
+                                      std::move(result_func),
+                                      MirrorsVec{names.begin(), names.end()});
                 }
             }
-
-            LOG_DEBUG("Found {} servers.", names.size());
-
-            throw_if_stopped(stopper);
-
-            // Step 3: Invoke the result callback.
-            if (result_func) {
-                pending_tasks.add("fetch_mirrors_thread()::result_func",
-                                  std::move(result_func),
-                                  MirrorsVec{names.begin(), names.end()});
+            catch (std::exception& e) {
+                string msg = e.what();
+                LOG_ERROR("{}", msg);
+                if (error_func)
+                    pending_tasks.add("fetch_mirrors_thread()::error_func",
+                                      std::move(error_func),
+                                      std::move(msg));
             }
-        }
-        catch (std::exception& e) {
-            string msg = e.what();
-            LOG_ERROR("{}", msg);
-            if (error_func)
-                pending_tasks.add("fetch_mirrors_thread()::error_func",
-                                  std::move(error_func),
-                                  std::move(msg));
         }
 
 

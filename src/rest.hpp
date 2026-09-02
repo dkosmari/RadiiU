@@ -14,8 +14,6 @@
 #include <stdexcept>
 #include <string>
 
-#include "mime_type.hpp"
-
 
 namespace rest {
 
@@ -31,16 +29,16 @@ namespace rest {
     }; // struct error
 
 
-    using success_function_sig = void (const std::string& response,
-                                       const std::string& content_type);
-    using success_function_t = std::move_only_function<success_function_sig>;
+    using success_function_signature = void (const std::string& response,
+                                             const std::string& content_type);
+    using success_function_t = std::move_only_function<success_function_signature>;
 
-    using error_function_sig = void (const std::exception& err);
-    using error_function_t = std::move_only_function<error_function_sig>;
+    using error_function_signature = void (const std::exception& err);
+    using error_function_t = std::move_only_function<error_function_signature>;
 
 
-    using json_success_function_sig = void (const std::string& json_response);
-    using json_success_function_t = std::move_only_function<json_success_function_sig>;
+    using json_success_function_signature = void (const std::string& json_response);
+    using json_success_function_t = std::move_only_function<json_success_function_signature>;
 
 
     using get_params_t = std::map<std::string, std::string>;

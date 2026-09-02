@@ -13,6 +13,7 @@
 #include <iostream>
 #include <iterator>
 #include <print>
+#include <thread>
 
 #include "LogManager.hpp"
 
@@ -59,6 +60,7 @@ namespace LogManager {
         /* Variables */
         /*-----------*/
 
+        std::thread::id main_thread_id;
         Timestamp timestamp;
         SafeMessageVec safe_messages;
 
@@ -146,6 +148,9 @@ namespace LogManager {
     initialize()
     {
         TRACE_FUNC;
+
+        main_thread_id = std::this_thread::get_id();
+        std::println("main thread is {}", main_thread_id);
     }
 
 
@@ -159,8 +164,11 @@ namespace LogManager {
     void
     clear()
     {
-        App::add_task("LogManager::task_clear()",
-                      task_clear);
+        if (std::this_thread::get_id() != main_thread_id)
+            App::add_task("LogManager::task_clear()",
+                          task_clear);
+        else
+            task_clear();
     }
 
 
@@ -192,9 +200,14 @@ namespace LogManager {
     void
     log(Message msg)
     {
-        App::add_async_task("LogManager::task_log()",
-                            task_log,
-                            std::move(msg));
+        if (std::this_thread::get_id() != main_thread_id)
+            App::add_task("LogManager::task_log()",
+                          task_log,
+                          std::move(msg));
+        else {
+            std::println("logging from the main thread");
+            task_log(msg);
+        }
     }
 
 

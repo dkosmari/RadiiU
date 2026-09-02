@@ -29,6 +29,7 @@
 #include "LogManager.hpp"
 #include "RadioBrowserAPI.hpp"
 #include "string_utils.hpp"
+#include "TraceFunction.hpp"
 #include "tracer.hpp"
 
 
@@ -231,6 +232,10 @@ namespace CountryManager {
         {
             float font_size = get_final_font_size(config, baked);
 
+            glz::generic_u64 args;
+            args["font_size"] = font_size;
+            TraceFunction tf{"CountryManager"sv, std::move(args)};
+
             // Load all flags for this size.
             for (auto& [code, flag_entry] : flags) {
                 auto image_entry = flag_entry.find_image(font_size);
@@ -262,6 +267,8 @@ namespace CountryManager {
                                      ImFontGlyph* glyph,
                                      float* p_advance_x)
         {
+            TraceFunction tf{"CountryManager"sv};
+
             // Early out: if not a valid codepoint
             if (!font_loader_src_contains_glyph(atlas, config, codepoint))
                 return false;
@@ -349,6 +356,9 @@ namespace CountryManager {
         {
             if (image)
                 return;
+
+            TraceFunction tf{"CountryManager"sv};
+
             auto full_path = App::get_content_path() / "flags" / std::to_string(icon_size) / file;
             try {
                 image = sdl::img::load_png(full_path);
@@ -375,7 +385,19 @@ namespace CountryManager {
     {
         TRACE_FUNC;
 
+        TraceFunction tf{"CountryManager"sv};
+
+        // Reserve enough size for the hash tables.
+        const std::size_t reserved = 400;
+        flags.reserve(reserved);
+        codepoint_to_code.reserve(reserved);
+        code_to_name.reserve(reserved);
+        name_to_code.reserve(reserved);
+
+
         try {
+            TraceDuration duration_flag_loading{"CountryManager::initialize()/loading"sv,
+                                                "CountryManager"sv};
             auto flags_root = App::get_content_path() / "flags";
             for (auto& size_entry : std::filesystem::directory_iterator{flags_root}) {
                 if (!size_entry.is_directory())
@@ -399,8 +421,10 @@ namespace CountryManager {
                             country_entry.path().filename()
                         };
 
-                        // Preload sizes 32 and 64
-                        if (icon_size == 32 || icon_size == 64)
+                        // Preload sizes 32, 48 and 64
+                        if (icon_size == 32 ||
+                            icon_size == 48 ||
+                            icon_size == 64)
                             image_entry.load();
                     }
                 }
@@ -458,6 +482,8 @@ namespace CountryManager {
 
         flags.clear();
         codepoint_to_code.clear();
+        code_to_name.clear();
+        name_to_code.clear();
     }
 
 

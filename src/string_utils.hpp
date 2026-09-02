@@ -10,6 +10,7 @@
 
 #include <compare>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -23,6 +24,13 @@ namespace string_utils {
     concat(const std::string& a,
            const std::string& b,
            const std::string& sep = "");
+
+
+
+    [[nodiscard]]
+    std::optional<std::string>
+    drop_prefix(const std::string& input,
+                const std::string& prefix);
 
 
     [[nodiscard]]

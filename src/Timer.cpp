@@ -1,6 +1,9 @@
-#include <ostream>
-
 #include "Timer.hpp"
+
+#include "PerfWindow.hpp"
+
+
+using flt_seconds = std::chrono::duration<float>;
 
 
 Timer::Timer(const std::string& name) :
@@ -8,31 +11,9 @@ Timer::Timer(const std::string& name) :
 {}
 
 
-std::ostream&
-Timer::print(std::ostream& out)
-{
-    out << "Timer";
-    if (!name.empty())
-        out << " \"" << name << "\"";
-    out << ": " << duration_cast<std::chrono::milliseconds>(elapsed());
-    return out;
-}
-
-
-TimerReporter::~TimerReporter()
-{
-    if (canceled)
-        return;
-
-    auto diff = timer.stop();
-    if (diff > threshold)
-        timer.print(out) << std::endl;
-}
-
-
 void
-TimerReporter::cancel()
-    noexcept
+Timer::report()
 {
-    canceled = true;
+    float dt = duration_cast<flt_seconds>(elapsed()).count();
+    PerfWindow::record_time(name, dt);
 }

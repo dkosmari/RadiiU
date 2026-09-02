@@ -39,8 +39,11 @@
 #include "LogManagerCurl.hpp"
 #include "mime_type.hpp"
 #include "Settings.hpp"
+#include "string_utils.hpp"
 #include "thread_safe.hpp"
-#include "Timer.hpp"
+#include "TraceDuration.hpp"
+#include "TraceFunction.hpp"
+#include "TraceManager.hpp"
 #include "tracer.hpp"
 
 
@@ -61,7 +64,7 @@ namespace ImageLoader {
 
         enum class LoadState : int {
             unloaded,
-            loading,
+            requested,
             loaded,
             converted,
             error,
@@ -95,7 +98,7 @@ namespace ImageLoader {
 
 
         struct CacheEntry : std::enable_shared_from_this<CacheEntry> {
-            std::atomic<LoadState> state{LoadState::loading};
+            std::atomic<LoadState> state{LoadState::requested};
             std::uint64_t last_use = 0;
             sdl::texture tex;
             sdl::surface img;
@@ -191,10 +194,14 @@ namespace ImageLoader {
             loader_thread_function(std::stop_token stopper);
 
             void
-            prepare_load(CacheEntryPtr entry);
+            process();
 
             void
-            process();
+            process_create_one_texture();
+
+            void
+            prepare_request(CacheEntryPtr entry);
+
 
             void
             trim_cache();
@@ -307,7 +314,9 @@ namespace ImageLoader {
         void
         CacheEntry::load()
         {
-            if (state != LoadState::loading) {
+            TraceFunction tf{"ImageLoader,loader_thread"sv};
+
+            if (state != LoadState::requested) {
                 LOG_ERROR("wrong cache entry state: {}", to_string(state.load()));
                 return;
             }
@@ -324,7 +333,7 @@ namespace ImageLoader {
                 state = LoadState::loaded;
             }
             catch (std::exception& e) {
-                LOG_ERROR("loading image:\n"
+                LOG_ERROR("requested image:\n"
                           "  location: {:?}\n"
                           "  what: {}",
                           location,
@@ -376,7 +385,8 @@ namespace ImageLoader {
         std::size_t
         CacheEntry::easy_write_callback(std::span<const char> buf)
         {
-            TimerReporter timer{std::cout, "easy_write_callback()", 1ms};
+            TraceFunction tf{"ImageLoader"sv};
+
             if (!checked_content_type) {
                 checked_content_type = true;
                 if (auto content_type = easy.try_get_header("Content-Type")) {
@@ -401,6 +411,8 @@ namespace ImageLoader {
         void
         CacheEntry::enforce_size_limit()
         {
+            TraceFunction tf{"ImageLoader,loader_thread"sv};
+
             if (size_limit.x <= 0 && size_limit.y <= 0)
                 return;
 
@@ -462,6 +474,8 @@ namespace ImageLoader {
         void
         CacheEntry::load_from_buffer()
         {
+            TraceFunction tf{"ImageLoader,loader_thread"sv};
+
             assert(raw_buf);
             sdl::rwops rw{std::span(*raw_buf)};
             img = sdl::img::load(rw);
@@ -473,6 +487,8 @@ namespace ImageLoader {
         void
         CacheEntry::load_from_file()
         {
+            TraceFunction tf{"ImageLoader,loader_thread"sv};
+
             img = sdl::img::load(location);
             // LOG_DEBUG("Loaded file {:?}", location);
         }
@@ -493,6 +509,8 @@ namespace ImageLoader {
         sdl::surface
         optimized(sdl::surface input)
         {
+            TraceFunction tf{"ImageLoader,loader_thread"sv};
+
             if (!input)
                 return {};
             switch (input.get_format().get_enum()) {
@@ -594,12 +612,12 @@ namespace ImageLoader {
                         case LoadState::error:
                             return &error_icon;
 
-                        case LoadState::loading:
+                        case LoadState::requested:
                         case LoadState::loaded:
                             return &loading_icon;
 
                         case LoadState::unloaded:
-                            prepare_load(std::move(entry));
+                            prepare_request(std::move(entry));
                             return &loading_icon;
 
                         default:
@@ -608,19 +626,19 @@ namespace ImageLoader {
 
                     }
                 } else {
-                    // entry not found, queue it up to load
+                    // entry not found, prpare a request
                     std::string real_location;
                     // LOG_DEBUG("Requested: {:?}", location);
-                    if (location.starts_with(content_prefix)) {
-                        real_location =
-                            content_dir / location.substr(content_prefix.size());
+                    if (auto without_prefix = string_utils::drop_prefix(location,
+                                                                        content_prefix)) {
+                        real_location = content_dir / *without_prefix;
                         // LOG_DEBUG("Content: {:?}", real_location);
                     } else
                         real_location = location;
 
                     entry = std::make_shared<CacheEntry>(timestamp, real_location, size_limit);
                     cache[key] = entry;
-                    prepare_load(std::move(entry));
+                    prepare_request(std::move(entry));
                     return &loading_icon;
                 }
             }
@@ -634,11 +652,17 @@ namespace ImageLoader {
         void
         Resources::downloader_thread_function(std::stop_token stopper)
         try {
+            TraceManager::thread_name("downloader_thread");
             while (!stopper.stop_requested()) {
                 unsigned work = 0; // keep track of any work, to detect we're idle
 
                 // Check if there are new download requests
                 while (auto maybe_entry = download_queue.try_pop()) {
+                    TraceDuration duration_check_new_requests{
+                        "ImageLoader::Resources::downloader_thread_function()"
+                        "/adding new requests"sv,
+                        "ImageLoader,downloader_thread"sv
+                    };
                     ++work;
                     auto& entry = *maybe_entry;
                     multi.add(entry->start_download(user_agent));
@@ -647,6 +671,12 @@ namespace ImageLoader {
                 work += multi.perform();
 
                 for (auto [easy, error_code] : multi.get_done()) {
+                    TraceDuration duration_handling_finished{
+                        "ImageLoader::Resources::downloader_thread_function()"
+                        "/handling finished"sv,
+                        "ImageLoader,downloader_thread"sv
+                    };
+
                     ++work;
                     auto entry = std::any_cast<CacheEntryPtr>(easy->get_private());
                     if (!entry) {
@@ -656,11 +686,6 @@ namespace ImageLoader {
                     }
 
                     std::string url = easy->get_effective_url();
-                    // LOG_DEBUG(
-                    //     "{:?} took {} to lookup",
-                    //     url,
-                    //     duration_cast<std::chrono::milliseconds>(easy->get_name_lookup_time())
-                    // );
 
                     multi.remove(*easy);
                     entry->finish_download(); // NOTE: destroy the easy handle
@@ -694,6 +719,7 @@ namespace ImageLoader {
         void
         Resources::loader_thread_function(std::stop_token stopper)
         try {
+            TraceManager::thread_name("loader_thread");
             while (!stopper.stop_requested()) {
                 auto entry = load_queue.try_pop_block(stopper);
                 if (entry) {
@@ -702,7 +728,7 @@ namespace ImageLoader {
                         convert_queue.push(std::move(*entry));
                     }
                     catch (std::exception& e) {
-                        LOG_ERROR("Loading: {}", e.what());
+                        LOG_ERROR("Requested: {}", e.what());
                     }
                 } else if (stopper.stop_requested() ||
                            entry.error() == async_queue_error::stop) {
@@ -719,9 +745,32 @@ namespace ImageLoader {
 
 
         void
-        Resources::prepare_load(CacheEntryPtr entry)
+        Resources::process()
         {
-            entry->state = LoadState::loading;
+            // NOTE: This is called from the main thread.
+            ++timestamp;
+            process_create_one_texture();
+            trim_cache();
+        }
+
+
+        void
+        Resources::process_create_one_texture()
+        {
+            if (auto maybe_entry = convert_queue.try_pop()) {
+                TraceFunction tf{"ImageLoader"sv};
+                auto& entry = *maybe_entry;
+                entry->make_texture(renderer);
+            }
+        }
+
+
+        void
+        Resources::prepare_request(CacheEntryPtr entry)
+        {
+            TraceFunction tf{"ImageLoader"sv};
+
+            entry->state = LoadState::requested;
             if (entry->is_remote())
                 download_queue.push(std::move(entry));
             else
@@ -730,31 +779,12 @@ namespace ImageLoader {
 
 
         void
-        Resources::process()
-        {
-            // NOTE: we only do on the main thread what we must: convert images into textures.
-
-            TimerReporter timer{std::cout, "ImageLoader::Resources::process()", 5ms};
-            ++timestamp;
-            {
-                TimerReporter convert_timer{std::cout, "texture converter", 5ms};
-                // Convert at most one image into a texture.
-                if (auto value = convert_queue.try_pop()) {
-                    auto& entry = *value;
-                    entry->make_texture(renderer);
-                }
-            }
-            trim_cache();
-        }
-
-
-        void
         Resources::trim_cache()
         {
-            TimerReporter timer{std::cout, "ImageLoader::Resources::trim_cache()", 5ms};
-
             if (cache.size() <= max_cache_size)
                 return;
+
+            TraceFunction tf{"ImageLoader"sv};
 
             std::size_t excess = cache.size() - max_cache_size;
             LOG_DEBUG("Prunning {} icons.", excess);
@@ -839,8 +869,8 @@ namespace ImageLoader {
                 using enum LoadState;
                 case unloaded:
                     return "unloaded";
-                case loading:
-                    return "loading";
+                case requested:
+                    return "requested";
                 case loaded:
                     return "loaded";
                 case converted:

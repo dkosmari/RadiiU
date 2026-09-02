@@ -7,12 +7,15 @@
 
 #include <curlxx/url.hpp>
 
-#include "radio_client.hpp"
+#include "RadioClient.hpp"
 
 #include "m3u.hpp"
 #include "mime_type.hpp"
 #include "pls.hpp"
 #include "Settings.hpp"
+#include "TraceDuration.hpp"
+#include "TraceFunction.hpp"
+#include "TraceManager.hpp"
 #include "tracer.hpp"
 
 #include "LogManager.hpp"
@@ -50,9 +53,9 @@ namespace {
 } // namespace
 
 
-radio_client::radio_client(const std::string& url_,
-                           const std::string& url_resolved_,
-                           const std::string& user_agent_) :
+RadioClient::RadioClient(const std::string& url_,
+                         const std::string& url_resolved_,
+                         const std::string& user_agent_) :
     url{url_},
     url_resolved{url_resolved_},
     user_agent{user_agent_},
@@ -79,8 +82,9 @@ radio_client::radio_client(const std::string& url_,
 
 
 void
-radio_client::process()
+RadioClient::process()
 {
+    TraceFunction tf{"RadioClient"sv};
     try {
         http.process();
     }
@@ -91,14 +95,14 @@ radio_client::process()
 
 
 void
-radio_client::consume_samples(const ConsumeSamplesFunction& func)
+RadioClient::consume_samples(const ConsumeSamplesFunction& func)
 {
     func(*decoder_output.lock());
 }
 
 
 void
-radio_client::with_metadata(const MetadataFunction& func)
+RadioClient::with_metadata(const MetadataFunction& func)
     const noexcept
 {
     func(*safe_metadata.c_lock());
@@ -106,7 +110,7 @@ radio_client::with_metadata(const MetadataFunction& func)
 
 
 void
-radio_client::with_decoder_info(const DecoderInfoFunction& func)
+RadioClient::with_decoder_info(const DecoderInfoFunction& func)
     const noexcept
 {
     func(*safe_decoder_info.c_lock());
@@ -114,14 +118,14 @@ radio_client::with_decoder_info(const DecoderInfoFunction& func)
 
 
 void
-radio_client::with_decoder_spec(const DecoderSpecFunction& func)
+RadioClient::with_decoder_spec(const DecoderSpecFunction& func)
 {
     func(*safe_decoder_spec.c_lock());
 }
 
 
 void
-radio_client::set_next_url(const std::string& next_url)
+RadioClient::set_next_url(const std::string& next_url)
 {
     TRACE_FUNC;
 
@@ -142,9 +146,11 @@ radio_client::set_next_url(const std::string& next_url)
 
 
 void
-radio_client::process_http_response_started()
+RadioClient::process_http_response_started()
 {
     // TRACE_FUNC;
+
+    TraceFunction tf{"RadioClient"sv};
 
     auto content_type = http.get_header("content-type");
     if (!content_type) {
@@ -180,7 +186,7 @@ radio_client::process_http_response_started()
 
 
 void
-radio_client::process_http_response_finished()
+RadioClient::process_http_response_finished()
 {
     // TRACE_FUNC;
 
@@ -190,8 +196,10 @@ radio_client::process_http_response_finished()
 
 
 void
-radio_client::process_http_recv()
+RadioClient::process_http_recv()
 {
+    TraceFunction tf{"RadioClient"sv};
+
     if (icy_stream)
         icy_stream->process();
 
@@ -201,7 +209,7 @@ radio_client::process_http_recv()
 
 
 void
-radio_client::process_playlist()
+RadioClient::process_playlist()
 {
     // TRACE_FUNC;
 
@@ -243,8 +251,10 @@ radio_client::process_playlist()
 
 
 void
-radio_client::process_audio()
+RadioClient::process_audio()
 {
+    TraceFunction tf{"RadioClient"sv};
+
     if (current_state != state::streaming_audio)
         LOG_ERROR("BUG: process_audio should only happen during streaming_audio state");
 
@@ -261,6 +271,10 @@ radio_client::process_audio()
         if (data_stream->size() < cfg.player_buffer_size * 1024)
             return; // don't bother creating a decoder when too little data
         try {
+            TraceDuration duration_create_decoder{
+                "RadioClient::process_audio()/create decoder"sv,
+                "RadioClient"sv
+            };
             // try to create a decoder
             auto hdr_content_type = http.get_header("content-type");
             auto content_type = hdr_content_type ? *hdr_content_type : ""s;
@@ -272,7 +286,7 @@ radio_client::process_audio()
             // All further decoding will happen in the decoder thread.
             decoder_input_to_decoder_buffer.resize(65536);
             decoder_thread = std::jthread{
-                std::bind_front(&radio_client::decoder_thread_function,
+                std::bind_front(&RadioClient::decoder_thread_function,
                                 this)
             };
         }
@@ -293,13 +307,20 @@ radio_client::process_audio()
 
 
 void
-radio_client::decoder_thread_function(std::stop_token stopper)
+RadioClient::decoder_thread_function(std::stop_token stopper)
 {
+    TraceManager::thread_name("decoder_thread"sv);
+
     LOG_DEBUG("Decoder thread started.");
 
     try {
         while (!stopper.stop_requested()) {
             {
+                TraceDuration duration_feeding{
+                    "RadioClient::decoder_thread_function()/feeding decoder"sv,
+                    "RadioClient,decoder_thread"sv
+                };
+
                 std::unique_lock guard{decoder_input_mutex};
                 empty_decoder_input.wait(guard,
                                          stopper,
@@ -314,24 +335,37 @@ radio_client::decoder_thread_function(std::stop_token stopper)
                     dec->feed(available);
             }
 
-            for (auto samples = dec->decode();
-                 !samples.empty();
-                 samples = dec->decode()) {
-                auto output = decoder_output.lock();
-                output->write(samples);
+            {
+                TraceDuration duration_decoding{
+                    "RadioClient::decoder_thread_function()/decoding"sv,
+                    "RadioClient,decoder_thread"sv
+                };
+                for (auto samples = dec->decode();
+                     !samples.empty();
+                     samples = dec->decode()) {
+                    auto output = decoder_output.lock();
+                    output->write(samples);
+                }
             }
 
-            if (auto dec_meta = dec->get_metadata()) {
-                auto metadata_guard = safe_metadata.lock();
-                auto& metadata = *metadata_guard;
-                if (metadata)
-                    metadata->merge(*dec_meta);
-                else
-                    metadata = std::move(dec_meta);
-            }
+            {
+                TraceDuration duration_metadata{
+                    "RadioClient::decoder_thread_function()/handling metadata"sv,
+                    "RadioClient,decoder_thread"sv
+                };
 
-            safe_decoder_info.store(dec->get_info());
-            safe_decoder_spec.store(dec->get_spec());
+                if (auto dec_meta = dec->get_metadata()) {
+                    auto metadata_guard = safe_metadata.lock();
+                    auto& metadata = *metadata_guard;
+                    if (metadata)
+                        metadata->merge(*dec_meta);
+                    else
+                        metadata = std::move(dec_meta);
+                }
+
+                safe_decoder_info.store(dec->get_info());
+                safe_decoder_spec.store(dec->get_spec());
+            }
         }
     }
     catch (std::exception& e) {

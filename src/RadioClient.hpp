@@ -28,7 +28,7 @@
 
 // This class is the high-level handler for internet radio streams.
 
-struct radio_client {
+struct RadioClient {
 
     enum class state {
         stopped,
@@ -72,12 +72,12 @@ struct radio_client {
     byte_stream* data_stream = nullptr;
 
 
-    radio_client(const std::string& url,
-                 const std::string& url_resolved,
-                 const std::string& user_agent);
+    RadioClient(const std::string& url,
+                const std::string& url_resolved,
+                const std::string& user_agent);
 
     // disallow moving
-    radio_client(radio_client&&) = delete;
+    RadioClient(RadioClient&&) = delete;
 
 
     void
@@ -139,6 +139,6 @@ private:
     void
     decoder_thread_function(std::stop_token stopper);
 
-}; // struct radio_client
+}; // struct RadioClient
 
 #endif

@@ -13,6 +13,7 @@
 
 #include "LogManager.hpp"
 #include "LogManagerCurl.hpp"
+#include "TraceDuration.hpp"
 #include "tracer.hpp"
 
 
@@ -118,6 +119,8 @@ http_client::get_effective_url()
 void
 http_client::process()
 {
+    TraceDuration tracer{"http_client::process()"sv};
+
     if (!request_prepared) {
         for (auto& hdr : headers)
             easy.append_http_header(hdr);

@@ -21,6 +21,48 @@
 
 namespace string_utils {
 
+    namespace {
+
+        std::tuple<std::string::size_type,
+                   std::vector<std::string>::size_type>
+        find_first_of(const std::string& haystack,
+                      const std::vector<std::string>& needles,
+                      std::string::size_type start = 0)
+        {
+            std::string::size_type result_pos = std::string::npos;
+            std::vector<std::string>::size_type result_index = 0;
+            for (std::vector<std::string>::size_type i = 0; i < needles.size(); ++i) {
+                auto pos = haystack.find(needles[i], start);
+                if (pos < result_pos) {
+                    result_pos = pos;
+                    result_index = i;
+                }
+            }
+            return { result_pos, result_index };
+        }
+
+
+        std::tuple<std::string_view::size_type,
+                   std::vector<std::string_view>::size_type>
+        find_first_of(const std::string_view& haystack,
+                      const std::vector<std::string_view>& needles,
+                      std::string_view::size_type start = 0)
+        {
+            std::string_view::size_type result_pos = std::string_view::npos;
+            std::vector<std::string_view>::size_type result_index = 0;
+            for (std::vector<std::string_view>::size_type i = 0; i < needles.size(); ++i) {
+                auto pos = haystack.find(needles[i], start);
+                if (pos < result_pos) {
+                    result_pos = pos;
+                    result_index = i;
+                }
+            }
+            return { result_pos, result_index };
+        }
+
+    } // namespace
+
+
     std::string
     concat(const std::string& a,
            const std::string& b,
@@ -31,6 +73,16 @@ namespace string_utils {
         if (b.empty())
             return a;
         return a + sep + b;
+    }
+
+
+    std::optional<std::string>
+    drop_prefix(const std::string& input,
+                const std::string& prefix)
+    {
+        if (input.starts_with(prefix))
+            return input.substr(prefix.size());
+        return {};
     }
 
 
@@ -129,49 +181,6 @@ namespace string_utils {
         }
         return result;
     }
-
-
-    // Used by the split() functions.
-    namespace {
-
-        std::tuple<std::string::size_type,
-                   std::vector<std::string>::size_type>
-        find_first_of(const std::string& haystack,
-                      const std::vector<std::string>& needles,
-                      std::string::size_type start = 0)
-        {
-            std::string::size_type result_pos = std::string::npos;
-            std::vector<std::string>::size_type result_index = 0;
-            for (std::vector<std::string>::size_type i = 0; i < needles.size(); ++i) {
-                auto pos = haystack.find(needles[i], start);
-                if (pos < result_pos) {
-                    result_pos = pos;
-                    result_index = i;
-                }
-            }
-            return { result_pos, result_index };
-        }
-
-
-        std::tuple<std::string_view::size_type,
-                   std::vector<std::string_view>::size_type>
-        find_first_of(const std::string_view& haystack,
-                      const std::vector<std::string_view>& needles,
-                      std::string_view::size_type start = 0)
-        {
-            std::string_view::size_type result_pos = std::string_view::npos;
-            std::vector<std::string_view>::size_type result_index = 0;
-            for (std::vector<std::string_view>::size_type i = 0; i < needles.size(); ++i) {
-                auto pos = haystack.find(needles[i], start);
-                if (pos < result_pos) {
-                    result_pos = pos;
-                    result_index = i;
-                }
-            }
-            return { result_pos, result_index };
-        }
-
-    } // namespace
 
 
     std::vector<std::string>

@@ -32,6 +32,7 @@
 #include "Station.hpp"
 #include "string_utils.hpp"
 #include "TabID.hpp"
+#include "TraceFunction.hpp"
 #include "tracer.hpp"
 
 
@@ -819,9 +820,10 @@ namespace UI {
     void
     SmoothScroll(const ImVec2& target)
     {
-        // LOG_WARN("SmoothScroll({}, {})", target.x, target.y);
+        // TraceFunction tf{"UI"sv};
 
-        auto id = ImGui::GetItemID();
+        auto id = ImGui::GetID("");
+
         ImVec2 old_pos = { ImGui::GetScrollX(), ImGui::GetScrollY() };
         ImVec2 new_pos = {
             target.x < 0 ? old_pos.x : target.x,
@@ -835,6 +837,8 @@ namespace UI {
     void
     SmoothScrollItem()
     {
+        // TraceFunction tf{"UI"sv};
+
         ImVec2 item_min = ScreenToLocal(ImGui::GetItemRectMin());
         ImVec2 item_max = ScreenToLocal(ImGui::GetItemRectMax());
 
@@ -899,7 +903,9 @@ namespace UI {
     void
     DoSmoothScroll()
     {
-        auto id = ImGui::GetItemID();
+        // TraceFunction tf{"UI"sv};
+
+        auto id = ImGui::GetID("");
         if (!smooth_scroll_state.contains(id))
             return;
 

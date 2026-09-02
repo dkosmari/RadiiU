@@ -29,6 +29,7 @@
 #include "Station.hpp"
 #include "StationGlaze.hpp"
 #include "string_utils.hpp"
+#include "TraceFunction.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
 
@@ -138,6 +139,8 @@ namespace FavoritesTab {
                      StationPtr& station)
         {
             using namespace ImGui::RAII;
+
+            TraceFunction tf{"FavoritesTab"sv};
 
             ID station_id{static_cast<const void*>(station.get())};
 
@@ -332,6 +335,8 @@ namespace FavoritesTab {
     {
         using namespace ImGui::RAII;
 
+        TraceFunction tf{"FavoritesTab"sv};
+
         if (Child toolbar{
                 "toolbar",
                 {0, 0},
@@ -390,9 +395,9 @@ namespace FavoritesTab {
                     scroll_to_station.reset();
                     UI::SmoothScrollItem();
                 }
-                UI::DoSmoothScroll();
-
             }
+
+            UI::DoSmoothScroll();
 
         } // favorites
 
@@ -452,7 +457,7 @@ namespace FavoritesTab {
     void
     save()
     try {
-        TRACE_FUNC;
+        TraceFunction tf{"FavoritesTab"sv};
 
         auto filename = App::get_config_path() / "favorites.json";
         Serializer::save(stations, filename);

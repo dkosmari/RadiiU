@@ -28,18 +28,20 @@
 
 #include "App.hpp"
 #include "humanize.hpp"
+#include "humanize.hpp"
 #include "IconsFontAwesome4.h"
 #include "ImageLoader.hpp"
 #include "LogManager.hpp"
-#include "radio_client.hpp"
+#include "RadioClient.hpp"
 #include "RecentTab.hpp"
 #include "Serializer.hpp"
 #include "Settings.hpp"
 #include "StationClicking.hpp"
 #include "StationDetailsPopup.hpp"
 #include "StationVoting.hpp"
+#include "TraceDuration.hpp"
+#include "TraceFunction.hpp"
 #include "UI.hpp"
-#include "humanize.hpp"
 
 
 using std::chrono::system_clock;
@@ -79,7 +81,7 @@ namespace PlayerTab {
             sdl::audio::device audio_dev;
             sdl::audio::spec audio_spec;
             std::vector<std::byte> samples_buffer;
-            radio_client radio;
+            RadioClient radio;
             std::array<float, queued_history_size> queued_history;
             std::size_t last_queued_history = 0;
 
@@ -259,13 +261,15 @@ namespace PlayerTab {
         void
         PlaybackResources::process()
         {
+            TraceFunction tf{"PlayerTab"sv};
+
             try {
                 radio.process();
 
                 update_queued_history();
 
                 radio.with_metadata(
-                    [this](const radio_client::opt_stream_metadata& meta)
+                    [this](const RadioClient::opt_stream_metadata& meta)
                     {
                         if (!meta)
                             return;
@@ -288,8 +292,10 @@ namespace PlayerTab {
                 if (!audio_dev) {
                     // see if we have enough bytes to initialize audio_dev properly.
                     radio.with_decoder_spec(
-                        [this](const radio_client::opt_decoder_spec& radio_spec)
+                        [this](const RadioClient::opt_decoder_spec& radio_spec)
                         {
+                            TraceDuration audio_dev_duration{"creating SDL audio device"sv,
+                                                             "PlayerTab"sv};
                             if (!radio_spec)
                                 return;
                             sdl::audio::spec desired_spec;
@@ -554,7 +560,7 @@ namespace PlayerTab {
                         ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
 
                         play_res->radio.with_metadata(
-                            [](const radio_client::opt_stream_metadata& meta)
+                            [](const RadioClient::opt_stream_metadata& meta)
                             {
                                 if (!meta)
                                     return;
@@ -592,7 +598,7 @@ namespace PlayerTab {
                         );
 
                         play_res->radio.with_decoder_info(
-                            [](const radio_client::opt_decoder_info& info)
+                            [](const RadioClient::opt_decoder_info& info)
                             {
                                 if (!info)
                                     return;
@@ -644,7 +650,8 @@ namespace PlayerTab {
     {
         load();
 
-        App::add_callback(process_logic);
+        App::add_callback("PlayerTab::process_logic()",
+                          process_logic);
     }
 
 
@@ -685,7 +692,7 @@ namespace PlayerTab {
         if (!station)
             return;
 
-        if (play_res && play_res->radio.current_state != radio_client::state::stopped)
+        if (play_res && play_res->radio.current_state != RadioClient::state::stopped)
             stop();
 
         LOG_INFO("Starting playback of station {:?}", station->name);
@@ -724,7 +731,7 @@ namespace PlayerTab {
             return false;
         if (!station)
             return false;
-        if (play_res->radio.current_state == radio_client::state::stopped)
+        if (play_res->radio.current_state == RadioClient::state::stopped)
             return false;
         if (&st == station.get())
             return true;

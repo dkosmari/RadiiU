@@ -21,6 +21,7 @@
 #include "byte_stream.hpp"
 #include "LogManager.hpp"
 #include "LogManagerCurl.hpp"
+#include "mime_type.hpp"
 #include "Settings.hpp"
 #include "tracer.hpp"
 
@@ -704,7 +705,7 @@ namespace rest {
     make_easy(const std::string& url)
     {
         curl::easy easy;
-        easy.set_verbose(cfg.verbose_rest_logs);
+        easy.set_verbose(cfg.verbose_rest_logs); // TODO: set this during initialization
         LogManagerCurl::capture_curl_debug(easy);
         if (!user_agent.empty())
             easy.set_user_agent(user_agent);

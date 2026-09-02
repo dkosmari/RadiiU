@@ -55,6 +55,7 @@
 #include "ImageLoader.hpp"
 #include "LogManager.hpp"
 #include "LogsTab.hpp"
+#include "PerfWindow.hpp"
 #include "PlayerTab.hpp"
 #include "RadioBrowserAPI.hpp"
 #include "RecentTab.hpp"
@@ -63,7 +64,9 @@
 #include "StationVoting.hpp"
 #include "Styles.hpp"
 #include "task_queue.hpp"
-#include "Timer.hpp"
+#include "TraceDuration.hpp"
+#include "TraceFunction.hpp"
+#include "TraceManager.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
 
@@ -91,6 +94,12 @@ namespace App {
         /* Types */
         /*-------*/
 
+        struct CallbackInfo {
+            std::string name;
+            Function func;
+        };
+
+
         // RAII-managed resources are stored here.
         struct Resources {
 
@@ -106,10 +115,6 @@ namespace App {
 
             sdl::vector<sdl::game_controller::device> controllers;
 
-            std::vector<Callback> callbacks;
-            task_queue tasks;
-            async_task_queue async_tasks;
-
         }; // struct Resources
 
 
@@ -123,6 +128,9 @@ namespace App {
         /*-----------*/
         /* Variables */
         /*-----------*/
+
+        std::vector<CallbackInfo> callbacks;
+        async_task_queue tasks;
 
         std::optional<Resources> res;
 
@@ -195,8 +203,14 @@ namespace App {
             res->renderer.set_color(sdl::color::black);
             res->renderer.clear();
 
-            ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(),
-                                                  res->renderer.data());
+            {
+                TraceDuration duration_render_draw_data{
+                    "ImGui_ImplSDLRenderer2_RenderDrawData()"sv,
+                    "App,ImGui"sv
+                };
+                    ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(),
+                                                          res->renderer.data());
+            }
 
 #ifdef __WIIU__
             // WORKAROUND: the Wii U SDL2 port does not update the clipping until the next
@@ -206,6 +220,7 @@ namespace App {
 #endif
 
             res->renderer.present();
+            TraceManager::vsync();
         }
 
 
@@ -229,7 +244,7 @@ namespace App {
             ImGui_ImplSDLRenderer2_Shutdown();
             ImGui_ImplSDL2_Shutdown();
 
-            CountryManager::initialize();
+            CountryManager::finalize();
             FontLoader::finalize();
 
             ImGui::DestroyContext();
@@ -325,7 +340,7 @@ namespace App {
         void
         process()
         {
-            TimerReporter timer_process{cout, "App::process()", 10ms};
+            TraceFunction tf{"App"sv};
 
 #ifdef __WIIU__
             if (old_disable_swkbd != cfg.disable_swkbd) {
@@ -387,27 +402,26 @@ namespace App {
 
 
             try {
-                TimerReporter timer{cout, "tasks dispatch", 5ms};
-                res->tasks.dispatch_all();
+                TraceDuration duration_tasks{"App::process()/tasks.dispatch_all()"sv,
+                                             "App"sv};
+                tasks.dispatch_all();
             }
             catch (task_queue::error& e) {
-                LOG_ERROR("Dispatching task {}: {}", e.name, e.what());
+                LOG_ERROR("App tasks dispatch {}: {}", e.name, e.what());
             }
-
-            try {
-                TimerReporter timer{cout, "async_tasks dispatch", 5ms};
-                res->async_tasks.dispatch_all();
-            }
-            catch (async_task_queue::error& e) {
-                LOG_ERROR("Dispatching async task {}: {}", e.name, e.what());
-            }
-
 
             {
-                TimerReporter timer{cout, "App callbacks", 5ms};
-                for (auto& cb : res->callbacks)
-                    if (cb)
-                        cb();
+                TraceDuration duration_callbacks{"App::process()/callbacks"sv,
+                                                 "App"sv};
+                for (auto& [name, func] : callbacks) {
+                    try {
+                        if (func)
+                            func();
+                    }
+                    catch (std::exception& e) {
+                        LOG_ERROR("App callbacks dispatch: {}", e.what());
+                    }
+                }
             }
 
             Uint64 now = SDL_GetTicks64();
@@ -447,33 +461,58 @@ namespace App {
                 }
 
 
-            // ImGui frame processing
-            ImGui_ImplSDLRenderer2_NewFrame();
-            ImGui_ImplSDL2_NewFrame();
+            {
+                TraceDuration duration_render_block{"render block"sv,
+                                                    "App,render"sv};
 
-            ImGui::NewFrame();
-
-            if (screen_state == ScreenState::normal || screen_state == ScreenState::fading) {
-
-                auto& style = ImGui::GetStyle();
-
-                // Apply fading effect if fading is active.
-                if (screen_state == ScreenState::fading) {
-                    Uint64 now = SDL_GetTicks64();
-                    float ratio = 1.0f - (now - fade_start) / float(fade_duration_ms);
-                    if (ratio < 0)
-                        ratio = 0;
-                    style.Alpha = ratio;
-                } else {
-                    style.Alpha = 1.0f;
+                {
+                    TraceDuration duration_imgui{"ImGui_ImplSDLRenderer2_NewFrame()"sv,
+                                                 "App,ImGui,render"sv};
+                    // ImGui frame processing
+                    ImGui_ImplSDLRenderer2_NewFrame();
+                }
+                {
+                    TraceDuration duration_imgui{"ImGui_ImplSDL2_NewFrame()"sv,
+                                                 "App,ImGui,render"sv};
+                    ImGui_ImplSDL2_NewFrame();
+                }
+                {
+                    TraceDuration duration_imgui{"ImGui::NewFrame()"sv,
+                                                 "App,ImGui,render"sv};
+                    ImGui::NewFrame();
                 }
 
-                process_ui();
+                if (screen_state == ScreenState::normal
+                    || screen_state == ScreenState::fading) {
 
+                    auto& style = ImGui::GetStyle();
+
+                    // Apply fading effect if fading is active.
+                    if (screen_state == ScreenState::fading) {
+                        Uint64 now = SDL_GetTicks64();
+                        float ratio = 1.0f - (now - fade_start) / float(fade_duration_ms);
+                        if (ratio < 0)
+                            ratio = 0;
+                        style.Alpha = ratio;
+                    } else {
+                        style.Alpha = 1.0f;
+                    }
+
+                    process_ui();
+
+                }
+
+                {
+                    TraceDuration duration_end_frame{"ImGui::EndFrame()"sv,
+                                                     "App,ImGui,render"sv};
+                    ImGui::EndFrame();
+                }
+                {
+                    TraceDuration duration_render{"ImGui::Render()"sv,
+                                                  "App,ImGui,render"sv};
+                    ImGui::Render();
+                }
             }
-
-            ImGui::EndFrame();
-            ImGui::Render();
 
             process_screen_saver();
         }
@@ -482,12 +521,19 @@ namespace App {
         void
         process_events()
         {
+            TraceFunction tf{"App"sv};
+
             Uint64 now = SDL_GetTicks64();
 
             sdl::events::event event;
             while (sdl::events::poll(event)) {
 
-                ImGui_ImplSDL2_ProcessEvent(&event);
+                {
+                    TraceDuration duration_imgui_events{
+                        "ImGui_ImplSDL2_ProcessEvent()"sv,
+                        "App,ImGui"sv};
+                    ImGui_ImplSDL2_ProcessEvent(&event);
+                }
 
                 switch (sdl::events::type{event.type}) {
 
@@ -573,9 +619,9 @@ namespace App {
         {
             using namespace ImGui::RAII;
 
-            const auto& style = ImGui::GetStyle();
+            TraceFunction tf{"App"sv};
 
-            TimerReporter timer_process_ui{cout, "App::process_ui()", 16ms};
+            const auto& style = ImGui::GetStyle();
 
             {
                 /*
@@ -594,9 +640,11 @@ namespace App {
                                                      ImVec2{6, 6}};
                 if (Window main_window{PACKAGE_STRING,
                                        nullptr,
+                                       ImGuiWindowFlags_NoBringToFrontOnFocus |
                                        ImGuiWindowFlags_NoDecoration |
                                        ImGuiWindowFlags_NoMove |
                                        ImGuiWindowFlags_NoSavedSettings}) {
+
                     const auto content_begin = ImGui::GetCursorStartPos();
                     const auto content_end = content_begin + ImGui::GetContentRegionAvail();
 
@@ -698,12 +746,14 @@ namespace App {
                     }
 
                     ConfirmExitPopup::process_ui();
+
                 } // main_window
             }
 
-            ImGui::ShowStyleEditor();
+            // ImGui::ShowStyleEditor();
             // ImGui::ShowDemoWindow();
 
+            PerfWindow::process_ui();
         }
 
 
@@ -825,6 +875,7 @@ namespace App {
 
         LogManager::initialize();
         initialize_config_dir();
+        TraceManager::initialize(PACKAGE_NAME);
         // Note: initialize Settings module early.
         Settings::initialize();
         set_tab(cfg.initial_tab);
@@ -866,13 +917,16 @@ namespace App {
         initialize_imgui();
 
         // Initialize modules.
+        PerfWindow::initialize();
         Styles::initialize();
         ImageLoader::initialize(res->renderer);
         RadioBrowserAPI::initialize(get_user_agent(), cfg.server);
         RadioBrowserAPI::set_server(cfg.server);
 
-        add_callback(RadioBrowserAPI::process);
-        add_callback(ImageLoader::process);
+        add_callback("RadioBrowserAPI::process()",
+                     RadioBrowserAPI::process);
+        add_callback("ImageLoader::process()",
+                     ImageLoader::process);
 
         // Initialize tabs.
         AboutTab::initialize();
@@ -903,6 +957,7 @@ namespace App {
         RadioBrowserAPI::finalize();
         ImageLoader::finalize();
         Styles::finalize();
+        PerfWindow::finalize();
 
         finalize_imgui();
 
@@ -915,7 +970,11 @@ namespace App {
         Settings::finalize();
         finalize_config_dir();
 
+        TraceManager::finalize();
         LogManager::finalize();
+
+        callbacks.clear();
+        tasks.clear();
 
         res.reset();
     }
@@ -962,26 +1021,19 @@ namespace App {
 
 
     void
-    add_callback(Callback c)
+    add_callback(const std::string& name,
+                 Function func)
     {
-        res->callbacks.push_back(std::move(c));
+        callbacks.emplace_back(name,
+                               std::move(func));
     }
 
 
     void
     add_task_real(const std::string& name,
-                  Callback c)
+                  Function func)
     {
-        res->tasks.add(name, std::move(c));
-    }
-
-
-
-    void
-    add_async_task_real(const std::string& name,
-                        Callback c)
-    {
-        res->async_tasks.add(name, std::move(c));
+        tasks.add(name, std::move(func));
     }
 
 } // namespace App

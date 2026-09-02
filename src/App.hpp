@@ -15,9 +15,10 @@
 
 #include "TabID.hpp"
 
+
 namespace App {
 
-    using Callback = std::move_only_function<void()>;
+    using Function = std::move_only_function<void()>;
 
 
     [[nodiscard]]
@@ -54,13 +55,18 @@ namespace App {
     set_tab(TabID id);
 
 
-    void
-    add_callback(Callback c);
+    // Callbacks are called once every time around the main loop.
 
+    void
+    add_callback(const std::string& name,
+                 Function func);
+
+
+    // Tasks are called once, from the main loop.
 
     void
     add_task_real(const std::string& name,
-                  Callback c);
+                  Function func);
 
     template<typename F,
              typename... Args>
@@ -71,33 +77,6 @@ namespace App {
              Args&&... args)
     {
         add_task_real(
-            name,
-            [
-                func = std::forward<F>(func),
-                ... args = std::forward<Args>(args)
-            ]
-                mutable
-            {
-                std::invoke(func, args...);
-            }
-        );
-    }
-
-
-    void
-    add_async_task_real(const std::string& name,
-                        Callback c);
-
-
-    template<typename F,
-             typename... Args>
-    inline
-    void
-    add_async_task(const std::string& name,
-                   F&& func,
-                   Args&&... args)
-    {
-        add_async_task_real(
             name,
             [
                 func = std::forward<F>(func),
