@@ -8,155 +8,265 @@
 #ifndef REST_HPP
 #define REST_HPP
 
+#include <atomic>
+#include <flat_map>
 #include <functional>
-#include <map>
 #include <memory>
+#include <optional>
 #include <stdexcept>
+#include <stop_token>
 #include <string>
+#include <string_view>
+#include <thread>
+#include <unordered_map>
+
+#include <curlxx/easy.hpp>
+#include <curlxx/multi.hpp>
+
+#include "async_task_queue.hpp"
 
 
 namespace rest {
 
     struct error : std::runtime_error {
 
-        std::string response;
+        std::string content;
         std::string content_type;
 
         error(const std::string& msg,
-              const std::string& response = {},
-              const std::string& content_type = {});
+              std::string content_ = {},
+              std::string content_type_ = {});
 
     }; // struct error
 
 
-    using success_function_signature = void (const std::string& response,
-                                             const std::string& content_type);
-    using success_function_t = std::move_only_function<success_function_signature>;
-
-    using error_function_signature = void (const std::exception& err);
-    using error_function_t = std::move_only_function<error_function_signature>;
+    struct request;
+    struct manager;
 
 
-    using json_success_function_signature = void (const std::string& json_response);
-    using json_success_function_t = std::move_only_function<json_success_function_signature>;
+    using response_callback_signature = void (request& req);
+
+    using response_function_t = std::move_only_function<response_callback_signature>;
 
 
-    using get_params_t = std::map<std::string, std::string>;
+    using error_callback_signature = void (const std::exception& e);
+
+    using error_function_t = std::move_only_function<error_callback_signature>;
 
 
-    struct request_base;
-
-    enum class status {
-        invalid,
-        pending,
-        finished,
-        canceled,
-    }; // enum class status
+    using get_params_t = std::flat_map<std::string, std::string>;
 
 
-    class token {
-
-        std::shared_ptr<request_base> req;
+    struct request {
 
     public:
 
-        constexpr
-        token()
-        noexcept = default;
+        enum class status {
+            pending,
+            receiving,
+            finished,
+            canceled,
+        };
 
-        explicit
-        token(std::shared_ptr<request_base> req)
+
+        struct params_t {
+            std::optional<std::string>  accept_content_type  = {};
+            unsigned                    buffer_size          = 65536;
+            mutable error_function_t    error_func           = {};
+            std::optional<std::string>  post_fields          = {};
+            std::optional<std::string>  request_content_type = {};
+            mutable response_function_t response_func        = {};
+            bool                        ssl_verify_peer      = false;
+            std::string                 url;
+            std::optional<std::string>  user_agent           = {};
+            bool                        verbose              = true;
+        }; // struct params_t
+
+
+        request(params_t params_);
+
+
+        void
+        cancel();
+
+
+        std::string_view
+        get_content()
+            const noexcept;
+
+
+        std::string_view
+        get_content_type()
+            const noexcept;
+
+
+        std::exception_ptr
+        get_error()
+            const noexcept;
+
+        curl::easy&
+        get_easy()
             noexcept;
 
-        ~token()
-            noexcept;
+
+        CURL*
+        get_handle()
+            const noexcept;
+
+
+        const params_t&
+        get_params()
+            const noexcept;
+
 
         status
         get_status()
             const noexcept;
 
-        void
-        cancel();
 
         void
-        detach()
+        process();
+
+
+        void
+        process_error()
             noexcept;
 
-        bool
-        is_pending()
-            const noexcept;
 
-    }; // class token
-
-
-    void
-    initialize(const std::string& user_agent = "");
+        void
+        process_response()
+            noexcept;
 
 
-    void
-    finalize();
+        void
+        set_error(std::exception_ptr e);
 
 
-    void
-    process();
+    private:
 
-
-    /* ----------------- */
-    /* Untyped functions */
-    /* ----------------- */
-
-    token
-    get_async(const std::string& base_url,
-              const get_params_t& params,
-              success_function_t success_func,
-              error_function_t error_func = {});
-
-
-    token
-    post_async(const std::string& url,
-               const std::string& body,
-               success_function_t success_func,
-               error_function_t error_func = {});
-
-
-    struct response_and_type_t {
-        std::string response;
+        std::atomic<status> status_;
+        const params_t params;
+        std::string content;
         std::string content_type;
-    };
+        curl::easy easy;
+        std::exception_ptr error_ptr;
 
-    response_and_type_t
-    get_sync(const std::string& base_url,
-             const get_params_t& params = {});
+        std::size_t
+        easy_write_func(std::span<const char> data);
 
+        void
+        invoke_error_func(const std::exception& e)
+            noexcept;
 
-    response_and_type_t
-    post_sync(const std::string& url,
-              const std::string& body);
-
-    /* -------------- */
-    /* JSON functions */
-    /* -------------- */
-
-    token
-    get_json_async(const std::string& base_url,
-                   const get_params_t& params,
-                   json_success_function_t success_func,
-                   error_function_t error_func = {});
-
-    token
-    post_json_async(const std::string& url,
-                    const std::string& params,
-                    json_success_function_t success_func,
-                    error_function_t error_func = {});
+    }; // struct request
 
 
-    std::string
-    get_json_sync(const std::string& base_url,
-                  const get_params_t& params = {});
+    using request_ptr = std::shared_ptr<request>;
 
-    std::string
-    post_json_sync(const std::string& url,
-                   const std::string& body);
+
+
+    class manager {
+
+    public:
+
+        struct config {
+            unsigned        max_connections       = 5;
+            unsigned        max_total_connections = 5;
+            std::optional<std::string> user_agent;
+        };
+
+
+        manager(config cfg_,
+                const std::string& base_url_);
+
+        // Prevent moving
+        manager(manager&&) = delete;
+
+
+        ~manager()
+            noexcept;
+
+
+        void
+        process();
+
+
+        void
+        set_base_url(const std::string& base_url_);
+
+
+        request_ptr
+        add(request::params_t params);
+
+
+        request_ptr
+        get(const std::string& path,
+            response_function_t response_func,
+            error_function_t error_func);
+
+        request_ptr
+        get(const std::string& path,
+            const get_params_t& get_params,
+            response_function_t response_func,
+            error_function_t error_func);
+
+
+        request_ptr
+        get_json(const std::string& path,
+                 response_function_t response_func,
+                 error_function_t error_func);
+
+        request_ptr
+        get_json(const std::string& path,
+                 const get_params_t& get_params,
+                 response_function_t response_func,
+                 error_function_t error_func);
+
+
+        request_ptr
+        post(const std::string& path,
+             std::string post_body,
+             response_function_t response_func,
+             error_function_t error_func);
+
+
+        request_ptr
+        post_json(const std::string& path,
+                  std::string post_json_body,
+                  response_function_t response_func,
+                  error_function_t error_func);
+
+
+    private:
+
+        const config cfg;
+
+        std::string base_url;
+
+        async_queue<request_ptr> new_requests;
+        async_task_queue tasks;
+
+        struct {
+            std::jthread thread;
+            std::unordered_map<CURL*, request_ptr> active;
+            curl::multi multi;
+        } worker;
+
+
+        void
+        worker_thread_function(std::stop_token stopper);
+
+    }; // class manager
+
+
+    // Synchronous functions.
+
+    request_ptr
+    get_sync(request::params_t params);
+
+
+    request_ptr
+    post_sync(request::params_t params);
 
 } // namespace rest
 

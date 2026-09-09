@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <format>
 #include <memory>
 #include <queue>
 #include <random>
@@ -155,6 +156,7 @@ namespace RadioBrowserAPI {
         MirrorsVec mirrors;
         std::jthread fetch_mirrors_thread;
         async_task_queue pending_tasks;
+        std::optional<rest::manager> rest_manager;
 
 
         /*-----------------------*/
@@ -168,17 +170,14 @@ namespace RadioBrowserAPI {
             noexcept;
 
         rest::error_function_t
-        finish_exception(ExceptionFunction except_func);
+        make_error_func(ExceptionFunction func);
 
         template<typename F>
-        rest::json_success_function_t
-        finish_result(F&& result_func);
+        rest::response_function_t
+        make_response_func(F&& func);
 
         std::minstd_rand
         make_random_engine();
-
-        string
-        make_url(const string& endpoint);
 
         void
         start_call();
@@ -321,32 +320,32 @@ namespace RadioBrowserAPI {
 
         // Common code to clear the busy flag.
         rest::error_function_t
-        finish_exception(ExceptionFunction except_func)
+        make_error_func(ExceptionFunction func)
         {
             return
-                [except_func = std::move(except_func)]
+                [func = std::move(func)]
                 (const std::exception& e)
                     mutable
                 {
                     busy = false;
-                    if (except_func)
-                        except_func(e);
+                    if (func)
+                        func(e);
                 };
         }
 
 
         // Common code to clear the busy flag.
         template<typename F>
-        rest::json_success_function_t
-        finish_result(F&& result_func)
+        rest::response_function_t
+        make_response_func(F&& func)
         {
             return
-                [result_func = std::forward<F>(result_func)]
-                (const string& json)
+                [func = std::forward<F>(func)]
+                (const rest::request& req)
                     mutable
                 {
                     busy = false;
-                    result_func(json);
+                    func(req);
                 };
         }
 
@@ -371,17 +370,11 @@ namespace RadioBrowserAPI {
         }
 
 
-        string
-        make_url(const string& endpoint)
-        {
-            std::string server = current_server.empty() ? start_server : current_server;
-            return "http://"s + server + endpoint;
-        }
-
-
         void
         start_call()
         {
+            assert(rest_manager);
+
             if (busy)
                 throw async_task_queue::call_again{};
             busy = true;
@@ -398,21 +391,21 @@ namespace RadioBrowserAPI {
             std::string params_json;
             glz::ex::write_json(params, params_json);
 
-            rest::post_json_async(
-                make_url("/json/codecs"),
-                params_json,
-                finish_result(
-                    [result_func = std::move(result_func)]
-                    (const string& json)
+            rest_manager->post_json(
+                "/json/codecs",
+                std::move(params_json),
+                make_response_func(
+                    [func = std::move(result_func)]
+                    (const rest::request& req)
                         mutable
                     {
                         CodecVec result;
-                        glz::ex::read<glz_options>(result, json);
-                        if (result_func)
-                            result_func(std::move(result));
+                        glz::ex::read<glz_options>(result, req.get_content());
+                        if (func)
+                            func(std::move(result));
                     }
                 ),
-                finish_exception(std::move(except_func))
+                make_error_func(std::move(except_func))
             );
         }
 
@@ -427,21 +420,21 @@ namespace RadioBrowserAPI {
             std::string params_json;
             glz::ex::write_json(params, params_json);
 
-            rest::post_json_async(
-                make_url("/json/countries"),
-                params_json,
-                finish_result(
-                    [result_func = std::move(result_func)]
-                    (const std::string& json)
+            rest_manager->post_json(
+                "/json/countries",
+                std::move(params_json),
+                make_response_func(
+                    [func = std::move(result_func)]
+                    (const rest::request& req)
                         mutable
                     {
                         CountryVec result;
-                        glz::ex::read<glz_options>(result, json);
-                        if (result_func)
-                            result_func(std::move(result));
+                        glz::ex::read<glz_options>(result, req.get_content());
+                        if (func)
+                            func(std::move(result));
                     }
                 ),
-                finish_exception(std::move(except_func))
+                make_error_func(std::move(except_func))
             );
         }
 
@@ -452,21 +445,20 @@ namespace RadioBrowserAPI {
         {
             start_call();
 
-            rest::get_json_async(
-                make_url("/json/stats"),
-                {},
-                finish_result(
-                    [result_func = std::move(result_func)]
-                    (const std::string& json)
+            rest_manager->get_json(
+                "/json/stats",
+                make_response_func(
+                    [func = std::move(result_func)]
+                    (const rest::request& req)
                         mutable
                     {
                         ServerStats result;
-                        glz::ex::read<glz_options>(result, json);
-                        if (result_func)
-                            result_func(std::move(result));
+                        glz::ex::read<glz_options>(result, req.get_content());
+                        if (func)
+                            func(std::move(result));
                     }
                 ),
-                finish_exception(std::move(except_func))
+                make_error_func(std::move(except_func))
             );
         }
 
@@ -482,23 +474,28 @@ namespace RadioBrowserAPI {
             std::string params_json;
             glz::ex::write_json(params, params_json);
 
-            rest::post_json_async(
-                make_url("/json/stations/byuuid"),
-                params_json,
-                finish_result(
-                    [result_func = std::move(result_func)]
-                    (const std::string& json)
+            rest_manager->post_json(
+                "/json/stations/byuuid",
+                std::move(params_json),
+                make_response_func(
+                    [func = std::move(result_func)]
+                    (const rest::request& req)
                         mutable
                     {
                         StationVec result;
-                        glz::ex::read<glz_options>(result, json);
+                        glz::ex::read<glz_options>(result, req.get_content());
                         if (result.size() != 1)
-                            throw Error{"incorrect array size: " + std::to_string(result.size())};
-                        if (result_func)
-                            result_func(std::move(result[0]));
+                            throw Error{
+                                std::format("incorrect array size: {}\n"
+                                            "<content>\n{}\n</content>",
+                                            result.size(),
+                                            req.get_content())
+                            };
+                        if (func)
+                            func(std::move(result[0]));
                     }
                 ),
-                finish_exception(std::move(except_func))
+                make_error_func(std::move(except_func))
             );
         }
 
@@ -513,21 +510,21 @@ namespace RadioBrowserAPI {
             std::string params_json;
             glz::ex::write_json(params, params_json);
 
-            rest::post_json_async(
-                make_url("/json/tags"),
-                params_json,
-                finish_result(
-                    [result_func = std::move(result_func)]
-                    (const std::string& json)
+            rest_manager->post_json(
+                "/json/tags",
+                std::move(params_json),
+                make_response_func(
+                    [func = std::move(result_func)]
+                    (const rest::request& req)
                         mutable
                     {
                         TagVec result;
-                        glz::ex::read<glz_options>(result, json);
-                        if (result_func)
-                            result_func(std::move(result));
+                        glz::ex::read<glz_options>(result, req.get_content());
+                        if (func)
+                            func(std::move(result));
                     }
                 ),
-                finish_exception(std::move(except_func))
+                make_error_func(std::move(except_func))
             );
         }
 
@@ -542,21 +539,21 @@ namespace RadioBrowserAPI {
             std::string params_json;
             glz::ex::write_json(params, params_json);
 
-            rest::post_json_async(
-                make_url("/json/stations/search"),
-                params_json,
-                finish_result(
-                    [result_func = std::move(result_func)]
-                    (const std::string& json)
+            rest_manager->post_json(
+                "/json/stations/search",
+                std::move(params_json),
+                make_response_func(
+                    [func = std::move(result_func)]
+                    (const rest::request& req)
                         mutable
                     {
                         StationVec result;
-                        glz::ex::read<glz_options>(result, json);
-                        if (result_func)
-                            result_func(std::move(result));
+                        glz::ex::read<glz_options>(result, req.get_content());
+                        if (func)
+                            func(std::move(result));
                     }
                 ),
-                finish_exception(std::move(except_func))
+                make_error_func(std::move(except_func))
             );
         }
 
@@ -569,21 +566,20 @@ namespace RadioBrowserAPI {
             start_call();
 
             // Note: clicking does not support GET/POST parameters.
-            rest::get_json_async(
-                make_url("/json/url/" + uuid),
-                {},
-                finish_result(
-                    [result_func = std::move(result_func)]
-                    (const std::string& json)
+            rest_manager->get_json(
+                "/json/url/" + uuid,
+                make_response_func(
+                    [func = std::move(result_func)]
+                    (const rest::request& req)
                         mutable
                     {
                         ClickResult result;
-                        glz::ex::read<glz_options>(result, json);
-                        if (result_func)
-                            result_func(std::move(result));
+                        glz::ex::read<glz_options>(result, req.get_content());
+                        if (func)
+                            func(std::move(result));
                     }
                 ),
-                finish_exception(std::move(except_func))
+                make_error_func(std::move(except_func))
             );
         }
 
@@ -596,21 +592,20 @@ namespace RadioBrowserAPI {
             start_call();
 
             // NOTE: voting does not support GET/POST parameters.
-            rest::get_json_async(
-                make_url("/json/vote/" + uuid),
-                {},
-                finish_result(
-                    [result_func = std::move(result_func)]
-                    (const std::string& response)
+            rest_manager->get_json(
+                "/json/vote/" + uuid,
+                make_response_func(
+                    [func = std::move(result_func)]
+                    (const rest::request& req)
                         mutable
                     {
                         VoteResult result;
-                        glz::ex::read<glz_options>(result, response);
-                        if (result_func)
-                            result_func(std::move(result));
+                        glz::ex::read<glz_options>(result, req.get_content());
+                        if (func)
+                            func(std::move(result));
                     }
                 ),
-                finish_exception(std::move(except_func))
+                make_error_func(std::move(except_func))
             );
         }
 
@@ -644,14 +639,16 @@ namespace RadioBrowserAPI {
 
         busy = false;
 
-        rest::initialize(user_agent);
-
         fetch_mirrors_thread = {};
         current_server.clear();
         if (!server.empty())
             current_server = server;
         else
             update_mirrors_and_select_random();
+
+        rest::manager::config rest_config;
+        rest_config.user_agent = user_agent;
+        rest_manager.emplace(std::move(rest_config), get_server());
     }
 
 
@@ -662,7 +659,7 @@ namespace RadioBrowserAPI {
 
         fetch_mirrors_thread = {};
 
-        rest::finalize();
+        rest_manager.reset();
     }
 
 
@@ -676,7 +673,8 @@ namespace RadioBrowserAPI {
             LOG_ERROR("Dispatching RadioBrowerAPI task {}: {}", e.name, e.what());
         }
 
-        rest::process();
+        assert(rest_manager);
+        rest_manager->process();
     }
 
 
@@ -691,6 +689,7 @@ namespace RadioBrowserAPI {
     set_server(const string& server)
     {
         current_server = server;
+        rest_manager->set_base_url("http://"s + get_server());
     }
 
 
@@ -733,14 +732,14 @@ namespace RadioBrowserAPI {
             {
                 mirrors = std::move(result);
                 if (mirrors.empty())
-                    current_server.clear();
+                    set_server("");
                 else {
                     std::vector<string> samples(1);
                     std::ranges::sample(mirrors,
                                         samples.begin(),
                                         1,
                                         random_engine);
-                    current_server = std::move(samples[0]);
+                    set_server(samples[0]);
                 }
             }
         );

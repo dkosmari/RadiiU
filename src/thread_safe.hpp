@@ -153,6 +153,15 @@ public:
         *lock() = std::forward<U>(new_data);
     }
 
+
+    template<typename F>
+    void
+    with_lock(F&& func)
+    {
+        std::lock_guard guard{mutex};
+        func();
+    }
+
 }; // class thread_safe<T, M>
 
 #endif

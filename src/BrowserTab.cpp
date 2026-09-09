@@ -124,7 +124,7 @@ namespace BrowserTab {
             LOG_ERROR("{}", e.what());
             if (auto ee = dynamic_cast<const rest::error*>(&e)) {
                 LOG_ERROR("Content-Type: {}", ee->content_type);
-                LOG_ERROR("<response>\n{}\n</response>", ee->response);
+                LOG_ERROR("<content>\n{}\n</content>", ee->content);
             }
 
             error_message = e.what();

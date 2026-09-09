@@ -5,737 +5,554 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <cassert>
-#include <memory>
-#include <optional>
-#include <stdexcept>
+#include <chrono>
+#include <format>
 #include <utility>
-#include <vector>
 
-#include <curlxx/easy.hpp>
-#include <curlxx/escape.hpp>
-#include <curlxx/multi.hpp>
+#include <curlxx/url.hpp>
 
 #include "rest.hpp"
 
-#include "byte_stream.hpp"
 #include "LogManager.hpp"
 #include "LogManagerCurl.hpp"
 #include "mime_type.hpp"
-#include "Settings.hpp"
 #include "tracer.hpp"
 
 
 using namespace std::literals;
 
-using Settings::cfg;
 
-
-// TODO: implement data streaming too
-
+// New API
 
 namespace rest {
 
     namespace {
 
+        // Function declarations
 
+        std::string
+        make_url(const std::string& base_url,
+                 const std::string& path,
+                 const get_params_t& params = {});
+
+
+        void
+        task_process_error(request_ptr req);
+
+        void
+        task_process_response(request_ptr req);
+
+
+        // Function definitions
+
+        std::string
+        make_url(const std::string& base_url,
+                 const std::string& path,
+                 const get_params_t& params)
+        {
+            curl::url url{base_url};
+            if (!path.empty())
+                url.set_path(path);
+
+            for (const auto& [key, val] : params)
+                url.append_query(key + "=" + val, CURLU_URLENCODE);
+
+            return url.get_url();
+        }
+
+
+        void
+        task_process_error(request_ptr req)
+        {
+            req->process_error();
+        }
+
+
+        void
+        task_process_response(request_ptr req)
+        {
+            req->process_response();
+        }
 
     } // namespace
 
 
-    /* --------------------- */
-    /* function declarations */
-    /* --------------------- */
-
-    curl::easy
-    make_easy(const std::string& url);
-
-    std::string
-    make_url(const std::string& base_url,
-             const get_params_t& params);
-
-
-    /* -------------- */
-    /* struct request */
-    /* -------------- */
-
-    struct request_base {
-
-        status current_status = status::pending;
-        curl::easy easy;
-        success_function_t success_func;
-        error_function_t error_func;
-        byte_stream response_stream;
-
-        // forbid moving
-        request_base(request_base&& other) = delete;
-
-        explicit
-        request_base();
-
-        request_base(success_function_t success_func,
-                     error_function_t error_func);
-
-
-        virtual
-        ~request_base()
-            noexcept = default;
-
-        CURL*
-        get_id()
-            const noexcept;
-
-        void
-        finish()
-            noexcept;
-
-        virtual
-        void
-        handle_success(const std::string& response,
-                       const std::string& content_type)
-            noexcept;
-
-        void
-        handle_error(const std::exception& e)
-            noexcept;
-
-    }; // struct request
-
-
-    struct request_get : virtual request_base {
-
-        request_get(const std::string& url,
-                    const get_params_t& params,
-                    success_function_t success_func = {},
-                    error_function_t error_func = {});
-
-    }; // struct request_get
-
-
-    struct request_post : virtual request_base {
-
-        request_post(const std::string& url,
-                     const std::string& post_body,
-                     success_function_t success_func = {},
-                     error_function_t error_func = {});
-
-    }; // struct request_post
-
-
-    struct json_request_base : virtual request_base {
-        json_success_function_t json_success_func;
-
-        json_request_base(json_success_function_t json_success_func);
-
-        void
-        handle_success(const std::string& response,
-                       const std::string& content_type)
-            noexcept override;
-
-    }; // struct json_request
-
-
-    struct json_request_get : request_get, json_request_base {
-
-        json_request_get(const std::string& url,
-                         const get_params_t& params,
-                         json_success_function_t json_success_func,
-                         error_function_t error_func);
-
-    }; // struct json_request_get
-
-
-    struct json_request_post : request_post, json_request_base {
-
-        json_request_post(const std::string& url,
-                          const std::string& body,
-                          json_success_function_t json_success_func,
-                          error_function_t error_func);
-
-    }; // struct json_request_post
-
-
-    /* ---------------- */
-    /* struct resources */
-    /* ---------------- */
-
-    struct resources {
-
-        curl::multi multi;
-        std::map<CURL*, std::shared_ptr<request_base>> requests;
-
-        resources();
-
-        ~resources()
-            noexcept;
-
-        void
-        add(std::shared_ptr<request_base> req);
-
-        void
-        remove(std::shared_ptr<request_base>& req);
-
-        void
-        process();
-
-    }; // struct resources
-
-
-    /* --------- */
-    /* variables */
-    /* --------- */
-
-    std::string user_agent;
-    std::optional<resources> res;
-    unsigned init_counter;
-
-
-    /* ------------- */
-    /* error methods */
-    /* ------------- */
+    // Public functions
 
     error::error(const std::string& msg,
-                 const std::string& response,
-                 const std::string& content_type) :
+                 std::string content_,
+                 std::string content_type_) :
         std::runtime_error{msg},
-        response{std::move(response)},
-        content_type{std::move(content_type)}
+        content{std::move(content_)},
+        content_type{std::move(content_type_)}
     {}
 
 
-    /* -------------------- */
-    /* request_base methods */
-    /* -------------------- */
-
-    request_base::request_base()
+    request::request(params_t params_) :
+        status_{status::pending},
+        params{std::move(params_)}
     {
-        abort();
-    }
-
-
-    request_base::request_base(success_function_t success_func,
-                               error_function_t error_func) :
-        success_func{std::move(success_func)},
-        error_func{std::move(error_func)}
-    {
-        easy.set_write_function(
-            [this](std::span<const char> data)
-            {
-                return response_stream.write(data);
-            });
-    }
-
-
-    CURL*
-    request_base::get_id()
-        const noexcept
-    {
-        return easy.data();
-    }
-
-
-    void
-    request_base::finish()
-        noexcept
-    {
-        std::string response;
-        std::string content_type;
-        try {
-            current_status = status::finished;
-            response = response_stream.read_str();
-            if (auto h = easy.try_get_header("Content-Type"))
-                content_type = h->value;
-            handle_success(response, content_type);
-        }
-        catch (std::exception& e) {
-            handle_error(error{e.what(), response, content_type});
-        }
-    }
-
-
-    void
-    request_base::handle_success(const std::string& response,
-                                 const std::string& content_type)
-        noexcept
-    try {
-        if (success_func)
-            success_func(response, content_type);
-    }
-    catch (std::exception& e) {
-        TRACE_FUNC;
-        LOG_ERROR("{}", e.what());
-        handle_error(error{e.what(), response, content_type});
-    }
-    catch (...) {
-        TRACE_FUNC;
-        LOG_ERROR("caught unknown exception!\n"
-                  "<response>\n{}\n</response>",
-                  response);
-        handle_error(error{"unknown exception", response, content_type});
-    }
-
-
-    void
-    request_base::handle_error(const std::exception& e)
-        noexcept
-    try {
-        if (error_func)
-            error_func(e);
-    }
-    catch (std::exception& ee) {
-        TRACE_FUNC;
-        LOG_ERROR("{}", ee.what());
-    }
-    catch (...) {
-        TRACE_FUNC;
-        LOG_ERROR("caught unknown exception!");
-    }
-
-
-    /* ------------------- */
-    /* request_get methods */
-    /* ------------------- */
-
-    request_get::request_get(const std::string& url,
-                             const get_params_t& params,
-                             success_function_t success_func,
-                             error_function_t error_func) :
-        request_base{std::move(success_func), std::move(error_func)}
-    {
-        easy.set_url(make_url(url, params));
-    }
-
-
-    /* -------------------- */
-    /* request_post methods */
-    /* -------------------- */
-
-    request_post::request_post(const std::string& url,
-                               const std::string& body,
-                               success_function_t success_func,
-                               error_function_t error_func) :
-        request_base{std::move(success_func), std::move(error_func)}
-    {
-        easy.set_url(url);
-        easy.set_post(true);
-        easy.set_copy_post_fields(body);
-    }
-
-
-    /* ------------------------- */
-    /* json_request_base methods */
-    /* ------------------------- */
-
-    json_request_base::json_request_base(json_success_function_t json_success_func) :
-        request_base{},
-        json_success_func{std::move(json_success_func)}
-    {
-        easy.set_http_headers("Accept: application/json");
-    }
-
-
-    void
-    json_request_base::handle_success(const std::string& response,
-                                      const std::string& content_type)
-        noexcept
-    try {
-        if (!mime_type::match(content_type, "application/json")) {
-            handle_error(error{
-                    "invalid content type",
-                    response,
-                    content_type
-                });
-            return;
-        }
-        if (json_success_func)
-            json_success_func(response);
-    }
-    catch (std::exception& e) {
-        handle_error(error{e.what(), response, content_type});
-    }
-    catch (...) {
-        handle_error(error{"unknown exception", response, content_type});
-    }
-
-
-    /*--------------------------*/
-    /* json_request_get methods */
-    /*--------------------------*/
-
-    json_request_get::json_request_get(const std::string& base_url,
-                                       const get_params_t& params,
-                                       json_success_function_t json_success_func,
-                                       error_function_t error_func) :
-        request_base{{}, std::move(error_func)},
-        request_get{base_url, params},
-        json_request_base{std::move(json_success_func)}
-    {}
-
-
-    /* ------------------------- */
-    /* json_request_post methods */
-    /* ------------------------- */
-
-    json_request_post::json_request_post(const std::string& url,
-                                         const std::string& body,
-                                         json_success_function_t json_success_func,
-                                         error_function_t error_func) :
-        request_base{{}, std::move(error_func)},
-        request_post{url, body},
-        json_request_base{std::move(json_success_func)}
-    {
-        LOG_DEBUG("making json post request\n"
-                  "    URL: {}\n"
-                  "    body: {}",
-                  url,
-                  body);
-        easy.append_http_header("Content-Type: application/json");
-    }
-
-
-    /* ----------------- */
-    /* resources methods */
-    /* ----------------- */
-
-    resources::resources()
-    {
-        multi.set_max_total_connections(5);
-        multi.set_max_connections(5);
-    }
-
-
-    resources::~resources()
-        noexcept
-    {
-        for (auto& [key, val] : requests)
-            if (val)
-                multi.remove(val->easy);
-    }
-
-
-    void
-    resources::add(std::shared_ptr<request_base> req)
-    {
-        assert(req);
-        multi.add(req->easy);
-        requests.emplace(req->get_id(), std::move(req));
-    }
-
-
-    void
-    resources::remove(std::shared_ptr<request_base>& req)
-    {
-        assert(req);
-        multi.remove(req->easy);
-        requests.erase(req->get_id());
-    }
-
-
-    void
-    resources::process()
-    {
-        multi.perform();
-        for (auto& [easy, err] : multi.get_done()) {
-            auto id = easy->data();
-            auto it = requests.find(id);
-            if (it == requests.end()) {
-                LOG_ERROR("BUG: finished an unknown handle!");
-                continue;
-            }
-            auto req = std::move(it->second);
-            remove(req);
-            if (err)
-                req->handle_error(curl::error{err});
-            else
-                req->finish();
-        }
-    }
-
-
-    /* ------------- */
-    /* token methods */
-    /* ------------- */
-
-    token::token(std::shared_ptr<request_base> req)
-        noexcept :
-        req{std::move(req)}
-    {}
-
-
-    token::~token()
-        noexcept
-    {
-        detach();
-    }
-
-
-    status
-    token::get_status()
-        const noexcept
-    {
-        if (!req)
-            return status::invalid;
-        return req->current_status;
-    }
-
-
-    void
-    token::cancel()
-    {
-        if (req && req->current_status != status::finished) {
-            req->current_status = status::canceled;
-            res->remove(req);
-        }
-    }
-
-
-    void
-    token::detach()
-        noexcept
-    {
-        req.reset();
-    }
-
-
-    bool
-    token::is_pending()
-        const noexcept
-    {
-        if (!req)
-            return false;
-        return req->current_status == status::pending;
-    }
-
-
-    /* -------------- */
-    /* rest functions */
-    /* -------------- */
-
-    void
-    initialize(const std::string& ua)
-    {
-        TRACE_FUNC;
-
-        if (init_counter++)
-            return;
-
-        user_agent = ua;
-
-        res.emplace();
-    }
-
-
-    void
-    finalize()
-    {
-        TRACE_FUNC;
-
-        if (--init_counter)
-            return;
-
-        res.reset();
-    }
-
-
-    void
-    process()
-    {
-        assert(res);
-        res->process();
-    }
-
-
-    token
-    get_async(const std::string& base_url,
-              const get_params_t& params,
-              success_function_t success_func,
-              error_function_t error_func)
-    {
-        auto req = std::make_shared<request_get>(base_url,
-                                                 params,
-                                                 std::move(success_func),
-                                                 std::move(error_func));
-        res->add(req);
-        return token{std::move(req)};
-    }
-
-
-    token
-    post_async(const std::string& url,
-               const std::string& body,
-               success_function_t success_func,
-               error_function_t error_func)
-    {
-        auto req = std::make_shared<request_post>(url,
-                                                  body,
-                                                  std::move(success_func),
-                                                  std::move(error_func));
-        res->add(req);
-        return token{std::move(req)};
-    }
-
-
-    response_and_type_t
-    get_sync(const std::string& base_url,
-             const get_params_t& params)
-    {
-        std::string url = make_url(base_url, params);
-        curl::easy easy = make_easy(url);
-        byte_stream response_stream;
-        easy.set_write_function(
-            [&response_stream](std::span<const char> buf)
-            {
-                return response_stream.write(buf);
-            });
-        easy.perform();
-        std::string response = response_stream.read_str();
-        std::string content_type;
-        if (auto h = easy.try_get_header("Content-Type"))
-            content_type = h->value;
-        return {std::move(response), std::move(content_type)};
-    }
-
-
-    response_and_type_t
-    post_sync(const std::string& url,
-              const std::string& body)
-    {
-        curl::easy easy = make_easy(url);
-        easy.set_post(true);
-        easy.set_copy_post_fields(body);
-
-        byte_stream response_stream;
-        easy.set_write_function(
-            [&response_stream](std::span<const char> buf)
-            {
-                return response_stream.write(buf);
-            });
-        easy.perform();
-        std::string response = response_stream.read_str();
-        std::string content_type;
-        if (auto h = easy.try_get_header("Content-Type"))
-            content_type = h->value;
-        return {std::move(response), std::move(content_type)};
-    }
-
-
-    token
-    get_json_async(const std::string& base_url,
-                   const get_params_t& params,
-                   json_success_function_t json_success_func,
-                   error_function_t error_func)
-    {
-        auto req = std::make_shared<json_request_get>(base_url,
-                                                      params,
-                                                      std::move(json_success_func),
-                                                      std::move(error_func));
-        res->add(req);
-        return token{std::move(req)};
-    }
-
-
-    token
-    post_json_async(const std::string& url,
-                    const std::string& body,
-                    json_success_function_t success_func,
-                    error_function_t error_func)
-    {
-        auto req = std::make_shared<json_request_post>(url,
-                                                       body,
-                                                       std::move(success_func),
-                                                       std::move(error_func));
-        res->add(req);
-        return token{std::move(req)};
-    }
-
-
-    std::string
-    get_json_sync(const std::string& base_url,
-                  const get_params_t& params)
-    {
-        std::string url = make_url(base_url, params);
-        curl::easy easy = make_easy(url);
-        easy.set_http_headers("Accept: application/json");
-        byte_stream response_stream;
-        easy.set_write_function(
-            [&response_stream](std::span<const char> buf)
-            {
-                return response_stream.write(buf);
-            });
-        easy.perform();
-        std::string response = response_stream.read_str();
-        std::string content_type = easy.get_header("Content-Type").value;
-        if (!mime_type::match(content_type, "application/json"))
-            throw error{"Invalid content type", response, content_type};
-        return response;
-    }
-
-
-    std::string
-    post_json_sync(const std::string& url,
-                   const std::string& body)
-    {
-        curl::easy easy = make_easy(url);
-        easy.set_http_headers("Accept: application/json",
-                              "Content-Type: application/json");
-
-        easy.set_post(true);
-        easy.set_copy_post_fields(body);
-
-        byte_stream response_stream;
-        easy.set_write_function(
-            [&response_stream](std::span<const char> buf)
-            {
-                return response_stream.write(buf);
-            });
-        easy.perform();
-        std::string response = response_stream.read_str();
-        std::string content_type = easy.get_header("Content-Type").value;
-        if (!mime_type::match(content_type, "application/json"))
-            throw error{"Invalid content type", response, content_type};
-        return response;
-    }
-
-
-    /* ---------------- */
-    /* helper functions */
-    /* ---------------- */
-
-    curl::easy
-    make_easy(const std::string& url)
-    {
-        curl::easy easy;
-        easy.set_verbose(cfg.verbose_rest_logs); // TODO: set this during initialization
+        easy.set_verbose(params.verbose);
         LogManagerCurl::capture_curl_debug(easy);
-        if (!user_agent.empty())
-            easy.set_user_agent(user_agent);
+
+        easy.set_ssl_verify_peer(params.ssl_verify_peer);
+        easy.set_buffer_size(params.buffer_size);
+        easy.set_url(params.url);
+        // LOG_DEBUG("request url: {:?}", params.url);
+
+        if (params.user_agent)
+            easy.set_user_agent(*params.user_agent);
+
+        if (params.post_fields) {
+            easy.set_post(true);
+            easy.set_post_fields(*params.post_fields);
+            // LOG_DEBUG("request has post_fields:\n<fields>\n{}\n</fields>",
+            //           *params.post_fields);
+        }
+
+        if (params.accept_content_type)
+            easy.append_http_header("Accept: " + *params.accept_content_type);
+
+        if (params.request_content_type)
+            easy.append_http_header("Content-Type: " + *params.request_content_type);
+
         easy.set_accept_encoding("");
         easy.set_auto_referer(true);
-        easy.set_buffer_size(65536);
         easy.set_fail_on_error(true);
         easy.set_follow_location(true);
         easy.set_http_version(curl::easy::http_version::none);
-        easy.set_ssl_verify_peer(false);
         easy.set_tcp_no_delay(false);
         easy.set_transfer_encoding(true);
-        easy.set_url(url);
+
+        // Set up write callback.
+        easy.set_write_function(std::bind_front(&request::easy_write_func, this));
+    }
+
+
+    void
+    request::cancel()
+    {
+        status_ = status::canceled;
+    }
+
+
+    std::string_view
+    request::get_content()
+        const noexcept
+    {
+        return content;
+    }
+
+
+    std::string_view
+    request::get_content_type()
+        const noexcept
+    {
+        return content_type;
+    }
+
+
+    std::exception_ptr
+    request::get_error()
+        const noexcept
+    {
+        return error_ptr;
+    }
+
+
+    curl::easy&
+    request::get_easy()
+        noexcept
+    {
         return easy;
     }
 
 
-    std::string
-    make_url(const std::string& base_url,
-             const get_params_t& params)
+    CURL*
+    request::get_handle()
+        const noexcept
     {
-        if (params.empty())
-            return base_url;
-        std::string result = base_url;
-        const char* separator = "?";
-        for (auto& [key, val] : params) {
-            result += separator + curl::escape(key) + "=" + curl::escape(val);
-            separator = "&";
-        }
-        return result;
+        if (!easy)
+            return nullptr;
+        return easy.data();
     }
+
+
+    const request::params_t&
+    request::get_params()
+        const noexcept
+    {
+        return params;
+    }
+
+
+    request::status
+    request::get_status()
+        const noexcept
+    {
+        return status_;
+    }
+
+
+    void
+    request::process()
+    {
+        try {
+            easy.perform();
+            process_response();
+        }
+        catch (...) {
+            error_ptr = std::current_exception();
+            process_error();
+        }
+    }
+
+
+    void
+    request::process_error()
+        noexcept
+    {
+        status_ = status::finished;
+
+        try {
+            if (!error_ptr)
+                throw std::logic_error{"BUG: no error"};
+            std::rethrow_exception(error_ptr);
+        }
+        catch (std::exception& e) {
+            invoke_error_func(e);
+        }
+        catch (...) {
+            invoke_error_func(std::logic_error{"Unknown exception type"});
+        }
+    }
+
+
+    void
+    request::process_response()
+        noexcept
+    {
+        status_ = status::finished;
+
+        try {
+            // Enforce content type
+            if (params.accept_content_type) {
+                if (!mime_type::match(content_type, *params.accept_content_type)) {
+                    throw error{
+                        std::format("Content-Type mismatch: asked for {:?} but got {:?}",
+                                    *params.accept_content_type,
+                                    content_type),
+                        content,
+                        content_type
+                    };
+                }
+            }
+
+            if (params.response_func)
+                params.response_func(*this);
+        }
+        catch (...) {
+            error_ptr = std::current_exception();
+            process_error();
+        }
+    }
+
+
+    void
+    request::set_error(std::exception_ptr e)
+    {
+        error_ptr = std::move(e);
+    }
+
+
+    std::size_t
+    request::easy_write_func(std::span<const char> data)
+    {
+        if (status_ == status::pending) {
+            // First recv
+            status_ = status::receiving;
+            content_type = easy.try_get_content_type().value_or(""s);
+            // If length is known, reserve that.
+            if (auto content_length_header = easy.try_get_header("Content-Length")) {
+                auto size = std::stoull(content_length_header->value);
+                content.reserve(size);
+            }
+        }
+        content.append(data.data(), data.size());
+        return data.size();
+    }
+
+
+    void
+    request::invoke_error_func(const std::exception& e)
+        noexcept
+    {
+        try {
+            if (params.error_func)
+                params.error_func(e);
+        }
+        catch (std::exception& ee) {
+            LOG_ERROR("rest::request: error_func leaked exception: {}", ee.what());
+        }
+        catch (...) {
+            LOG_ERROR("rest::request: error_func leaked unknown exception");
+        }
+    }
+
+
+    manager::manager(config cfg_,
+                     const std::string& base_url_) :
+        cfg{std::move(cfg_)},
+        base_url{base_url_}
+    {
+        worker.multi.set_max_connections(cfg.max_connections);
+        worker.multi.set_max_total_connections(cfg.max_total_connections);
+
+        worker.thread = std::jthread{
+            std::bind_front(&manager::worker_thread_function, this)
+        };
+
+    }
+
+
+    manager::~manager()
+        noexcept
+    {
+        worker.thread = {};
+        if (!tasks.empty())
+            LOG_ERROR("Destroying rest::manager that had {} pending tasks.",
+                      tasks.size());
+
+        // Remove all easy handles from the multi.
+        for (auto& [key, req] : worker.active)
+            worker.multi.remove(req->get_easy());
+
+    }
+
+
+    void
+    manager::process()
+    {
+        tasks.dispatch_all();
+    }
+
+
+    void
+    manager::set_base_url(const std::string& base_url_)
+    {
+        base_url = base_url_;
+    }
+
+
+    request_ptr
+    manager::add(request::params_t params)
+    {
+        auto req = std::make_shared<request>(std::move(params));
+        new_requests.push(req);
+        return req;
+    }
+
+
+    request_ptr
+    manager::get(const std::string& path,
+                 response_function_t response_func,
+                 error_function_t error_func)
+    {
+        return get(
+            path,
+            {},
+            std::move(response_func),
+            std::move(error_func)
+        );
+    }
+
+
+    request_ptr
+    manager::get(const std::string& path,
+                 const get_params_t& get_params,
+                 response_function_t response_func,
+                 error_function_t error_func)
+    {
+        return add(
+            {
+                .error_func = std::move(error_func),
+                .response_func = std::move(response_func),
+                .url = make_url(base_url, path, get_params),
+                .user_agent = cfg.user_agent,
+            }
+        );
+    }
+
+
+    request_ptr
+    manager::get_json(const std::string& path,
+                      response_function_t response_func,
+                      error_function_t error_func)
+    {
+        return get_json(
+            path,
+            {},
+            std::move(response_func),
+            std::move(error_func)
+        );
+    }
+
+
+    request_ptr
+    manager::get_json(const std::string& path,
+                      const get_params_t& get_params,
+                      response_function_t response_func,
+                      error_function_t error_func)
+    {
+        return add(
+            {
+                .accept_content_type = "application/json",
+                .error_func = std::move(error_func),
+                .response_func = std::move(response_func),
+                .url = make_url(base_url, path, get_params),
+                .user_agent = cfg.user_agent,
+            }
+        );
+    }
+
+
+    request_ptr
+    manager::post(const std::string& path,
+                  std::string post_body,
+                  response_function_t response_func,
+                  error_function_t error_func)
+    {
+        return add(
+            {
+                .error_func = std::move(error_func),
+                .post_fields = std::move(post_body),
+                .response_func = std::move(response_func),
+                .url = make_url(base_url, path),
+                .user_agent = cfg.user_agent
+            }
+        );
+    }
+
+
+    request_ptr
+    manager::post_json(const std::string& path,
+                       std::string post_body,
+                       response_function_t response_func,
+                       error_function_t error_func)
+    {
+        return add(
+            {
+                .accept_content_type = "application/json",
+                .error_func = std::move(error_func),
+                .post_fields = std::move(post_body),
+                .request_content_type = "application/json",
+                .response_func = std::move(response_func),
+                .url = make_url(base_url, path),
+                .user_agent = cfg.user_agent,
+            }
+        );
+    }
+
+
+    void
+    manager::worker_thread_function(std::stop_token stopper)
+    {
+        try {
+            while (!stopper.stop_requested()) {
+
+                bool idle = true;
+
+                while (auto maybe_new_req = new_requests.try_pop()) {
+                    idle = false;
+                    auto& new_req = *maybe_new_req;
+                    if (new_req->get_status() != request::status::pending)
+                        continue;
+                    worker.active[new_req->get_handle()] = new_req;
+                    worker.multi.add(new_req->get_easy());
+                }
+
+                if (stopper.stop_requested())
+                    break;
+
+                // Remove all canceled requests.
+                std::erase_if(worker.active,
+                              [this](auto& item) -> bool
+                              {
+                                  auto& [key, req] = item;
+                                  if (req->get_status() == request::status::canceled) {
+                                      worker.multi.remove(req->get_easy());
+                                      return true;
+                                  }
+                                  return false;
+                              });
+
+                if (worker.multi.perform() > 0)
+                    idle = false;
+
+                if (stopper.stop_requested())
+                    break;
+
+                for (auto& [easy, err] : worker.multi.get_done()) {
+                    idle = false;
+                    auto key = easy->data();
+                    auto it = worker.active.find(key);
+                    if (it == worker.active.end()) {
+                        LOG_ERROR("BUG: finished transfer for unknown handle!");
+                        continue;
+                    }
+                    auto req = std::move(it->second);
+                    worker.multi.remove(req->get_easy());
+                    worker.active.erase(key);
+
+                    // Queue the appropriate task to the main thread.
+                    if (err) {
+                        req->set_error(
+                            std::make_exception_ptr(curl::error{err})
+                        );
+                        tasks.add("rest::task_process_error()"s,
+                                  task_process_error,
+                                  req);
+                    } else {
+                        tasks.add("rest::task_process_response()"s,
+                                  task_process_response,
+                                  req);
+                    }
+                }
+
+                if (stopper.stop_requested())
+                    break;
+
+                // Preserve CPU: if there was no work done this iteration, sleep for a while.
+                if (idle)
+                    std::this_thread::sleep_for(100ms);
+
+            }
+        }
+        catch (std::exception& e) {
+            LOG_ERROR("rest::manager thread stopped by exception: {}", e.what());
+        }
+        catch (...) {
+            LOG_ERROR("rest::manager thread stopped by unknown exception.");
+        }
+    }
+
+
+    request_ptr
+    get_sync(request::params_t params)
+    {
+        auto req = std::make_shared<request>(std::move(params));
+        req->process();
+        return req;
+    }
+
+
+    request_ptr
+    post_sync(request::params_t params)
+    {
+        auto req = std::make_shared<request>(std::move(params));
+        req->process();
+        return req;
+    }
+
 
 } // namespace rest

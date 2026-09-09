@@ -60,7 +60,7 @@ namespace StationDetailsPopup {
         std::optional<Station> station;
         std::string error_message;
         std::string error_content_type;
-        std::string error_response;
+        std::string error_content;
 
 
         /*-----------------------*/
@@ -94,9 +94,9 @@ namespace StationDetailsPopup {
             LOG_ERROR("{}", error_message);
             if (auto ee = dynamic_cast<const rest::error*>(&e)) {
                 error_content_type = ee->content_type;
-                error_response = ee->response;
-                LOG_ERROR("Content-Type: {}", error_content_type);
-                LOG_ERROR("Response:\n<response>\n{}\n</response>", error_response);
+                error_content = ee->content;
+                LOG_ERROR("Content-Type: {:?}", error_content_type);
+                LOG_ERROR("Content:\n<content>\n{}\n</content>", error_content);
             }
         }
 
@@ -121,7 +121,7 @@ namespace StationDetailsPopup {
             uuid.clear();
             error_message.clear();
             error_content_type.clear();
-            error_response.clear();
+            error_content.clear();
             station.reset();
         }
 
@@ -136,9 +136,9 @@ namespace StationDetailsPopup {
             Font smaller{nullptr, 0, 0.8};
             ImGui::TextWrapped(error_message);
             if (!error_content_type.empty())
-                ImGui::FormatText("Content-Type: {}", error_content_type);
-            if (!error_response.empty())
-                ImGui::FormatTextWrapped("Response:\n{}", error_response);
+                ImGui::FormatText("Content-Type: {:?}", error_content_type);
+            if (!error_content.empty())
+                ImGui::FormatTextWrapped("Content:\n{}", error_content);
         }
 
 
