@@ -23,6 +23,7 @@
 #include "enumerator.hpp"
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
+#include "TraceFunction.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
 
@@ -123,6 +124,8 @@ namespace LogsTab {
     process_ui()
     {
         using namespace ImGui::RAII;
+
+        TraceFunction tf{"LogsTab"sv};
 
         // Toolbar
 

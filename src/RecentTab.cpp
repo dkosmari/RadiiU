@@ -25,6 +25,7 @@
 #include "StationDetailsPopup.hpp"
 #include "StationGlaze.hpp"
 #include "string_utils.hpp"
+#include "TraceFunction.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
 
@@ -216,6 +217,8 @@ namespace RecentTab {
     process_ui()
     {
         using namespace ImGui::RAII;
+
+        TraceFunction tf{"RecentTab"sv};
 
         if (Child toolbar_child{
                 "toolbar",

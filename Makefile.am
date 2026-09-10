@@ -60,6 +60,8 @@ radiiu_elf_SOURCES = \
 	src/ConfirmExitPopup.hpp \
 	src/CountryManager.cpp \
 	src/CountryManager.hpp \
+	src/DebugWindow.cpp \
+	src/DebugWindow.hpp \
 	src/decoder.cpp \
 	src/decoder.hpp \
 	src/decoder_aac.cpp \
@@ -101,8 +103,6 @@ radiiu_elf_SOURCES = \
 	src/main.cpp \
 	src/mime_type.cpp \
 	src/mime_type.hpp \
-	src/PerfWindow.cpp \
-	src/PerfWindow.hpp \
 	src/PlayerTab.cpp \
 	src/PlayerTab.hpp \
 	src/pls.cpp \

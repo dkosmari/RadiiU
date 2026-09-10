@@ -14,18 +14,19 @@
 #include <imgui_raii.h>
 #include <imgui_stdlib.h>
 
-#include "PerfWindow.hpp"
+#include "DebugWindow.hpp"
 
 #include "App.hpp"
 #include "LogManager.hpp"
-#include "tracer.hpp"
 #include "thread_safe.hpp"
+#include "TraceManager.hpp"
+#include "tracer.hpp"
 
 
 using namespace std::literals;
 
 
-namespace PerfWindow {
+namespace DebugWindow {
 
     namespace {
 
@@ -64,6 +65,7 @@ namespace PerfWindow {
 
         // thread_safe<Collection> safe_collection;
         TimeSeries frame_time_history;
+        bool tracing = false;
 
 
         /*-----------------------*/
@@ -130,7 +132,7 @@ namespace PerfWindow {
         StyleColor transp_bg{ImGuiCol_WindowBg, {0.0f, 0.0f, 0.0f, 0.5f}};
 
         ImGui::SetNextWindowSize({680, 200}, ImGuiCond_Appearing);
-        if (Window perf_window{"PerfWindow",
+        if (Window debug_window{"DebugWindow",
                                nullptr,
                                ImGuiWindowFlags_None}) {
 
@@ -143,12 +145,23 @@ namespace PerfWindow {
                                      frame_time_history.get_first(),
                                      nullptr,
                                      0,
-                                     FLT_MAX,
+                                     75,
                                      {max_samples * 3, 0});
 
+                if (tracing) {
+                    if (ImGui::Button("Stop trace")) {
+                        TraceManager::stop();
+                        tracing = false;
+                    }
+                } else {
+                    if (ImGui::Button("Start trace")) {
+                        TraceManager::start();
+                        tracing = true;
+                    }
+                }
             }
 
-        } // perf_window
+        } // debug_window
     }
 
-} // namespace PerfWindow
+} // namespace DebugWindow

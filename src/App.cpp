@@ -55,7 +55,7 @@
 #include "ImageLoader.hpp"
 #include "LogManager.hpp"
 #include "LogsTab.hpp"
-#include "PerfWindow.hpp"
+#include "DebugWindow.hpp"
 #include "PlayerTab.hpp"
 #include "RadioBrowserAPI.hpp"
 #include "RecentTab.hpp"
@@ -208,8 +208,8 @@ namespace App {
                     "ImGui_ImplSDLRenderer2_RenderDrawData()"sv,
                     "App,ImGui"sv
                 };
-                    ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(),
-                                                          res->renderer.data());
+                ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(),
+                                                      res->renderer.data());
             }
 
 #ifdef __WIIU__
@@ -219,7 +219,12 @@ namespace App {
             res->renderer.draw_point(0, 0);
 #endif
 
-            res->renderer.present();
+            {
+                TraceDuration duration_sdl_present{"SDL_RenderPresent()"sv,
+                                                   "App,SDL"sv};
+                res->renderer.present();
+            }
+
             TraceManager::vsync();
         }
 
@@ -344,62 +349,94 @@ namespace App {
 
 #ifdef __WIIU__
             if (old_disable_swkbd != cfg.disable_swkbd) {
-                SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, cfg.disable_swkbd ? "0" : "1");
+                {
+                    TraceDuration d{"SDL_SetHint()"sv,
+                                    "SDL"sv};
+                    SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD,
+                                cfg.disable_swkbd ? "0" : "1");
+                }
                 old_disable_swkbd = cfg.disable_swkbd;
             }
 
-            std::uint32_t dim_enabled = 0;
-            IMError dim_error = IMIsDimEnabled(&dim_enabled);
-            VPADLcdMode current_vpad_mode;
-            VPADGetLcdMode(VPAD_CHAN_0, &current_vpad_mode);
-            if (!dim_error && dim_enabled) {
-                std::uint32_t dim_countdown = 0;
-                dim_error = IMGetTimeBeforeDimming(&dim_countdown);
-                if (!dim_error) {
-                    if (cfg.inactive_screen_off) {
-                        // This is the logic to turn the gamepad LCD off when the system
-                        // enters the dimmed state (screen burn-in protection.)
+            {
+                TraceDuration duration_dim{"DIM handling"sv,
+                                           "App"sv};
+                std::uint32_t dim_enabled = 0;
+                IMError dim_error;
+                {
+                    TraceDuration d{"IMIsDimEnabled()"sv,
+                                    "IM,cafe"sv};
+                    dim_error = IMIsDimEnabled(&dim_enabled);
+                }
+                VPADLcdMode current_vpad_mode;
+                {
+                    TraceDuration d{"VPADGetLcdMode()"sv,
+                                    "VPAD,cafe"};
+                    VPADGetLcdMode(VPAD_CHAN_0, &current_vpad_mode);
+                }
+                if (!dim_error && dim_enabled) {
+                    std::uint32_t dim_countdown = 0;
+                    {
+                        TraceDuration d{"IMGetTimeBeforeDimming"sv,
+                                        "IM,cafe"sv};
+                        dim_error = IMGetTimeBeforeDimming(&dim_countdown);
+                    }
 
-                        // TODO: find out how to do it with TV also.
-                        if (dim_countdown == 0) {
-                            if (current_vpad_mode != VPAD_LCD_STANDBY) {
-                                LOG_DEBUG("Screen dimming started, putting gamepad on standby.");
-                                current_vpad_mode = VPAD_LCD_STANDBY;
-                                VPADSetLcdMode(VPAD_CHAN_0, current_vpad_mode);
+                    if (!dim_error) {
+                        if (cfg.inactive_screen_off) {
+                            // This is the logic to turn the gamepad LCD off when the system
+                            // enters the dimmed state (screen burn-in protection.)
+
+                            // TODO: find out how to do it with TV also.
+                            if (dim_countdown == 0) {
+                                if (current_vpad_mode != VPAD_LCD_STANDBY) {
+                                    LOG_DEBUG("Screen dimming started, "
+                                              "putting gamepad on standby.");
+                                    current_vpad_mode = VPAD_LCD_STANDBY;
+                                    {
+                                        TraceDuration d{"VPADSetLcdMode()"sv,
+                                                        "VPAD,cafe"sv};
+                                        VPADSetLcdMode(VPAD_CHAN_0, current_vpad_mode);
+                                    }
+                                }
                             }
                         }
-                    }
 
-                    // If we leave the dimmed state, it counts as user input, for detecting
-                    // activity. Note that this event can be triggered by the gamepad's
-                    // accelerometers.
-                    if (dim_countdown > old_dim_countdown) {
-                        LOG_DEBUG("Detected activity from DIM");
-                        last_activity = SDL_GetTicks64();
-                        // Normally a standby gamepad only wakes up when using buttons or
-                        // sticks, this will wake on accelerometer and touch activity too.
-                        if (current_vpad_mode == VPAD_LCD_STANDBY) {
-                            LOG_DEBUG("Turning gamepad LCD backon.");
-                            current_vpad_mode = VPAD_LCD_ON;
-                            VPADSetLcdMode(VPAD_CHAN_0, current_vpad_mode);
+                        // If we leave the dimmed state, it counts as user input, for detecting
+                        // activity. Note that this event can be triggered by the gamepad's
+                        // accelerometers.
+                        if (dim_countdown > old_dim_countdown) {
+                            LOG_DEBUG("Detected activity from DIM");
+                            last_activity = SDL_GetTicks64();
+                            // Normally a standby gamepad only wakes up when using buttons or
+                            // sticks, this will wake on accelerometer and touch activity too.
+                            if (current_vpad_mode == VPAD_LCD_STANDBY) {
+                                LOG_DEBUG("Turning gamepad LCD backon.");
+                                current_vpad_mode = VPAD_LCD_ON;
+                                {
+                                    TraceDuration d{"VPADSetLcdMode()"sv,
+                                                    "VPAD,cafe"sv};
+                                    VPADSetLcdMode(VPAD_CHAN_0, current_vpad_mode);
+                                }
+                            }
                         }
-                    }
-                    if (dim_countdown == 0 && old_dim_countdown > 0) {
-                        LOG_DEBUG("Entered DIM state");
-                    }
+                        if (dim_countdown == 0 && old_dim_countdown > 0) {
+                            LOG_DEBUG("Entered DIM state");
+                        }
 
-                    old_dim_countdown = dim_countdown;
-                } else {
-                    LOG_ERROR("IMGetTimeBeforeDimming() failed: {}", static_cast<int>(dim_error));
+                        old_dim_countdown = dim_countdown;
+                    } else {
+                        LOG_ERROR("IMGetTimeBeforeDimming() failed: {}",
+                                  static_cast<int>(dim_error));
+                    }
                 }
-
             }
+
 #endif // __WIIU__
 
             process_events();
             if (!running)
                 return;
-
 
             try {
                 TraceDuration duration_tasks{"App::process()/tasks.dispatch_all()"sv,
@@ -426,6 +463,11 @@ namespace App {
 
             Uint64 now = SDL_GetTicks64();
 
+            {
+                TraceDuration duration_screensaver_transition{
+                    "App::process()/screensaver_transition"sv,
+                    "App"sv
+                };
             // process transitions to screen saver
             switch (screen_state) {
                 using enum ScreenState;
@@ -460,6 +502,7 @@ namespace App {
                     screen_state = ScreenState::normal;
                 }
 
+            }
 
             {
                 TraceDuration duration_render_block{"render block"sv,
@@ -529,9 +572,8 @@ namespace App {
             while (sdl::events::poll(event)) {
 
                 {
-                    TraceDuration duration_imgui_events{
-                        "ImGui_ImplSDL2_ProcessEvent()"sv,
-                        "App,ImGui"sv};
+                    TraceDuration duration_imgui_events{"ImGui_ImplSDL2_ProcessEvent()"sv,
+                                                        "App,ImGui"sv};
                     ImGui_ImplSDL2_ProcessEvent(&event);
                 }
 
@@ -753,7 +795,7 @@ namespace App {
             // ImGui::ShowStyleEditor();
             // ImGui::ShowDemoWindow();
 
-            PerfWindow::process_ui();
+            DebugWindow::process_ui();
         }
 
 
@@ -917,7 +959,7 @@ namespace App {
         initialize_imgui();
 
         // Initialize modules.
-        PerfWindow::initialize();
+        DebugWindow::initialize();
         Styles::initialize();
         ImageLoader::initialize(res->renderer);
         RadioBrowserAPI::initialize(get_user_agent(), cfg.server);
@@ -957,7 +999,7 @@ namespace App {
         RadioBrowserAPI::finalize();
         ImageLoader::finalize();
         Styles::finalize();
-        PerfWindow::finalize();
+        DebugWindow::finalize();
 
         finalize_imgui();
 

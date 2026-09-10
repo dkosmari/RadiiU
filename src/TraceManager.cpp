@@ -24,6 +24,10 @@
 #include <utility>
 #include <vector>
 
+#ifdef __WIIU__
+#include <coreinit/thread.h>
+#endif
+
 #include <glaze/json/write.hpp>
 #include <glaze/exceptions/core_exceptions.hpp>
 
@@ -121,7 +125,7 @@ namespace TraceManager {
         };
 
 
-        struct ThreadContext {
+        struct ThreadContext : std::enable_shared_from_this<ThreadContext> {
 
             thread_safe<EventBufferPtrList> safe_empty_buffers;
             thread_safe<EventBufferPtrList> safe_full_buffers;
@@ -149,19 +153,38 @@ namespace TraceManager {
             EventBufferPtr
             get_new_buffer_for(ThreadContextPtr ctx);
 
+            void
+            block_until_active();
+
         }; // struct ThreadContextManager
+
+
+        struct TraceActivator {
+
+            TraceActivator(ThreadContextManager& mgr_);
+
+            ~TraceActivator();
+
+            ThreadContextManager& mgr;
+
+        }; // struct TraceActivator
 
 
         // Constants
 
         constexpr custom_glz_opts_t custom_glz_opts;
 
-        std::size_t max_full_buffers_per_thread = 64;
+        const std::size_t max_full_buffers_per_thread = 64;
 
+#ifdef __WIIU__
+        const OSThreadSpecificID context_id = OS_THREAD_SPECIFIC_0;
+#endif
 
         /*-----------*/
         /* Variables */
         /*-----------*/
+
+        std::string current_process_name;
 
         std::chrono::steady_clock::time_point start_time;
 
@@ -169,8 +192,11 @@ namespace TraceManager {
 
         std::jthread collector_thread;
 
-        thread_local std::shared_ptr<ThreadContext> thread_context;
-
+#ifdef __WIIU__
+        thread_safe<std::unordered_map<std::thread::id, ThreadContextPtr>> safe_thread_contexts;
+#else
+        thread_local ThreadContextPtr thread_context;
+#endif
 
         /*-----------------------*/
         /* Function declarations */
@@ -179,6 +205,14 @@ namespace TraceManager {
         bool
         add_event(const Event& e)
             noexcept;
+
+        void
+        collect_active_events(std::ostream& output,
+                              std::stop_token& stopper,
+                              EventBufferPtrList& work_buffers,
+                              std::string& json_buffer,
+                              bool& started,
+                              std::vector<ThreadContextPtr>& producers);
 
         void
         collector_thread_function(std::stop_token stopper);
@@ -197,8 +231,8 @@ namespace TraceManager {
 
         bool
         dump_full_buffers(ThreadContextPtr& ctx,
-                          EventBufferPtrList& work_buffers,
                           std::ostream& output,
+                          EventBufferPtrList& work_buffers,
                           std::string& json_buffer,
                           bool& started);
 
@@ -209,7 +243,7 @@ namespace TraceManager {
         std::size_t
         get_tid();
 
-        ThreadContextPtr&
+        ThreadContext*
         get_thread_context();
 
         dbl_microseconds
@@ -287,8 +321,7 @@ namespace TraceManager {
         ThreadContextManager::shutdown()
         {
             active = false;
-            auto producers = safe_producers.lock();
-            producers->clear();
+            safe_producers.lock()->clear();
         }
 
 
@@ -311,6 +344,29 @@ namespace TraceManager {
         }
 
 
+        void
+        ThreadContextManager::block_until_active()
+        {
+            for (unsigned i = 0; i < 100; ++i) {
+                if (active)
+                    return;
+                std::this_thread::sleep_for(1ms);
+            }
+        }
+
+
+        TraceActivator::TraceActivator(ThreadContextManager& mgr_) :
+            mgr(mgr_)
+        {
+            mgr.active = true;
+        }
+
+        TraceActivator::~TraceActivator()
+        {
+            mgr.active = false;
+        }
+
+
         bool
         add_event(const Event& e)
             noexcept
@@ -318,7 +374,7 @@ namespace TraceManager {
             if (!context_manager.active)
                 return false;
 
-            auto& ctx = get_thread_context();
+            auto ctx = get_thread_context();
             try {
                 if (ctx->error != ThreadError::none)
                     return false;
@@ -339,7 +395,7 @@ namespace TraceManager {
                         cur = std::move(empty_buffers->front());
                         empty_buffers->pop_front();
                     } else
-                        cur = context_manager.get_new_buffer_for(ctx);
+                        cur = context_manager.get_new_buffer_for(ctx->shared_from_this());
                 }
 
                 if (!cur) {
@@ -363,12 +419,49 @@ namespace TraceManager {
 
 
         void
+        collect_active_events(std::ostream& output,
+                              std::stop_token& stopper,
+                              EventBufferPtrList& work_buffers,
+                              std::string& json_buffer,
+                              bool& started,
+                              std::vector<ThreadContextPtr>& producers)
+        {
+            TraceActivator activator{context_manager};
+
+            while (!stopper.stop_requested()) {
+
+                bool worked = false;
+
+                // With producers locked: collect all contexts into a vector.
+                producers.clear();
+                {
+                    auto all_producers = context_manager.safe_producers.lock();
+                    for (auto& [tid, ctx] : *all_producers)
+                        producers.push_back(ctx);
+                }
+
+                if (stopper.stop_requested())
+                    break;
+
+                for (auto& ctx : producers)
+                    if (dump_full_buffers(ctx,
+                                          output,
+                                          work_buffers,
+                                          json_buffer,
+                                          started))
+                        worked = true;
+
+                if (!worked)
+                    std::this_thread::sleep_for(10ms);
+            }
+        }
+
+
+        void
         collector_thread_function(std::stop_token stopper)
         {
             try {
                 LOG_DEBUG("Started collector thread");
-
-                context_manager.active = true;
 
                 auto filename = make_log_filename();
                 if (stopper.stop_requested())
@@ -382,51 +475,39 @@ namespace TraceManager {
 
                 output << "[\n";
 
-                // Note: these containers are held outside the loop so their memory can be
-                // reused, reducing alloations.
+                bool started = false; // used to track if we need commas in the output
+
+                // NOTE: keep buffer objects alive to reduce allocations.
+                EventBufferPtrList work_buffers;
                 std::string json_buffer;
                 std::vector<ThreadContextPtr> producers;
-                EventBufferPtrList work_buffers;
-                bool started = false;
 
-                while (!stopper.stop_requested()) {
-
-                    bool worked = false;
-
-                    // With producers locked: collect all contexts into a vector.
-                    producers.clear();
-                    {
-                        auto all_producers = context_manager.safe_producers.lock();
-                        for (auto& [tid, ctx] : *all_producers)
-                            producers.push_back(ctx);
-                    }
-
-                    if (stopper.stop_requested())
-                        break;
-
-                    for (auto& ctx : producers)
-                        if (dump_full_buffers(ctx, work_buffers, output, json_buffer, started))
-                            worked = true;
-
-                    if (!worked)
-                        std::this_thread::sleep_for(10ms);
-
-                }
-
-                context_manager.active = false;
+                collect_active_events(output,
+                                      stopper,
+                                      work_buffers,
+                                      json_buffer,
+                                      started,
+                                      producers);
 
                 std::println("Finishing event collection.");
                 // Assume all threads stopped generating events, so take their buffers.
                 auto all_producers = context_manager.safe_producers.lock();
                 for (auto& [tid, ctx] : *all_producers) {
                     std::println("Dumping full buffers from {}", tid);
-                    dump_full_buffers(ctx, work_buffers, output, json_buffer, started);
+                    dump_full_buffers(ctx,
+                                      output,
+                                      work_buffers,
+                                      json_buffer,
+                                      started);
                     // Also consume the current_buffer
                     if (ctx->current_buffer) {
                         std::println("Dumping current buffer from {}: {} events",
                                      tid,
                                      ctx->current_buffer->size());
-                        dump_buffer(ctx->current_buffer, output, json_buffer, started);
+                        dump_buffer(ctx->current_buffer,
+                                    output,
+                                    json_buffer,
+                                    started);
                     }
                 }
 
@@ -469,8 +550,8 @@ namespace TraceManager {
 
         bool
         dump_full_buffers(ThreadContextPtr& ctx,
-                          EventBufferPtrList& work_buffers,
                           std::ostream& output,
+                          EventBufferPtrList& work_buffers,
                           std::string& json_buffer,
                           bool& started)
         {
@@ -513,12 +594,27 @@ namespace TraceManager {
         }
 
 
-        ThreadContextPtr&
+        ThreadContext*
         get_thread_context()
         {
+#ifdef __WIIU__
+            auto ctx = reinterpret_cast<ThreadContext*>(OSGetThreadSpecific(context_id));
+            if (ctx)
+                return ctx;
+
+            auto result = std::make_shared<ThreadContext>();
+            {
+                auto thread_contexts = safe_thread_contexts.lock();
+                auto id = std::this_thread::get_id();
+                (*thread_contexts)[id] = result;
+            }
+            OSSetThreadSpecific(context_id, result.get());
+            return result.get();
+#else
             if (!thread_context)
                 thread_context = std::make_shared<ThreadContext>();
-            return thread_context;
+            return thread_context.get();
+#endif
         }
 
 
@@ -576,23 +672,35 @@ namespace TraceManager {
     {
         TRACE_FUNC;
 
-        start_time = std::chrono::steady_clock::now();
-
-        collector_thread = std::jthread{collector_thread_function};
-
-        for (unsigned i = 0; i < 100; ++i) {
-            if (context_manager.active)
-                break;
-            std::this_thread::sleep_for(1ms);
-        }
-
-        process_name(proc_name);
-        thread_name("main thread");
+        current_process_name = proc_name;
     }
 
 
     void
     finalize()
+    {
+        TRACE_FUNC;
+    }
+
+
+    void
+    start()
+    {
+        TRACE_FUNC;
+
+        start_time = std::chrono::steady_clock::now();
+
+        collector_thread = std::jthread{collector_thread_function};
+
+        context_manager.block_until_active();
+
+        process_name(current_process_name);
+        thread_name("main thread");
+    }
+
+
+    void
+    stop()
     {
         TRACE_FUNC;
 

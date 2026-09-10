@@ -23,6 +23,14 @@ namespace TraceManager {
     finalize();
 
 
+    void
+    start();
+
+
+    void
+    stop();
+
+
     bool
     duration_begin(std::string_view name,
                    std::optional<std::string_view> cat = {},

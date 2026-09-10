@@ -17,6 +17,9 @@
 #include "tracer.hpp"
 
 
+// TODO: move curl operations to a worker thread
+
+
 using namespace std::literals;
 
 

@@ -27,6 +27,7 @@
 #include "Settings.hpp"
 #include "StationDetailsPopup.hpp"
 #include "StationVoting.hpp"
+#include "TraceFunction.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
 
@@ -508,6 +509,8 @@ namespace BrowserTab {
     process_ui()
     {
         using namespace ImGui::RAII;
+
+        TraceFunction tf{"BrowserTab"sv};
 
         Disabled if_busy{RadioBrowserAPI::is_busy()};
 

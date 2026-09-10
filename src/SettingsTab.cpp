@@ -17,6 +17,7 @@
 #include "RadioBrowserAPI.hpp"
 #include "Settings.hpp"
 #include "Styles.hpp"
+#include "TraceFunction.hpp"
 #include "UI.hpp"
 
 
@@ -31,6 +32,8 @@ namespace SettingsTab {
     process_ui()
     {
         using namespace ImGui::RAII;
+
+        TraceFunction tf{"SettingsTab"sv};
 
         const ImGuiStyle& style = ImGui::GetStyle();
 

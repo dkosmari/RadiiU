@@ -35,10 +35,11 @@
 #include "AboutTab.hpp"
 
 #include "App.hpp"
-#include "ImageLoader.hpp"
 #include "IconsFontAwesome4.h"
+#include "ImageLoader.hpp"
 #include "LogManager.hpp"
 #include "string_utils.hpp"
+#include "TraceFunction.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
 
@@ -281,6 +282,8 @@ namespace AboutTab {
     process_ui()
     {
         using namespace ImGui::RAII;
+
+        TraceFunction tf{"AboutTab"sv};
 
         // Note: flat navigation doesn't work well on child windows that scroll.
         if (Child about{"about"}) {

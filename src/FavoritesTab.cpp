@@ -140,7 +140,7 @@ namespace FavoritesTab {
         {
             using namespace ImGui::RAII;
 
-            TraceFunction tf{"FavoritesTab"sv};
+            // TraceFunction tf{"FavoritesTab"sv};
 
             ID station_id{static_cast<const void*>(station.get())};
 
