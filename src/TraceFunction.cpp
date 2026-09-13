@@ -10,6 +10,8 @@
 #include "TraceFunction.hpp"
 
 
+#ifdef ENABLE_TRACING
+
 TraceFunction::TraceFunction(std::optional<std::string_view> cat_,
                              std::optional<glz::generic_u64> args,
                              const std::source_location& location)
@@ -21,3 +23,5 @@ TraceFunction::TraceFunction(std::optional<std::string_view> cat_,
         location
     }
 {}
+
+#endif // ENABLE_TRACING

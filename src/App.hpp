@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include "TabID.hpp"
@@ -58,21 +59,21 @@ namespace App {
     // Callbacks are called once every time around the main loop.
 
     void
-    add_callback(const std::string& name,
+    add_callback(std::string_view name,
                  Function func);
 
 
     // Tasks are called once, from the main loop.
 
     void
-    add_task_real(const std::string& name,
+    add_task_real(std::string_view name,
                   Function func);
 
     template<typename F,
              typename... Args>
     inline
     void
-    add_task(const std::string& name,
+    add_task(std::string_view name,
              F&& func,
              Args&&... args)
     {

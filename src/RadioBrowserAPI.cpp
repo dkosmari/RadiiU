@@ -184,42 +184,42 @@ namespace RadioBrowserAPI {
 
         void
         task_get_codecs(const CodecParams& params,
-                        GetCodecsResultFunction& result_func,
-                        ExceptionFunction& except_func);
+                        GetCodecsResultFunction result_func,
+                        ExceptionFunction except_func);
 
         void
         task_get_countries(const CountryParams& params,
-                           GetCountriesResultFunction& result_func,
-                           ExceptionFunction& except_func);
+                           GetCountriesResultFunction result_func,
+                           ExceptionFunction except_func);
 
         void
-        task_get_server_stats(GetServerStatsResultFunction& result_func,
-                              ExceptionFunction& except_func);
+        task_get_server_stats(GetServerStatsResultFunction result_func,
+                              ExceptionFunction except_func);
 
         void
         task_get_station(const string& uuid,
-                         GetStationResultFunction& result_func,
-                         ExceptionFunction& except_func);
+                         GetStationResultFunction result_func,
+                         ExceptionFunction except_func);
 
         void
         task_get_tags(const TagParams& params,
-                      GetTagsResultFunction& result_func,
-                      ExceptionFunction& except_func);
+                      GetTagsResultFunction result_func,
+                      ExceptionFunction except_func);
 
         void
         task_search_stations(const SearchStationParams& params,
-                             SearchStationsResultFunction& result_func,
-                             ExceptionFunction& except_func);
+                             SearchStationsResultFunction result_func,
+                             ExceptionFunction except_func);
 
         void
         task_send_click(const string& uuid,
-                        SendClickResultFunction& result_func,
-                        ExceptionFunction& except_func);
+                        SendClickResultFunction result_func,
+                        ExceptionFunction except_func);
 
         void
         task_send_vote(const string& uuid,
-                       SendVoteResultFunction& result_func,
-                       ExceptionFunction& except_func);
+                       SendVoteResultFunction result_func,
+                       ExceptionFunction except_func);
 
         void
         throw_if_stopped(std::stop_token& stopper);
@@ -302,7 +302,7 @@ namespace RadioBrowserAPI {
 
                 // Step 3: Invoke the result callback.
                 if (result_func) {
-                    pending_tasks.add("fetch_mirrors_thread()::result_func",
+                    pending_tasks.add("fetch_mirrors_thread()::result_func"sv,
                                       std::move(result_func),
                                       MirrorsVec{names.begin(), names.end()});
                 }
@@ -311,7 +311,7 @@ namespace RadioBrowserAPI {
                 string msg = e.what();
                 LOG_ERROR("{}", msg);
                 if (error_func)
-                    pending_tasks.add("fetch_mirrors_thread()::error_func",
+                    pending_tasks.add("fetch_mirrors_thread()::error_func"sv,
                                       std::move(error_func),
                                       std::move(msg));
             }
@@ -383,8 +383,8 @@ namespace RadioBrowserAPI {
 
         void
         task_get_codecs(const CodecParams& params,
-                        GetCodecsResultFunction& result_func,
-                        ExceptionFunction& except_func)
+                        GetCodecsResultFunction result_func,
+                        ExceptionFunction except_func)
         {
             start_call();
 
@@ -412,8 +412,8 @@ namespace RadioBrowserAPI {
 
         void
         task_get_countries(const CountryParams& params,
-                           GetCountriesResultFunction& result_func,
-                           ExceptionFunction& except_func)
+                           GetCountriesResultFunction result_func,
+                           ExceptionFunction except_func)
         {
             start_call();
 
@@ -440,8 +440,8 @@ namespace RadioBrowserAPI {
 
 
         void
-        task_get_server_stats(GetServerStatsResultFunction& result_func,
-                              ExceptionFunction& except_func)
+        task_get_server_stats(GetServerStatsResultFunction result_func,
+                              ExceptionFunction except_func)
         {
             start_call();
 
@@ -465,8 +465,8 @@ namespace RadioBrowserAPI {
 
         void
         task_get_station(const string& uuid,
-                         GetStationResultFunction& result_func,
-                         ExceptionFunction& except_func)
+                         GetStationResultFunction result_func,
+                         ExceptionFunction except_func)
         {
             start_call();
 
@@ -502,8 +502,8 @@ namespace RadioBrowserAPI {
 
         void
         task_get_tags(const TagParams& params,
-                      GetTagsResultFunction& result_func,
-                      ExceptionFunction& except_func)
+                      GetTagsResultFunction result_func,
+                      ExceptionFunction except_func)
         {
             start_call();
 
@@ -531,8 +531,8 @@ namespace RadioBrowserAPI {
 
         void
         task_search_stations(const SearchStationParams& params,
-                             SearchStationsResultFunction& result_func,
-                             ExceptionFunction& except_func)
+                             SearchStationsResultFunction result_func,
+                             ExceptionFunction except_func)
         {
             start_call();
 
@@ -560,8 +560,8 @@ namespace RadioBrowserAPI {
 
         void
         task_send_click(const string& uuid,
-                        SendClickResultFunction& result_func,
-                        ExceptionFunction& except_func)
+                        SendClickResultFunction result_func,
+                        ExceptionFunction except_func)
         {
             start_call();
 
@@ -586,8 +586,8 @@ namespace RadioBrowserAPI {
 
         void
         task_send_vote(const string& uuid,
-                       SendVoteResultFunction& result_func,
-                       ExceptionFunction& except_func)
+                       SendVoteResultFunction result_func,
+                       ExceptionFunction except_func)
         {
             start_call();
 
@@ -760,7 +760,7 @@ namespace RadioBrowserAPI {
                GetCodecsResultFunction result_func,
                ExceptionFunction except_func)
     {
-        pending_tasks.add("task_get_codecs()",
+        pending_tasks.add("task_get_codecs()"sv,
                           task_get_codecs,
                           params,
                           std::move(result_func),
@@ -773,7 +773,7 @@ namespace RadioBrowserAPI {
                   GetCountriesResultFunction result_func,
                   ExceptionFunction except_func)
     {
-        pending_tasks.add("task_get_countries()",
+        pending_tasks.add("task_get_countries()"sv,
                           task_get_countries,
                           params,
                           std::move(result_func),
@@ -785,7 +785,7 @@ namespace RadioBrowserAPI {
     get_server_stats(GetServerStatsResultFunction result_func,
                      ExceptionFunction except_func)
     {
-        pending_tasks.add("task_get_server_stats()",
+        pending_tasks.add("task_get_server_stats()"sv,
                           task_get_server_stats,
                           std::move(result_func),
                           std::move(except_func));
@@ -797,7 +797,7 @@ namespace RadioBrowserAPI {
                 GetStationResultFunction result_func,
                 ExceptionFunction except_func)
     {
-        pending_tasks.add("task_get_station()",
+        pending_tasks.add("task_get_station()"sv,
                           task_get_station,
                           uuid,
                           std::move(result_func),
@@ -810,7 +810,7 @@ namespace RadioBrowserAPI {
              GetTagsResultFunction result_func,
              ExceptionFunction except_func)
     {
-        pending_tasks.add("task_get_tags()",
+        pending_tasks.add("task_get_tags()"sv,
                           task_get_tags,
                           params,
                           std::move(result_func),
@@ -823,7 +823,7 @@ namespace RadioBrowserAPI {
                     SearchStationsResultFunction result_func,
                     ExceptionFunction except_func)
     {
-        pending_tasks.add("task_search_stations()",
+        pending_tasks.add("task_search_stations()"sv,
                           task_search_stations,
                           params,
                           std::move(result_func),
@@ -836,7 +836,7 @@ namespace RadioBrowserAPI {
                SendClickResultFunction result_func,
                ExceptionFunction except_func)
     {
-        pending_tasks.add("task_send_click()",
+        pending_tasks.add("task_send_click()"sv,
                           task_send_click,
                           uuid,
                           std::move(result_func),
@@ -849,7 +849,7 @@ namespace RadioBrowserAPI {
               SendVoteResultFunction result_func,
               ExceptionFunction except_func)
     {
-        pending_tasks.add("task_send_vote()",
+        pending_tasks.add("task_send_vote()"sv,
                           task_send_vote,
                           uuid,
                           std::move(result_func),

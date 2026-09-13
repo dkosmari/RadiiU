@@ -165,7 +165,7 @@ namespace LogManager {
     clear()
     {
         if (std::this_thread::get_id() != main_thread_id)
-            App::add_task("LogManager::task_clear()",
+            App::add_task("LogManager::task_clear()"sv,
                           task_clear);
         else
             task_clear();
@@ -201,11 +201,11 @@ namespace LogManager {
     log(Message msg)
     {
         if (std::this_thread::get_id() != main_thread_id)
-            App::add_task("LogManager::task_log()",
+            App::add_task("LogManager::task_log()"sv,
                           task_log,
                           std::move(msg));
         else {
-            std::println("logging from the main thread");
+            // std::println("logging from the main thread");
             task_log(msg);
         }
     }

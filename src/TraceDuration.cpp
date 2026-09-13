@@ -14,6 +14,7 @@
 
 using namespace std::literals;
 
+#ifdef ENABLE_TRACING
 
 TraceDuration::TraceDuration(std::string_view name_,
                              std::optional<std::string_view> cat_,
@@ -38,3 +39,5 @@ TraceDuration::~TraceDuration()
     if (success)
         TraceManager::duration_end(name, cat);
 }
+
+#endif // ENABLE_TRACING

@@ -132,7 +132,7 @@ namespace RecentTab {
                         StationDetailsPopup::open(station->stationuuid);
 
                     if (ImGui::Button(ICON_FA_TRASH_O, UI::get_small_button_size())) // 🗑
-                        App::add_task("RecentTab::task_remove()",
+                        App::add_task("RecentTab::task_remove()"sv,
                                       task_remove,
                                       index);
                     ImGui::SetItemTooltip("Remove station from recent history.");
@@ -276,7 +276,7 @@ namespace RecentTab {
     void
     add(ConstStationPtr station)
     {
-        App::add_task("RecentTab::task_add()",
+        App::add_task("RecentTab::task_add()"sv,
                       task_add,
                       std::move(station));
     }

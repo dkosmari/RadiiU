@@ -8,6 +8,12 @@
 #ifndef TRACE_FUNCTION_HPP
 #define TRACE_FUNCTION_HPP
 
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#ifdef ENABLE_TRACING
+
 #include "TraceDuration.hpp"
 
 
@@ -19,5 +25,19 @@ struct TraceFunction : TraceDuration {
         noexcept;
 
 }; // struct TraceFunction
+
+#else
+
+struct TraceFunction {
+
+    template<typename... Args>
+    constexpr
+    TraceFunction(Args&&...)
+        noexcept
+    {}
+
+}; // struct TraceFunction
+
+#endif
 
 #endif

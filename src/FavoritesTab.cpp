@@ -175,7 +175,7 @@ namespace FavoritesTab {
                         // ▲
                         if (ImGui::Button(ICON_FA_CHEVRON_UP,
                                           UI::get_small_button_size())) {
-                            App::add_task("FavoritesTab::task_move_up()",
+                            App::add_task("FavoritesTab::task_move_up()"sv,
                                           task_move_up,
                                           index);
                         }
@@ -189,7 +189,7 @@ namespace FavoritesTab {
                         // ▼
                         if (ImGui::Button(ICON_FA_CHEVRON_DOWN,
                                           UI::get_small_button_size())) {
-                            App::add_task("FavoritesTab::task_move_down()",
+                            App::add_task("FavoritesTab::task_move_down()"sv,
                                           task_move_down,
                                           index);
                         }

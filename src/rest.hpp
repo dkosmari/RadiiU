@@ -23,6 +23,7 @@
 #include <curlxx/easy.hpp>
 #include <curlxx/multi.hpp>
 
+#include "async_queue.hpp"
 #include "async_task_queue.hpp"
 
 

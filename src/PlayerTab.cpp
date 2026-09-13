@@ -650,7 +650,7 @@ namespace PlayerTab {
     {
         load();
 
-        App::add_callback("PlayerTab::process_logic()",
+        App::add_callback("PlayerTab::process_logic()"sv,
                           process_logic);
     }
 

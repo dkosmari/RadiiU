@@ -53,6 +53,17 @@ AC_DEFINE_UNQUOTED([MPG123_VERSION],
                    ["`$PKG_CONFIG --modversion libmpg123`"],
                    [version of mpg123])
 
+
+AC_ARG_ENABLE([debug],
+              [AS_HELP_STRING([--enable-debug],
+                              [Enable debug options (debug window, tracing, etc)])])
+AS_VAR_IF([enable_debug], [yes],
+          [
+              AC_DEFINE([ENABLE_TRACING], [1], [Enable collecting execution traces.])
+              AC_DEFINE([ENABLE_DEBUG_WINDOW], [1], [Show the debug window.])
+          ])
+AM_CONDITIONAL([ENABLE_DEBUG], [test x$enable_debug = xyes])
+
 AX_SUBDIRS_CONFIGURE([external/curlxx],
                      [[--enable-static-libcurl],
                       [--disable-shared],

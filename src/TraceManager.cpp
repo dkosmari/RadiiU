@@ -90,7 +90,7 @@ namespace TraceManager {
                 const noexcept;
 
             void
-            add(const Event& e);
+            add(Event e);
 
             DataArray::const_iterator
             begin()
@@ -131,7 +131,7 @@ namespace TraceManager {
             thread_safe<EventBufferPtrList> safe_full_buffers;
             EventBufferPtr current_buffer;
             ThreadError error = ThreadError::none;
-
+            std::string name;
         }; //struct ThreadContext
 
         using ThreadContextPtr = std::shared_ptr<ThreadContext>;
@@ -203,7 +203,7 @@ namespace TraceManager {
         /*-----------------------*/
 
         bool
-        add_event(const Event& e)
+        add_event(Event e)
             noexcept;
 
         void
@@ -228,6 +228,12 @@ namespace TraceManager {
                      std::ostream& output,
                      std::string& json_buffer,
                      bool& started);
+
+        void
+        dump_event(const Event& event,
+                   std::ostream& output,
+                   std::string& json_buffer,
+                   bool& started);
 
         bool
         dump_full_buffers(ThreadContextPtr& ctx,
@@ -285,10 +291,10 @@ namespace TraceManager {
 
 
         void
-        EventBuffer::add(const Event& e)
+        EventBuffer::add(Event e)
         {
             if (size_ < data_.size())
-                data_[size_++] = e;
+                data_[size_++] = std::move(e);
         }
 
 
@@ -321,7 +327,6 @@ namespace TraceManager {
         ThreadContextManager::shutdown()
         {
             active = false;
-            safe_producers.lock()->clear();
         }
 
 
@@ -361,6 +366,7 @@ namespace TraceManager {
             mgr.active = true;
         }
 
+
         TraceActivator::~TraceActivator()
         {
             mgr.active = false;
@@ -368,13 +374,16 @@ namespace TraceManager {
 
 
         bool
-        add_event(const Event& e)
+        add_event(Event e)
             noexcept
         {
+            auto ctx = get_thread_context();
+            if (e.ph == 'M' && e.args)
+                ctx->name = (*e.args)["name"].as<std::string>();
+
             if (!context_manager.active)
                 return false;
 
-            auto ctx = get_thread_context();
             try {
                 if (ctx->error != ThreadError::none)
                     return false;
@@ -403,7 +412,7 @@ namespace TraceManager {
                     return false;
                 }
 
-                cur->add(e);
+                cur->add(std::move(e));
 
                 return true;
             }
@@ -452,7 +461,7 @@ namespace TraceManager {
                         worked = true;
 
                 if (!worked)
-                    std::this_thread::sleep_for(10ms);
+                    std::this_thread::sleep_for(100ms);
             }
         }
 
@@ -461,7 +470,7 @@ namespace TraceManager {
         collector_thread_function(std::stop_token stopper)
         {
             try {
-                LOG_DEBUG("Started collector thread");
+                LOG_DEBUG("Starting trace collector thread");
 
                 auto filename = make_log_filename();
                 if (stopper.stop_requested())
@@ -509,9 +518,23 @@ namespace TraceManager {
                                     json_buffer,
                                     started);
                     }
+                    // Add a name event, for good measure
+                    glz::generic_u64 args;
+                    args["name"] = ctx->name;
+                    Event name_event{
+                        .ts = get_timestamp_floor(),
+                        .name = "thread_name"sv,
+                        .tid = tid,
+                        .pid = 1,
+                        .ph = 'M',
+                        .args = std::move(args),
+                    };
+                    dump_event(name_event, output, json_buffer, started);
                 }
 
                 output << "\n]\n";
+
+                LOG_DEBUG("Finishing trace collector thread");
             }
             catch (std::exception& e) {
                 LOG_ERROR("dumping traces: {}", e.what());
@@ -525,14 +548,8 @@ namespace TraceManager {
                     std::string& json_buffer,
                     bool& started)
         {
-            for (const auto& event : *buffer) {
-                json_buffer.clear();
-                glz::ex::write<custom_glz_opts>(event, json_buffer);
-                if (started)
-                    output << ",\n";
-                output << json_buffer;
-                started = true;
-            }
+            for (const auto& event : *buffer)
+                dump_event(event, output, json_buffer, started);
             buffer->clear();
         }
 
@@ -545,6 +562,21 @@ namespace TraceManager {
         {
             for (auto& buffer : buffers)
                 dump_buffer(buffer, output, json_buffer, started);
+        }
+
+
+        void
+        dump_event(const Event& event,
+                   std::ostream& output,
+                   std::string& json_buffer,
+                   bool& started)
+        {
+            json_buffer.clear();
+            glz::ex::write<custom_glz_opts>(event, json_buffer);
+            if (started)
+                output << ",\n";
+            output << json_buffer;
+            started = true;
         }
 
 

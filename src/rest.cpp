@@ -16,6 +16,7 @@
 #include "LogManager.hpp"
 #include "LogManagerCurl.hpp"
 #include "mime_type.hpp"
+#include "TraceManager.hpp"
 #include "tracer.hpp"
 
 
@@ -458,6 +459,8 @@ namespace rest {
     manager::worker_thread_function(std::stop_token stopper)
     {
         try {
+            TraceManager::thread_name("rest worker thread"sv);
+
             while (!stopper.stop_requested()) {
 
                 bool idle = true;
@@ -509,11 +512,11 @@ namespace rest {
                         req->set_error(
                             std::make_exception_ptr(curl::error{err})
                         );
-                        tasks.add("rest::task_process_error()"s,
+                        tasks.add("rest::task_process_error()"sv,
                                   task_process_error,
                                   req);
                     } else {
-                        tasks.add("rest::task_process_response()"s,
+                        tasks.add("rest::task_process_response()"sv,
                                   task_process_response,
                                   req);
                     }

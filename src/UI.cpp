@@ -10,7 +10,6 @@
 #include <iostream>
 #include <optional>
 #include <stdexcept>
-#include <unordered_map>
 
 #include <imgui_raii.h>
 #include <imgui_stdlib.h>
@@ -61,27 +60,23 @@ namespace UI {
         };
 
 
-        struct SmoothScrollState {
-            ImVec2 start_pos;
-            ImVec2 final_pos;
-            double start_time;
-        };
-
-
         /*-----------*/
         /* Constants */
         /*-----------*/
 
         const int favicon_height = 173;
 
-        const float smooth_scroll_duration = 0.5f;
+        constexpr const char* key_smooth_scroll_start_pos_x = "smooth_scroll.start_pos.x";
+        constexpr const char* key_smooth_scroll_start_pos_y = "smooth_scroll.start_pos.y";
+        constexpr const char* key_smooth_scroll_final_pos_x = "smooth_scroll.final_pos.x";
+        constexpr const char* key_smooth_scroll_final_pos_y = "smooth_scroll.final_pos.y";
+        constexpr const char* key_smooth_scroll_start_time  = "smooth_scroll.start_time";
+        constexpr const char* key_smooth_scroll_duration    = "smooth_scroll.duration";
 
 
         /*-----------*/
         /* Variables */
         /*-----------*/
-
-        std::unordered_map<ImGuiID, SmoothScrollState> smooth_scroll_state;
 
 
         /*-----------------------*/
@@ -95,6 +90,10 @@ namespace UI {
                              const Pt& d0,
                              const Pt& d1,
                              float t);
+
+        void
+        erase_from_storage(ImGuiStorage* storage,
+                           ImGuiID id);
 
         std::pair<double, double>
         get_scales_for(const sdl::vec2& input,
@@ -125,6 +124,19 @@ namespace UI {
             Pt c =                        d0;
             Pt d =      p0;
             return a * t*t*t + b * t*t + c * t + d;
+        }
+
+
+        void
+        erase_from_storage(ImGuiStorage* storage,
+                           ImGuiID id)
+        {
+            auto it = std::ranges::lower_bound(storage->Data,
+                                               id,
+                                               {},
+                                               &ImGuiStoragePair::key);
+            if (it != storage->Data.end() && it->key == id)
+                storage->Data.erase(it);
         }
 
 
@@ -818,24 +830,33 @@ namespace UI {
 
 
     void
-    SmoothScroll(const ImVec2& target)
+    SmoothScroll(const ImVec2& target,
+                 float duration)
     {
         // TraceFunction tf{"UI"sv};
 
-        auto id = ImGui::GetID("");
-
-        ImVec2 old_pos = { ImGui::GetScrollX(), ImGui::GetScrollY() };
-        ImVec2 new_pos = {
-            target.x < 0 ? old_pos.x : target.x,
-            target.y < 0 ? old_pos.y : target.y
+        ImVec2 start_pos = { ImGui::GetScrollX(), ImGui::GetScrollY() };
+        ImVec2 final_pos = {
+            target.x < 0 ? start_pos.x : target.x,
+            target.y < 0 ? start_pos.y : target.y
         };
-        double now = ImGui::GetTime();
-        smooth_scroll_state[id] = {old_pos, new_pos, now};
+        double start_time = ImGui::GetTime();
+
+        auto storage = ImGui::GetStateStorage();
+
+        storage->SetFloat(ImGui::GetID(key_smooth_scroll_start_pos_x), start_pos.x);
+        storage->SetFloat(ImGui::GetID(key_smooth_scroll_start_pos_y), start_pos.y);
+
+        storage->SetFloat(ImGui::GetID(key_smooth_scroll_final_pos_x), final_pos.x);
+        storage->SetFloat(ImGui::GetID(key_smooth_scroll_final_pos_y), final_pos.y);
+
+        storage->SetFloat(ImGui::GetID(key_smooth_scroll_start_time), start_time);
+        storage->SetFloat(ImGui::GetID(key_smooth_scroll_duration), duration);
     }
 
 
     void
-    SmoothScrollItem()
+    SmoothScrollItem(float duration)
     {
         // TraceFunction tf{"UI"sv};
 
@@ -896,7 +917,7 @@ namespace UI {
         }
 
         if (new_scroll != scroll)
-            SmoothScroll(new_scroll);
+            SmoothScroll(new_scroll, duration);
     }
 
 
@@ -905,25 +926,52 @@ namespace UI {
     {
         // TraceFunction tf{"UI"sv};
 
-        auto id = ImGui::GetID("");
-        if (!smooth_scroll_state.contains(id))
-            return;
+        auto storage = ImGui::GetStateStorage();
+        auto id_duration = ImGui::GetID(key_smooth_scroll_duration);
 
-        auto& state = smooth_scroll_state.at(id);
-        double now = ImGui::GetTime();
-        float dt = (now - state.start_time) / smooth_scroll_duration;
+        if (std::ranges::binary_search(storage->Data,
+                                       id_duration,
+                                       {},
+                                       &ImGuiStoragePair::key)) {
 
-        auto pos = cubic_hermite_spline(state.start_pos,
-                                        state.final_pos,
-                                        ImVec2{0, 0},
-                                        ImVec2{0, 0},
-                                        dt);
+            auto id_start_pos_x = ImGui::GetID(key_smooth_scroll_start_pos_x);
+            auto id_start_pos_y = ImGui::GetID(key_smooth_scroll_start_pos_y);
+            auto id_final_pos_x = ImGui::GetID(key_smooth_scroll_final_pos_x);
+            auto id_final_pos_y = ImGui::GetID(key_smooth_scroll_final_pos_y);
+            auto id_start_time  = ImGui::GetID(key_smooth_scroll_start_time);
 
-        ImGui::SetScrollX(pos.x);
-        ImGui::SetScrollY(pos.y);
+            ImVec2 start_pos;
+            start_pos.x = storage->GetFloat(id_start_pos_x);
+            start_pos.y = storage->GetFloat(id_start_pos_y);
 
-        if (dt >= 1)
-            smooth_scroll_state.erase(id);
+            ImVec2 final_pos;
+            final_pos.x = storage->GetFloat(id_final_pos_x);
+            final_pos.y = storage->GetFloat(id_final_pos_y);
+
+            double start_time = storage->GetFloat(id_start_time);
+            float duration = storage->GetFloat(id_duration);
+
+            double now = ImGui::GetTime();
+            float dt = (now - start_time) / duration;
+
+            auto pos = cubic_hermite_spline(start_pos,
+                                            final_pos,
+                                            ImVec2{0, 0},
+                                            ImVec2{0, 0},
+                                            dt);
+
+            ImGui::SetScrollX(pos.x);
+            ImGui::SetScrollY(pos.y);
+
+            if (dt >= 1) {
+                erase_from_storage(storage, id_start_pos_x);
+                erase_from_storage(storage, id_start_pos_y);
+                erase_from_storage(storage, id_final_pos_x);
+                erase_from_storage(storage, id_final_pos_y);
+                erase_from_storage(storage, id_start_time);
+                erase_from_storage(storage, id_duration);
+            }
+        }
     }
 
 

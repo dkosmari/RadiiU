@@ -9,13 +9,12 @@
 #define ASYNC_TASK_QUEUE_HPP
 
 #include <cstddef>
+#include <deque>
 #include <functional>
+#include <mutex>
 #include <stdexcept>
-#include <stop_token>
-#include <string>
+#include <string_view>
 #include <utility>
-
-#include "async_queue.hpp"
 
 
 struct async_task_queue {
@@ -24,10 +23,10 @@ struct async_task_queue {
 
         std::string name;
 
-        error(const std::string& name,
+        error(std::string_view name_,
               const char* message);
 
-        error(const std::string& name,
+        error(std::string_view name_,
               const std::string& message);
 
     }; // struct error
@@ -40,13 +39,13 @@ struct async_task_queue {
 
         using function_type = std::move_only_function<void()>;
 
-        std::string name;
+        std::string_view name;
         function_type function;
 
     }; // struct task_type
 
 
-    using queue_type = async_queue<task_type>;
+    using queue_type = std::deque<task_type>;
 
 
     async_task_queue()
@@ -55,7 +54,7 @@ struct async_task_queue {
     template<typename... Args>
     explicit
     async_task_queue(Args&&... args) :
-        tasks(std::forward<Args>(args)...)
+        queued_tasks(std::forward<Args>(args)...)
     {}
 
 
@@ -77,11 +76,13 @@ struct async_task_queue {
     template<typename F,
              typename... Args>
     void
-    add(const std::string& name,
+    add(std::string_view name,
         F&& func,
         Args&&... args)
     {
-        tasks.emplace(
+        std::lock_guard guard{queued_tasks_mutex};
+
+        queued_tasks.emplace_back(
             name,
             [
                 func = std::forward<F>(func),
@@ -89,7 +90,7 @@ struct async_task_queue {
             ]
                 mutable
             {
-                std::invoke(func, args...);
+                func(std::move(args)...);
             }
         );
     }
@@ -97,9 +98,6 @@ struct async_task_queue {
 
     bool
     dispatch_one();
-
-    bool
-    dispatch_one(std::stop_token& stopper);
 
 
     bool
@@ -109,9 +107,6 @@ struct async_task_queue {
     std::size_t
     dispatch_all();
 
-    std::size_t
-    dispatch_all(std::stop_token& stopper);
-
 
     std::size_t
     try_dispatch_all();
@@ -119,12 +114,15 @@ struct async_task_queue {
 
 private:
 
-    queue_type tasks;
+    mutable std::mutex queued_tasks_mutex;
+    queue_type queued_tasks;
+
     queue_type deferred_tasks;
+    queue_type dispatch_tasks;
 
 
     void
-    promote_deferred_tasks();
+    try_requeue_deferred_tasks();
 
 }; // task_queue
 

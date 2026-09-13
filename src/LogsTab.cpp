@@ -65,8 +65,8 @@ namespace LogsTab {
         /*-----------*/
 
         LogManager::Timestamp timestamp;
-
         LogLevel min_level;
+        bool auto_scroll = true;
 
 
         /*-----------------------*/
@@ -77,6 +77,12 @@ namespace LogsTab {
         operator ==(const std::source_location& a,
                     const std::source_location& b)
             noexcept;
+
+        void
+        show_logs();
+
+        void
+        show_toolbar();
 
 
         /*----------------------*/
@@ -95,6 +101,151 @@ namespace LogsTab {
             if (a.column() != b.column())
                 return false;
             return true;
+        }
+
+
+        void
+        show_logs()
+        {
+            using namespace ImGui::RAII;
+
+            StyleColor bg_color{ImGuiCol_ChildBg, log_bg_color};
+            if (Child text_box{"text_box",
+                               {0, 0},
+                               ImGuiChildFlags_Borders}) {
+
+                Font font{nullptr, log_font_size};
+
+                float level_label_width = 0;
+                for (auto level : enumerator::enumerate(min_level))
+                    level_label_width = std::fmax(level_label_width,
+                                                  ImGui::CalcTextSize(to_string(level)).x);
+
+                // Use this to collapse repeated messages from the same location.
+                std::optional<std::source_location> prev_location;
+                std::optional<std::string> prev_tag;
+
+                LogManager::for_each(
+                    min_level,
+                    [
+                        level_label_width,
+                        &prev_location,
+                        &prev_tag
+                    ](const LogManager::Message& msg)
+                    {
+                        bool skip_header =
+                            (prev_location && *prev_location == msg.location)
+                            &&
+                            (prev_tag && *prev_tag == msg.tag);
+
+                        prev_location = msg.location;
+                        prev_tag = msg.tag;
+
+                        if (!skip_header) {
+
+                            {
+                                auto idx = std::to_underlying(msg.level);
+                                StyleColor text_color{ImGuiCol_Text, log_level_colors.at(idx)};
+                                ImGui::TextAligned(0.0f, level_label_width, to_string(msg.level));
+                            }
+
+                            ImGui::SameLine();
+
+                            {
+                                StyleColor text_color{ImGuiCol_Text, log_location_color};
+                                ImGui::FormatText("{}:{}",
+                                                  msg.location.file_name(),
+                                                  msg.location.line());
+                            }
+                            // NOTE: use regular theme text color for the popup.
+                            if (ItemTooltip function_tooltip{}) {
+                                TextWrapPos wrap_at{900};
+                                ImGui::Text(msg.location.function_name());
+                            }
+
+                            if (!msg.tag.empty()) {
+                                Indent one;
+                                StyleColor text_color{ImGuiCol_Text, log_tag_color};
+                                ImGui::TextWrapped(msg.tag);
+                            }
+
+                        }
+
+                        {
+                            Indent one;
+                            Indent two;
+                            StyleColor text_color{ImGuiCol_Text, log_text_color};
+                            ImGui::TextWrapped(msg.text);
+                        }
+                    }
+                );
+
+                auto new_timestamp = LogManager::get_timestamp();
+                if (auto_scroll && new_timestamp != timestamp) {
+                    // Make sure last added line is visible.
+                    UI::SmoothScrollItem(0.25f);
+                    timestamp = new_timestamp;
+                }
+                UI::DoSmoothScroll();
+            }
+        }
+
+
+        void
+        show_toolbar()
+        {
+            using namespace ImGui::RAII;
+
+            if (ImGui::Button("Clear"))
+                LogManager::clear();
+
+            ImGui::SameLine();
+
+            if (ImGui::Button(ICON_FA_DOWNLOAD " Save"))
+                LogManager::save();
+
+            ImGui::SameLine();
+
+            auto& style = ImGui::GetStyle();
+            float combo_width =
+                ImGui::CalcTextSize("DEBUG").x +
+                ImGui::GetFrameHeight() +
+                2 * style.FramePadding.x;
+            ImGui::SetNextItemWidth(combo_width);
+            if (Combo min_level_combo{"##min_level_combo", to_string(min_level)}) {
+                for (auto level : enumerator::enumerate<LogLevel>())
+                    if (ImGui::Selectable(to_string(level), min_level == level)) {
+                        min_level = level;
+                        timestamp = 0;
+                    }
+            }
+
+            ImGui::SameLine();
+
+            ImGui::Checkbox("auto scroll"s, auto_scroll);
+
+#ifdef DEBUG_MESSAGE_COLORS
+            ImGui::SameLine();
+
+            if (ImGui::Button(ICON_FA_PLUS " DBG"))
+                LOG_DEBUG("This is an injected debug message.");
+
+            ImGui::SameLine();
+
+            if (ImGui::Button(ICON_FA_PLUS " INF"))
+                LOG_INFO("This is an injected info message.");
+
+            ImGui::SameLine();
+
+            if (ImGui::Button(ICON_FA_PLUS " WARN"))
+                LOG_WARN("This is an injected warning message.");
+
+            ImGui::SameLine();
+
+            if (ImGui::Button(ICON_FA_PLUS " ERR"))
+                LOG_ERROR("This is an injected error message.");
+#endif
+
         }
 
     } // namespace
@@ -123,138 +274,11 @@ namespace LogsTab {
     void
     process_ui()
     {
-        using namespace ImGui::RAII;
-
         TraceFunction tf{"LogsTab"sv};
 
-        // Toolbar
+        show_toolbar();
 
-        if (ImGui::Button("Clear"))
-            LogManager::clear();
-
-        ImGui::SameLine();
-
-        if (ImGui::Button(ICON_FA_DOWNLOAD " Save"))
-            LogManager::save();
-
-        ImGui::SameLine();
-
-        auto& style = ImGui::GetStyle();
-        float combo_width =
-            ImGui::CalcTextSize("DEBUG").x +
-            ImGui::GetFrameHeight() +
-            2 * style.FramePadding.x;
-        ImGui::SetNextItemWidth(combo_width);
-        if (Combo min_level_combo{"##min_level_combo", to_string(min_level)}) {
-            for (auto level : enumerator::enumerate<LogLevel>())
-                if (ImGui::Selectable(to_string(level), min_level == level)) {
-                    min_level = level;
-                    timestamp = 0;
-                }
-        }
-
-#ifdef DEBUG_MESSAGE_COLORS
-        ImGui::SameLine();
-
-        if (ImGui::Button(ICON_FA_PLUS " debug"))
-            LOG_DEBUG("This is an injected debug message.");
-
-        ImGui::SameLine();
-
-        if (ImGui::Button(ICON_FA_PLUS " info"))
-            LOG_INFO("This is an injected info message.");
-
-        ImGui::SameLine();
-
-        if (ImGui::Button(ICON_FA_PLUS " warn"))
-            LOG_WARN("This is an injected warning message.");
-
-        ImGui::SameLine();
-
-        if (ImGui::Button(ICON_FA_PLUS " error"))
-            LOG_ERROR("This is an injected error message.");
-#endif
-
-        // Text box
-        StyleColor bg_color{ImGuiCol_ChildBg, log_bg_color};
-        if (Child text_box{"text_box",
-                           {0, 0},
-                           ImGuiChildFlags_Borders}) {
-
-            Font font{nullptr, log_font_size};
-
-            float level_label_width = 0;
-            for (auto level : enumerator::enumerate(min_level))
-                level_label_width = std::fmax(level_label_width,
-                                              ImGui::CalcTextSize(to_string(level)).x);
-
-            // Use this to collapse repeated messages from the same location.
-            std::optional<std::source_location> prev_location;
-            std::optional<std::string> prev_tag;
-
-            LogManager::for_each(
-                min_level,
-                [
-                    level_label_width,
-                    &prev_location,
-                    &prev_tag
-                ](const LogManager::Message& msg)
-                {
-                    bool skip_header =
-                        (prev_location && *prev_location == msg.location)
-                        &&
-                        (prev_tag && *prev_tag == msg.tag);
-
-                    prev_location = msg.location;
-                    prev_tag = msg.tag;
-
-                    if (!skip_header) {
-
-                        {
-                            auto idx = std::to_underlying(msg.level);
-                            StyleColor text_color{ImGuiCol_Text, log_level_colors.at(idx)};
-                            ImGui::TextAligned(0.0f, level_label_width, to_string(msg.level));
-                        }
-
-                        ImGui::SameLine();
-
-                        {
-                            StyleColor text_color{ImGuiCol_Text, log_location_color};
-                            ImGui::FormatText("{}:{}",
-                                              msg.location.file_name(),
-                                              msg.location.line());
-                        }
-                        // NOTE: use regular theme text color for the popup.
-                        if (ItemTooltip function_tooltip{}) {
-                            TextWrapPos wrap_at{900};
-                            ImGui::Text(msg.location.function_name());
-                        }
-
-                        if (!msg.tag.empty()) {
-                            Indent one;
-                            StyleColor text_color{ImGuiCol_Text, log_tag_color};
-                            ImGui::TextWrapped(msg.tag);
-                        }
-
-                    }
-
-                    {
-                        Indent one;
-                        Indent two;
-                        StyleColor text_color{ImGuiCol_Text, log_text_color};
-                        ImGui::TextWrapped(msg.text);
-                    }
-                }
-            );
-
-            auto new_timestamp = LogManager::get_timestamp();
-            if (new_timestamp != timestamp) {
-                // Make sure last added line is visible.
-                UI::SmoothScrollItem();
-                timestamp = new_timestamp;
-            }
-            UI::DoSmoothScroll();
-        }
+        show_logs();
     }
 
 } // namespace LogsTab

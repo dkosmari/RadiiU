@@ -60,8 +60,6 @@ radiiu_elf_SOURCES = \
 	src/ConfirmExitPopup.hpp \
 	src/CountryManager.cpp \
 	src/CountryManager.hpp \
-	src/DebugWindow.cpp \
-	src/DebugWindow.hpp \
 	src/decoder.cpp \
 	src/decoder.hpp \
 	src/decoder_aac.cpp \
@@ -194,6 +192,15 @@ radiiu_elf_LDADD =  \
 	$(VORBISFILE_LIBS) \
 	$(FT_LIBS) \
 	$(SDL_LIBS)
+
+
+if ENABLE_DEBUG
+
+radiiu_elf_SOURCES += \
+	src/DebugWindow.cpp \
+	src/DebugWindow.hpp
+
+endif ENABLE_DEBUG
 
 
 if ENABLE_WIIU

@@ -19,8 +19,15 @@
 #include "App.hpp"
 #include "LogManager.hpp"
 #include "thread_safe.hpp"
-#include "TraceManager.hpp"
 #include "tracer.hpp"
+
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#ifdef ENABLE_TRACING
+#include "TraceManager.hpp"
+#endif
 
 
 using namespace std::literals;
@@ -56,8 +63,6 @@ namespace DebugWindow {
 
         }; // struct TimeSeries
 
-        // using Collection = std::unordered_map<std::string, TimeSeries>;
-
 
         /*-----------*/
         /* Variables */
@@ -65,7 +70,10 @@ namespace DebugWindow {
 
         // thread_safe<Collection> safe_collection;
         TimeSeries frame_time_history;
+
+#ifdef ENABLE_TRACING
         bool tracing = false;
+#endif
 
 
         /*-----------------------*/
@@ -148,6 +156,7 @@ namespace DebugWindow {
                                      75,
                                      {max_samples * 3, 0});
 
+#ifdef ENABLE_TRACING
                 if (tracing) {
                     if (ImGui::Button("Stop trace")) {
                         TraceManager::stop();
@@ -159,6 +168,8 @@ namespace DebugWindow {
                         tracing = true;
                     }
                 }
+#endif
+
             }
 
         } // debug_window

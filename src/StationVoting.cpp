@@ -190,7 +190,7 @@ namespace StationVoting {
     initialize()
     {
         TRACE_FUNC;
-        App::add_callback("StationVoting::process_logic()",
+        App::add_callback("StationVoting::process_logic()"sv,
                           process_logic);
     }
 

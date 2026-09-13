@@ -6,20 +6,20 @@
  */
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
-#include <filesystem>
 #include <format>
 #include <iostream>
 #include <memory>
 #include <optional>
 #include <set>
 #include <stdexcept>
+#include <thread>
 #include <utility>
 #include <vector>
 
 #ifdef __WIIU__
-#include <coreinit/energysaver.h>
-#include <coreinit/memory.h>
+#include <coreinit/im.h>
 #include <nn/act.h>
 #include <nn/save.h>
 #include <vpad/input.h>
@@ -55,13 +55,13 @@
 #include "ImageLoader.hpp"
 #include "LogManager.hpp"
 #include "LogsTab.hpp"
-#include "DebugWindow.hpp"
 #include "PlayerTab.hpp"
 #include "RadioBrowserAPI.hpp"
 #include "RecentTab.hpp"
 #include "Settings.hpp"
 #include "SettingsTab.hpp"
 #include "StationVoting.hpp"
+#include "string_utils.hpp"
 #include "Styles.hpp"
 #include "task_queue.hpp"
 #include "TraceDuration.hpp"
@@ -74,16 +74,21 @@
 #include <config.h>
 #endif
 
+#ifdef ENABLE_DEBUG_WINDOW
+#include "DebugWindow.hpp"
+#endif
+
 
 using std::cout;
 using std::endl;
-
-using std::filesystem::path;
 
 using namespace std::literals;
 using namespace sdl::literals;
 
 using Settings::cfg;
+
+
+// #define ENABLE_DIM_TIMER_WATCHER
 
 
 namespace App {
@@ -95,9 +100,124 @@ namespace App {
         /*-------*/
 
         struct CallbackInfo {
-            std::string name;
+            std::string_view name;
             Function func;
         };
+
+
+#ifdef __WIIU__
+
+        // RAII type for IM handles
+        struct IMDevice {
+
+            struct AsyncCall {
+
+                enum class State {
+                    idle,
+                    started,
+                    waiting,
+                    handling,
+                    shutdown_start,
+                    shutdown_finish,
+                };
+
+                alignas(0x40) IMRequest request{};
+                IMDevice& device;
+                std::atomic<State> state{State::idle};
+
+                AsyncCall(IMDevice& dev);
+
+                // Prevent moving.
+                AsyncCall(AsyncCall&&) = delete;
+
+                virtual
+                ~AsyncCall()
+                    noexcept;
+
+                virtual
+                void
+                callback(IOSError e);
+
+            protected:
+
+                static
+                void
+                callback_helper(IOSError e,
+                                void* ctx)
+                    noexcept;
+
+                bool
+                finish_shutdown()
+                    noexcept;
+
+            }; // struct AsyncCall
+
+
+            struct EventWatcher : AsyncCall {
+
+                IMEventMask desired;
+                IMEventMask event{};
+
+                EventWatcher(IMDevice& dev,
+                             IMEventMask ev);
+
+                ~EventWatcher()
+                    noexcept;
+
+                void
+                watch();
+
+            protected:
+
+                static
+                void
+                callback_helper(IOSError e,
+                                void* ctx)
+                    noexcept;
+
+            }; // struct EventWatcher
+
+
+            const IOSHandle handle;
+
+            IMDevice();
+
+            ~IMDevice()
+                noexcept;
+
+        }; // struct IMDevice
+
+#ifdef ENABLE_DIM_TIMER_WATCHER
+
+        struct DIMTimerReader : IMDevice::AsyncCall {
+
+            std::uint32_t value = 0;
+
+            DIMTimerReader(IMDevice& dev);
+
+            void
+            read();
+
+            void
+            callback(IOSError e)
+                override;
+
+        }; // struct DIMTimerReader
+
+#endif // ENABLE_DIM_TIMER_WATCHER
+
+
+        struct UNDIMEventWatcher : IMDevice::EventWatcher {
+
+            UNDIMEventWatcher(IMDevice& dev);
+
+            void
+            callback(IOSError e)
+                override;
+
+        }; // struct UNDIMEventWatcher
+
+#endif // __WIIU__
 
 
         // RAII-managed resources are stored here.
@@ -114,6 +234,14 @@ namespace App {
             sdl::renderer renderer;
 
             sdl::vector<sdl::game_controller::device> controllers;
+
+#ifdef __WIIU__
+            IMDevice im_device;
+#ifdef ENABLE_DIM_TIMER_WATCHER
+            DIMTimerReader dim_timer_reader{im_device};
+#endif // ENABLE_DIM_TIMER_WATCHER
+            UNDIMEventWatcher undim_event_watcher{im_device};
+#endif // __WIIU__
 
         }; // struct Resources
 
@@ -139,7 +267,6 @@ namespace App {
 
 #ifdef __WIIU__
         bool old_disable_swkbd;
-        std::uint32_t old_dim_countdown;
 #endif
 
         Uint64 last_activity;
@@ -157,6 +284,9 @@ namespace App {
         /*-----------------------*/
         /* Function declarations */
         /*-----------------------*/
+
+        void
+        detected_activity();
 
         void
         draw();
@@ -192,10 +322,297 @@ namespace App {
         void
         setup_imgui_style();
 
+#ifdef __WIIU__
+        std::string
+        to_string(IMDevice::AsyncCall::State st);
+#endif // __WIIU__
 
         /*----------------------*/
         /* Function definitions */
         /*----------------------*/
+
+#ifdef __WIIU__
+
+        IMDevice::AsyncCall::AsyncCall(IMDevice& dev) :
+            device(dev)
+        {}
+
+
+        IMDevice::AsyncCall::~AsyncCall()
+            noexcept
+        {
+            TRACE_FUNC;
+            State old_state = State::idle;
+            if (!state.compare_exchange_strong(old_state, State::shutdown_finish)) {
+                LOG_WARN("shutting down while async call active: state = {}",
+                         to_string(old_state));
+                // !idle -> shutdown_start
+                state = State::shutdown_start;
+                auto start = std::chrono::steady_clock::now();
+                while ((old_state = state) != State::shutdown_finish) {
+                    std::this_thread::sleep_for(5ms);
+                    auto now = std::chrono::steady_clock::now();
+                    if (now - start > 100ms) {
+                        LOG_ERROR("timed out waiting for shutdown_finish state: state is {}",
+                                  to_string(old_state));
+                        break;
+                    }
+                }
+            }
+        }
+
+
+        void
+        IMDevice::AsyncCall::callback(IOSError)
+        {}
+
+
+        void
+        IMDevice::AsyncCall::callback_helper(IOSError e,
+                                             void* ctx)
+            noexcept
+        {
+            auto self = reinterpret_cast<AsyncCall*>(ctx);
+
+            State old_state;
+
+            if (self->finish_shutdown())
+                return;
+
+            // waiting -> handling
+            old_state = State::waiting;
+            if (!self->state.compare_exchange_strong(old_state, State::handling)) {
+                LOG_WARN("could not enter handling state: old_state was {}",
+                         to_string(old_state));
+                if (self->finish_shutdown())
+                    return;
+            }
+
+            try {
+                self->callback(e);
+            }
+            catch (std::exception& e) {
+                LOG_ERROR("callback failed: {}", e.what());
+            }
+            catch (...) {
+                LOG_ERROR("callback failed (unknown exception)");
+            }
+
+            // handling -> idle
+            old_state = State::handling;
+            if (!self->state.compare_exchange_strong(old_state, State::idle))
+                if (self->finish_shutdown())
+                    return;
+        }
+
+
+        bool
+        IMDevice::AsyncCall::finish_shutdown()
+            noexcept
+        {
+            State old_state = State::shutdown_start;
+            if (state.compare_exchange_strong(old_state, State::shutdown_finish))
+                return true;
+            // Shouldn't happen, but just to be safe...
+            if (old_state == State::shutdown_finish) {
+                LOG_ERROR("finish_shutdown() called multiple times!");
+                return true;
+            }
+            return false;
+        }
+
+
+        IMDevice::EventWatcher::EventWatcher(IMDevice& dev,
+                                             IMEventMask ev) :
+            AsyncCall{dev},
+            desired{ev}
+        {
+            watch();
+        }
+
+
+        IMDevice::EventWatcher::~EventWatcher()
+            noexcept
+        {
+            TRACE_FUNC;
+
+            alignas(0x40) IMRequest cancel_req{};
+            IM_CancelGetEventNotify(device.handle,
+                                    &cancel_req,
+                                    nullptr,
+                                    nullptr);
+
+            state = State::idle;
+        }
+
+
+        void
+        IMDevice::EventWatcher::watch()
+        {
+            State old_state;
+
+            // idle -> started
+            old_state = State::idle;
+            if (!state.compare_exchange_strong(old_state, State::started)) {
+                LOG_WARN("could not enter started state: old_state is {}",
+                         to_string(old_state));
+                if (finish_shutdown())
+                    return;
+            }
+
+            event = desired;
+            if (auto e = IM_GetEventNotify(device.handle,
+                                           &request,
+                                           &event,
+                                           &EventWatcher::callback_helper,
+                                           this)) {
+                // started -> idle
+                old_state = State::started;
+                if (!state.compare_exchange_strong(old_state, State::idle)) {
+                    LOG_WARN("could not enter idle state: old_state is {}",
+                             to_string(old_state));
+                    if (finish_shutdown())
+                        return;
+                }
+                throw std::runtime_error{"IM_GetEventNotify() failed: "s
+                                         + std::to_string(std::to_underlying(e))};
+            }
+
+            // started -> waiting
+            old_state = State::started;
+            // NOTE: this can fail if we entered shutdown, don't override the shutdown state.
+            if (!state.compare_exchange_strong(old_state, State::waiting)) {
+                LOG_WARN("could not enter waiting state: old_state is {}",
+                         to_string(old_state));
+                if (finish_shutdown())
+                    return;
+            }
+        }
+
+
+        void
+        IMDevice::EventWatcher::callback_helper(IOSError e,
+                                                void* ctx)
+            noexcept
+        {
+            auto self = reinterpret_cast<EventWatcher*>(ctx);
+
+            if (self->finish_shutdown())
+                return;
+
+            IMDevice::AsyncCall::callback_helper(e, static_cast<AsyncCall*>(self));
+
+            try {
+                if (!e)
+                    self->watch();
+            }
+            catch (std::exception& e) {
+                LOG_ERROR("re-watch failed: {}", e.what());
+            }
+            catch (...) {
+                LOG_ERROR("re-watch failed (unknown exception)");
+            }
+        }
+
+
+        IMDevice::IMDevice() :
+            handle{IM_Open()}
+        {
+            if (handle < 0)
+                throw std::runtime_error{"IM_Open() failed: "s
+                                         + std::to_string(handle)};
+        }
+
+
+        IMDevice::~IMDevice()
+        {
+            IM_Close(handle);
+        }
+
+
+#ifdef ENABLE_DIM_TIMER_WATCHER
+
+        DIMTimerReader::DIMTimerReader(IMDevice& dev) :
+            IMDevice::AsyncCall{dev}
+        {}
+
+
+        void
+        DIMTimerReader::read()
+        {
+            State old_state;
+            // idle -> started
+            old_state = State::idle;
+            if (!state.compare_exchange_strong(old_state, State::started)) {
+                LOG_WARN("could not enter started state: old_state is {}",
+                         to_string(old_state));
+                return;
+            }
+
+            auto e = IM_GetTimerRemaining(device.handle,
+                                          &request,
+                                          IM_TIMER_DIM,
+                                          &value,
+                                          &IMDevice::AsyncCall::callback_helper,
+                                          static_cast<IMDevice::AsyncCall*>(this));
+            if (e)
+                throw std::runtime_error{"IM_GetTimerRemaining() failed: "s
+                                         + std::to_string(std::to_underlying(e))};
+
+            // started -> waiting
+            old_state = State::started;
+            if (!state.compare_exchange_strong(old_state, State::waiting)) {
+                LOG_WARN("could not enter waiting state: old_state is {}",
+                         to_string(old_state));
+                if (finish_shutdown())
+                    return;
+            }
+        }
+
+
+        void
+        DIMTimerReader::callback(IOSError e)
+        {
+            IMDevice::AsyncCall::callback(e);
+            if (e)
+                LOG_ERROR("DIMTimerReader: got error: {}",
+                          std::to_underlying(e));
+        }
+
+#endif // ENABLE_DIM_TIMER_WATCHER
+
+
+        UNDIMEventWatcher::UNDIMEventWatcher(IMDevice& dev) :
+            // TODO: change to curly braces after wut is fixed
+            IMDevice::EventWatcher(dev, IM_EVENT_UNDIM)
+        {}
+
+
+        void
+        UNDIMEventWatcher::callback(IOSError e)
+        {
+            IMDevice::EventWatcher::callback(e);
+            if (!e) {
+                if (event & IM_EVENT_UNDIM) {
+                    LOG_DEBUG("undim event");
+                    add_task("undim event"sv,
+                    []
+                    {
+                        detected_activity();
+                    });
+                }
+            }
+        }
+
+#endif // __WIIU__
+
+
+        void
+        detected_activity()
+        {
+            last_activity = SDL_GetTicks64();
+        }
+
 
         void
         draw()
@@ -219,11 +636,7 @@ namespace App {
             res->renderer.draw_point(0, 0);
 #endif
 
-            {
-                TraceDuration duration_sdl_present{"SDL_RenderPresent()"sv,
-                                                   "App,SDL"sv};
-                res->renderer.present();
-            }
+            res->renderer.present();
 
             TraceManager::vsync();
         }
@@ -348,89 +761,37 @@ namespace App {
             TraceFunction tf{"App"sv};
 
 #ifdef __WIIU__
+
             if (old_disable_swkbd != cfg.disable_swkbd) {
-                {
-                    TraceDuration d{"SDL_SetHint()"sv,
-                                    "SDL"sv};
-                    SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD,
-                                cfg.disable_swkbd ? "0" : "1");
-                }
+                SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD,
+                            cfg.disable_swkbd ? "0" : "1");
                 old_disable_swkbd = cfg.disable_swkbd;
             }
 
-            {
-                TraceDuration duration_dim{"DIM handling"sv,
-                                           "App"sv};
-                std::uint32_t dim_enabled = 0;
-                IMError dim_error;
-                {
-                    TraceDuration d{"IMIsDimEnabled()"sv,
-                                    "IM,cafe"sv};
-                    dim_error = IMIsDimEnabled(&dim_enabled);
-                }
-                VPADLcdMode current_vpad_mode;
-                {
-                    TraceDuration d{"VPADGetLcdMode()"sv,
-                                    "VPAD,cafe"};
-                    VPADGetLcdMode(VPAD_CHAN_0, &current_vpad_mode);
-                }
-                if (!dim_error && dim_enabled) {
-                    std::uint32_t dim_countdown = 0;
-                    {
-                        TraceDuration d{"IMGetTimeBeforeDimming"sv,
-                                        "IM,cafe"sv};
-                        dim_error = IMGetTimeBeforeDimming(&dim_countdown);
-                    }
-
-                    if (!dim_error) {
-                        if (cfg.inactive_screen_off) {
-                            // This is the logic to turn the gamepad LCD off when the system
-                            // enters the dimmed state (screen burn-in protection.)
-
-                            // TODO: find out how to do it with TV also.
-                            if (dim_countdown == 0) {
-                                if (current_vpad_mode != VPAD_LCD_STANDBY) {
-                                    LOG_DEBUG("Screen dimming started, "
-                                              "putting gamepad on standby.");
-                                    current_vpad_mode = VPAD_LCD_STANDBY;
-                                    {
-                                        TraceDuration d{"VPADSetLcdMode()"sv,
-                                                        "VPAD,cafe"sv};
-                                        VPADSetLcdMode(VPAD_CHAN_0, current_vpad_mode);
-                                    }
-                                }
-                            }
-                        }
-
-                        // If we leave the dimmed state, it counts as user input, for detecting
-                        // activity. Note that this event can be triggered by the gamepad's
-                        // accelerometers.
-                        if (dim_countdown > old_dim_countdown) {
-                            LOG_DEBUG("Detected activity from DIM");
-                            last_activity = SDL_GetTicks64();
-                            // Normally a standby gamepad only wakes up when using buttons or
-                            // sticks, this will wake on accelerometer and touch activity too.
-                            if (current_vpad_mode == VPAD_LCD_STANDBY) {
-                                LOG_DEBUG("Turning gamepad LCD backon.");
-                                current_vpad_mode = VPAD_LCD_ON;
-                                {
-                                    TraceDuration d{"VPADSetLcdMode()"sv,
-                                                    "VPAD,cafe"sv};
-                                    VPADSetLcdMode(VPAD_CHAN_0, current_vpad_mode);
-                                }
-                            }
-                        }
-                        if (dim_countdown == 0 && old_dim_countdown > 0) {
-                            LOG_DEBUG("Entered DIM state");
-                        }
-
-                        old_dim_countdown = dim_countdown;
-                    } else {
-                        LOG_ERROR("IMGetTimeBeforeDimming() failed: {}",
-                                  static_cast<int>(dim_error));
-                    }
+#ifdef ENABLE_DIM_TIMER_WATCHER
+            static std::uint32_t old_dim_timer = 0;
+            if (res->dim_timer_reader.state != IMDevice::AsyncCall::State::waiting) {
+                std::uint32_t cur_dim_timer = res->dim_timer_reader.value;
+                // detect a DIM timer reset
+                // if (cur_dim_timer > old_dim_timer)
+                //     detected_activity();
+                if (cur_dim_timer != old_dim_timer) {
+                    // LOG_DEBUG("DIM timer: {}", cur_dim_timer);
+                    old_dim_timer = cur_dim_timer;
                 }
             }
+
+            try {
+                TraceDuration duration_dim_timer_reader{
+                    "dim_timer_reader.read()"sv,
+                    "App"sv
+                };
+                res->dim_timer_reader.read();
+            }
+            catch (std::exception& e) {
+                LOG_ERROR("dim_timer_reader.read(): {}", e.what());
+            }
+#endif // ENABLE_DIM_TIMER_WATCHER
 
 #endif // __WIIU__
 
@@ -566,8 +927,6 @@ namespace App {
         {
             TraceFunction tf{"App"sv};
 
-            Uint64 now = SDL_GetTicks64();
-
             sdl::events::event event;
             while (sdl::events::poll(event)) {
 
@@ -589,7 +948,7 @@ namespace App {
                         auto gc = sdl::game_controller::device(event.cdevice.which);
                         LOG_INFO("Added controller: {:?}", gc.get_name());
                         res->controllers.push_back(std::move(gc));
-                        last_activity = now;
+                        detected_activity();
                         break;
                     }
 
@@ -599,7 +958,7 @@ namespace App {
                                       {
                                           return id == gc.get_id();
                                       });
-                        last_activity = now;
+                        detected_activity();
                         break;
                     }
 
@@ -616,7 +975,7 @@ namespace App {
                     case text_editing_ext:
                     case text_input:
                     case will_enter_foreground:
-                        last_activity = now;
+                        detected_activity();
                         break;
 
                     case window:
@@ -627,13 +986,13 @@ namespace App {
                             case SDL_WINDOWEVENT_RESTORED:
                             case SDL_WINDOWEVENT_FOCUS_GAINED:
                             case SDL_WINDOWEVENT_ENTER:
-                                last_activity = now;
+                                detected_activity();
                                 break;
 
                             case SDL_WINDOWEVENT_SIZE_CHANGED:
                                 res->renderer.set_logical_size(event.window.data1,
                                                                event.window.data2);
-                                last_activity = now;
+                                detected_activity();
                                 break;
 
                         }
@@ -794,8 +1153,9 @@ namespace App {
 
             // ImGui::ShowStyleEditor();
             // ImGui::ShowDemoWindow();
-
+#ifdef ENABLE_DEBUG_WINDOW
             DebugWindow::process_ui();
+#endif
         }
 
 
@@ -874,6 +1234,38 @@ namespace App {
 
             style.DisplaySafeAreaPadding = {10, 10};
         }
+
+
+#ifdef __WIIU__
+
+        std::string
+        to_string(IMDevice::AsyncCall::State st)
+        {
+            switch (st) {
+                using enum IMDevice::AsyncCall::State;
+
+                case idle:
+                    return "idle";
+
+                case started:
+                    return "started";
+
+                case waiting:
+                    return "waiting";
+
+                case handling:
+                    return "handling";
+
+                case shutdown_start:
+                    return "shutdown_start";
+
+                case shutdown_finish:
+                    return "shutdown_finish";
+            }
+            return "?";
+        }
+
+#endif // __WIIU__
 
     } // namespace
 
@@ -959,7 +1351,9 @@ namespace App {
         initialize_imgui();
 
         // Initialize modules.
+#ifdef ENABE_DEBUG
         DebugWindow::initialize();
+#endif
         Styles::initialize();
         ImageLoader::initialize(res->renderer);
         RadioBrowserAPI::initialize(get_user_agent(), cfg.server);
@@ -999,7 +1393,9 @@ namespace App {
         RadioBrowserAPI::finalize();
         ImageLoader::finalize();
         Styles::finalize();
+#ifdef ENABLE_DEBUG_WINDOW
         DebugWindow::finalize();
+#endif
 
         finalize_imgui();
 
@@ -1063,7 +1459,7 @@ namespace App {
 
 
     void
-    add_callback(const std::string& name,
+    add_callback(std::string_view name,
                  Function func)
     {
         callbacks.emplace_back(name,
@@ -1072,7 +1468,7 @@ namespace App {
 
 
     void
-    add_task_real(const std::string& name,
+    add_task_real(std::string_view name,
                   Function func)
     {
         tasks.add(name, std::move(func));

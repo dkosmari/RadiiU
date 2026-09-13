@@ -202,11 +202,12 @@ namespace UI {
                  float target_y);
 
     void
-    SmoothScroll(const ImVec2& target);
+    SmoothScroll(const ImVec2& target,
+                 float duration = 0.5f);
 
 
     void
-    SmoothScrollItem();
+    SmoothScrollItem(float duration = 0.5f);
 
 
     void
