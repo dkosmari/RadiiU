@@ -90,11 +90,11 @@ namespace rest {
 
 
     request::request(params_t params_) :
-        status_{status::pending},
+        current_status{status::pending},
         params{std::move(params_)}
     {
-        easy.set_verbose(params.verbose);
         LogManagerCurl::capture_curl_debug(easy);
+        easy.set_verbose(params.verbose);
 
         easy.set_ssl_verify_peer(params.ssl_verify_peer);
         easy.set_buffer_size(params.buffer_size);
@@ -133,7 +133,7 @@ namespace rest {
     void
     request::cancel()
     {
-        status_ = status::canceled;
+        current_status = status::canceled;
     }
 
 
@@ -191,7 +191,7 @@ namespace rest {
     request::get_status()
         const noexcept
     {
-        return status_;
+        return current_status;
     }
 
 
@@ -213,7 +213,7 @@ namespace rest {
     request::process_error()
         noexcept
     {
-        status_ = status::finished;
+        current_status = status::finished;
 
         try {
             if (!error_ptr)
@@ -233,7 +233,7 @@ namespace rest {
     request::process_response()
         noexcept
     {
-        status_ = status::finished;
+        current_status = status::finished;
 
         try {
             // Enforce content type
@@ -267,19 +267,19 @@ namespace rest {
 
 
     std::size_t
-    request::easy_write_func(std::span<const char> data)
+    request::easy_write_func(std::span<const std::byte> data)
     {
-        if (status_ == status::pending) {
+        if (current_status == status::pending) {
             // First recv
-            status_ = status::receiving;
-            content_type = easy.try_get_content_type().value_or(""s);
+            current_status = status::receiving;
+            content_type = easy.get_content_type();
             // If length is known, reserve that.
             if (auto content_length_header = easy.try_get_header("Content-Length")) {
                 auto size = std::stoull(content_length_header->value);
                 content.reserve(size);
             }
         }
-        content.append(data.data(), data.size());
+        content.append(reinterpret_cast<const char*>(data.data()), data.size());
         return data.size();
     }
 
@@ -380,6 +380,7 @@ namespace rest {
                 .response_func = std::move(response_func),
                 .url = make_url(base_url, path, get_params),
                 .user_agent = cfg.user_agent,
+                .verbose = cfg.verbose,
             }
         );
     }
@@ -412,6 +413,7 @@ namespace rest {
                 .response_func = std::move(response_func),
                 .url = make_url(base_url, path, get_params),
                 .user_agent = cfg.user_agent,
+                .verbose = cfg.verbose,
             }
         );
     }
@@ -429,7 +431,8 @@ namespace rest {
                 .post_fields = std::move(post_body),
                 .response_func = std::move(response_func),
                 .url = make_url(base_url, path),
-                .user_agent = cfg.user_agent
+                .user_agent = cfg.user_agent,
+                .verbose = cfg.verbose,
             }
         );
     }
@@ -450,6 +453,7 @@ namespace rest {
                 .response_func = std::move(response_func),
                 .url = make_url(base_url, path),
                 .user_agent = cfg.user_agent,
+                .verbose = cfg.verbose,
             }
         );
     }
@@ -556,6 +560,5 @@ namespace rest {
         req->process();
         return req;
     }
-
 
 } // namespace rest

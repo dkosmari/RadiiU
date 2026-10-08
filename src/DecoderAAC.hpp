@@ -1,38 +1,38 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #ifndef DECODER_AAC_HPP
 #define DECODER_AAC_HPP
 
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include <cstdint>
 
 #include <neaacdec.h>
 
 #include "byte_stream.hpp"
-#include "decoder.hpp"
+#include "Decoder.hpp"
 
 
-namespace decoder {
+namespace Decoder {
 
-    struct aac : base {
+    struct AAC : Base {
 
-        struct error : std::runtime_error {
+        struct Error : std::runtime_error {
 
-            error(unsigned char code);
+            Error(unsigned char code);
 
-            error(const std::string& msg);
+            Error(const std::string& msg);
 
-            error(const std::string& msg,
+            Error(const std::string& msg,
                   unsigned char code);
 
-        }; // struct error
+        }; // struct Error
 
 
         NeAACDecHandle handle = nullptr;
@@ -43,30 +43,41 @@ namespace decoder {
         unsigned char current_channels = 0;
         unsigned long current_rate = 0;
 
-        aac(std::span<const char> data);
 
-        ~aac()
+        AAC(std::span<const std::byte> data);
+
+        ~AAC()
             noexcept override;
 
-        std::size_t
-        feed(std::span<const char> data)
+        std::span<const std::byte>
+        feed(std::span<const std::byte> data)
             override;
 
-        std::span<const char>
+        std::span<const std::byte>
         decode()
             override;
 
-        std::optional<spec>
+        std::optional<Spec>
         get_spec()
             noexcept override;
 
-        info
+        Info
         get_info()
             override;
 
         std::optional<stream_metadata>
         get_metadata()
             const override;
+
+
+        static
+        bool
+        match_mime(const std::string& content_type);
+
+
+        static
+        bool
+        match_prefix(std::span<const std::byte> data);
 
 
     private:
@@ -80,8 +91,8 @@ namespace decoder {
         close()
             noexcept;
 
-    }; // struct aac
+    }; // struct AAC
 
-} // namespace decoder
+} // namespace Decoder
 
 #endif

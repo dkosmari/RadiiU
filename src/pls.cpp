@@ -8,11 +8,14 @@
 #include <cstdio>
 #include <ostream>
 #include <ranges>
+#include <string_view>
 #include <utility>              // move()
 
 #include "pls.hpp"
 
+#include "mime_type.hpp"
 #include "string_utils.hpp"
+#include "utils.hpp"
 
 
 using namespace std::literals;
@@ -20,7 +23,26 @@ using namespace std::literals;
 
 namespace pls {
 
-    const std::string header = "[playlist]";
+    namespace {
+
+        constexpr std::string_view header = "[playlist]"sv;
+
+
+        // Mime types for PLS playlists
+        constexpr std::array pls_mimes {
+            "audio/x-scpls"sv,
+            "audio/pls"sv,
+            "audio/x-pls"sv,
+            "text/playlist"sv,
+        };
+
+
+        // Prefixes for PLS playlists
+        constexpr std::array pls_prefixes {
+            header,
+        };
+
+    } // namespace
 
 
     error::error(const std::string& msg) :
@@ -133,6 +155,28 @@ namespace pls {
                         + std::to_string(result.size()) + " tracks"};
 
         return result;
+    }
+
+
+    bool
+    match_mime(const std::string& content_type)
+    {
+        return mime_type::match_any(content_type, pls_mimes);
+    }
+
+
+    bool
+    match_path(const std::string& path)
+    {
+        auto low_path = string_utils::to_lower(path);
+        return low_path.ends_with(".pls");
+    }
+
+
+    bool
+    match_prefix(std::span<const std::byte> data)
+    {
+        return utils::starts_with_any(data, pls_prefixes);
     }
 
 } // namespace pls

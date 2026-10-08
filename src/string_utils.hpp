@@ -101,6 +101,11 @@ namespace string_utils {
 
     [[nodiscard]]
     std::string
+    to_lower(std::string input);
+
+
+    [[nodiscard]]
+    std::string
     to_upper(std::string input);
 
 
@@ -109,10 +114,19 @@ namespace string_utils {
     std::string
     trimmed(const std::string& input);
 
+    [[nodiscard]]
+    std::string_view
+    trimmed(std::string_view input);
+
 
     [[nodiscard]]
     std::string
     trimmed(const std::string& input,
+            char discard);
+
+    [[nodiscard]]
+    std::string_view
+    trimmed(std::string_view input,
             char discard);
 
 
@@ -121,15 +135,31 @@ namespace string_utils {
     trimmed(const std::string& input,
             const std::string& discard);
 
+    [[nodiscard]]
+    std::string_view
+    trimmed(std::string_view input,
+            std::string_view discard);
+
 
     [[nodiscard]]
     std::string
     trimmed(const std::string& input,
-            const std::function<bool(std::string::value_type)>& predicate);
+            const std::function<bool(char)>& predicate);
+
+    [[nodiscard]]
+    std::string_view
+    trimmed(std::string_view input,
+            const std::function<bool(char)>& predicate);
+
 
     [[nodiscard]]
     std::string
     trimmed(const std::string& input,
+            int (*predicate)(int));
+
+    [[nodiscard]]
+    std::string_view
+    trimmed(std::string_view input,
             int (*predicate)(int));
 
 } // namespace string_utils

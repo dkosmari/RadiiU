@@ -133,8 +133,8 @@ namespace Styles {
             for (auto& st : imgui_styles)
                 style_list.emplace_back(Group::imgui, st.name);
 
-            for (auto& entry :
-                     std::filesystem::directory_iterator{App::get_content_path() / "styles"}) {
+            auto built_in_styles_dir = App::get_content_dir() / "styles";
+            for (auto& entry : std::filesystem::directory_iterator{built_in_styles_dir}) {
                 if (!entry.is_regular_file())
                     continue;
                 auto& path = entry.path();
@@ -145,11 +145,10 @@ namespace Styles {
             }
 
 
-            auto user_styles_path = App::get_config_path() / "styles";
-            if (exists(user_styles_path)) {
+            auto user_styles_dir = App::get_data_dir() / "styles";
+            if (exists(user_styles_dir)) {
                 try {
-                    for (auto& entry :
-                             std::filesystem::directory_iterator{}) {
+                    for (auto& entry : std::filesystem::directory_iterator{user_styles_dir}) {
                         if (!entry.is_regular_file())
                             continue;
                         auto& path = entry.path();
@@ -295,10 +294,10 @@ namespace Styles {
         const std::string filename = "styles/" + cfg.style + ".json";
 
         // Prioritize user theme, in case of name clash.
-        if (load_style_file(App::get_config_path() / filename))
+        if (load_style_file(App::get_data_dir() / filename))
             return;
 
-        load_style_file(App::get_content_path() / filename);
+        load_style_file(App::get_content_dir() / filename);
     }
     catch (std::exception& e) {
         LOG_ERROR("{}", e.what());

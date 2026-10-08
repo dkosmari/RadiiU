@@ -5,10 +5,15 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <algorithm>
+#include <cstdint>
+#include <locale>
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
+
+#include <SDL_stdinc.h>
 
 #include <curlxx/url.hpp>
 
@@ -53,68 +58,58 @@ namespace icy {
         }
 #endif
 
+
         std::optional<std::string>
-        if_not_empty(std::string input)
+        if_not_empty(std::string_view input)
         {
             if (input.empty())
                 return {};
-            return {std::move(input)};
+            return std::string{input};
+        }
+
+
+        bool
+        is_just_a_number(std::string_view input)
+        {
+            auto loc = std::locale::classic();
+            for (char c : input)
+                if (!std::isdigit(c, loc))
+                    return false;
+            return true;
+        }
+
+
+        void
+        remove_prefix(std::span<const std::byte>& input,
+                      std::size_t n)
+        {
+            input = input.subspan(n);
         }
 
     } // namespace
 
 
-    stream::stream(http_client& hc) :
-        http(hc),
-        base_url{http.get_effective_url()}
+    stream::stream()
     {
         TRACE_FUNC;
+    }
 
-        using string_utils::trimmed;
 
-        unsigned icy_num = 0;
+    void
+    stream::reset(std::string base_url_,
+                  std::size_t new_interval)
+    {
+        base_url = std::move(base_url_);
 
-        if (auto hdr = http.get_header("icy-metaint")) {
-            LOG_INFO("Got icy-metaint={} in header.", *hdr);
-            data_left = interval = std::stoull(*hdr);
-            ++icy_num;
-        }
+        meta_stream.clear();
+        data_stream.clear();
 
-        if (auto hdr = http.get_header("icy-name")) {
-            initial_meta.station_name = trimmed(*hdr);
-            ++icy_num;
-        }
+        interval = new_interval;
 
-        if (auto hdr = http.get_header("icy-url")) {
-            initial_meta.station_url = trimmed(*hdr);
-            ++icy_num;
-        }
+        data_left = interval;
+        meta_left = 0;
 
-        if (auto hdr = http.get_header("icy-genre")) {
-            initial_meta.station_genre = trimmed(*hdr);
-            ++icy_num;
-        }
-
-        if (auto hdr = http.get_header("icy-description")) {
-            initial_meta.station_description = trimmed(*hdr);
-            ++icy_num;
-        }
-
-        if (auto hdr = http.get_header("icy-br"))
-            ++icy_num;
-
-        if (auto hdr = http.get_header("ice-audio-info"))
-            ++icy_num;
-
-        if (auto hdr = http.get_header("icy-pub"))
-            ++icy_num;
-
-        // TODO: process icy-noticeN headers.
-
-        if (!icy_num)
-            throw std::runtime_error{"not an icecast stream"};
-
-        current_meta = initial_meta;
+        current_meta = {};
     }
 
 
@@ -126,41 +121,50 @@ namespace icy {
     }
 
 
+    std::span<std::byte>
+    stream::get_data(std::span<std::byte> dst)
+    {
+        return data_stream.read(dst);
+    }
+
+
     void
-    stream::process()
+    stream::feed(std::span<const std::byte> input)
     {
         if (!interval) {
-            data_stream.consume(http.data_stream);
+            data_stream.write(input);
             return;
         }
 
-        // try to convert the whole raw_stream into either data_stream or meta_stream
-        while (!http.data_stream.empty()) {
+        while (!input.empty()) {
 
-            if (data_left)
-                data_left -= data_stream.consume(http.data_stream, data_left);
-            else {
-                // no more data, start reading metadata
-
+            if (data_left) {
+                std::size_t n = std::min(data_left, input.size());
+                auto written = data_stream.write(input.first(n));
+                remove_prefix(input, written.size());
+                data_left -= written.size();
+            } else {
                 if (meta_left == 0) {
-                    // when both data_left and meta_left are zero, we're waiting for the
-                    // meta size prefix
-                    auto c = http.data_stream.try_load_u8();
-                    if (!c) // if not enough raw data to parse size of meta data, give up
-                        return;
-                    meta_left = *c * 16u;
-                    if (meta_left == 0) { // no metadata for now
-                        data_left = interval;
+                    // When both data_left and meta_left are zero, we're waiting for the meta
+                    // size prefix.
+                    auto hdr = static_cast<std::uint8_t>(input.front());
+                    remove_prefix(input, 1);
+                    meta_left = hdr * 16u;
+                    if (meta_left == 0) { // no metadata
+                        data_left = interval; // go back to reading data
                         continue;
                     }
                 }
 
-                meta_left -= meta_stream.consume(http.data_stream, meta_left);
+                std::size_t n = std::min(meta_left, input.size());
+                auto written = meta_stream.write(input.first(n));
+                remove_prefix(input, written.size());
+                meta_left -= written.size();
                 if (meta_left == 0) {
-                    // finished reading this chunk of metadata
-                    data_left = interval;
+                    // Finished reading this chunk of metadata.
+                    data_left = interval; // go back to reading data
                     try {
-                        process_metadata();
+                        parse_metadata();
                     }
                     catch (std::exception& e) {
                         LOG_ERROR("Metadata error: {}", e.what());
@@ -174,45 +178,48 @@ namespace icy {
 
 
     void
-    stream::process_metadata()
+    stream::parse_metadata()
     {
         using string_utils::trimmed;
 
-        current_meta = initial_meta;
+        //current_meta = {};
 
         // Note: icy metadata is padded with null bytes.
-        std::string meta_str = trimmed(meta_stream.read_str(), '\0');
+        std::string raw_meta_str(meta_stream.size(), '\0');
+        std::ignore = meta_stream.read(std::span{raw_meta_str});
+        std::string meta_str = trimmed(raw_meta_str, '\0');
 
         auto parsed_meta = icy::parse(meta_str);
 
         auto& meta = current_meta;
 
-        // TODO: should probably do case-insensitive key comparisons
-
-        for (const auto& [key, val_] : parsed_meta) {
-            auto val = trimmed(val_);
-            // LOG_DEBUG("icy meta key: {} = {:?}", key, val);
-            if (key == "StreamTitle"s) {
+        for (const auto& [key, raw_val] : parsed_meta) {
+            auto val = trimmed(raw_val);
+            LOG_DEBUG("icy meta key: {} = {:?}", key, val);
+            if (key == "StreamTitle"sv) {
                 meta.title = if_not_empty(std::move(val));
-            } else if (key == "StreamUrl"s) {
-                auto url = resolve_url(val);
-                if (!parsed_meta.contains("StreamArtwork"s))
-                    meta.cover_art = if_not_empty(std::move(url));
-                else
-                    meta.station_url = if_not_empty(std::move(url));
-            } else if (key == "StreamArtwork"s) {
+            } else if (key == "StreamUrl"sv) {
+                // NOTE: Some servers report a numeric song ID as the URL, let's ignore them.
+                if (!is_just_a_number(val)) {
+                    auto url = resolve_url(val);
+                    if (!parsed_meta.contains("StreamArtwork"sv))
+                        meta.cover_art = if_not_empty(url);
+                    else
+                        meta.station.url = if_not_empty(url);
+                }
+            } else if (key == "StreamArtwork"sv) {
                 meta.cover_art = if_not_empty(resolve_url(val));
-            } else if (key == "StreamArtist"s) {
-                meta.artist = if_not_empty(std::move(val));
-            } else if (key == "StreamAlbum"s) {
-                meta.album = if_not_empty(std::move(val));
-            } else if (key == "StreamGenre"s) {
-                meta.genre = if_not_empty(std::move(val));
-            } else if (key == "StreamYear"s) {
-                meta.date = if_not_empty(std::move(val));
-            } else if (key == "StreamDate"s) {
-                meta.date = if_not_empty(std::move(val));
-            } else
+            } else if (key == "StreamArtist"sv) {
+                meta.artist = if_not_empty(val);
+            } else if (key == "StreamAlbum"sv) {
+                meta.album = if_not_empty(val);
+            } else if (key == "StreamGenre"sv) {
+                meta.genre = if_not_empty(val);
+            } else if (key == "StreamYear"sv) {
+                meta.date = if_not_empty(val);
+            } else if (key == "StreamDate"sv) {
+                meta.date = if_not_empty(val);
+            } else {
                 /*
                   Not handled:
                   StreamComposer
@@ -226,21 +233,22 @@ namespace icy {
                   ImageUrl
                   AlbumArt
                 */
-                current_meta.extra[key] = std::move(val);
+                current_meta.extra[std::string{key}] = std::string{val};
+            }
         }
 
     }
 
 
     std::string
-    stream::resolve_url(const std::string& url)
+    stream::resolve_url(std::string_view url)
         noexcept
     {
         try {
             if (url.empty())
                 return {};
             curl::url resolver{base_url};
-            resolver.set_url(url);
+            resolver.set_url(std::string{url});
             std::string result = resolver.get_url();
             if (url != result)
                 LOG_DEBUG("Resolved URL: {} -> {}", url, result);

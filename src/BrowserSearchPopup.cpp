@@ -220,8 +220,8 @@ namespace BrowserSearchPopup {
         load_tags_regex()
         try {
             std::ifstream input;
-            if (!try_open_file(input, App::get_config_path() / "tags.ignore"))
-                if (!try_open_file(input, App::get_content_path() / "tags.ignore"))
+            if (!try_open_file(input, App::get_config_dir() / "tags.ignore"))
+                if (!try_open_file(input, App::get_content_dir() / "tags.ignore"))
                     throw std::runtime_error{"could not find tags.ignore"};
             std::string line;
             std::string full_regex;
@@ -584,7 +584,7 @@ namespace BrowserSearchPopup {
         } // content
 
         ButtonHBox buttons;
-        buttons.expand = true;
+        buttons.spread = true;
         buttons.add(
             ICON_FA_TIMES " Cancel",
             ImGui::CloseCurrentPopup

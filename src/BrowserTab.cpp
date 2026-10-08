@@ -481,7 +481,7 @@ namespace BrowserTab {
         BrowserSearchPopup::initialize();
 
         // Changed after 0.3.0: no more browser.json
-        auto browser_json = App::get_config_path() / "browser.json";
+        auto browser_json = App::get_config_dir() / "browser.json";
         try {
             if (exists(browser_json))
                 remove(browser_json);

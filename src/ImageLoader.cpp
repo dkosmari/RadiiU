@@ -12,6 +12,7 @@
 #include <chrono>
 #include <cmath>
 #include <concepts>
+#include <cstddef>
 #include <filesystem>
 #include <format>
 #include <functional>
@@ -22,6 +23,7 @@
 #include <ranges>
 #include <span>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
 #include <vector>
@@ -48,6 +50,9 @@
 
 
 using namespace std::literals;
+
+using std::cout;
+using std::endl;
 
 using sdl::vec2;
 
@@ -103,8 +108,9 @@ namespace ImageLoader {
             sdl::texture tex;
             sdl::surface img;
             curl::easy easy{nullptr};
-            std::optional<std::vector<char>> raw_buf; // TODO: use byte_stream, implement rwops
-            std::string location;
+            std::optional<std::vector<std::byte>> raw_buf; // TODO: use byte_stream, implement
+                                                           // rwops
+            const std::string location;
             vec2 size_limit;
             bool checked_content_type = false;
 
@@ -134,7 +140,7 @@ namespace ImageLoader {
         private:
 
             std::size_t
-            easy_write_callback(std::span<const char> buf);
+            easy_write_callback(std::span<const std::byte> buf);
 
             void
             enforce_size_limit();
@@ -162,16 +168,18 @@ namespace ImageLoader {
             std::filesystem::path content_dir;
             sdl::texture error_icon;
             sdl::texture loading_icon;
-            curl::multi multi;
             Cache cache;
 
             async_queue<CacheEntryPtr> download_queue;
             std::jthread downloader_thread;
 
             async_queue<CacheEntryPtr> load_queue;
-            std::jthread loader_thread;
 
             async_queue<CacheEntryPtr> convert_queue;
+
+            curl::multi multi;
+            std::jthread loader_thread;
+
 
             Resources(sdl::renderer& renderer,
                       const std::string& user_agent,
@@ -188,10 +196,12 @@ namespace ImageLoader {
                 const sdl::vec2& size_limit);
 
             void
-            downloader_thread_function(std::stop_token stopper);
+            downloader_thread_function(std::stop_token stopper)
+                noexcept;
 
             void
-            loader_thread_function(std::stop_token stopper);
+            loader_thread_function(std::stop_token stopper)
+                noexcept;
 
             void
             process();
@@ -284,6 +294,7 @@ namespace ImageLoader {
             location{location_},
             size_limit{size_limit_}
         {
+            LOG_DEBUG("CacheEntry created for {:?}", location);
             if (size_limit.x < 0)
                 size_limit.x = 0;
             if (size_limit.y < 0)
@@ -361,6 +372,7 @@ namespace ImageLoader {
         CacheEntry::start_download(const std::string& user_agent)
         {
             easy.create();
+            LogManagerCurl::capture_curl_debug(easy);
             if (!user_agent.empty())
                 easy.set_user_agent(user_agent);
             easy.set_accept_encoding("");
@@ -376,14 +388,13 @@ namespace ImageLoader {
             easy.set_url(location);
             easy.set_verbose(cfg.verbose_image_logs);
             easy.set_write_function(std::bind_front(&CacheEntry::easy_write_callback, this));
-            LogManagerCurl::capture_curl_debug(easy);
             checked_content_type = false;
             return easy;
         }
 
 
         std::size_t
-        CacheEntry::easy_write_callback(std::span<const char> buf)
+        CacheEntry::easy_write_callback(std::span<const std::byte> buf)
         {
             TraceFunction tf{"ImageLoader"sv};
 
@@ -581,12 +592,11 @@ namespace ImageLoader {
             convert_queue.stop();
 
             // Stop the threads
+            cout << "ImageLoader: downloader thread" << endl;
             downloader_thread = {};
-            loader_thread = {};
 
-            for (auto& [location, entry] : cache)
-                if (entry->easy)
-                    multi.remove(entry->easy);
+            cout << "ImageLoader: loader thread" << endl;
+            loader_thread = {};
         }
 
 
@@ -626,11 +636,12 @@ namespace ImageLoader {
 
                     }
                 } else {
-                    // entry not found, prpare a request
+                    // entry not found, prepare a request
                     std::string real_location;
-                    // LOG_DEBUG("Requested: {:?}", location);
+                    LOG_DEBUG("Requested: {:?}", location);
                     if (auto without_prefix = string_utils::drop_prefix(location,
                                                                         content_prefix)) {
+                        // Local file using content:/ prefix
                         real_location = content_dir / *without_prefix;
                         // LOG_DEBUG("Content: {:?}", real_location);
                     } else
@@ -651,8 +662,9 @@ namespace ImageLoader {
 
         void
         Resources::downloader_thread_function(std::stop_token stopper)
+            noexcept
         try {
-            TraceManager::thread_name("downloader_thread");
+            TraceManager::thread_name("ImageLoader downloader thread");
             while (!stopper.stop_requested()) {
                 unsigned work = 0; // keep track of any work, to detect we're idle
 
@@ -666,7 +678,18 @@ namespace ImageLoader {
                     ++work;
                     auto& entry = *maybe_entry;
                     multi.add(entry->start_download(user_agent));
+
+                    if (stopper.stop_requested())
+                        break;
                 }
+
+                if (stopper.stop_requested())
+                    break;
+
+                multi.poll(100ms, stopper);
+
+                if (stopper.stop_requested())
+                    break;
 
                 work += multi.perform();
 
@@ -697,7 +720,7 @@ namespace ImageLoader {
                         load_queue.push(entry);
                     }
                     catch (std::exception& e) {
-                        LOG_ERROR("Processing finished download for {:?}: {}",
+                        LOG_ERROR("Finished download for {:?}: {}",
                                   url,
                                   e.what());
                         entry->state = LoadState::error;
@@ -718,6 +741,7 @@ namespace ImageLoader {
 
         void
         Resources::loader_thread_function(std::stop_token stopper)
+            noexcept
         try {
             TraceManager::thread_name("loader_thread");
             while (!stopper.stop_requested()) {
@@ -896,7 +920,7 @@ namespace ImageLoader {
 
         res.emplace(rend,
                     App::get_user_agent(),
-                    App::get_content_path());
+                    App::get_content_dir());
     }
 
 

@@ -56,7 +56,7 @@ namespace AboutTab {
     namespace {
 
 #ifdef __WIIU__
-        std::filesystem::path real_save_path;
+        std::filesystem::path real_save_dir;
 #endif
 
 
@@ -155,7 +155,7 @@ namespace AboutTab {
             std::vector<RoleName> result;
 
             try {
-                std::ifstream input{ App::get_content_path() / "CREDITS" };
+                std::ifstream input{ App::get_content_dir() / "CREDITS" };
                 std::string line;
                 while (getline(input, line)) {
                     if (!line.empty() && line.front() == '#')
@@ -264,7 +264,7 @@ namespace AboutTab {
             if (RPXLoader_GetPathOfSaveRedirection(real_save_buf,
                                                    sizeof real_save_buf)
                 == RPX_LOADER_RESULT_SUCCESS)
-                real_save_path = std::filesystem::path{"SD:/"} / real_save_buf;
+                real_save_dir = std::filesystem::path{"SD:/"} / real_save_buf;
             RPXLoader_DeInitLibrary();
         }
 #endif
@@ -301,12 +301,13 @@ namespace AboutTab {
                 UI::LinkRow("Bugs", PACKAGE_BUGREPORT);
                 UI::InfoRow("User Agent", App::get_user_agent());
 #ifdef __WIIU__
-                if (!real_save_path.empty())
-                    UI::InfoRow("Save folder", real_save_path);
+                if (!real_save_dir.empty())
+                    UI::InfoRow("Save folder", real_save_dir);
                 else
-                    UI::InfoRow("Save folder", App::get_config_path());
+                    UI::InfoRow("Save folder", App::get_config_dir());
 #else
-                UI::InfoRow("Save folder", App::get_config_path());
+                UI::InfoRow("Config folder", App::get_config_dir());
+                UI::InfoRow("Data folder", App::get_data_dir());
 #endif
 
             }

@@ -16,14 +16,29 @@
 
 namespace LogManagerCurl {
 
+    namespace {
+
+        std::string_view
+        to_string_view(std::span<const std::byte> data)
+        {
+            return {
+                reinterpret_cast<const char*>(data.data()),
+                data.size()
+            };
+        }
+
+    } // namespace
+
+
     void
     capture_curl_debug(curl::easy& easy,
                        const std::source_location& location)
     {
         easy.set_debug_function(
-            [location](CURL*,
+            [location](curl::easy*,
+                       CURL*,
                        curl_infotype type,
-                       std::span<const char> data)
+                       std::span<const std::byte> data)
             {
                 switch (type) {
                     case CURLINFO_TEXT:
@@ -31,7 +46,7 @@ namespace LogManagerCurl {
                                         location,
                                         "CURL " ICON_FA_INFO_CIRCLE,
                                         "{}",
-                                        std::string_view(data.data(), data.size()));
+                                        to_string_view(data));
                         break;
 
                     case CURLINFO_HEADER_IN:
@@ -39,7 +54,7 @@ namespace LogManagerCurl {
                                         location,
                                         "CURL " ICON_FA_ARROW_CIRCLE_O_DOWN,
                                         "{}",
-                                        std::string_view(data.data(), data.size()));
+                                        to_string_view(data));
                         break;
 
                     case CURLINFO_HEADER_OUT:
@@ -47,7 +62,7 @@ namespace LogManagerCurl {
                                         location,
                                         "CURL " ICON_FA_ARROW_CIRCLE_O_UP,
                                         "{}",
-                                        std::string_view(data.data(), data.size()));
+                                        to_string_view(data));
                         break;
 
                     default:

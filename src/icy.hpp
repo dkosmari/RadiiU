@@ -8,14 +8,13 @@
 #ifndef ICY_HPP
 #define ICY_HPP
 
-#include <string>
 #include <string_view>
 #include <unordered_map>
 
 
 namespace icy {
 
-    using dict_t = std::unordered_map<std::string, std::string>;
+    using dict_t = std::unordered_map<std::string_view, std::string_view>;
 
     dict_t
     parse(std::string_view input);

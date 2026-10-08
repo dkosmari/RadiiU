@@ -9,21 +9,41 @@
 #include <cerrno>
 #include <format>
 #include <string_view>
+#include <array>
 
 #include <opus/opus_defines.h>
 
-#include "decoder_opus.hpp"
+#include "DecoderOpus.hpp"
 
 #include "LogManager.hpp"
+#include "mime_type.hpp"
 #include "string_utils.hpp"
+#include "utils.hpp"
 
 
 using namespace std::literals;
 
 
-namespace decoder {
+namespace Decoder {
 
     namespace {
+
+        // Constants
+
+        constexpr std::array opus_mimes{
+            "audio/opus"sv,
+            "audio/ogg; codecs=opus"sv,
+            "audio/ogg"sv,
+            "application/ogg"sv,
+        };
+
+
+        constexpr std::array opus_prefixes{
+            "OggS"sv,
+        };
+
+
+        // Function definitions
 
         std::string
         opus_error_to_string(int code)
@@ -34,18 +54,18 @@ namespace decoder {
     } // namespace
 
 
-    opus::error::error(int code) :
+    Opus::Error::Error(int code) :
         std::runtime_error{opus_error_to_string(code)}
     {}
 
 
-    opus::error::error(const std::string& msg,
+    Opus::Error::Error(const std::string& msg,
                        int code) :
         std::runtime_error{msg + ": " + opus_error_to_string(code)}
     {}
 
 
-    opus::opus(std::span<const char> data) :
+    Opus::Opus(std::span<const std::byte> data) :
         samples(8192 * 2)
     {
         OpusFileCallbacks callbacks {
@@ -62,28 +82,28 @@ namespace decoder {
                                 data.size_bytes(),
                                 &e);
         if (!oof)
-            throw error{"op_open_callbacks() failed", e};
+            throw Error{"op_open_callbacks() failed", e};
 
         LOG_INFO("Created opus decoder.");
     }
 
 
-    opus::~opus()
+    Opus::~Opus()
         noexcept
     {
         op_free(oof);
     }
 
 
-    std::size_t
-    opus::feed(std::span<const char> data)
+    std::span<const std::byte>
+    Opus::feed(std::span<const std::byte> data)
     {
-        return stream.write(data);
+        return stream.write_some(data);
     }
 
 
-    std::span<const char>
-    opus::decode()
+    std::span<const std::byte>
+    Opus::decode()
     {
         int r = op_read_stereo(oof,
                                samples.data(),
@@ -98,20 +118,19 @@ namespace decoder {
                     LOG_DEBUG("Harmless (?) Opus error: {:?}", opus_error_to_string(r));
                     return {};
                 default:
-                    throw error{"op_read_stereo() failed", r};
+                    throw Error{"op_read_stereo() failed", r};
             }
         }
         auto decoded = std::span(samples.data(), r * 2);
-        return std::span{reinterpret_cast<const char*>(decoded.data()),
-                         decoded.size_bytes()};
+        return std::as_bytes(decoded);
     }
 
 
-    std::optional<spec>
-    opus::get_spec()
+    std::optional<Spec>
+    Opus::get_spec()
         noexcept
     {
-        spec result;
+        Spec result;
         result.format = AUDIO_S16SYS;
         result.rate = 48000;
         //result.channels = op_channel_count(oof, -1);
@@ -120,10 +139,10 @@ namespace decoder {
     }
 
 
-    info
-    opus::get_info()
+    Info
+    Opus::get_info()
     {
-        info result;
+        Info result;
 
         result.codec = "Ogg Opus";
 
@@ -163,7 +182,7 @@ namespace decoder {
 
 
     std::optional<stream_metadata>
-    opus::get_metadata()
+    Opus::get_metadata()
         const
     {
         auto tags = op_tags(oof, -1);
@@ -197,12 +216,26 @@ namespace decoder {
     }
 
 
+    bool
+    Opus::match_mime(const std::string& content_type)
+    {
+        return mime_type::match_any(content_type, opus_mimes);
+    }
+
+
+    bool
+    Opus::match_prefix(std::span<const std::byte> data)
+    {
+        return utils::starts_with_any(data, opus_prefixes);
+    }
+
+
     int
-    opus::read_callback(void* ctx,
+    Opus::read_callback(void* ctx,
                         unsigned char* buf,
                         int size)
     {
-        auto self = reinterpret_cast<opus*>(ctx);
+        auto self = reinterpret_cast<Opus*>(ctx);
         if (!self) {
             errno = EINVAL;
             return -1;
@@ -212,7 +245,13 @@ namespace decoder {
             return 0;
         }
 
-        return self->stream.read(buf, size);
+        std::span<std::byte> src{
+            reinterpret_cast<std::byte*>(buf),
+            static_cast<std::size_t>(size)
+        };
+
+        auto result = self->stream.read(src);
+        return result.size();
     }
 
-} // namespace decoder
+} // namespace Decoder

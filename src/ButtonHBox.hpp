@@ -29,12 +29,13 @@ struct ButtonHBox {
 
     float halign = 0.5f;
     float valign = -1;
-    bool expand = false;
+    bool uniform = true;
+    bool spread = false;
     std::vector<Button> buttons = {};
 
-    ImVec2 button_size   = {};  // recalculated after each add()
-    float  buttons_width = 0;   // recalculated after each add()
-    float  total_width   = 0;   // recalculated after each add()
+    ImVec2 uniform_size   = {};  // recalculated after each add()
+    float  buttons_width  = 0;   // recalculated after each add()
+    ImVec2 allocated_size = {};  // recalculated after each add()
 
     void
     add(Button&& b);
@@ -64,7 +65,7 @@ struct ButtonHBox {
 private:
 
     void
-    update();
+    update_layout();
 
 }; // struct ButtonHBox
 

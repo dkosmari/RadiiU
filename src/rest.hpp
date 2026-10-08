@@ -9,6 +9,7 @@
 #define REST_HPP
 
 #include <atomic>
+#include <cstddef>
 #include <flat_map>
 #include <functional>
 #include <memory>
@@ -145,7 +146,7 @@ namespace rest {
 
     private:
 
-        std::atomic<status> status_;
+        std::atomic<status> current_status;
         const params_t params;
         std::string content;
         std::string content_type;
@@ -153,7 +154,7 @@ namespace rest {
         std::exception_ptr error_ptr;
 
         std::size_t
-        easy_write_func(std::span<const char> data);
+        easy_write_func(std::span<const std::byte> data);
 
         void
         invoke_error_func(const std::exception& e)
@@ -171,9 +172,10 @@ namespace rest {
     public:
 
         struct config {
-            unsigned        max_connections       = 5;
-            unsigned        max_total_connections = 5;
-            std::optional<std::string> user_agent;
+            unsigned                   max_connections       = 5;
+            unsigned                   max_total_connections = 5;
+            std::optional<std::string> user_agent            = {};
+            bool                       verbose               = false;
         };
 
 

@@ -678,7 +678,7 @@ namespace TraceManager {
             std::chrono::hh_mm_ss time{now_seconds - today};
             std::string filename = std::format("trace-{}-{:%H-%M-%S}.json", date, time);
             std::ranges::replace(filename, ':', '-');
-            return App::get_config_path() / filename;
+            return App::get_data_dir() / filename;
         }
 
 

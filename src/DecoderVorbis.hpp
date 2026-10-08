@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -17,16 +17,16 @@
 #include <vorbis/vorbisfile.h>
 
 #include "byte_stream.hpp"
-#include "decoder.hpp"
+#include "Decoder.hpp"
 
 
-namespace decoder {
+namespace Decoder {
 
-    struct vorbis : base {
+    struct Vorbis : Base {
 
-        struct error : std::runtime_error {
-            error(int code);
-            error(const std::string& msg,
+        struct Error : std::runtime_error {
+            Error(int code);
+            Error(const std::string& msg,
                   int code);
         };
 
@@ -37,24 +37,24 @@ namespace decoder {
         long bitrate = 0;
 
 
-        vorbis(std::span<const char> data);
+        Vorbis(std::span<const std::byte> data);
 
-        ~vorbis()
+        ~Vorbis()
             noexcept override;
 
-        std::size_t
-        feed(std::span<const char> data)
+        std::span<const std::byte>
+        feed(std::span<const std::byte> data)
             override;
 
-        std::span<const char>
+        std::span<const std::byte>
         decode()
             override;
 
-        std::optional<spec>
+        std::optional<Spec>
         get_spec()
             noexcept override;
 
-        info
+        Info
         get_info()
             override;
 
@@ -64,14 +64,26 @@ namespace decoder {
 
 
         static
+        bool
+        match_mime(const std::string& content_type);
+
+
+        static
+        bool
+        match_prefix(std::span<const std::byte> data);
+
+
+    private:
+
+        static
         std::size_t
         read_callback(void* buf,
                       std::size_t size,
                       std::size_t count,
                       void* ctx);
 
-    }; // struct vorbis
+    }; // struct Vorbis
 
-} // namespace decoder
+} // namespace Decoder
 
 #endif

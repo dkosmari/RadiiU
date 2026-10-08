@@ -8,21 +8,16 @@
 #include <array>
 #include <chrono>
 #include <deque>
+#include <format>
 #include <memory>
 #include <optional>
+#include <ranges>
+#include <utility>
 #include <vector>
-
-#ifdef __WUT__
-#include <coreinit/energysaver.h>
-#endif
-
-#include <curlxx/curl.hpp>
 
 #include <imgui.h>
 #include <imgui_raii.h>
 #include <imgui_stdlib.h>
-
-#include <sdl2xx/audio.hpp>
 
 #include "PlayerTab.hpp"
 
@@ -56,7 +51,7 @@ namespace PlayerTab {
 
     namespace {
 
-        constexpr std::size_t queued_history_size = 5 * 60;
+        constexpr std::size_t audio_queue_history_size = 5 * 60;
 
 
         /*-------*/
@@ -71,19 +66,16 @@ namespace PlayerTab {
 
         struct State {
             bool details_expanded{};
-            bool history_expanded{};
+            bool track_history_expanded{};
             std::deque<TrackInfo> history{};
         };
 
 
         struct PlaybackResources {
 
-            sdl::audio::device audio_dev;
-            sdl::audio::spec audio_spec;
-            std::vector<std::byte> samples_buffer;
             RadioClient radio;
-            std::array<float, queued_history_size> queued_history;
-            std::size_t last_queued_history = 0;
+            std::array<float, audio_queue_history_size> audio_queue_history;
+            std::size_t audio_queue_index = 0;
 
 
             PlaybackResources(const std::string& url,
@@ -95,8 +87,8 @@ namespace PlayerTab {
             PlaybackResources(PlaybackResources&&) = delete;
 
 
-            bool
-            is_buffer_too_empty();
+            // bool
+            // is_buffer_too_empty();
 
 
             void
@@ -104,7 +96,7 @@ namespace PlayerTab {
 
 
             void
-            update_queued_history();
+            update_audio_queue_history();
 
         }; // struct PlaybackResources
 
@@ -132,12 +124,6 @@ namespace PlayerTab {
         format_to_string(sdl::audio::format fmt);
 
         void
-        history_add(const std::string& title);
-
-        void
-        history_trim();
-
-        void
         load();
 
         void
@@ -146,8 +132,8 @@ namespace PlayerTab {
         void
         save();
 
-        void
-        show_details_popup();
+        // void
+        // show_details_popup();
 
         void
         show_history();
@@ -160,6 +146,12 @@ namespace PlayerTab {
 
         void
         show_toolbar();
+
+        void
+        track_history_add(const std::string& title);
+
+        void
+        track_history_trim();
 
 
         /*----------------------*/
@@ -182,31 +174,9 @@ namespace PlayerTab {
 
 
         void
-        history_add(const std::string& title)
-        {
-            if (!state.history.empty() && state.history.front().title == title)
-                return;
-
-            state.history.emplace_front(system_clock::now(), title);
-            history_trim();
-        }
-
-
-        void
-        history_trim()
-        {
-            if (state.history.size() > cfg.player_history_limit) {
-                std::size_t excess = state.history.size() - cfg.player_history_limit;
-                state.history.erase(state.history.end() - excess,
-                                    state.history.end());
-            }
-        }
-
-
-        void
         load()
         try {
-            auto filename = App::get_config_path() / "player.json";
+            auto filename = App::get_config_dir() / "player.json";
             Serializer::load(state, filename);
         }
         catch (std::exception& e) {
@@ -223,30 +193,19 @@ namespace PlayerTab {
 
 
         PlaybackResources::PlaybackResources(const std::string& url,
-                  const std::string& url_resolved) :
-            samples_buffer(65536),
-            radio{url, url_resolved, App::get_user_agent()}
+                                             const std::string& url_resolved) :
+            radio{App::get_user_agent(), url, {url_resolved}}
         {
-            queued_history.fill(0);
-
-            if (cfg.disable_apd) {
-#ifdef __WUT__
-                IMDisableAPD();
-#else
-                // TODO: write similar code for desktop, to prevent computer from
-                // suspending.
-#endif
-            }
+            audio_queue_history.fill(0);
         }
 
 
         PlaybackResources::~PlaybackResources()
         {
-#ifdef __WUT__
-            IMEnableAPD();
-#endif
         }
 
+
+#if 0
         bool
         PlaybackResources::is_buffer_too_empty()
         {
@@ -256,6 +215,7 @@ namespace PlayerTab {
             // return total_bytes_fed < cfg.player_buffer_size * 1024u;
             return false;
         }
+#endif
 
 
         void
@@ -266,62 +226,20 @@ namespace PlayerTab {
             try {
                 radio.process();
 
-                update_queued_history();
+                update_audio_queue_history();
 
                 radio.with_metadata(
-                    [this](const RadioClient::opt_stream_metadata& meta)
+                    [this](const stream_metadata& meta)
                     {
-                        if (!meta)
-                            return;
-
-                        if (meta->title) {
-                            if (meta->artist)
-                                history_add(*meta->artist + " - " + *meta->title);
+                        if (meta.title) {
+                            if (meta.artist)
+                                track_history_add(*meta.artist + " - " + *meta.title);
                             else
-                                history_add(*meta->title);
+                                track_history_add(*meta.title);
                         } else
-                            history_add({});
+                            track_history_add({});
                     }
                 );
-
-                if (is_buffer_too_empty()) {
-                    // LOG_DEBUG("buffer too empty");
-                    return;
-                }
-
-                if (!audio_dev) {
-                    // see if we have enough bytes to initialize audio_dev properly.
-                    radio.with_decoder_spec(
-                        [this](const RadioClient::opt_decoder_spec& radio_spec)
-                        {
-                            TraceDuration audio_dev_duration{"creating SDL audio device"sv,
-                                                             "PlayerTab"sv};
-                            if (!radio_spec)
-                                return;
-                            sdl::audio::spec desired_spec;
-                            desired_spec.freq     = radio_spec->rate;
-                            desired_spec.channels = radio_spec->channels;
-                            desired_spec.format   = radio_spec->format;
-                            desired_spec.samples  = 8192;
-                            audio_dev.create(nullptr, false, desired_spec, audio_spec);
-                            audio_dev.unpause();
-                        }
-                    );
-                }
-
-                if (!audio_dev)
-                    return;
-
-                radio.consume_samples(
-                    [this](byte_stream& stream)
-                    {
-                        while (!stream.empty()) {
-                            auto samples = stream.read(std::span(samples_buffer));
-                            audio_dev.play(samples);
-                        }
-                    }
-                );
-
             }
             catch (std::exception& e) {
                 LOG_ERROR("{}", e.what());
@@ -330,24 +248,25 @@ namespace PlayerTab {
 
 
         void
-        PlaybackResources::update_queued_history()
+        PlaybackResources::update_audio_queue_history()
         {
-            std::size_t queued_size = audio_dev ? audio_dev.get_queued_size() : 0z;
-            auto sample_size = SDL_AUDIO_BITSIZE(audio_spec.format);
-            float current =
-                queued_size
-                / float(sample_size * audio_spec.freq);
+            TraceFunction tf{"PlayerTab"sv};
 
-            queued_history[last_queued_history++] = current;
-            if (last_queued_history >= queued_history.size())
-                last_queued_history = 0;
+            radio.with_device_info(
+                [this](const RadioClient::DeviceInfo& info)
+                {
+                    audio_queue_history[audio_queue_index++] = info.queued;
+                    if (audio_queue_index >= audio_queue_history.size())
+                        audio_queue_index = 0;
+                }
+            );
         }
 
 
         void
         save()
         try {
-            auto filename = App::get_config_path() / "player.json";
+            auto filename = App::get_config_dir() / "player.json";
             Serializer::save(state, filename);
         }
         catch (std::exception& e) {
@@ -361,7 +280,7 @@ namespace PlayerTab {
             using namespace ImGui::RAII;
 
             const auto& style = ImGui::GetStyle();
-            float width = queued_history_size * 3
+            float width = audio_queue_history_size * 3
                 + 2 * style.FramePadding.x
                 + 2 * style.WindowPadding.x;
             ImGui::SetNextWindowSize({width, 500}, ImGuiCond_Always);
@@ -386,34 +305,40 @@ namespace PlayerTab {
 
                 Font smaller{nullptr, 0, 0.8f};
 
-                const auto& dev = play_res->audio_dev;
-                if (!dev) {
-                    ImGui::Text("Output audio device not initialized.");
-                } else {
-                    const auto& spec = play_res->audio_spec;
-                    if (Table table{"table", 2}) {
-                        ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed);
-                        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
-
-                        try {
-                            auto [default_name, default_spec] = sdl::audio::get_default_info(false);
-                            UI::InfoRow("Device", default_name);
+                play_res->radio.with_device_info(
+                    [](const RadioClient::DeviceInfo& info)
+                    {
+                        if (!info.active) {
+                            ImGui::Text("Output audio device not initialized.");
+                            return;
                         }
-                        catch (...) {}
-                        UI::InfoRow("Status", to_string(dev.get_status()));
-                        UI::FormatInfoRow("Frequency", "{}Hz", humanize::value(spec.freq));
-                        UI::InfoRow("Sample format", format_to_string(spec.format));
-                    }
 
-                    auto available = ImGui::GetContentRegionAvail();
-                    ImGui::PlotHistogram("##queued_audio",
-                                         std::span{play_res->queued_history},
-                                         play_res->last_queued_history,
-                                         {},
-                                         0,
-                                         FLT_MAX,
-                                         available);
-                }
+                        const auto& spec = info.spec;
+                        if (Table table{"table", 2}) {
+                            ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed);
+                            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+
+                            try {
+                                auto [default_name, default_spec] =
+                                    sdl::audio::get_default_info(false);
+                                UI::InfoRow("Device", default_name);
+                            }
+                            catch (...) {}
+
+                            UI::FormatInfoRow("Frequency", "{}Hz", humanize::value(spec.freq));
+                            UI::InfoRow("Sample format", format_to_string(spec.format));
+                        }
+
+                        auto available = ImGui::GetContentRegionAvail();
+                        ImGui::PlotHistogram("##audio_queue_history",
+                                             std::span{play_res->audio_queue_history},
+                                             play_res->audio_queue_index,
+                                             {},
+                                             0,
+                                             FLT_MAX,
+                                             available);
+                    }
+                );
             }
         }
 
@@ -432,8 +357,8 @@ namespace PlayerTab {
                     ImGuiChildFlags_NavFlattened
                 }) {
 
-                ImGui::SetNextItemOpen(state.history_expanded);
-                if ((state.history_expanded = ImGui::CollapsingHeader("Track history"))) {
+                ImGui::SetNextItemOpen(state.track_history_expanded);
+                if ((state.track_history_expanded = ImGui::CollapsingHeader("Track history"))) {
 
                     Font smaller{nullptr, 0, 0.8f};
                     Indent indenter;
@@ -526,6 +451,33 @@ namespace PlayerTab {
 
                     UI::StationInfo(*station, true);
 
+                    if (play_res) {
+                        unsigned cur_idx = play_res->radio.get_current_url_info_index();
+                        play_res->radio.with_url_info_vec(
+                            [cur_idx](const RadioClient::URLInfoVec& info_vec)
+                            {
+                                std::string cur_url;
+                                if (cur_idx < info_vec.size())
+                                    cur_url = info_vec[cur_idx].url;
+                                if (Combo url_list{"URLs"s, cur_url}) {
+                                    for (auto [idx, entry] : info_vec | std::views::enumerate) {
+                                        auto& [url, content_type, type] = entry;
+                                        auto label = std::format(
+                                            "[{}] {} ({})",
+                                            to_string(type),
+                                            url,
+                                            content_type
+                                        );
+                                        if (ImGui::RadioButton(label,
+                                                               std::cmp_equal(idx, cur_idx))) {
+                                            play_res->radio.play(idx);
+                                        }
+                                    }
+                                }
+                            }
+                        );
+                    }
+
                 } // details
 
             } // station_frame
@@ -560,52 +512,48 @@ namespace PlayerTab {
                         ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
 
                         play_res->radio.with_metadata(
-                            [](const RadioClient::opt_stream_metadata& meta)
+                            [](const stream_metadata& meta)
                             {
-                                if (!meta)
-                                    return;
-                                UI::InfoRowOpt("Title", meta->title);
-                                UI::InfoRowOpt("Artist", meta->artist);
+                                UI::InfoRowOpt("Title", meta.title);
+                                UI::InfoRowOpt("Artist", meta.artist);
 
-                                if (meta->cover_art && !meta->cover_art->empty()) {
+                                if (meta.cover_art && !meta.cover_art->empty()) {
                                     auto available = ImGui::GetContentRegionAvail();
                                     const sdl::vec2 max_size = {
                                         static_cast<int>(available.x),
                                         0
                                     };
-                                    auto art = ImageLoader::get(*meta->cover_art, max_size);
+                                    auto art = ImageLoader::get(*meta.cover_art, max_size);
                                     ImGui::TableNextRow();
                                     ImGui::TableNextColumn();
                                     UI::Label("Cover art");
                                     ImGui::TableNextColumn();
                                     UI::Image(*art);
-                                    ImGui::SetItemTooltip(*meta->cover_art);
+                                    ImGui::SetItemTooltip(*meta.cover_art);
                                 }
 
-                                UI::InfoRowOpt("Album", meta->album);
-                                UI::InfoRowOpt("Genre", meta->genre);
-                                UI::InfoRowOpt("Date", meta->date);
+                                UI::InfoRowOpt("Album", meta.album);
+                                UI::InfoRowOpt("Genre", meta.genre);
+                                UI::InfoRowOpt("Date", meta.date);
 
-                                for (auto& [k, v] : meta->extra)
+                                for (auto& [k, v] : meta.extra)
                                     UI::InfoRow(k, v);
 
                                 // station metadata
-                                UI::InfoRowOpt("Station Name", meta->station_name);
-                                UI::InfoRowOpt("Station Genre", meta->station_genre);
-                                UI::InfoRowOpt("Station Description", meta->station_description);
-                                UI::InfoRowOpt("Station URL", meta->station_url);
+                                UI::InfoRowOpt("Station Name", meta.station.name);
+                                UI::InfoRowOpt("Station Genre", meta.station.genre);
+                                UI::InfoRowOpt("Station Description", meta.station.description);
+                                UI::InfoRowOpt("Station URL", meta.station.url);
                             }
                         );
 
                         play_res->radio.with_decoder_info(
-                            [](const RadioClient::opt_decoder_info& info)
+                            [](const Decoder::Info& info)
                             {
-                                if (!info)
-                                    return;
-                                if (!info->codec.empty())
-                                    UI::InfoRow("Codec", info->codec);
-                                if (!info->bitrate.empty())
-                                    UI::InfoRow("Bitrate", info->bitrate);
+                                if (!info.codec.empty())
+                                    UI::InfoRow("Codec", info.codec);
+                                if (!info.bitrate.empty())
+                                    UI::InfoRow("Bitrate", info.bitrate);
                             }
                         );
                     }
@@ -624,21 +572,48 @@ namespace PlayerTab {
             ImGui::AlignTextToFramePadding();
 
             if (play_res) {
+#if 1
                 if (ImGui::Button(ICON_FA_INFO_CIRCLE))
                     ImGui::OpenPopup(details_popup_id);
                 ImGui::SetItemTooltip("Show output audio device properties.");
                 show_details_popup();
 
-                ImGui::SameLine();
+                // ImGui::SameLine();
 
-                if (const auto& dev = play_res->audio_dev) {
-                    ImGui::FormatText("Output audio device: {}",
-                                      to_string(dev.get_status()));
-                } else {
-                    ImGui::Text("Waiting for audio.");
-                }
+                // if (const auto& dev = play_res->audio_dev) {
+                //     ImGui::FormatText("Output audio device: {}",
+                //                       to_string(dev.get_status()));
+                // } else {
+                //     ImGui::Text("Waiting for audio.");
+                // }
+#endif
+
             } else {
                 ImGui::Text("Not playing.");
+            }
+        }
+
+
+        void
+        track_history_add(const std::string& title)
+        {
+            TraceFunction tf{"PlayerTab"sv};
+
+            if (!state.history.empty() && state.history.front().title == title)
+                return;
+
+            state.history.emplace_front(system_clock::now(), title);
+            track_history_trim();
+        }
+
+
+        void
+        track_history_trim()
+        {
+            if (state.history.size() > cfg.player_history_limit) {
+                std::size_t excess = state.history.size() - cfg.player_history_limit;
+                state.history.erase(state.history.end() - excess,
+                                    state.history.end());
             }
         }
 
@@ -692,7 +667,7 @@ namespace PlayerTab {
         if (!station)
             return;
 
-        if (play_res && play_res->radio.current_state != RadioClient::state::stopped)
+        if (play_res && play_res->radio.is_playing())
             stop();
 
         LOG_INFO("Starting playback of station {:?}", station->name);
@@ -703,7 +678,10 @@ namespace PlayerTab {
                  station->url,
                  station->url_resolved);
 
-        play_res.emplace(station->url, station->url_resolved);
+        if (!play_res)
+            play_res.emplace(station->url, station->url_resolved);
+
+        play_res->radio.play();
 
         StationClicking::click(station);
     }
@@ -712,6 +690,9 @@ namespace PlayerTab {
     void
     play(StationPtr& st)
     {
+        if (st != station)
+            play_res.reset();
+
         station = st;
         play();
     }
@@ -720,7 +701,8 @@ namespace PlayerTab {
     void
     stop()
     {
-        play_res.reset();
+        if (play_res)
+            play_res->radio.stop();
     }
 
 
@@ -731,7 +713,7 @@ namespace PlayerTab {
             return false;
         if (!station)
             return false;
-        if (play_res->radio.current_state == RadioClient::state::stopped)
+        if (!play_res->radio.is_playing())
             return false;
         if (&st == station.get())
             return true;

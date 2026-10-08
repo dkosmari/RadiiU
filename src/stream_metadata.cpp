@@ -13,36 +13,46 @@
 void
 stream_metadata::merge(const stream_metadata& other)
 {
-    if (other.title)
+    if (other.title && title != other.title)
         title = other.title;
 
-    if (other.artist)
+    if (other.artist && artist != other.artist)
         artist = other.artist;
 
-    if (other.album)
+    if (other.album && album != other.album)
         album = other.album;
 
-    if (other.genre)
+    if (other.genre && genre != other.genre)
         genre = other.genre;
 
-    if (other.date)
+    if (other.date && date != other.date)
         date = other.date;
 
-    if (other.cover_art)
+    if (other.cover_art && cover_art != other.cover_art)
         cover_art = other.cover_art;
 
-    if (other.station_name)
-        station_name = other.station_name;
+    if (other.station.name && station.name != other.station.name)
+        station.name = other.station.name;
 
-    if (other.station_description)
-        station_description = other.station_description;
+    if (other.station.description && station.description != other.station.description)
+        station.description = other.station.description;
 
-    if (other.station_url)
-        station_url = other.station_url;
+    if (other.station.url && station.url != other.station.url)
+        station.url = other.station.url;
 
-    for (const auto& [k, v] : other.extra)
-        if (!v.empty())
-            extra[k] = v;
+    for (const auto& [key, val] : other.extra)
+        if (!val.empty()) {
+            auto it = extra.find(key);
+            if (it != extra.end()) {
+                // already have key
+                if (it->second == val)
+                    continue;
+                it->second = val;
+            } else {
+                // key not found, just insert it
+                extra[key] = val;
+            }
+        }
 }
 
 
@@ -68,17 +78,17 @@ operator <<(std::ostream& out,
     if (m.cover_art)
         out << "Cover Art: " << *m.cover_art << '\n';
 
-    if (m.station_name)
-        out << "Station Name: " << *m.station_name << '\n';
+    if (m.station.name)
+        out << "Station Name: " << *m.station.name << '\n';
 
-    if (m.station_genre)
-        out << "Station Genre: " << *m.station_genre << '\n';
+    if (m.station.genre)
+        out << "Station Genre: " << *m.station.genre << '\n';
 
-    if (m.station_description)
-        out << "Station Description: " << *m.station_description << '\n';
+    if (m.station.description)
+        out << "Station Description: " << *m.station.description << '\n';
 
-    if (m.station_url)
-        out << "Station URL: " << *m.station_url << '\n';
+    if (m.station.url)
+        out << "Station URL: " << *m.station.url << '\n';
 
     if (!m.extra.empty()) {
         out << "Extra:\n";

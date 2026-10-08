@@ -43,6 +43,8 @@ radiiu_elf_SOURCES = \
 	src/AboutTab.hpp \
 	src/App.cpp \
 	src/App.hpp \
+	src/async_byte_stream.cpp \
+	src/async_byte_stream.hpp \
 	src/async_queue.hpp \
 	src/async_task_queue.cpp \
 	src/async_task_queue.hpp \
@@ -60,16 +62,16 @@ radiiu_elf_SOURCES = \
 	src/ConfirmExitPopup.hpp \
 	src/CountryManager.cpp \
 	src/CountryManager.hpp \
-	src/decoder.cpp \
-	src/decoder.hpp \
-	src/decoder_aac.cpp \
-	src/decoder_aac.hpp \
-	src/decoder_mp3.cpp \
-	src/decoder_mp3.hpp \
-	src/decoder_opus.cpp \
-	src/decoder_opus.hpp \
-	src/decoder_vorbis.cpp \
-	src/decoder_vorbis.hpp \
+	src/Decoder.cpp \
+	src/Decoder.hpp \
+	src/DecoderAAC.cpp \
+	src/DecoderAAC.hpp \
+	src/DecoderMP3.cpp \
+	src/DecoderMP3.hpp \
+	src/DecoderOpus.cpp \
+	src/DecoderOpus.hpp \
+	src/DecoderVorbis.cpp \
+	src/DecoderVorbis.hpp \
 	src/EditStationPopup.cpp \
 	src/EditStationPopup.hpp \
 	src/enumerator.hpp \
@@ -77,8 +79,6 @@ radiiu_elf_SOURCES = \
 	src/FavoritesTab.hpp \
 	src/FontLoader.cpp \
 	src/FontLoader.hpp \
-	src/http_client.cpp \
-	src/http_client.hpp \
 	src/humanize.cpp \
 	src/humanize.hpp \
 	src/IconsFontAwesome4.h \
@@ -151,7 +151,9 @@ radiiu_elf_SOURCES = \
 	src/tracer.hpp \
 	src/UI.cpp \
 	src/UI.hpp \
-	src/unit_test.hpp
+	src/unit_test.hpp \
+	src/utils.cpp \
+	src/utils.hpp
 
 
 radiiu_elf_CPPFLAGS = \
@@ -176,7 +178,7 @@ radiiu_elf_CPPFLAGS = \
 	-I$(srcdir)/external/sdl2xx/include
 
 
-radiiu_elf_LDADD =  \
+radiiu_elf_LDADD = \
 	libnet.a \
 	$(LDADD) \
 	external/curlxx/lib/libcurlxx.la \

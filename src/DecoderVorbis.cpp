@@ -5,23 +5,42 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <array>
 #include <bit>
 #include <cerrno>
 #include <format>
 #include <string_view>
 
-#include "decoder_vorbis.hpp"
+#include "DecoderVorbis.hpp"
 
 #include "LogManager.hpp"
+#include "mime_type.hpp"
 #include "string_utils.hpp"
+#include "utils.hpp"
 
 
 using namespace std::literals;
 
 
-namespace decoder {
+namespace Decoder {
 
     namespace {
+
+        // Constants
+
+        constexpr std::array vorbis_mimes{
+            "audio/vorbis"sv,
+            "audio/ogg; codecs=vorbis"sv,
+            "audio/ogg"sv,
+        };
+
+
+        constexpr std::array vorbis_prefixes{
+            "OggS"sv,
+        };
+
+
+        // Function definitions
 
         std::string
         vorbis_error_to_string(int code)
@@ -63,18 +82,18 @@ namespace decoder {
     } // namespace
 
 
-    vorbis::error::error(int code) :
+    Vorbis::Error::Error(int code) :
         std::runtime_error{vorbis_error_to_string(code)}
     {}
 
 
-    vorbis::error::error(const std::string& msg,
+    Vorbis::Error::Error(const std::string& msg,
                          int code) :
         std::runtime_error{msg + ": " + vorbis_error_to_string(code)}
     {}
 
 
-    vorbis::vorbis(std::span<const char> data) :
+    Vorbis::Vorbis(std::span<const std::byte> data) :
         samples(8192)
     {
         ov_callbacks callbacks {
@@ -84,62 +103,66 @@ namespace decoder {
             .tell_func = nullptr,
         };
 
-        int e = ov_open_callbacks(this,
-                                  &ovf,
-                                  data.data(),
-                                  data.size_bytes(),
-                                  callbacks);
+        int e = ov_open_callbacks(
+            this,
+            &ovf,
+            reinterpret_cast<const char*>(data.data()),
+            data.size_bytes(),
+            callbacks
+        );
         if (e)
-            throw error{"ov_open_callbacks() failed", e};
+            throw Error{"ov_open_callbacks() failed", e};
 
         LOG_INFO("Created vorbis decoder.");
     }
 
 
-    vorbis::~vorbis()
+    Vorbis::~Vorbis()
         noexcept
     {
         ov_clear(&ovf);
     }
 
 
-    std::size_t
-    vorbis::feed(std::span<const char> data)
+    std::span<const std::byte>
+    Vorbis::feed(std::span<const std::byte> data)
     {
-        return stream.write(data);
+        return stream.write_some(data);
     }
 
 
-    std::span<const char>
-    vorbis::decode()
+    std::span<const std::byte>
+    Vorbis::decode()
     {
         // TODO: when more than 2 channels, we should reorder them to match SDL channels.
         int bitstream;
-        long r = ov_read(&ovf,
-                         samples.data(),
-                         samples.size(),
-                         std::endian::native == std::endian::big,
-                         2,
-                         1,
-                         &bitstream);
+        long r = ov_read(
+            &ovf,
+            samples.data(),
+            samples.size(),
+            std::endian::native == std::endian::big,
+            2,
+            1,
+            &bitstream
+        );
         if (r == 0)
             return {};
         if (r < 0) {
             LOG_ERROR("{}", vorbis_error_to_string(r));
             return {};
         }
-        return std::span(samples.data(), r);
+        return std::as_bytes(std::span(samples.data(), r));
     }
 
 
-    std::optional<spec>
-    vorbis::get_spec()
+    std::optional<Spec>
+    Vorbis::get_spec()
         noexcept
     {
         auto vinfo = ov_info(&ovf, -1);
         if (!vinfo)
             return {};
-        spec result;
+        Spec result;
         result.format = AUDIO_S16SYS;
         result.rate = vinfo->rate;
         result.channels = vinfo->channels;
@@ -147,10 +170,10 @@ namespace decoder {
     }
 
 
-    info
-    vorbis::get_info()
+    Info
+    Vorbis::get_info()
     {
-        info result;
+        Info result;
 
         result.codec = "Ogg Vorbis"s;
 
@@ -190,7 +213,7 @@ namespace decoder {
 
 
     std::optional<stream_metadata>
-    vorbis::get_metadata()
+    Vorbis::get_metadata()
         const
     {
         auto comment = ov_comment(const_cast<OggVorbis_File*>(&ovf), -1);
@@ -224,13 +247,27 @@ namespace decoder {
     }
 
 
+    bool
+    Vorbis::match_mime(const std::string& content_type)
+    {
+        return mime_type::match_any(content_type, vorbis_mimes);
+    }
+
+
+    bool
+    Vorbis::match_prefix(std::span<const std::byte> data)
+    {
+        return utils::starts_with_any(data, vorbis_prefixes);
+    }
+
+
     std::size_t
-    vorbis::read_callback(void* buf,
+    Vorbis::read_callback(void* buf,
                           std::size_t size,
                           std::size_t count,
                           void* ctx)
     {
-        auto self = reinterpret_cast<vorbis*>(ctx);
+        auto self = reinterpret_cast<Vorbis*>(ctx);
         if (!self) {
             errno = EINVAL;
             return 0;
@@ -240,7 +277,13 @@ namespace decoder {
             return 0;
         }
 
-        return self->stream.read(buf, size * count);
+        std::span<std::byte> src{
+            reinterpret_cast<std::byte*>(buf),
+            size * count
+        };
+
+        auto result = self->stream.read(src);
+        return result.size();
     }
 
-} // namespace decoder
+} // namespace Decoder

@@ -29,12 +29,17 @@ namespace App {
 
     [[nodiscard]]
     const std::filesystem::path&
-    get_content_path();
+    get_content_dir();
 
 
     [[nodiscard]]
     const std::filesystem::path&
-    get_config_path();
+    get_config_dir();
+
+
+    [[nodiscard]]
+    const std::filesystem::path&
+    get_data_dir();
 
 
     void

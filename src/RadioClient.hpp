@@ -8,37 +8,84 @@
 #ifndef RADIO_CLIENT_HPP
 #define RADIO_CLIENT_HPP
 
+#include <atomic>
 #include <condition_variable>
 #include <cstddef>
 #include <functional>
+#include <initializer_list>
 #include <mutex>
+#include <optional>
 #include <span>
 #include <stop_token>
 #include <string>
+#include <string_view>
 #include <thread>
+
+#include <curlxx/easy.hpp>
+#include <curlxx/error.hpp>
+#include <curlxx/multi.hpp>
 
 #include <sdl2xx/audio.hpp>
 
+#include "async_byte_stream.hpp"
+#include "async_task_queue.hpp"
 #include "byte_stream.hpp"
-#include "decoder.hpp"
-#include "http_client.hpp"
+#include "Decoder.hpp"
 #include "icy_stream.hpp"
+#include "stream_metadata.hpp"
 #include "thread_safe.hpp"
 
 
 // This class is the high-level handler for internet radio streams.
 
-struct RadioClient {
+class RadioClient {
 
-    enum class state {
-        stopped,
-        started,
-        receiving_playlist,
-        streaming_audio,
+    struct APDDisabler {
+        APDDisabler()
+            noexcept;
+
+        ~APDDisabler()
+            noexcept;
     };
 
 
-    enum class playlist_type {
+public:
+
+    enum class Phase {
+        stopped,
+        fetching,
+        streaming,
+        error,
+    };
+
+
+    enum class TransferState {
+        idle,
+        queued,
+        started,
+        in_progress,
+        paused,
+        unpausing,
+        error,
+    };
+
+
+    enum class DecoderState {
+        stopped,
+        queued,
+        running,
+    };
+
+
+    enum class URLType {
+        unknown,
+        playlist,
+        audio,
+        other,
+    };
+
+
+    enum class PlaylistType {
         none,
         asx,                    // TODO
         cue,                    // TODO
@@ -49,96 +96,196 @@ struct RadioClient {
         xspf,                   // TODO application/xspf+xml
     };
 
-    using opt_stream_metadata = std::optional<stream_metadata>;
-    using opt_decoder_info = std::optional<decoder::info>;
-    using opt_decoder_spec = std::optional<decoder::spec>;
 
-    using ConsumeSamplesFunction = std::function<void(byte_stream& stream)>;
-    using MetadataFunction = std::function<void(const opt_stream_metadata&)>;
-    using DecoderInfoFunction = std::function<void(const opt_decoder_info&)>;
-    using DecoderSpecFunction = std::function<void(const opt_decoder_spec&)>;
-
-    state current_state = state::stopped;
-
-    playlist_type current_playlist = playlist_type::none;
-
-    std::string url;
-    std::string url_resolved;
-    std::string user_agent;
-
-    http_client http;
-    std::unique_ptr<icy::stream> icy_stream;
-
-    byte_stream* data_stream = nullptr;
+    struct DeviceInfo {
+        bool active = false;
+        sdl::audio::spec spec = {};
+        float queued = 0;
+    };
 
 
-    RadioClient(const std::string& url,
-                const std::string& url_resolved,
-                const std::string& user_agent);
+    struct URLInfo {
+        std::string url{};
+        std::string content_type{};
+        URLType type = URLType::unknown;
+    };
 
-    // disallow moving
-    RadioClient(RadioClient&&) = delete;
+    using URLInfoVec = std::vector<URLInfo>;
 
 
+    using MetadataCallbackSignature = void (const stream_metadata& meta);
+    using MetadataFunc = std::function<MetadataCallbackSignature>;
+
+
+    using DecoderInfoCallbackSignature = void (const Decoder::Info& info);
+    using DecoderInfoFunc = std::function<DecoderInfoCallbackSignature>;
+
+
+    using DeviceInfoCallbackSignature = void (const DeviceInfo& info);
+    using DeviceInfoFunc = std::function<DeviceInfoCallbackSignature>;
+
+    using URLInfoVecCallbackSignature = void (const URLInfoVec& info_vec);
+    using URLInfoVecFunction = std::function<URLInfoVecCallbackSignature>;
+
+
+    RadioClient(const std::string& user_agent_,
+                const std::string& station_url_,
+                std::initializer_list<std::string_view> extra_urls = {});
+
+    ~RadioClient()
+        noexcept;
+
+        // This is called by the "Player" tab, once per iteration of the main app loop.
     void
     process();
 
+    // Enter the "fetching" phase, starting from the given URL index.
+    //
+    void
+    play(unsigned idx = 0);
 
     void
-    consume_samples(const ConsumeSamplesFunction& func);
+    stop();
 
 
-    void
-    with_metadata(const MetadataFunction& func)
+    bool
+    is_playing()
         const noexcept;
 
 
     void
-    with_decoder_info(const DecoderInfoFunction& func)
-        const noexcept;
+    with_metadata(const MetadataFunc& func)
+        const;
 
 
     void
-    with_decoder_spec(const DecoderSpecFunction& func);
+    with_decoder_info(const DecoderInfoFunc& func)
+        const;
+
+
+    void
+    with_device_info(const DeviceInfoFunc& func)
+        const;
+
+
+    void
+    with_url_info_vec(const URLInfoVecFunction& func)
+        const;
+
+
+    unsigned
+    get_current_url_info_index()
+        const;
+
 
 private:
 
-    std::unique_ptr<decoder::base> dec;
-    std::vector<char> network_to_decoder_input_buffer;
-    std::vector<char> decoder_input_to_decoder_buffer;
+    const std::string user_agent;
+    const std::string station_url;
 
-    thread_safe<opt_stream_metadata> safe_metadata;
-    thread_safe<opt_decoder_spec> safe_decoder_spec;
-    thread_safe<opt_decoder_info> safe_decoder_info;
+    std::atomic<Phase> phase = Phase::stopped;
+    std::atomic<TransferState> transfer_state = TransferState::idle;
 
-    std::mutex decoder_input_mutex;
-    std::condition_variable_any empty_decoder_input;
-    byte_stream decoder_input;
-    thread_safe<byte_stream> decoder_output;
+    thread_safe<URLInfoVec> safe_url_info_vec;
+    std::atomic<unsigned> url_info_idx{0};
+
+
+    thread_safe<std::string> network_error_message;
+    std::vector<std::byte> network_buffer;
+
+    PlaylistType playlist_type = PlaylistType::none;
+    byte_stream playlist_data{2 * 1024 * 1024};
+    async_byte_stream encoded_audio{64 * 1024};
+
+    icy::stream icy_parser;
+    thread_safe<stream_metadata> safe_metadata; // updated by either thread, read by the UI code
+
+    // async_task_queue main_tasks; // dispatched from .process()
+    async_task_queue network_tasks; // dispatched from network thread
+
+    curl::multi multi;
+    curl::easy easy;
+
+    std::string stream_content_type;
+    std::atomic<DecoderState> decoder_state = DecoderState::stopped;
+    std::unique_ptr<Decoder::Base> decoder;
+    sdl::audio::device audio_dev;
+    thread_safe<Decoder::Info> safe_decoder_info;
+    thread_safe<DeviceInfo> safe_device_info;
+
+    std::jthread network_thread;
     std::jthread decoder_thread;
 
 
-    void
-    set_next_url(const std::string& next_url);
+    std::optional<APDDisabler> apd_disabler;
+
 
     void
-    process_http_response_started();
+    add_url(const std::string& url);
+
 
     void
-    process_http_response_finished();
+    network_thread_function(std::stop_token stopper)
+        noexcept;
 
     void
-    process_http_recv();
+    decoder_thread_function(std::stop_token stopper)
+        noexcept;
+
+
+    void
+    task_queue_transfer(unsigned idx);
+
+
+    void
+    task_cancel_transfer();
+
+
+    void
+    task_resume_transfer();
+
+
+    void
+    on_transfer_error(const curl::error& e);
+
+    void
+    on_transfer_finished();
+
+    std::size_t
+    on_transfer_recv(std::span<const std::byte> data);
+
+    void
+    on_transfer_started(std::span<const std::byte> data);
+
+
+    void
+    start_decoder_thread();
+
+    void
+    resume_transfer_if_paused();
 
     void
     process_playlist();
 
     void
-    process_audio();
-
-    void
-    decoder_thread_function(std::stop_token stopper);
+    try_next_url();
 
 }; // struct RadioClient
+
+
+std::string
+to_string(RadioClient::Phase phase);
+
+
+std::string
+to_string(RadioClient::PlaylistType type);
+
+
+std::string
+to_string(RadioClient::TransferState state);
+
+
+std::string
+to_string(RadioClient::URLType type);
 
 #endif

@@ -7,11 +7,14 @@
 
 #include <ostream>
 #include <ranges>
+#include <string_view>
 #include <utility>              // move()
 
 #include "m3u.hpp"
 
+#include "mime_type.hpp"
 #include "string_utils.hpp"
+#include "utils.hpp"
 
 
 using namespace std::literals;
@@ -19,8 +22,29 @@ using namespace std::literals;
 
 namespace m3u {
 
-    const std::string ext_m3u = "#EXTM3U";
-    const std::string ext_inf = "#EXTINF:";
+    namespace {
+
+        constexpr std::string_view ext_m3u = "#EXTM3U"sv;
+        constexpr std::string_view ext_inf = "#EXTINF:"sv;
+
+
+        // Mime types for M3U playlists
+        constexpr std::array m3u_mimes {
+            "audio/mpegurl"sv,
+            "audio/x-mpegurl"sv,
+            "application/vnd.apple.mpegurl"sv,
+            "application/vnd.apple.mpegurl.audio"sv,
+            "application/mpegurl"sv,
+            "application/x-mpegurl"sv,
+        };
+
+
+        // Prefixes for M3U playlists
+        constexpr std::array m3u_prefixes {
+            ext_m3u,
+        };
+
+    } // namespace
 
     void
     write(std::ostream& out,
@@ -122,6 +146,29 @@ namespace m3u {
         }
 
         return result;
+    }
+
+
+    bool
+    match_mime(const std::string& content_type)
+    {
+        return mime_type::match_any(content_type, m3u_mimes);
+    }
+
+
+    bool
+    match_path(const std::string& path)
+    {
+        auto low_path = string_utils::to_lower(path);
+        return low_path.ends_with(".m3u"sv)
+            || low_path.ends_with(".m3u8"sv);
+    }
+
+
+    bool
+    match_prefix(std::span<const std::byte> data)
+    {
+        return utils::starts_with_any(data, m3u_prefixes);
     }
 
 } // namespace m3u

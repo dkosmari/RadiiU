@@ -22,11 +22,16 @@ struct stream_metadata {
     std::optional<std::string> genre;
     std::optional<std::string> date;
     std::optional<std::string> cover_art;
-    std::optional<std::string> station_name;
-    std::optional<std::string> station_genre;
-    std::optional<std::string> station_description;
-    std::optional<std::string> station_url;
+    struct {
+        std::optional<std::string> name;
+        std::optional<std::string> genre;
+        std::optional<std::string> description;
+        std::optional<std::string> url;
+        std::optional<std::string> notice;
+    } station;
+
     std::unordered_map<std::string, std::string> extra;
+
 
     void
     merge(const stream_metadata& other);

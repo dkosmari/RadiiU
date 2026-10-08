@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
 #include <format>
 #include <iostream>
 #include <memory>
@@ -28,6 +29,8 @@
 #include <wordexp.h>
 #endif
 
+#include <SDL_filesystem.h>
+
 #include <cafe_glyphs.h>
 
 #include <curlxx/global.hpp>
@@ -37,7 +40,6 @@
 #include <imgui_stdlib.h>
 #include <imgui_impl_sdl2.h>
 #include <imgui_impl_sdlrenderer2.h>
-#include <imgui_freetype.h>
 
 #include <sdl2xx/sdl.hpp>
 #include <sdl2xx/img.hpp>
@@ -89,6 +91,10 @@ using Settings::cfg;
 
 
 // #define ENABLE_DIM_TIMER_WATCHER
+
+#ifndef ORG_NAME
+#define ORG_NAME "com.github.dkosmari"
+#endif
 
 
 namespace App {
@@ -276,7 +282,8 @@ namespace App {
 
         Uint64 fade_duration_ms = 5'000;
 
-        std::filesystem::path config_path;
+        std::filesystem::path config_dir;
+        std::filesystem::path data_dir;
 
         bool running;
 
@@ -688,34 +695,41 @@ namespace App {
 
 #ifdef __WIIU__
             nn::act::Initialize();
-            config_path = std::format("/vol/save/{:08x}", nn::act::GetPersistentId());
+            config_dir = std::format("/vol/save/{:08x}", nn::act::GetPersistentId());
             SAVEInit();
-            if (!exists(config_path)) {
-                LOG_INFO("Creating save dir: {:?}", config_path.string());
+            if (!exists(config_dir)) {
+                LOG_INFO("Creating save dir: {:?}", config_dir.string());
                 auto status = SAVEInitSaveDir(nn::act::GetSlotNo());
                 if (status)
                     LOG_ERROR("SAVEInitSaveDir() failed: {}", static_cast<int>(status));
                 else
                     LOG_INFO("Save dir created.");
             }
+            data_dir = config_dir;
 #else
-            std::filesystem::path config_home;
-            wordexp_t expanded{};
-            if (wordexp("${XDG_CONFIG_HOME:-~/.config}", &expanded, WRDE_NOCMD)) {
-                // env variables not set properly, just use the "current" directory and hope
-                // it works
-                config_home = ".";
+            const char* xdg_config = std::getenv("XDG_CONFIG_HOME");
+            if (xdg_config && xdg_config[0] != '\0') {
+                config_dir = xdg_config / std::filesystem::path{PACKAGE_TARNAME};
             } else {
-                config_home = expanded.we_wordv[0];
-                config_path = config_home / PACKAGE;
+                const char* home = std::getenv("HOME");
+                if (home && home[0] != '\0')
+                    config_dir = std::filesystem::path{home}
+                                  / ".config"
+                                  / std::filesystem::path{PACKAGE_TARNAME};
             }
-            wordfree(&expanded);
+            if (config_dir.empty())
+                return;
 
-            if (!exists(config_path)) {
-                LOG_INFO("Creating config dir: {:?}", config_path.string());
-                if (!create_directory(config_path))
+            if (!exists(config_dir)) {
+                LOG_INFO("Creating config dir: {:?}", config_dir.string());
+                if (!create_directories(config_dir))
                     LOG_ERROR("create_directories() failed.");
             }
+
+            if (auto pref_path = sdl::try_get_pref_path(ORG_NAME, PACKAGE_TARNAME)) {
+                data_dir = std::move(*pref_path);
+            } else
+                data_dir = config_dir;
 #endif
         }
         catch (std::exception& e) {
@@ -745,8 +759,8 @@ namespace App {
             setup_imgui_style();
 
             FontLoader::initialize(); // load system font(s)
-            FontLoader::load_dir(get_content_path() / "fonts");
-            FontLoader::load_dir(get_config_path() / "fonts");
+            FontLoader::load_dir(get_content_dir() / "fonts");
+            FontLoader::load_dir(get_data_dir() / "fonts");
             CountryManager::initialize();
 
             ImGui_ImplSDL2_InitForSDLRenderer(res->window.data(),
@@ -1284,21 +1298,28 @@ namespace App {
 
 
     const std::filesystem::path&
-    get_content_path()
+    get_content_dir()
     {
 #ifdef __WIIU__
-        static const std::filesystem::path content_path = "/vol/content";
+        static const std::filesystem::path content_dir = "/vol/content";
 #else
-        static const std::filesystem::path content_path = "assets/content";
+        static const std::filesystem::path content_dir = "assets/content";
 #endif
-        return content_path;
+        return content_dir;
     }
 
 
     const std::filesystem::path&
-    get_config_path()
+    get_config_dir()
     {
-        return config_path;
+        return config_dir;
+    }
+
+
+    const std::filesystem::path&
+    get_data_dir()
+    {
+        return data_dir;
     }
 
 
@@ -1323,6 +1344,15 @@ namespace App {
             // SDL_StartTextInput();
         }
 #endif
+
+        auto prefs_path = SDL_GetPrefPath("com.github.dkosmari", PACKAGE_TARNAME);
+        if (prefs_path) {
+            LOG_DEBUG("prefs_path: {}", prefs_path);
+            SDL_free(prefs_path);
+        } else {
+            LOG_DEBUG("prefs_path is null: {}", SDL_GetError());
+
+        }
 
         res.emplace();
 

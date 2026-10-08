@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -16,16 +16,16 @@
 #include <opus/opusfile.h>
 
 #include "byte_stream.hpp"
-#include "decoder.hpp"
+#include "Decoder.hpp"
 
 
-namespace decoder {
+namespace Decoder {
 
-    struct opus : base {
+    struct Opus : Base {
 
-        struct error : std::runtime_error {
-            error(int code);
-            error(const std::string& msg,
+        struct Error : std::runtime_error {
+            Error(int code);
+            Error(const std::string& msg,
                   int code);
         };
 
@@ -36,25 +36,25 @@ namespace decoder {
         opus_int32 bitrate = 0;
 
 
-        opus(std::span<const char> data);
+        Opus(std::span<const std::byte> data);
 
-        ~opus()
+        ~Opus()
             noexcept override;
 
 
-        std::size_t
-        feed(std::span<const char> data)
+        std::span<const std::byte>
+        feed(std::span<const std::byte> data)
             override;
 
-        std::span<const char>
+        std::span<const std::byte>
         decode()
             override;
 
-        std::optional<spec>
+        std::optional<Spec>
         get_spec()
             noexcept override;
 
-        info
+        Info
         get_info()
             override;
 
@@ -64,14 +64,26 @@ namespace decoder {
 
 
         static
+        bool
+        match_mime(const std::string& content_type);
+
+
+        static
+        bool
+        match_prefix(std::span<const std::byte> data);
+
+
+    private:
+
+        static
         int
         read_callback(void* ctx,
                       unsigned char* buf,
                       int size);
 
 
-    }; // struct opus
+    }; // struct Opus
 
-} // namespace decoder
+} // namespace Decoder
 
 #endif

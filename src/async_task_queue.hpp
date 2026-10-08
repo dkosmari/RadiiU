@@ -90,7 +90,7 @@ struct async_task_queue {
             ]
                 mutable
             {
-                func(std::move(args)...);
+                std::invoke(func, std::move(args)...);
             }
         );
     }

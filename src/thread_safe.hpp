@@ -162,6 +162,26 @@ public:
         func();
     }
 
+
+    template<typename F>
+    void
+    with_lock(F&& func)
+        const
+    {
+        std::lock_guard guard{mutex};
+        func(data);
+    }
+
+
+    template<typename F>
+    void
+    with_c_lock(F&& func)
+        const
+    {
+        std::lock_guard guard{mutex};
+        func(data);
+    }
+
 }; // class thread_safe<T, M>
 
 #endif

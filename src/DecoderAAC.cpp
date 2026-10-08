@@ -5,35 +5,39 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <array>
 #include <cassert>
+#include <string_view>
 
-#include "decoder_aac.hpp"
+#include "DecoderAAC.hpp"
 
 #include "LogManager.hpp"
+#include "mime_type.hpp"
+#include "utils.hpp"
 
 
 using namespace std::literals;
 
 
-namespace decoder {
-
-    aac::error::error(unsigned char code) :
-        std::runtime_error{NeAACDecGetErrorMessage(code)}
-    {}
-
-
-    aac::error::error(const std::string& msg) :
-        std::runtime_error{msg}
-    {}
-
-
-    aac::error::error(const std::string& msg,
-                      unsigned char code) :
-        std::runtime_error{msg + ": "s + NeAACDecGetErrorMessage(code)}
-    {}
-
+namespace Decoder {
 
     namespace {
+
+        // Constants
+
+        constexpr std::array aac_mimes{
+            "audio/aac"sv,
+            "audio/aacp"sv,
+            "audio/x-aac"sv,
+            "audio/x-hx-aac-adts"sv,
+        };
+
+
+        constexpr std::array aac_prefixes{
+            "\xff\xf1"sv,
+            "\xff\xf9"sv,
+        };
+
 
 #if 0
         std::string
@@ -106,7 +110,23 @@ namespace decoder {
     } // namespace
 
 
-    aac::aac(std::span<const char> data) :
+    AAC::Error::Error(unsigned char code) :
+        std::runtime_error{NeAACDecGetErrorMessage(code)}
+    {}
+
+
+    AAC::Error::Error(const std::string& msg) :
+        std::runtime_error{msg}
+    {}
+
+
+    AAC::Error::Error(const std::string& msg,
+                      unsigned char code) :
+        std::runtime_error{msg + ": "s + NeAACDecGetErrorMessage(code)}
+    {}
+
+
+    AAC::AAC(std::span<const std::byte> data) :
         handle{open()}
     {
         auto cfg = NeAACDecGetCurrentConfiguration(handle);
@@ -116,22 +136,24 @@ namespace decoder {
         cfg->downMatrix = 1; // downmix to stereo
         if (!NeAACDecSetConfiguration(handle, cfg)) {
             close();
-            throw error{"NeAACDecSetConfiguration() failed"};
+            throw Error{"NeAACDecSetConfiguration() failed"};
         }
 
-        auto r = NeAACDecInit(handle,
-                              reinterpret_cast<unsigned char*>(const_cast<char*>(data.data())),
-                              data.size_bytes(),
-                              &rate,
-                              &channels);
+        auto r = NeAACDecInit(
+            handle,
+            reinterpret_cast<unsigned char*>(const_cast<std::byte*>(data.data())),
+            data.size_bytes(),
+            &rate,
+            &channels
+        );
         if (r < 0) {
             close();
-            throw error{"NeAACDecInit() failed"};
+            throw Error{"NeAACDecInit() failed"};
         }
         assert((unsigned long)r <= data.size());
 
-        LOG_DEBUG("aac::rate = {}\n"
-                  "aac::channels = {}",
+        LOG_DEBUG("AAC::rate = {}\n"
+                  "AAC::channels = {}",
                   rate,
                   channels);
 
@@ -142,22 +164,22 @@ namespace decoder {
     }
 
 
-    aac::~aac()
+    AAC::~AAC()
         noexcept
     {
         close();
     }
 
 
-    std::size_t
-    aac::feed(std::span<const char> data)
+    std::span<const std::byte>
+    AAC::feed(std::span<const std::byte> data)
     {
         return stream.write(data);
     }
 
 
-    std::span<const char>
-    aac::decode()
+    std::span<const std::byte>
+    AAC::decode()
     {
         if (stream.empty())
             return {};
@@ -173,7 +195,7 @@ namespace decoder {
                                       available.size());
         if (frame.error) {
             // TODO: throwing from here should stop playback?
-            throw error{"NeAACDecDecode() failed", frame.error};
+            throw Error{"NeAACDecDecode() failed", frame.error};
         }
         stream.discard(frame.bytesconsumed);
         if (frame.samples == 0) {
@@ -185,17 +207,17 @@ namespace decoder {
         current_rate = frame.samplerate;
 
         return {
-            reinterpret_cast<const char*>(samples),
+            reinterpret_cast<const std::byte*>(samples),
             2 * frame.samples
         };
     }
 
 
-    std::optional<spec>
-    aac::get_spec()
+    std::optional<Spec>
+    AAC::get_spec()
         noexcept
     {
-        spec result;
+        Spec result;
         result.format = AUDIO_S16SYS;
         result.rate = rate;
         result.channels = 2;
@@ -203,10 +225,10 @@ namespace decoder {
     }
 
 
-    info
-    aac::get_info()
+    Info
+    AAC::get_info()
     {
-        info result;
+        Info result;
         result.codec = "AAC";
         // TODO: estimate bitrate
         return result;
@@ -214,25 +236,39 @@ namespace decoder {
 
 
     std::optional<stream_metadata>
-    aac::get_metadata()
+    AAC::get_metadata()
         const
     {
         return {};
     }
 
 
+    bool
+    AAC::match_mime(const std::string& content_type)
+    {
+        return mime_type::match_any(content_type, aac_mimes);
+    }
+
+
+    bool
+    AAC::match_prefix(std::span<const std::byte> data)
+    {
+        return utils::starts_with_any(data, aac_prefixes);
+    }
+
+
     NeAACDecHandle
-    aac::open()
+    AAC::open()
     {
         auto h = NeAACDecOpen();
         if (!h)
-            throw error{"NeAACDecOpen() failed"};
+            throw Error{"NeAACDecOpen() failed"};
         return h;
     }
 
 
     void
-    aac::close()
+    AAC::close()
         noexcept
     {
         if (handle) {
@@ -241,4 +277,4 @@ namespace decoder {
         }
     }
 
-} // namespace decoder
+} // namespace Decoder

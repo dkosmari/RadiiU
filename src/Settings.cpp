@@ -56,7 +56,7 @@ namespace Settings {
     {
         TRACE_FUNC;
         try {
-            auto filename = App::get_config_path() / "settings.json";
+            auto filename = App::get_config_dir() / "settings.json";
             Serializer::load(cfg, filename);
         }
         catch (std::exception& e) {
@@ -70,7 +70,7 @@ namespace Settings {
     {
         TRACE_FUNC;
         try {
-            auto filename = App::get_config_path() / "settings.json";
+            auto filename = App::get_config_dir() / "settings.json";
             Serializer::save(cfg, filename);
         }
         catch (std::exception& e) {

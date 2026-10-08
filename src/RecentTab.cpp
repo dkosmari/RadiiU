@@ -79,7 +79,7 @@ namespace RecentTab {
         load()
         try {
             stations.clear();
-            auto filename = App::get_config_path() / "recent.json";
+            auto filename = App::get_config_dir() / "recent.json";
             Serializer::load(stations, filename);
         }
         catch (std::exception& e) {
@@ -90,7 +90,7 @@ namespace RecentTab {
         void
         save()
         try {
-            auto filename = App::get_config_path() / "recent.json";
+            auto filename = App::get_config_dir() / "recent.json";
             Serializer::save(stations, filename);
         }
         catch (std::exception& e) {

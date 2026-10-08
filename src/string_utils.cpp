@@ -276,6 +276,16 @@ namespace string_utils {
 
 
     std::string
+    to_lower(std::string input)
+    {
+        auto loc = std::locale::classic();
+        for (auto& c : input)
+            c = std::tolower(c, loc);
+        return input;
+    }
+
+
+    std::string
     to_upper(std::string input)
     {
         auto loc = std::locale::classic();
@@ -292,6 +302,13 @@ namespace string_utils {
     }
 
 
+    std::string_view
+    trimmed(std::string_view input)
+    {
+        return trimmed(input, std::isspace);
+    }
+
+
     std::string
     trimmed(const std::string& input,
             char discard)
@@ -300,6 +317,20 @@ namespace string_utils {
             return {};
         auto start = input.find_first_not_of(discard);
         if (start == std::string::npos)
+            return {};
+        auto finish = input.find_last_not_of(discard);
+        return input.substr(start, finish - start + 1);
+    }
+
+
+    std::string_view
+    trimmed(std::string_view input,
+            char discard)
+    {
+        if (input.empty())
+            return {};
+        auto start = input.find_first_not_of(discard);
+        if (start == std::string_view::npos)
             return {};
         auto finish = input.find_last_not_of(discard);
         return input.substr(start, finish - start + 1);
@@ -320,9 +351,23 @@ namespace string_utils {
     }
 
 
+    std::string_view
+    trimmed(std::string_view input,
+            std::string_view discard)
+    {
+        if (input.empty())
+            return {};
+        auto start = input.find_first_not_of(discard);
+        if (start == std::string_view::npos)
+            return {};
+        auto finish = input.find_last_not_of(discard);
+        return input.substr(start, finish - start + 1);
+    }
+
+
     std::string
     trimmed(const std::string& input,
-            const std::function<bool(std::string::value_type)>& predicate)
+            const std::function<bool(char)>& predicate)
     {
         if (input.empty())
             return {};
@@ -334,14 +379,45 @@ namespace string_utils {
     }
 
 
+    std::string_view
+    trimmed(std::string_view input,
+            const std::function<bool(char)>& predicate)
+    {
+        if (input.empty())
+            return {};
+        auto start = std::ranges::find_if_not(input, predicate);
+        if (start == input.end())
+            return {};
+        auto finish = std::ranges::find_if_not(input | std::views::reverse, predicate).base();
+        return std::string_view{start, finish};
+    }
+
+
     std::string
     trimmed(const std::string& input,
             int (*predicate)(int))
     {
-        return trimmed(input, [predicate](std::string::value_type c) -> bool
-        {
-            return predicate(static_cast<unsigned char>(c));
-        });
+        return trimmed(
+            input,
+            [predicate](char c) -> bool
+            {
+                return predicate(static_cast<unsigned char>(c));
+            }
+        );
+    }
+
+
+    std::string_view
+    trimmed(std::string_view input,
+            int (*predicate)(int))
+    {
+        return trimmed(
+            input,
+            [predicate](char c) -> bool
+            {
+                return predicate(static_cast<unsigned char>(c));
+            }
+        );
     }
 
 } // namespace string_utils

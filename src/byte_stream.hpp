@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -9,87 +9,75 @@
 #define BYTE_STREAM_HPP
 
 #include <cstddef>
-#include <cstdint>
 #include <deque>
-#include <optional>
 #include <span>
-#include <string>
-#include <string_view>
+#include <utility>
 #include <vector>
 
 
 class byte_stream {
 
     std::deque<std::byte> data;
+    const std::size_t max_size = 0;
+    std::vector<std::byte> consume_buffer;
 
 public:
+
+    byte_stream(std::size_t max_size_ = 0);
+
 
     void
     clear();
 
 
+    [[nodiscard]]
     bool
-    empty() const noexcept;
+    empty()
+        const noexcept;
 
+
+    [[nodiscard]]
     std::size_t
-    size() const noexcept;
+    size()
+        const noexcept;
 
 
-    std::size_t
-    read(void* buf,
-         std::size_t count)
+    [[nodiscard]]
+    std::span<std::byte>
+    read(std::span<std::byte> dst)
         noexcept;
 
     template<typename T,
              std::size_t E>
     requires(sizeof(T) == 1)
     [[nodiscard]]
-    std::span<const T>
-    read(std::span<T, E> buf)
+    std::span<T>
+    read(std::span<T, E> dst)
         noexcept;
 
-    [[nodiscard]]
-    std::vector<std::byte>
-    read();
 
+    template<typename C>
     [[nodiscard]]
-    std::vector<std::byte>
-    read(std::size_t count);
-
-
-    template<typename T>
-    requires(sizeof(T) == 1)
-    [[nodiscard]]
-    std::vector<T>
-    read_as(std::size_t count);
-
-    template<typename T>
-    requires(sizeof(T) == 1)
-    [[nodiscard]]
-    std::vector<T>
-    read_as();
+    C
+    read_all_as()
+    {
+        C result;
+        result.resize(size());
+        std::ignore = read(std::span{result});
+        return result;
+    }
 
 
     [[nodiscard]]
-    std::string
-    read_str(std::size_t count);
-
-    [[nodiscard]]
-    std::string
-    read_str();
-
-
-    [[nodiscard]]
-    std::size_t
-    peek(void* buf,
-         std::size_t count)
+    std::span<std::byte>
+    peek(std::span<std::byte> dst)
         const noexcept;
 
     template<typename T,
              std::size_t E>
     requires(sizeof(T) == 1)
     [[nodiscard]]
-    std::span<const T>
+    std::span<T>
     peek(std::span<T, E> buf)
         const noexcept;
 
@@ -99,28 +87,38 @@ public:
         noexcept;
 
 
-    std::optional<std::uint8_t>
-    try_load_u8();
+    // Write all or nothing.
 
+    std::span<const std::byte>
+    write(std::span<const std::byte> src);
 
-    std::size_t
-    write(const void* buf,
-          std::size_t size);
 
     template<typename T,
              std::size_t E>
-    std::size_t
-    write(std::span<T, E> buf);
-
-    std::size_t
-    write(std::string_view sv);
+    requires (sizeof(T) == 1)
+    std::span<const T>
+    write(std::span<const T, E> src);
 
 
-    std::size_t
-    consume(byte_stream& other);
+    // Write as much as possible.
+
+    std::span<const std::byte>
+    write_some(std::span<const std::byte> src);
+
+    template<typename T,
+             std::size_t E>
+    requires (sizeof(T) == 1)
+    [[nodiscard]]
+    std::span<const T>
+    write_some(std::span<const T> src);
+
 
     std::size_t
-    consume(byte_stream& other, std::size_t count);
+    consume(byte_stream& src);
+
+    std::size_t
+    consume(byte_stream& src,
+            std::size_t count);
 
 }; // class byte_stream
 
@@ -133,35 +131,15 @@ template<typename T,
          std::size_t E>
 requires(sizeof(T) == 1)
 inline
-std::span<const T>
-byte_stream::read(std::span<T, E> buf)
+std::span<T>
+byte_stream::read(std::span<T, E> dst)
     noexcept
 {
-    std::size_t valid = read(buf.data(), buf.size_bytes());
-    return std::span{buf.data(), valid};
-}
-
-
-template<typename T>
-requires(sizeof(T) == 1)
-inline
-std::vector<T>
-byte_stream::read_as(std::size_t count)
-{
-    std::vector<T> result(count);
-    auto occupied = read(std::span(result));
-    result.resize(occupied.size());
-    return result;
-}
-
-
-template<typename T>
-requires(sizeof(T) == 1)
-inline
-std::vector<T>
-byte_stream::read_as()
-{
-    return read_as<T>(size());
+    auto result = read(std::as_writable_bytes(dst));
+    return {
+        reinterpret_cast<T*>(result.data()),
+        result.size()
+    };
 }
 
 
@@ -169,22 +147,44 @@ template<typename T,
          std::size_t E>
 requires(sizeof(T) == 1)
 inline
-std::span<const T>
-byte_stream::peek(std::span<T, E> buf)
+std::span<T>
+byte_stream::peek(std::span<T, E> dst)
     const noexcept
 {
-    auto valid = peek(buf.data(), buf.size_bytes());
-    return std::span{buf.data(), valid};
+    auto result = peek(std::as_writable_bytes(dst));
+    return {
+        reinterpret_cast<T*>(result.data()),
+        result.size()
+    };
 }
 
 
 template<typename T,
          std::size_t E>
+requires (sizeof(T) == 1)
 inline
-std::size_t
-byte_stream::write(std::span<T, E> buf)
+std::span<const T>
+byte_stream::write(std::span<const T, E> src)
 {
-    return write(buf.data(), buf.size_bytes());
+    auto result = write(std::as_bytes(src));
+    return {
+        reinterpret_cast<const T*>(result.data()),
+        result.size()
+    };
+}
+
+
+template<typename T,
+         std::size_t E>
+requires (sizeof(T) == 1)
+std::span<const T>
+byte_stream::write_some(std::span<const T> src)
+{
+    auto result = write_some(std::as_bytes(src));
+    return {
+        reinterpret_cast<const T*>(result.data()),
+        result.size()
+    };
 }
 
 #endif

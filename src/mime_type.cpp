@@ -5,20 +5,24 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <stdexcept>
 #include <regex>
+#include <stdexcept>
+#include <string>
 
 #include "mime_type.hpp"
 
 #include "string_utils.hpp"
 
 
+using namespace std::literals;
+
+
 namespace mime_type {
 
     namespace {
         bool
-        glob_match(const std::string& input,
-                   const std::string& glob_rule)
+        glob_match(std::string_view input,
+                   std::string_view glob_rule)
         {
             // quick check for trivial match
             if (glob_rule == "*")
@@ -51,8 +55,12 @@ namespace mime_type {
                         regex_rule += c;
                 }
             }
-            std::regex regex{regex_rule};
-            return regex_match(input, regex);
+            std::regex regex{
+                regex_rule,
+                std::regex_constants::ECMAScript |
+                std::regex_constants::icase
+            };
+            return regex_match(std::string{input}, regex);
         }
 
     } // namespace
@@ -60,31 +68,33 @@ namespace mime_type {
 
     bool
     match(const std::string& input,
-          const std::string& candidate)
+          std::string_view candidate)
     {
-        using string_utils::split;
+        using string_utils::split_view;
 
-        // ignore the paramter, if present
-        std::string no_param_input;
-        auto semicolon_pos = input.find(';');
-        if (semicolon_pos != std::string::npos)
-            no_param_input = input.substr(0, semicolon_pos);
+        auto input_sv = std::string_view{input};
+        // ignore the parameter, if present
+        // TODO: should process parameters too
+        std::string_view no_param_input;
+        auto semicolon_pos = input_sv.find(';');
+        if (semicolon_pos != std::string_view::npos)
+            no_param_input = input_sv.substr(0, semicolon_pos);
         else
-            no_param_input = input;
+            no_param_input = input_sv;
 
-        auto input_v = split(no_param_input, "/", false, 2);
-        if (input_v.size() != 2) {
+        auto input_tokens = split_view(no_param_input, "/"sv, false, 2);
+        if (input_tokens.size() != 2) {
             //throw std::runtime_error{"invalid mime-type in input"};
             return false;
         }
-        auto& input_type = input_v[0];
-        auto& input_subtype = input_v[1];
+        auto& input_type = input_tokens[0];
+        auto& input_subtype = input_tokens[1];
 
-        auto candidate_v = split(candidate, "/", false, 2);
-        if (candidate_v.size() != 2)
+        auto candidate_tokens = split_view(candidate, "/"sv, false, 2);
+        if (candidate_tokens.size() != 2)
             throw std::runtime_error{"invalid mime-type in candidate"};
-        auto& candidate_type = candidate_v[0];
-        auto& candidate_subtype = candidate_v[1];
+        auto& candidate_type = candidate_tokens[0];
+        auto& candidate_subtype = candidate_tokens[1];
 
         if (!candidate_type.contains('*')) {
             // if no wildcards, it has to be an exact match
@@ -104,17 +114,6 @@ namespace mime_type {
                 return false;
         }
         return true;
-    }
-
-
-    bool
-    match(const std::string& input,
-          const std::vector<std::string>& candidates)
-    {
-        for (auto& candidate : candidates)
-            if (match(input, candidate))
-                return true;
-        return false;
     }
 
 } // namespace mime_type

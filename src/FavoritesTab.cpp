@@ -314,7 +314,7 @@ namespace FavoritesTab {
 
         stations.clear();
 
-        auto filename = App::get_config_path() / "favorites.json";
+        auto filename = App::get_config_dir() / "favorites.json";
         Serializer::load(stations, filename);
 
         uuids.clear();
@@ -459,7 +459,7 @@ namespace FavoritesTab {
     try {
         TraceFunction tf{"FavoritesTab"sv};
 
-        auto filename = App::get_config_path() / "favorites.json";
+        auto filename = App::get_config_dir() / "favorites.json";
         Serializer::save(stations, filename);
     }
     catch (std::exception& e) {

@@ -5,92 +5,64 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <algorithm>
 #include <iostream>
 #include <stdexcept>
+#include <vector>
 
-#include "decoder.hpp"
+#include "Decoder.hpp"
 
-#include "decoder_aac.hpp"
-#include "decoder_mp3.hpp"
-#include "decoder_opus.hpp"
-#include "decoder_vorbis.hpp"
+#include "DecoderAAC.hpp"
+#include "DecoderMP3.hpp"
+#include "DecoderOpus.hpp"
+#include "DecoderVorbis.hpp"
 #include "LogManager.hpp"
 
 
-namespace decoder {
+using namespace std::literals;
 
-    base::~base()
+
+namespace Decoder {
+
+    Base::~Base()
         noexcept
     {}
 
 
-    namespace {
-
-        bool
-        match(std::span<const char> data,
-              std::span<const char> prefix)
-        {
-            if (data.size() < prefix.size())
-                return false;
-
-            return std::equal(prefix.begin(),
-                              prefix.end(),
-                              data.begin());
-        }
-
-    } // namespace
-
-
-    std::unique_ptr<base>
+    std::unique_ptr<Base>
     create(const std::string& content_type,
-           std::span<const char> data)
+           std::span<const std::byte> data)
     {
-        if (content_type == "audio/aac" ||
-            content_type == "audio/aacp" ||
-            content_type == "audio/x-aac" ||
-            content_type == "audio/audio/x-hx-aac-adts") {
+        if (AAC::match_mime(content_type)) {
             LOG_INFO("Creating aac decoder from content type: {}", content_type);
-            return std::make_unique<aac>(data);
+            return std::make_unique<AAC>(data);
         }
 
-        if (content_type == "audio/mpeg") {
+        if (MP3::match_mime(content_type)) {
             LOG_INFO("Creating MP3 decoder from content type: {}", content_type);
-            return std::make_unique<mp3>(data);
+            return std::make_unique<MP3>(data);
         }
 
-        if (content_type == "audio/vorbis") {
+        if (Opus::match_mime(content_type)) {
             LOG_INFO("Creating Opus decoder from content type: {}", content_type);
-            return std::make_unique<opus>(data);
+            return std::make_unique<Opus>(data);
         }
 
-        if (content_type == "audio/vorbis") {
+        if (Vorbis::match_mime(content_type)) {
             LOG_INFO("Creating Vorbis decoder from content type: {}", content_type);
-            return std::make_unique<vorbis>(data);
+            return std::make_unique<Vorbis>(data);
         }
 
         LOG_INFO("No match for content type: {}", content_type);
 
-        if (match(data, "\xff\xfb") || match(data, "ID3")) {
+        if (MP3::match_prefix(data)) {
             LOG_INFO("Creating MP3 decoder from data signature");
-            return std::make_unique<mp3>(data);
+            return std::make_unique<MP3>(data);
         }
 
-        if (match(data, "OggS")) {
+        if (Opus::match_prefix(data)) {
             try {
                 LOG_INFO("Creating Opus decoder from data signature.");
-                return std::make_unique<opus>(data);
-            }
-            catch (std::exception& e) {
-                LOG_INFO("Failed: {}", e.what());
-            }
-            catch (...) {
-                LOG_INFO("Failed!");
-            }
-
-            try {
-                LOG_INFO("Creating Vorbis decoder from data signature.");
-                return std::make_unique<vorbis>(data);
+                return std::make_unique<Opus>(data);
             }
             catch (std::exception& e) {
                 LOG_INFO("Failed: {}", e.what());
@@ -100,10 +72,22 @@ namespace decoder {
             }
         }
 
-        if (match(data, "\xff\xf1") ||
-            match(data, "\xff\xf9")) {
+        if (Vorbis::match_prefix(data)) {
+            try {
+                LOG_INFO("Creating Vorbis decoder from data signature.");
+                return std::make_unique<Vorbis>(data);
+            }
+            catch (std::exception& e) {
+                LOG_INFO("Failed: {}", e.what());
+            }
+            catch (...) {
+                LOG_INFO("Failed!");
+            }
+        }
+
+        if (AAC::match_prefix(data)) {
             LOG_INFO("Creating AAC decoder from data signature.");
-            return std::make_unique<aac>(data);
+            return std::make_unique<AAC>(data);
         }
 
         // Note: FLAC is  66 4C 61 43   "fLaC"
@@ -111,4 +95,4 @@ namespace decoder {
         throw std::runtime_error{"cannot create decoder"};
     }
 
-} // namespace decoder
+} // namespace Decoder

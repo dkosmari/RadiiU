@@ -359,7 +359,7 @@ namespace CountryManager {
 
             TraceFunction tf{"CountryManager"sv};
 
-            auto full_path = App::get_content_path() / "flags" / std::to_string(icon_size) / file;
+            auto full_path = App::get_content_dir() / "flags" / std::to_string(icon_size) / file;
             try {
                 image = sdl::img::load_png(full_path);
                 // LOG_DEBUG("Loaded {}", full_path.string());
@@ -398,7 +398,7 @@ namespace CountryManager {
         try {
             TraceDuration duration_flag_loading{"CountryManager::initialize()/loading"sv,
                                                 "CountryManager"sv};
-            auto flags_root = App::get_content_path() / "flags";
+            auto flags_root = App::get_content_dir() / "flags";
             for (auto& size_entry : std::filesystem::directory_iterator{flags_root}) {
                 if (!size_entry.is_directory())
                     continue;

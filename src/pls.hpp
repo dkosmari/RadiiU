@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <iosfwd>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -49,6 +50,18 @@ namespace pls {
 
     playlist
     parse(const std::string& input);
+
+
+    bool
+    match_mime(const std::string& content_type);
+
+
+    bool
+    match_path(const std::string& path);
+
+
+    bool
+    match_prefix(std::span<const std::byte> data);
 
 } // namespace pls
 

@@ -5,48 +5,70 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <array>
+#include <string_view>
 #include <utility>
 
-#include "decoder_mp3.hpp"
+#include "DecoderMP3.hpp"
 
 #include "LogManager.hpp"
+#include "mime_type.hpp"
+#include "utils.hpp"
 
 
 using namespace std::literals;
 
 
-namespace decoder {
+namespace Decoder {
 
-    mp3::mp3(std::span<const char> data)
+    namespace {
+
+        // Constants
+
+        constexpr std::array mp3_mimes{
+            "audio/mpeg"sv,
+            "audio/mp3"sv,
+        };
+
+
+        constexpr std::array mp3_prefixes{
+            "\xff\xfb"sv,
+            "ID3"sv,
+        };
+
+    } // namespace
+
+
+    MP3::MP3(std::span<const std::byte> data)
     {
         mpg.set_verbose(true);
         mpg.open_feed();
         feed(data);
 
-        LOG_INFO("Created mp3 decoder.");
+        LOG_INFO("Created MP3 decoder.");
     }
 
 
-    mp3::~mp3()
+    MP3::~MP3()
         noexcept
     {}
 
 
-    std::size_t
-    mp3::feed(std::span<const char> data)
+    std::span<const std::byte>
+    MP3::feed(std::span<const std::byte> data)
     {
         mpg.feed(data);
-        return data.size_bytes();
+        return data;
     }
 
 
-    std::span<const char>
-    mp3::decode()
+    std::span<const std::byte>
+    MP3::decode()
     {
         auto samples = mpg.try_decode_frame();
         if (!samples)
             return {};
-        return samples->as<char>();
+        return samples->as<std::byte>();
     }
 
 
@@ -79,15 +101,15 @@ namespace decoder {
     } // namespace
 
 
-    std::optional<spec>
-    mp3::get_spec()
+    std::optional<Spec>
+    MP3::get_spec()
         noexcept
     {
         auto fmt = mpg.try_get_format();
         if (!fmt)
             return {};
 
-        spec result;
+        Spec result;
         result.rate = fmt->rate;
         result.channels = fmt->channels & MPG123_STEREO ? 2 : 1;
         result.format = to_sdl_format(fmt->encoding);
@@ -176,10 +198,10 @@ namespace decoder {
     } // namespace
 
 
-    info
-    mp3::get_info()
+    Info
+    MP3::get_info()
     {
-        info result;
+        Info result;
         if (auto info = mpg.try_get_frame_info()) {
             result.codec = "MPEG "s + to_string(info->version)
                            + " layer "s
@@ -198,7 +220,7 @@ namespace decoder {
 
 
     std::optional<stream_metadata>
-    mp3::get_metadata()
+    MP3::get_metadata()
         const
     {
         // These don't show up on streams, but do if playing a regular mp3 file.
@@ -244,4 +266,18 @@ namespace decoder {
         return {};
     }
 
-} // namespace decoder
+
+    bool
+    MP3::match_mime(const std::string& content_type)
+    {
+        return mime_type::match_any(content_type, mp3_mimes);
+    }
+
+
+    bool
+    MP3::match_prefix(std::span<const std::byte> data)
+    {
+        return utils::starts_with_any(data, mp3_prefixes);
+    }
+
+} // namespace Decoder

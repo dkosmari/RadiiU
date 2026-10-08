@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -9,65 +9,65 @@
 #define DECODER_HPP
 
 #include <cstddef>
-#include <unordered_map>
+#include <iosfwd>
 #include <memory>
 #include <optional>
-#include <iosfwd>
 #include <span>
 #include <string>
+#include <unordered_map>
 
 #include <SDL_audio.h>
 
 #include "stream_metadata.hpp"
 
 
-namespace decoder {
+namespace Decoder {
 
-    struct spec {
+    struct Spec {
         SDL_AudioFormat format;
         int rate;
         int channels;
     };
 
 
-    struct info {
+    struct Info {
         std::string codec;
         std::string bitrate;
     };
 
 
-    struct base {
+    struct Base {
 
         constexpr
-        base()
+        Base()
             noexcept = default;
 
         // disallow moving
-        base(base&& other) = delete;
+        Base(Base&& other) = delete;
 
-        base&
-        operator=(base&& other) = delete;
+        Base&
+        operator=(Base&& other) = delete;
 
 
         virtual
-        ~base()
+        ~Base()
             noexcept;
 
         virtual
-        std::size_t
-        feed(std::span<const char> data) = 0;
+        std::span<const std::byte>
+        feed(std::span<const std::byte> data) = 0;
 
         virtual
-        std::span<const char>
+        std::span<const std::byte>
         decode() = 0;
 
         virtual
-        std::optional<spec>
+        std::optional<Spec>
         get_spec()
             noexcept = 0;
 
         virtual
-        info
+        Info
         get_info() = 0;
 
         virtual
@@ -75,13 +75,13 @@ namespace decoder {
         get_metadata()
             const = 0;
 
-    }; // struct base
+    }; // struct Base
 
 
-    std::unique_ptr<base>
+    std::unique_ptr<Base>
     create(const std::string& content_type,
-           std::span<const char> data);
+           std::span<const std::byte> data);
 
-} // namespace decoder
+} // namespace Decoder
 
 #endif

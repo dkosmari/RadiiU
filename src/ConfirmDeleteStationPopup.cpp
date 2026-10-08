@@ -145,7 +145,7 @@ namespace ConfirmDeleteStationPopup {
         }
 
         ButtonHBox buttons;
-        buttons.expand = true;
+        buttons.spread = true;
         buttons.add(
             ICON_FA_TIMES " Cancel",
             ImGui::CloseCurrentPopup

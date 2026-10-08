@@ -13,6 +13,7 @@
 #include <iostream>
 #include <iterator>
 #include <print>
+#include <string_view>
 #include <thread>
 
 #include "LogManager.hpp"
@@ -40,6 +41,21 @@ namespace LogManager {
         using SafeMessageVec = thread_safe<MessageVec, std::recursive_mutex>;
 
 
+        struct MessageAttributes {
+
+            LogLevel level;
+            std::source_location location;
+            std::string tag;
+
+
+            constexpr
+            bool
+            operator ==(const MessageAttributes& other)
+                const noexcept;
+
+        }; // struct MessageAttributes
+
+
         /*-----------*/
         /* Constants */
         /*-----------*/
@@ -64,6 +80,8 @@ namespace LogManager {
         Timestamp timestamp;
         SafeMessageVec safe_messages;
 
+        std::optional<MessageAttributes> last_msg_attributes;
+
 
         /*-----------------------*/
         /* Function declarations */
@@ -85,6 +103,18 @@ namespace LogManager {
         /*----------------------*/
         /* Function definitions */
         /*----------------------*/
+
+        constexpr
+        bool
+        MessageAttributes::operator ==(const MessageAttributes& other)
+            const noexcept
+        {
+            return (level == other.level)
+                && (std::string_view{location.file_name()} ==
+                    std::string_view{other.location.file_name()})
+                && (location.line() == other.location.line());
+        }
+
 
         std::string
         create_log_filename()
@@ -109,16 +139,29 @@ namespace LogManager {
         void
         task_log(Message& msg)
         {
-            // TODO: set ANSI colors for each level
-            std::println(cout,
-                         "{}{}{} [{}:{}] {}\n{}",
-                         log_level_ansi_prefixes.at(std::to_underlying(msg.level)),
-                         msg.level,
-                         ansi_reset,
-                         msg.location.file_name(),
-                         msg.location.line(),
-                         msg.tag,
-                         msg.text);
+            MessageAttributes attr{
+                msg.level,
+                msg.location,
+                msg.tag
+            };
+
+            if (last_msg_attributes != attr) {
+                std::println(cout,
+                             "{}{}{} [{}:{}] {}\n{}",
+                             log_level_ansi_prefixes.at(std::to_underlying(msg.level)),
+                             msg.level,
+                             ansi_reset,
+                             msg.location.file_name(),
+                             msg.location.line(),
+                             msg.tag,
+                             msg.text);
+                last_msg_attributes = std::move(attr);
+            } else {
+                // Skip repeating message attributes line
+                std::println(cout,
+                             "{}",
+                             msg.text);
+            }
 
             auto messages = safe_messages.lock();
             messages->push_back(std::move(msg));
@@ -216,12 +259,11 @@ namespace LogManager {
     {
         TRACE_FUNC;
 
-        auto cfg_path = App::get_config_path();
-        auto logs_path = cfg_path / "logs";
-        if (!exists(logs_path))
-            create_directories(logs_path);
+        auto logs_dir = App::get_data_dir() / "logs";
+        if (!exists(logs_dir))
+            create_directories(logs_dir);
 
-        auto filename = logs_path / create_log_filename();
+        auto filename = logs_dir / create_log_filename();
         std::ofstream output{filename, std::ios::out | std::ios::trunc};
 
         auto messages = safe_messages.c_lock();

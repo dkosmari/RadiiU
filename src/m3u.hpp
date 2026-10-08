@@ -11,6 +11,7 @@
 #include <chrono>
 #include <iosfwd>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -40,6 +41,18 @@ namespace m3u {
 
     playlist
     parse(const std::string& input);
+
+
+    bool
+    match_mime(const std::string& content_type);
+
+
+    bool
+    match_path(const std::string& path);
+
+
+    bool
+    match_prefix(std::span<const std::byte> data);
 
 } // namespace m3u
 
