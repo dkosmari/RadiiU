@@ -8,10 +8,11 @@
 #ifndef STREAM_METADATA_HPP
 #define STREAM_METADATA_HPP
 
+#include <flat_map>
 #include <iosfwd>
 #include <optional>
 #include <string>
-#include <unordered_map>
+#include <vector>
 
 
 struct stream_metadata {
@@ -22,19 +23,29 @@ struct stream_metadata {
     std::optional<std::string> genre;
     std::optional<std::string> date;
     std::optional<std::string> cover_art;
-    struct {
+
+    struct station_metadata {
         std::optional<std::string> name;
         std::optional<std::string> genre;
         std::optional<std::string> description;
         std::optional<std::string> url;
-        std::optional<std::string> notice;
-    } station;
+        std::optional<std::string> bitrate;
+        std::optional<std::string> audio_info;
+        std::vector<std::string> notice;
+    };
 
-    std::unordered_map<std::string, std::string> extra;
+    station_metadata station;
+
+    std::flat_map<std::string, std::string> extra;
 
 
     void
-    merge(const stream_metadata& other);
+    merge(stream_metadata&& other);
+
+
+    void
+    clean_empty()
+        noexcept;
 
 }; // struct stream_metadata
 

@@ -451,33 +451,6 @@ namespace PlayerTab {
 
                     UI::StationInfo(*station, true);
 
-                    if (play_res) {
-                        unsigned cur_idx = play_res->radio.get_current_url_info_index();
-                        play_res->radio.with_url_info_vec(
-                            [cur_idx](const RadioClient::URLInfoVec& info_vec)
-                            {
-                                std::string cur_url;
-                                if (cur_idx < info_vec.size())
-                                    cur_url = info_vec[cur_idx].url;
-                                if (Combo url_list{"URLs"s, cur_url}) {
-                                    for (auto [idx, entry] : info_vec | std::views::enumerate) {
-                                        auto& [url, content_type, type] = entry;
-                                        auto label = std::format(
-                                            "[{}] {} ({})",
-                                            to_string(type),
-                                            url,
-                                            content_type
-                                        );
-                                        if (ImGui::RadioButton(label,
-                                                               std::cmp_equal(idx, cur_idx))) {
-                                            play_res->radio.play(idx);
-                                        }
-                                    }
-                                }
-                            }
-                        );
-                    }
-
                 } // details
 
             } // station_frame
@@ -536,14 +509,28 @@ namespace PlayerTab {
                                 UI::InfoRowOpt("Genre", meta.genre);
                                 UI::InfoRowOpt("Date", meta.date);
 
-                                for (auto& [k, v] : meta.extra)
-                                    UI::InfoRow(k, v);
-
                                 // station metadata
                                 UI::InfoRowOpt("Station Name", meta.station.name);
                                 UI::InfoRowOpt("Station Genre", meta.station.genre);
                                 UI::InfoRowOpt("Station Description", meta.station.description);
                                 UI::InfoRowOpt("Station URL", meta.station.url);
+                                UI::InfoRowOpt("Station Bitrate", meta.station.bitrate);
+                                UI::InfoRowOpt("Station Audio Info", meta.station.audio_info);
+
+#if 0
+                                for (auto [index, line] :
+                                         meta.station.notice | std::views::enumerate) {
+                                    UI::InfoRow(
+                                        "Station Notice "s + std::to_string(index+1),
+                                        line
+                                    );
+                                }
+#endif
+
+                                // extra metadata
+                                for (const auto& [key, val] : meta.extra)
+                                    UI::InfoRow(key, val);
+
                             }
                         );
 
@@ -572,24 +559,55 @@ namespace PlayerTab {
             ImGui::AlignTextToFramePadding();
 
             if (play_res) {
-#if 1
+
                 if (ImGui::Button(ICON_FA_INFO_CIRCLE))
                     ImGui::OpenPopup(details_popup_id);
                 ImGui::SetItemTooltip("Show output audio device properties.");
                 show_details_popup();
 
-                // ImGui::SameLine();
+                ImGui::SameLine();
 
-                // if (const auto& dev = play_res->audio_dev) {
-                //     ImGui::FormatText("Output audio device: {}",
-                //                       to_string(dev.get_status()));
-                // } else {
-                //     ImGui::Text("Waiting for audio.");
-                // }
-#endif
+                // Show URL info vec
+                play_res->radio.with_url_info_vec(
+                    [](const RadioClient::URLInfoVec& info_vec)
+                    {
+                        auto cur_idx = play_res->radio.get_current_url_info_index();
+                        auto size = info_vec.size();
+                        std::string combo_label = std::format(ICON_FA_SERVER " {}/{}",
+                                                              cur_idx + 1,
+                                                              size);
+                        auto combo_label_size = ImGui::CalcTextSize(combo_label);
+                        const auto& style = ImGui::GetStyle();
+                        float combo_width =
+                            2 * style.FramePadding.x // padding
+                            + combo_label_size.x // text
+                            + style.ItemInnerSpacing.x // separation between text and arrow
+                            + ImGui::GetFrameHeight(); // arrow
+                        ImGui::SetNextItemWidth(combo_width);
+                        if (Combo url_vec_combo{"##url_vec_combo"s, combo_label}) {
+                            for (auto [idx, entry] : info_vec | std::views::enumerate) {
+                                auto& [url, content_type, type] = entry;
+                                auto label = std::format(
+                                    "{} {} ({})",
+                                    to_label(type),
+                                    url,
+                                    content_type.empty() ? "?"s : content_type
+                                );
+                                if (ImGui::RadioButton(label, std::cmp_equal(idx, cur_idx)))
+                                    play_res->radio.play(idx);
+                            }
+                        }
+                        ImGui::SetItemTooltip("Show all URLs for this stream.");
+                    }
+                );
+
+                ImGui::SameLine();
+
+                auto phase = play_res->radio.get_phase();
+                ImGui::FormatText("State: {}", to_string(phase));
 
             } else {
-                ImGui::Text("Not playing.");
+                ImGui::Text("No station set.");
             }
         }
 

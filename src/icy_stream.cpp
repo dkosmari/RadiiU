@@ -59,6 +59,7 @@ namespace icy {
 #endif
 
 
+#if 0
         std::optional<std::string>
         if_not_empty(std::string_view input)
         {
@@ -66,6 +67,7 @@ namespace icy {
                 return {};
             return std::string{input};
         }
+#endif
 
 
         bool
@@ -113,11 +115,11 @@ namespace icy {
     }
 
 
-    const stream_metadata&
+    stream_metadata&&
     stream::get_metadata()
-        const noexcept
+        noexcept
     {
-        return current_meta;
+        return std::move(current_meta);
     }
 
 
@@ -189,36 +191,36 @@ namespace icy {
         std::ignore = meta_stream.read(std::span{raw_meta_str});
         std::string meta_str = trimmed(raw_meta_str, '\0');
 
-        auto parsed_meta = icy::parse(meta_str);
+        auto meta_dict = icy::parse(meta_str);
 
         auto& meta = current_meta;
 
-        for (const auto& [key, raw_val] : parsed_meta) {
+        for (const auto& [key, raw_val] : meta_dict) {
             auto val = trimmed(raw_val);
             LOG_DEBUG("icy meta key: {} = {:?}", key, val);
             if (key == "StreamTitle"sv) {
-                meta.title = if_not_empty(std::move(val));
+                meta.title = std::move(val);
             } else if (key == "StreamUrl"sv) {
                 // NOTE: Some servers report a numeric song ID as the URL, let's ignore them.
                 if (!is_just_a_number(val)) {
                     auto url = resolve_url(val);
-                    if (!parsed_meta.contains("StreamArtwork"sv))
-                        meta.cover_art = if_not_empty(url);
+                    if (!meta_dict.contains("StreamArtwork"sv))
+                        meta.cover_art = std::move(url);
                     else
-                        meta.station.url = if_not_empty(url);
+                        meta.station.url = std::move(url);
                 }
             } else if (key == "StreamArtwork"sv) {
-                meta.cover_art = if_not_empty(resolve_url(val));
+                meta.cover_art = resolve_url(val);
             } else if (key == "StreamArtist"sv) {
-                meta.artist = if_not_empty(val);
+                meta.artist = val;
             } else if (key == "StreamAlbum"sv) {
-                meta.album = if_not_empty(val);
+                meta.album = val;
             } else if (key == "StreamGenre"sv) {
-                meta.genre = if_not_empty(val);
+                meta.genre = val;
             } else if (key == "StreamYear"sv) {
-                meta.date = if_not_empty(val);
+                meta.date = val;
             } else if (key == "StreamDate"sv) {
-                meta.date = if_not_empty(val);
+                meta.date = val;
             } else {
                 /*
                   Not handled:

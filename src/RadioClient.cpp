@@ -10,6 +10,8 @@
 #include <chrono>
 #include <ranges>
 
+#include <sys/socket.h>
+
 #ifdef __WUT__
 #include <coreinit/energysaver.h>
 #endif
@@ -20,17 +22,18 @@
 
 #include "RadioClient.hpp"
 
+#include "IconsFontAwesome4.h"
+#include "LogManager.hpp"
+#include "LogManagerCurl.hpp"
 #include "m3u.hpp"
 #include "mime_type.hpp"
 #include "pls.hpp"
 #include "Settings.hpp"
+#include "string_utils.hpp"
 #include "TraceDuration.hpp"
 #include "TraceFunction.hpp"
 #include "TraceManager.hpp"
 #include "tracer.hpp"
-#include "LogManager.hpp"
-#include "LogManagerCurl.hpp"
-#include "string_utils.hpp"
 
 
 using namespace std::literals;
@@ -228,6 +231,14 @@ RadioClient::get_current_url_info_index()
 }
 
 
+RadioClient::Phase
+RadioClient::get_phase()
+    const
+{
+    return phase;
+}
+
+
 void
 RadioClient::add_url(const std::string& input_url)
 {
@@ -407,11 +418,6 @@ RadioClient::decoder_thread_function(std::stop_token stopper)
                         if (samples.empty())
                             break;
 
-                        if (auto dec_meta = decoder->get_metadata()) {
-                            auto metadata = safe_metadata.lock();
-                            metadata->merge(*dec_meta);
-                        }
-
                         if (stopper.stop_requested())
                             break;
 
@@ -430,6 +436,13 @@ RadioClient::decoder_thread_function(std::stop_token stopper)
                     } // while (!stopper.stop_requested())
 
                 } // if (audio_dev)
+
+                safe_decoder_info.store(decoder->get_info());
+
+                if (auto dec_meta = decoder->get_metadata()) {
+                    auto metadata = safe_metadata.lock();
+                    metadata->merge(std::move(*dec_meta));
+                }
 
             }
 
@@ -509,19 +522,36 @@ RadioClient::task_queue_transfer(unsigned idx)
     easy.set_accept_encoding("");
     easy.set_auto_referer(true);
     easy.set_buffer_size(64 * 1024);
+    easy.set_connect_timeout(30s);
     easy.set_fail_on_error(true);
     easy.set_follow_location(true);
     easy.set_forbid_reuse(false);
     easy.set_http_09_allowed(true);
     easy.set_http_200_aliases({"ICY 200 OK"});
     easy.set_http_version(curl::easy::http_version::none);
-    easy.set_url(next_url);
+    easy.set_low_speed_limit(4096);
+    easy.set_low_speed_time(5s);
+    easy.set_sockopt_function(
+        [](curl_socket_t fd,
+           curlsocktype) -> int
+        {
+#ifdef __WIIU__
+            std::size_t winscale_arg = 1;
+            setsockopt(fd, SOL_SOCKET, SO_WINSCALE, &winscale_arg, sizeof winscale_arg);
+#endif
+            std::size_t rcvbuf_arg = 65536;
+            setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &rcvbuf_arg, sizeof rcvbuf_arg);
+
+            return CURL_SOCKOPT_OK;
+        }
+    );
     easy.set_ssl_verify_peer(false);
-    easy.set_tcp_no_delay(false);
-    easy.set_transfer_encoding(true);
     easy.set_tcp_keep_alive(true);
     easy.set_tcp_keep_idle(120s);
     easy.set_tcp_keep_intvl(60s);
+    easy.set_tcp_no_delay(false);
+    easy.set_transfer_encoding(true);
+    easy.set_url(next_url);
     easy.set_write_function(
         std::bind_front(&RadioClient::on_transfer_recv, this)
     );
@@ -745,8 +775,6 @@ RadioClient::on_transfer_started(std::span<const std::byte> data)
         }
     }
 
-    safe_metadata.store(stream_metadata{});
-
     std::size_t icy_meta_int = 0;
     if (auto hdr = easy.try_get_header("icy-metaint")) {
         LOG_INFO("icy-metaint={}", hdr->value);
@@ -754,15 +782,17 @@ RadioClient::on_transfer_started(std::span<const std::byte> data)
     }
     icy_parser.reset(std::move(effective_url), icy_meta_int);
 
+    // Initialize metadata from the ICY headers.
     {
         using string_utils::trimmed;
+        using string_utils::equal_case;
+
         auto metadata = safe_metadata.lock();
+
+        *metadata = {};
 
         if (auto hdr = easy.try_get_header("icy-name"))
             metadata->station.name = trimmed(hdr->value);
-
-        if (auto hdr = easy.try_get_header("icy-url"))
-            metadata->station.url = trimmed(hdr->value);
 
         if (auto hdr = easy.try_get_header("icy-genre"))
             metadata->station.genre = trimmed(hdr->value);
@@ -770,23 +800,24 @@ RadioClient::on_transfer_started(std::span<const std::byte> data)
         if (auto hdr = easy.try_get_header("icy-description"))
             metadata->station.description = trimmed(hdr->value);
 
-        // TODO: process icy-noticeN headers.
+        if (auto hdr = easy.try_get_header("icy-url"))
+            metadata->station.url = trimmed(hdr->value);
 
+        if (auto hdr = easy.try_get_header("icy-br"))
+            metadata->station.bitrate = trimmed(hdr->value);
 
-#if 0
-        if (auto hdr = easy.try_get_header("icy-br")) {
-            // No need to store advertised bitrate.
+        if (auto hdr = easy.try_get_header("icy-audio-info"))
+            metadata->station.audio_info = trimmed(hdr->value);
+
+        if (auto hdr = easy.try_get_header("icy-pub"))
+            LOG_DEBUG("icy-pub: {:?}", hdr->value);
+
+        for (auto hdr : easy.get_header_iterator()) {
+            if (hdr.name.starts_with("icy-notice"sv))
+                metadata->station.notice.push_back(trimmed(hdr.value));
         }
 
-        if (auto hdr = easy.try_get_header("icy-audio-info")) {
-            // No need to store advertised audio info.
-        }
-
-        if (auto hdr = easy.try_get_header("icy-pub")) {
-            // No need to store this.
-        }
-#endif
-
+        metadata->clean_empty();
     }
 }
 
@@ -981,5 +1012,25 @@ to_string(RadioClient::URLType type)
             return "other"s;
         default:
             return "<UNKNOWN>"s;
+    }
+}
+
+
+std::string
+to_label(RadioClient::URLType type)
+{
+    switch (type) {
+        using enum RadioClient::URLType;
+
+        case unknown:
+            return ICON_FA_QUESTION_CIRCLE;
+        case playlist:
+            return ICON_FA_LIST_OL;
+        case audio:
+            return ICON_FA_FILE_AUDIO_O;
+        case other:
+            return ICON_FA_EXCLAMATION_TRIANGLE;
+        default:
+            return ICON_FA_BAN;
     }
 }

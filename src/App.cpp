@@ -1345,15 +1345,6 @@ namespace App {
         }
 #endif
 
-        auto prefs_path = SDL_GetPrefPath("com.github.dkosmari", PACKAGE_TARNAME);
-        if (prefs_path) {
-            LOG_DEBUG("prefs_path: {}", prefs_path);
-            SDL_free(prefs_path);
-        } else {
-            LOG_DEBUG("prefs_path is null: {}", SDL_GetError());
-
-        }
-
         res.emplace();
 
         // Create a temporary audio device to stop the boot sound.

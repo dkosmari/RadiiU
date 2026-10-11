@@ -10,49 +10,110 @@
 #include "stream_metadata.hpp"
 
 
+using namespace std::literals;
+
+
+namespace {
+
+
+    void
+    erase_if_empty_str(std::optional<std::string>& field)
+    {
+        if (field && field->empty())
+            field.reset();
+    }
+
+
+    template<typename T,
+             typename Ptr>
+    void
+    move_if_present(T& dst,
+                    T& src,
+                    Ptr member_ptr)
+    {
+        if (!(src.*member_ptr))
+            return;
+
+        if (dst.*member_ptr == src.*member_ptr)
+            return;
+
+        dst.*member_ptr = std::move(src.*member_ptr);
+
+        (src.*member_ptr).reset(); // ensure src is cleared
+    }
+
+
+    void
+    print_opt(std::ostream& out,
+              const std::string& label,
+              const std::optional<std::string> value)
+    {
+        if (value)
+            out << label << ": " << *value << '\n';
+    }
+
+} // namespace
+
+
 void
-stream_metadata::merge(const stream_metadata& other)
+stream_metadata::merge(stream_metadata&& other)
 {
-    if (other.title && title != other.title)
-        title = other.title;
+    // Track fields
+    move_if_present(*this, other, &stream_metadata::title);
+    move_if_present(*this, other, &stream_metadata::artist);
+    move_if_present(*this, other, &stream_metadata::album);
+    move_if_present(*this, other, &stream_metadata::genre);
+    move_if_present(*this, other, &stream_metadata::date);
+    move_if_present(*this, other, &stream_metadata::cover_art);
 
-    if (other.artist && artist != other.artist)
-        artist = other.artist;
+    // Station fields
+    move_if_present(this->station, other.station, &stream_metadata::station_metadata::name);
+    move_if_present(this->station, other.station, &stream_metadata::station_metadata::genre);
+    move_if_present(this->station, other.station, &stream_metadata::station_metadata::description);
+    move_if_present(this->station, other.station, &stream_metadata::station_metadata::url);
+    move_if_present(this->station, other.station, &stream_metadata::station_metadata::bitrate);
+    move_if_present(this->station, other.station, &stream_metadata::station_metadata::audio_info);
 
-    if (other.album && album != other.album)
-        album = other.album;
+    // Extra fields
+    for (auto oit = other.extra.begin(); oit != other.extra.end(); ++oit) {
+        const auto& key = oit->first;
+        auto& val = oit->second;
+        auto it = extra.find(key);
+        if (it != extra.end())
+            it->second = std::move(val);
+        else
+            extra.emplace(key, std::move(val));
+    }
+    other.extra.clear();
 
-    if (other.genre && genre != other.genre)
-        genre = other.genre;
+    clean_empty();
+}
 
-    if (other.date && date != other.date)
-        date = other.date;
 
-    if (other.cover_art && cover_art != other.cover_art)
-        cover_art = other.cover_art;
+void
+stream_metadata::clean_empty()
+    noexcept
+{
+    erase_if_empty_str(title);
+    erase_if_empty_str(artist);
+    erase_if_empty_str(album);
+    erase_if_empty_str(genre);
+    erase_if_empty_str(date);
+    erase_if_empty_str(cover_art);
 
-    if (other.station.name && station.name != other.station.name)
-        station.name = other.station.name;
+    erase_if_empty_str(station.name);
+    erase_if_empty_str(station.genre);
+    erase_if_empty_str(station.description);
+    erase_if_empty_str(station.url);
+    erase_if_empty_str(station.bitrate);
+    erase_if_empty_str(station.audio_info);
 
-    if (other.station.description && station.description != other.station.description)
-        station.description = other.station.description;
-
-    if (other.station.url && station.url != other.station.url)
-        station.url = other.station.url;
-
-    for (const auto& [key, val] : other.extra)
-        if (!val.empty()) {
-            auto it = extra.find(key);
-            if (it != extra.end()) {
-                // already have key
-                if (it->second == val)
-                    continue;
-                it->second = val;
-            } else {
-                // key not found, just insert it
-                extra[key] = val;
-            }
-        }
+    for (auto it = extra.begin(); it != extra.end();) {
+        if (it->second.empty())
+            it = extra.erase(it);
+        else
+            ++it;
+    }
 }
 
 
@@ -60,40 +121,24 @@ std::ostream&
 operator <<(std::ostream& out,
             const stream_metadata& m)
 {
-    if (m.title)
-        out << "Title: " << *m.title << '\n';
+    print_opt(out, "Title"s, m.title);
+    print_opt(out, "Artist"s, m.artist);
+    print_opt(out, "Album"s, m.album);
+    print_opt(out, "Genre"s, m.genre);
+    print_opt(out, "Date"s, m.date);
+    print_opt(out, "Cover Art"s, m.cover_art);
 
-    if (m.artist)
-        out << "Artist: " << *m.artist << '\n';
-
-    if (m.album)
-        out << "Album: " << *m.album << '\n';
-
-    if (m.genre)
-        out << "Genre: " << *m.genre << '\n';
-
-    if (m.date)
-        out << "Date: " << *m.date << '\n';
-
-    if (m.cover_art)
-        out << "Cover Art: " << *m.cover_art << '\n';
-
-    if (m.station.name)
-        out << "Station Name: " << *m.station.name << '\n';
-
-    if (m.station.genre)
-        out << "Station Genre: " << *m.station.genre << '\n';
-
-    if (m.station.description)
-        out << "Station Description: " << *m.station.description << '\n';
-
-    if (m.station.url)
-        out << "Station URL: " << *m.station.url << '\n';
+    print_opt(out, "Station Name"s, m.station.name);
+    print_opt(out, "Station Genre"s, m.station.genre);
+    print_opt(out, "Station Description"s, m.station.description);
+    print_opt(out, "Station URL"s, m.station.url);
+    print_opt(out, "Station Bitrate"s, m.station.bitrate);
+    print_opt(out, "Station Audio Info"s, m.station.audio_info);
 
     if (!m.extra.empty()) {
         out << "Extra:\n";
-        for (auto& [k, v] : m.extra) {
-            out << "    " << k << ": " << v << '\n';
+        for (const auto& [key, val] : m.extra) {
+            out << "    " << key << ": " << val << '\n';
         }
     }
 

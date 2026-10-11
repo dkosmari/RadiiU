@@ -36,9 +36,9 @@ namespace icy {
         feed(std::span<const std::byte> input);
 
 
-        const stream_metadata&
+        stream_metadata&&
         get_metadata()
-            const noexcept;
+            noexcept;
 
 
         std::span<std::byte>

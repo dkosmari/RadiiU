@@ -178,6 +178,13 @@ public:
         const;
 
 
+    Phase
+    get_phase()
+        const;
+
+
+
+
 private:
 
     const std::string user_agent;
@@ -287,5 +294,9 @@ to_string(RadioClient::TransferState state);
 
 std::string
 to_string(RadioClient::URLType type);
+
+
+std::string
+to_label(RadioClient::URLType type);
 
 #endif

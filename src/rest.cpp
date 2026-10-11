@@ -16,8 +16,8 @@
 #include "LogManager.hpp"
 #include "LogManagerCurl.hpp"
 #include "mime_type.hpp"
+#include "TraceDuration.hpp"
 #include "TraceManager.hpp"
-#include "tracer.hpp"
 
 
 using namespace std::literals;
@@ -467,40 +467,61 @@ namespace rest {
 
             while (!stopper.stop_requested()) {
 
-                bool idle = true;
-
-                while (auto maybe_new_req = new_requests.try_pop()) {
-                    idle = false;
-                    auto& new_req = *maybe_new_req;
-                    if (new_req->get_status() != request::status::pending)
-                        continue;
-                    worker.active[new_req->get_handle()] = new_req;
-                    worker.multi.add(new_req->get_easy());
+                if (!new_requests.empty()) {
+                    TraceDuration add_req_duration{
+                        "adding new requests"sv,
+                        "rest"sv
+                    };
+                    // Add new requests.
+                    while (auto maybe_new_req = new_requests.try_pop()) {
+                        auto& new_req = *maybe_new_req;
+                        if (new_req->get_status() != request::status::pending)
+                            continue;
+                        worker.active[new_req->get_handle()] = new_req;
+                        worker.multi.add(new_req->get_easy());
+                    }
                 }
 
                 if (stopper.stop_requested())
                     break;
 
-                // Remove all canceled requests.
-                std::erase_if(worker.active,
-                              [this](auto& item) -> bool
-                              {
-                                  auto& [key, req] = item;
-                                  if (req->get_status() == request::status::canceled) {
-                                      worker.multi.remove(req->get_easy());
-                                      return true;
-                                  }
-                                  return false;
-                              });
+                {
+                    TraceDuration remove_req_duration{
+                        "removing canceled requests"sv,
+                        "rest"sv
+                    };
+                    // Remove all canceled requests.
+                    std::erase_if(
+                        worker.active,
+                        [this](auto& item) -> bool
+                        {
+                            auto& [key, req] = item;
+                            if (req->get_status() == request::status::canceled) {
+                                worker.multi.remove(req->get_easy());
+                                return true;
+                            }
+                            return false;
+                        }
+                    );
+                }
 
-                if (worker.multi.perform() > 0)
-                    idle = false;
+                worker.multi.poll(100ms, stopper);
+
+                if (stopper.stop_requested())
+                    break;
+
+                {
+                    TraceDuration multi_perform_duration{
+                        "multi.perform()"sv,
+                        "rest"sv
+                    };
+                    worker.multi.perform();
+                }
 
                 if (stopper.stop_requested())
                     break;
 
                 for (auto& [easy, err] : worker.multi.get_done()) {
-                    idle = false;
                     auto key = easy->data();
                     auto it = worker.active.find(key);
                     if (it == worker.active.end()) {
@@ -528,11 +549,6 @@ namespace rest {
 
                 if (stopper.stop_requested())
                     break;
-
-                // Preserve CPU: if there was no work done this iteration, sleep for a while.
-                if (idle)
-                    std::this_thread::sleep_for(100ms);
-
             }
         }
         catch (std::exception& e) {
