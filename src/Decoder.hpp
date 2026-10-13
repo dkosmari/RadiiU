@@ -25,8 +25,8 @@ namespace Decoder {
 
     struct Spec {
         SDL_AudioFormat format;
-        int rate;
-        int channels;
+        unsigned rate;
+        unsigned channels;
     };
 
 

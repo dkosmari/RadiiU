@@ -22,6 +22,7 @@
 
 #include "RadioClient.hpp"
 
+#include "App.hpp"
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
 #include "LogManagerCurl.hpp"
@@ -170,6 +171,7 @@ RadioClient::stop()
         );
         decoder_thread.request_stop();
         encoded_audio.close();
+        decoder_thread = {};
     }
 }
 
@@ -204,14 +206,6 @@ RadioClient::with_decoder_info(const DecoderInfoFunc& func)
     const
 {
     safe_decoder_info.with_c_lock(func);
-}
-
-
-void
-RadioClient::with_device_info(const DeviceInfoFunc& func)
-    const
-{
-    safe_device_info.with_c_lock(func);
 }
 
 
@@ -358,6 +352,7 @@ RadioClient::decoder_thread_function(std::stop_token stopper)
                     decoder = Decoder::create(stream_content_type, data);
                     LOG_INFO("Decoder created.");
                     encoded_audio.discard(data.size());
+
                     resume_transfer_if_paused();
                 }
                 catch (std::exception& e) {
@@ -380,37 +375,36 @@ RadioClient::decoder_thread_function(std::stop_token stopper)
 
                 decoder->feed(data);
 
-                if (!audio_dev) {
-                    TraceDuration create_device_duration{
-                        "create audio device"sv,
+                if (!audio_converter) {
+                    TraceDuration create_converter_duration{
+                        "create audio converter"sv,
                         "RadioClient"sv
                     };
 
-                    if (auto decoder_spec = decoder->get_spec()) {
-                        sdl::audio::spec desired_spec;
-                        desired_spec.freq     = decoder_spec->rate;
-                        desired_spec.channels = decoder_spec->channels;
-                        desired_spec.format   = decoder_spec->format;
-                        desired_spec.samples  = 4096;
-                        LOG_INFO("Creating audio device: {} Hz, {}",
-                                 desired_spec.freq,
-                                 format_to_string(desired_spec.format));
-                        sdl::audio::spec obtained_spec;
-                        audio_dev.create(nullptr, false, desired_spec, obtained_spec);
-                        {
-                            auto info = safe_device_info.lock();
-                            info->active = true;
-                            info->spec = std::move(obtained_spec);
-                            info->queued = 0;
-                        }
-                        audio_dev.unpause();
+                    if (auto src_spec = decoder->get_spec()) {
+                        LOG_INFO("Creating audio_stream: {} Hz, {}",
+                                 src_spec->rate,
+                                 format_to_string(src_spec->format));
+
+                        auto dst_spec = App::get_audio_spec();
+
+                        audio_converter.create(
+                            src_spec->format,
+                            src_spec->channels,
+                            src_spec->rate,
+                            dst_spec.format,
+                            dst_spec.channels,
+                            dst_spec.rate
+                        );
+
+                        LOG_INFO("Audio stream created.");
                     }
                 }
 
                 if (stopper.stop_requested())
                     break;
 
-                if (audio_dev) {
+                if (audio_converter) {
 
                     while (!stopper.stop_requested()) {
 
@@ -421,21 +415,18 @@ RadioClient::decoder_thread_function(std::stop_token stopper)
                         if (stopper.stop_requested())
                             break;
 
-                        audio_dev.play(samples);
+                        audio_converter.put(samples);
 
-                        {
-                            auto info = safe_device_info.lock();
-                            auto sample_size = SDL_AUDIO_BITSIZE(info->spec.format);
-                            float seconds =
-                                audio_dev.get_queued_size()
-                                /
-                                float(sample_size * info->spec.freq);
-                            info->queued = seconds;
+                        while (true) {
+                            auto converted = audio_converter.get(std::span{buffer});
+                            if (converted.empty())
+                                break;
+                            App::play_audio(converted);
                         }
 
                     } // while (!stopper.stop_requested())
 
-                } // if (audio_dev)
+                } // if (audio_converter)
 
                 safe_decoder_info.store(decoder->get_info());
 
@@ -457,13 +448,11 @@ RadioClient::decoder_thread_function(std::stop_token stopper)
 
     LOG_DEBUG("Ending decoder thread.");
 
-    if (audio_dev) {
-        audio_dev.clear();
-        audio_dev.destroy();
-    }
+    App::clear_audio();
 
-    safe_device_info.store(DeviceInfo{});
     safe_metadata.store(stream_metadata{});
+
+    audio_converter.destroy();
 
     decoder.reset();
 
@@ -485,18 +474,26 @@ RadioClient::task_queue_transfer(unsigned idx)
 
     phase = Phase::fetching;
 
-    if (transfer_state != TransferState::idle) {
-        LOG_ERROR("invalid transfer state");
-        return;
+    auto ts = transfer_state.load();
+    switch (ts) {
+        using enum TransferState;
+
+        case idle:
+        case error:
+            break;
+
+        case started:
+        case in_progress:
+        case paused:
+        case unpausing:
+        default:
+            LOG_ERROR("invalid transfer state: {}", to_string(ts));
     }
 
     std::ignore = multi.try_remove(easy);
-
     easy.reset();
 
-    LogManagerCurl::capture_curl_debug(easy);
-
-    std::string next_url;
+    std::string url;
 
     url_info_idx = idx;
 
@@ -507,14 +504,15 @@ RadioClient::task_queue_transfer(unsigned idx)
             phase = Phase::error;
             return;
         }
-        next_url = url_info_vec->at(idx).url;
-        if (next_url.empty()) {
+        url = url_info_vec->at(idx).url;
+        if (url.empty()) {
             LOG_ERROR("BUG: URL is empty!");
             phase = Phase::error;
             return;
         }
     }
 
+    LogManagerCurl::capture_curl_debug(easy);
     easy.set_verbose(cfg.verbose_stream_logs);
 
     if (!user_agent.empty())
@@ -551,7 +549,7 @@ RadioClient::task_queue_transfer(unsigned idx)
     easy.set_tcp_keep_intvl(60s);
     easy.set_tcp_no_delay(false);
     easy.set_transfer_encoding(true);
-    easy.set_url(next_url);
+    easy.set_url(url);
     easy.set_write_function(
         std::bind_front(&RadioClient::on_transfer_recv, this)
     );
@@ -601,6 +599,28 @@ RadioClient::on_transfer_error(const curl::error& e)
     LOG_ERROR("Transfer error: {}", e.what());
     network_error_message.store(e.what());
     transfer_state = TransferState::error;
+
+    switch (phase.load()) {
+        using enum Phase;
+
+        case stopped:
+            break;
+
+        case fetching:
+            try_next_url();
+            break;
+
+        case streaming:
+            phase = Phase::error;
+            encoded_audio.close();
+            break;
+
+        case error:
+            break;
+
+        default:
+            phase = Phase::error;
+    }
 }
 
 
@@ -625,7 +645,6 @@ RadioClient::on_transfer_finished()
             break;
 
         case audio:
-            // Connection ended.
             encoded_audio.close();
             break;
 
@@ -775,12 +794,18 @@ RadioClient::on_transfer_started(std::span<const std::byte> data)
         }
     }
 
-    std::size_t icy_meta_int = 0;
+    std::size_t icy_metaint = 0;
     if (auto hdr = easy.try_get_header("icy-metaint")) {
         LOG_INFO("icy-metaint={}", hdr->value);
-        icy_meta_int = std::stoull(hdr->value);
+        try {
+            icy_metaint = std::stoull(hdr->value);
+        }
+        catch (std::exception& e) {
+            LOG_ERROR("failed to parse icy-metaint: {}", e.what());
+            icy_metaint = 0;
+        }
     }
-    icy_parser.reset(std::move(effective_url), icy_meta_int);
+    icy_parser.reset(std::move(effective_url), icy_metaint);
 
     // Initialize metadata from the ICY headers.
     {
@@ -978,8 +1003,8 @@ to_string(RadioClient::TransferState state)
 
         case idle:
             return "idle"s;
-        case queued:
-            return "queued"s;
+        // case queued:
+        //     return "queued"s;
         case started:
             return "started"s;
         case in_progress:

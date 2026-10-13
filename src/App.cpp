@@ -236,8 +236,26 @@ namespace App {
                                sdl::init::flag::game_controller};
             sdl::img::init img_init;
 
-            sdl::window window;
-            sdl::renderer renderer;
+            sdl::window window{nullptr};
+            sdl::renderer renderer{nullptr};
+
+            struct {
+                sdl::audio::spec spec{};
+                sdl::audio::device device{
+                    nullptr,
+                    false,
+                    [] -> sdl::audio::spec
+                    {
+                        sdl::audio::spec result;
+                        result.freq = 48000;
+                        result.format = AUDIO_S16SYS;
+                        result.channels = 2;
+                        result.samples = 2048;
+                        return result;
+                    }(),
+                    spec
+                };
+            } audio;
 
             sdl::vector<sdl::game_controller::device> controllers;
 
@@ -1347,13 +1365,7 @@ namespace App {
 
         res.emplace();
 
-        // Create a temporary audio device to stop the boot sound.
-        sdl::audio::spec aspec;
-        aspec.freq = 48000;
-        aspec.format = AUDIO_S16SYS;
-        aspec.channels = 2;
-        aspec.samples = 2048;
-        sdl::audio::device adev{nullptr, false, aspec};
+        res->audio.device.unpause();
 
         SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
         SDL_SetHint(SDL_HINT_RENDER_LINE_METHOD, "2");
@@ -1493,6 +1505,55 @@ namespace App {
                   Function func)
     {
         tasks.add(name, std::move(func));
+    }
+
+
+    audio_spec
+    get_audio_spec()
+        noexcept
+    {
+        if (!res) {
+            LOG_ERROR("Getting audio spec with no audio device available.");
+            return {};
+        }
+
+        return {
+            .format = res->audio.spec.format,
+            .channels = res->audio.spec.channels,
+            .rate = static_cast<unsigned>(res->audio.spec.freq),
+        };
+    }
+
+
+    void
+    play_audio(std::span<const std::byte> samples)
+    {
+        if (!res) {
+            LOG_ERROR("Playing audio with no audio device available.");
+            return;
+        }
+
+        res->audio.device.play(samples);
+    }
+
+
+    void
+    clear_audio()
+        noexcept
+    {
+        if (!res)
+            return;
+        res->audio.device.clear();
+    }
+
+
+    std::size_t
+    get_audio_queued_size()
+        noexcept
+    {
+        if (!res)
+            return 0;
+        return res->audio.device.get_queued_size();
     }
 
 } // namespace App

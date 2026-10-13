@@ -61,7 +61,7 @@ public:
 
     enum class TransferState {
         idle,
-        queued,
+        // queued,
         started,
         in_progress,
         paused,
@@ -97,13 +97,6 @@ public:
     };
 
 
-    struct DeviceInfo {
-        bool active = false;
-        sdl::audio::spec spec = {};
-        float queued = 0;
-    };
-
-
     struct URLInfo {
         std::string url{};
         std::string content_type{};
@@ -121,9 +114,6 @@ public:
     using DecoderInfoFunc = std::function<DecoderInfoCallbackSignature>;
 
 
-    using DeviceInfoCallbackSignature = void (const DeviceInfo& info);
-    using DeviceInfoFunc = std::function<DeviceInfoCallbackSignature>;
-
     using URLInfoVecCallbackSignature = void (const URLInfoVec& info_vec);
     using URLInfoVecFunction = std::function<URLInfoVecCallbackSignature>;
 
@@ -140,7 +130,6 @@ public:
     process();
 
     // Enter the "fetching" phase, starting from the given URL index.
-    //
     void
     play(unsigned idx = 0);
 
@@ -160,11 +149,6 @@ public:
 
     void
     with_decoder_info(const DecoderInfoFunc& func)
-        const;
-
-
-    void
-    with_device_info(const DeviceInfoFunc& func)
         const;
 
 
@@ -216,9 +200,8 @@ private:
     std::string stream_content_type;
     std::atomic<DecoderState> decoder_state = DecoderState::stopped;
     std::unique_ptr<Decoder::Base> decoder;
-    sdl::audio::device audio_dev;
+    sdl::audio::stream audio_converter{nullptr};
     thread_safe<Decoder::Info> safe_decoder_info;
-    thread_safe<DeviceInfo> safe_device_info;
 
     std::jthread network_thread;
     std::jthread decoder_thread;

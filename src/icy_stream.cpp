@@ -152,6 +152,7 @@ namespace icy {
                     auto hdr = static_cast<std::uint8_t>(input.front());
                     remove_prefix(input, 1);
                     meta_left = hdr * 16u;
+                    // LOG_DEBUG("metadata size: {}", meta_left);
                     if (meta_left == 0) { // no metadata
                         data_left = interval; // go back to reading data
                         continue;

@@ -8,11 +8,15 @@
 #ifndef APP_HPP
 #define APP_HPP
 
+#include <cstddef>
 #include <filesystem>
 #include <functional>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <span>
+
+#include <sdl2xx/audio.hpp>
 
 #include "TabID.hpp"
 
@@ -94,6 +98,32 @@ namespace App {
             }
         );
     }
+
+
+    struct audio_spec {
+        sdl::audio::format format{};
+        unsigned channels{};
+        unsigned rate{};
+    };
+
+
+    audio_spec
+    get_audio_spec()
+        noexcept;
+
+
+    void
+    play_audio(std::span<const std::byte> samples);
+
+
+    void
+    clear_audio()
+        noexcept;
+
+
+    std::size_t
+    get_audio_queued_size()
+        noexcept;
 
 } // namespace App
 

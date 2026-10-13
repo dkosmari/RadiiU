@@ -252,14 +252,16 @@ namespace PlayerTab {
         {
             TraceFunction tf{"PlayerTab"sv};
 
-            radio.with_device_info(
-                [this](const RadioClient::DeviceInfo& info)
-                {
-                    audio_queue_history[audio_queue_index++] = info.queued;
-                    if (audio_queue_index >= audio_queue_history.size())
-                        audio_queue_index = 0;
-                }
-            );
+            auto spec = App::get_audio_spec();
+            auto sample_size = SDL_AUDIO_BITSIZE(spec.format);
+            float queued_seconds =
+                App::get_audio_queued_size()
+                /
+                float(sample_size * spec.rate * spec.channels);
+
+            audio_queue_history[audio_queue_index++] = queued_seconds;
+            if (audio_queue_index >= audio_queue_history.size())
+                audio_queue_index = 0;
         }
 
 
@@ -305,40 +307,30 @@ namespace PlayerTab {
 
                 Font smaller{nullptr, 0, 0.8f};
 
-                play_res->radio.with_device_info(
-                    [](const RadioClient::DeviceInfo& info)
-                    {
-                        if (!info.active) {
-                            ImGui::Text("Output audio device not initialized.");
-                            return;
-                        }
+                auto spec = App::get_audio_spec();
+                if (Table table{"table", 2}) {
+                    ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed);
+                    ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-                        const auto& spec = info.spec;
-                        if (Table table{"table", 2}) {
-                            ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed);
-                            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
-
-                            try {
-                                auto [default_name, default_spec] =
-                                    sdl::audio::get_default_info(false);
-                                UI::InfoRow("Device", default_name);
-                            }
-                            catch (...) {}
-
-                            UI::FormatInfoRow("Frequency", "{}Hz", humanize::value(spec.freq));
-                            UI::InfoRow("Sample format", format_to_string(spec.format));
-                        }
-
-                        auto available = ImGui::GetContentRegionAvail();
-                        ImGui::PlotHistogram("##audio_queue_history",
-                                             std::span{play_res->audio_queue_history},
-                                             play_res->audio_queue_index,
-                                             {},
-                                             0,
-                                             FLT_MAX,
-                                             available);
+                    try {
+                        auto [default_name, default_spec] =
+                            sdl::audio::get_default_info(false);
+                        UI::InfoRow("Device", default_name);
                     }
-                );
+                    catch (...) {}
+
+                    UI::FormatInfoRow("Sample rate", "{}Hz", humanize::value(spec.rate));
+                    UI::InfoRow("Sample format", format_to_string(spec.format));
+                }
+
+                auto available = ImGui::GetContentRegionAvail();
+                ImGui::PlotHistogram("##audio_queue_history",
+                                     std::span{play_res->audio_queue_history},
+                                     play_res->audio_queue_index,
+                                     {},
+                                     0,
+                                     FLT_MAX,
+                                     available);
             }
         }
 
