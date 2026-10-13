@@ -163,7 +163,6 @@ RadioClient::stop()
     TraceFunction tf{"RadioClient"sv};
 
     if  (is_playing()) {
-        phase = Phase::stopped;
         network_tasks.add(
             "task_cancel_transfer"sv,
             &RadioClient::task_cancel_transfer,
@@ -171,8 +170,9 @@ RadioClient::stop()
         );
         decoder_thread.request_stop();
         encoded_audio.close();
-        decoder_thread = {};
+        // decoder_thread = {};
     }
+    phase = Phase::stopped;
 }
 
 
@@ -528,7 +528,7 @@ RadioClient::task_queue_transfer(unsigned idx)
     easy.set_http_200_aliases({"ICY 200 OK"});
     easy.set_http_version(curl::easy::http_version::none);
     easy.set_low_speed_limit(4096);
-    easy.set_low_speed_time(5s);
+    easy.set_low_speed_time(10s);
     easy.set_sockopt_function(
         [](curl_socket_t fd,
            curlsocktype) -> int
