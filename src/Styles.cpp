@@ -7,12 +7,16 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cstdio>
 #include <filesystem>
-#include <unordered_map>
+#include <format>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <system_error>
+#include <unordered_map>
 #include <vector>
 
 #include <glaze/core/meta.hpp>
@@ -20,6 +24,8 @@
 
 #include <imgui.h>
 #include <imgui_stdlib.h>
+
+#include <sdl2xx/color.hpp>
 
 #include "Styles.hpp"
 
@@ -37,11 +43,119 @@ using ImGui::to_string;
 using Settings::cfg;
 
 
+struct HexColor32 {
+
+    ImVec4 value = {};
+
+
+    static
+    HexColor32
+    from_string(std::string_view input)
+    {
+        if (input.empty())
+            return {};
+        if (input[0] != '#')
+            throw std::runtime_error{"invalid hex color"};
+
+        auto read_octet = [](std::string_view s) -> Uint8
+        {
+            Uint8 result = 0;
+            auto [ptr, ec] = std::from_chars(s.data(),
+                                             s.data() + s.size(),
+                                             result,
+                                             16);
+            if (ec != std::errc{})
+                throw std::system_error{std::make_error_code(ec), "failed to parse"};
+            if (ptr != s.data() + s.size())
+                throw std::runtime_error{"invalid character"};
+            return result;
+        };
+
+        Uint8 r, g, b, a = 1;
+        auto hex = input.substr(1); // skip the '#'
+
+        switch (hex.size()) {
+
+            case 4:
+                a = read_octet(hex.substr(3, 1));
+                a = (a << 4) | a; // double the bits
+                [[fallthrough]];
+
+            case 3:
+                r = read_octet(hex.substr(0, 2));
+                g = read_octet(hex.substr(1, 2));
+                b = read_octet(hex.substr(2, 2));
+                r = (r << 4) | r; // double the bits
+                g = (g << 4) | g; // double the bits
+                b = (b << 4) | b; // double the bits
+                break;
+
+            case 8:
+                a = read_octet(hex.substr(6, 2));
+                [[fallthrough]];
+
+            case 6:
+                r = read_octet(hex.substr(0, 2));
+                g = read_octet(hex.substr(2, 2));
+                b = read_octet(hex.substr(4, 2));
+                break;
+
+            default:
+                throw std::runtime_error{"invalid hex string length"};
+
+        }
+
+        sdl::color c{r, g, b, a};
+        auto rgba = c.to_rgba();
+        HexColor32 result;
+        result.value.x = rgba.r;
+        result.value.y = rgba.g;
+        result.value.z = rgba.b;
+        result.value.w = rgba.a;
+        return result;
+    }
+
+}; // struct HexColor32
+
+
+std::string
+to_string(const HexColor32& hc)
+{
+    sdl::rgba rgba{
+        hc.value.x,
+        hc.value.y,
+        hc.value.z,
+        hc.value.w
+    };
+    auto c = sdl::color::from_rgba(rgba);
+    return std::format("#{:x}{:x}{:x}{:x}",
+                       c.r,
+                       c.g,
+                       c.b,
+                       c.a);
+}
+
+
 template<>
-struct glz::meta<ImVec4> {
-    using T = ImVec4;
+struct glz::meta<HexColor32> {
+    using T = HexColor32;
+
     static constexpr
-    auto value = array(&T::x, &T::y, &T::z, &T::w);
+    auto read_fn =
+        [](T& c, std::string_view input)
+        {
+            c = T::from_string(input);
+        };
+
+    static constexpr
+    auto write_fn =
+        [](const T& c) -> std::string
+        {
+            return to_string(c);
+        };
+
+    static constexpr
+    auto value = glz::custom<read_fn, write_fn>;
 };
 
 
@@ -53,7 +167,7 @@ namespace Styles {
         /* Type aliases */
         /*--------------*/
 
-        using ColorMap = std::unordered_map<std::string, ImVec4>;
+        using ColorMap = std::unordered_map<std::string, HexColor32>;
 
 
         /*-------*/
@@ -192,9 +306,9 @@ namespace Styles {
             const noexcept
         {
             ImVec4* im_colors = ImGui::GetStyle().Colors;
-            for (auto [key, value] : colors) {
+            for (auto [key, color] : colors) {
                 if (auto idx = color_name_to_index(key)) {
-                    im_colors[*idx] = value;
+                    im_colors[*idx] = color.value;
                 } else {
                     LOG_ERROR("Style color name {:?} is invalid.", key);
                 }

@@ -9,6 +9,26 @@ import math
 import sys
 
 
+def lerp(a, b, t: float):
+    return a + t * (b - a)
+
+
+def clamp(x, lo, hi):
+    if x < lo:
+        return lo
+    if x > hi:
+        return hi
+    return x
+
+
+def normalize(x):
+    return x / 255.0
+
+
+def denormalize(x) :
+    return clamp(round(x * 255), 0, 255)
+
+
 @dataclass
 class RGBA:
     r: float
@@ -17,7 +37,12 @@ class RGBA:
     a: float = 1.0
 
     def __str__(self):
-        return f"[{self.r:0=.2f}, {self.g:.2f}, {self.b:.2f}, {self.a:.2f}]"
+        # return f"[{self.r:0=.2f}, {self.g:.2f}, {self.b:.2f}, {self.a:.2f}]"
+        r = denormalize(self.r)
+        g = denormalize(self.g)
+        b = denormalize(self.b)
+        a = denormalize(self.a)
+        return f'"#{r:02x}{g:02x}{b:02x}{a:02x}"'
 
     def __iter__(self):
         return iter(astuple(self))
@@ -78,10 +103,6 @@ class HSVA:
         return iter(astuple(self))
 
 
-def normalize(x):
-    return x / 255.0
-
-
 def parse_hex(hex_str: str):
     original_hex_str = hex_str
     hex_str = hex_str.lstrip('#')
@@ -97,18 +118,6 @@ def parse_hex(hex_str: str):
     g = int(hex_str[2:4], 16)
     b = int(hex_str[4:6], 16)
     return RGBA(normalize(r), normalize(g), normalize(b), 1.0)
-
-
-def lerp(a, b, t: float):
-    return a + t * (b - a)
-
-
-def clamp(x, lo, hi):
-    if x < lo:
-        return lo
-    if x > hi:
-        return hi
-    return x
 
 
 def to_hsva(rgba: RGBA) -> HSVA:
