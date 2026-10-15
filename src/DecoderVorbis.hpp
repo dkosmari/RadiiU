@@ -20,70 +20,66 @@
 #include "Decoder.hpp"
 
 
-namespace Decoder {
+struct DecoderVorbis : Decoder {
 
-    struct Vorbis : Base {
-
-        struct Error : std::runtime_error {
-            Error(int code);
-            Error(const std::string& msg,
-                  int code);
-        };
+    struct Error : std::runtime_error {
+        Error(int code);
+        Error(const std::string& msg,
+              int code);
+    };
 
 
-        OggVorbis_File ovf;
-        byte_stream stream;
-        std::vector<char> samples;
-        long bitrate = 0;
+    DecoderVorbis(std::span<const std::byte> input);
+
+    ~DecoderVorbis()
+        noexcept override;
+
+    std::span<const std::byte>
+    feed(std::span<const std::byte> input)
+        override;
+
+    std::optional<std::span<const std::byte>>
+    decode()
+        override;
+
+    std::optional<Spec>
+    get_spec()
+        noexcept override;
+
+    Info
+    get_info()
+        override;
+
+    std::optional<stream_metadata>
+    get_metadata()
+        const override;
 
 
-        Vorbis(std::span<const std::byte> data);
-
-        ~Vorbis()
-            noexcept override;
-
-        std::span<const std::byte>
-        feed(std::span<const std::byte> data)
-            override;
-
-        std::span<const std::byte>
-        decode()
-            override;
-
-        std::optional<Spec>
-        get_spec()
-            noexcept override;
-
-        Info
-        get_info()
-            override;
-
-        std::optional<stream_metadata>
-        get_metadata()
-            const override;
+    static
+    bool
+    match_mime(const std::string& content_type);
 
 
-        static
-        bool
-        match_mime(const std::string& content_type);
+    static
+    bool
+    match_prefix(std::span<const std::byte> input);
 
 
-        static
-        bool
-        match_prefix(std::span<const std::byte> data);
+private:
+
+    OggVorbis_File ovf;
+    byte_stream input_stream;
+    std::vector<char> output_buffer;
+    long bitrate = 0;
 
 
-    private:
+    static
+    std::size_t
+    read_callback(void* buf,
+                  std::size_t size,
+                  std::size_t count,
+                  void* ctx);
 
-        static
-        std::size_t
-        read_callback(void* buf,
-                      std::size_t size,
-                      std::size_t count,
-                      void* ctx);
-
-    }; // struct Vorbis
-
-} // namespace Decoder
+}; // struct DecoderVorbis
 
 #endif

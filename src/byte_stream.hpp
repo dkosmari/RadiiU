@@ -166,7 +166,7 @@ inline
 std::span<const T>
 byte_stream::write(std::span<const T, E> src)
 {
-    auto result = write(std::as_bytes(src));
+    auto result = write(as_bytes(src));
     return {
         reinterpret_cast<const T*>(result.data()),
         result.size()
@@ -180,7 +180,7 @@ requires (sizeof(T) == 1)
 std::span<const T>
 byte_stream::write_some(std::span<const T> src)
 {
-    auto result = write_some(std::as_bytes(src));
+    auto result = write_some(as_bytes(src));
     return {
         reinterpret_cast<const T*>(result.data()),
         result.size()

@@ -63,9 +63,35 @@ namespace AboutTab {
         std::string
         get_faad2_version()
         {
+            using string_utils::concat;
+
             char* faad_id = nullptr;
             NeAACDecGetVersion(&faad_id, nullptr);
-            return faad_id;
+
+            std::string cap_str;
+            const std::string sep = ", "s;
+            auto cap = NeAACDecGetCapabilities();
+            if (cap & LC_DEC_CAP)
+                cap_str = concat(cap_str, "LC"s, sep);
+
+            if (cap & MAIN_DEC_CAP)
+                cap_str = concat(cap_str, "MAIN"s, sep);
+
+            if (cap & LTP_DEC_CAP)
+                cap_str = concat(cap_str, "LTP"s, sep);
+
+            if (cap & LD_DEC_CAP)
+                cap_str = concat(cap_str, "LD"s, sep);
+
+            if (cap & ERROR_RESILIENCE_CAP)
+                cap_str = concat(cap_str, "ER"s, sep);
+
+            if (cap & FIXED_POINT_CAP)
+                cap_str = concat(cap_str, "FP"s, sep);
+
+            return std::format("{}: {}",
+                               faad_id,
+                               cap_str);
         }
 
 

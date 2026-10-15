@@ -146,6 +146,8 @@ RadioClient::play(unsigned idx)
 {
     TraceFunction tf{"RadioClient"sv};
 
+    TRACE_FUNC;
+
     stop();
 
     network_tasks.add(
@@ -161,6 +163,8 @@ void
 RadioClient::stop()
 {
     TraceFunction tf{"RadioClient"sv};
+
+    TRACE_FUNC;
 
     if  (is_playing()) {
         network_tasks.add(
@@ -190,6 +194,14 @@ RadioClient::is_playing()
         default:
             return false;
     }
+}
+
+
+bool
+RadioClient::is_error()
+    const noexcept
+{
+    return phase == Phase::error;
 }
 
 
@@ -238,6 +250,11 @@ RadioClient::add_url(const std::string& input_url)
 {
     TraceFunction tf{"RadioClient"sv};
 
+    if (is_error()) {
+        LOG_DEBUG("add_url() gave up: error phase");
+        return;
+    }
+
     if (input_url.empty())
         return;
 
@@ -262,6 +279,11 @@ RadioClient::network_thread_function(std::stop_token stopper)
     try {
 
         while (!stopper.stop_requested()) {
+
+            if (is_error()) {
+                LOG_DEBUG("network thread stopping: error phase");
+                break;
+            }
 
             if (!network_tasks.empty()) {
                 TraceDuration duration_tasks_dispatch{
@@ -307,6 +329,10 @@ RadioClient::network_thread_function(std::stop_token stopper)
     catch (...) {
         LOG_ERROR("Unknown exception in network thread.");
     }
+
+    std::ignore = multi.try_remove(easy);
+    easy.reset();
+
     LOG_DEBUG("Ending network thread.");
 }
 
@@ -318,8 +344,12 @@ RadioClient::decoder_thread_function(std::stop_token stopper)
     TraceManager::thread_name("RadioClient decoder thread"sv);
     TraceFunction tf{"RadioClient"sv};
 
-    decoder_state = DecoderState::running;
     LOG_DEBUG("Started decoder thread.");
+
+    if (decoder_state != DecoderState::queued)
+        LOG_ERROR("BUG: wrong decoder state: {}", to_string(decoder_state.load()));
+    decoder_state = DecoderState::running;
+
     try {
         constexpr unsigned max_failures = 10;
         unsigned create_failures = 0;
@@ -327,6 +357,11 @@ RadioClient::decoder_thread_function(std::stop_token stopper)
         std::vector<std::byte> buffer(64 * 1024);
 
         while (!stopper.stop_requested()) {
+
+            if (is_error()) {
+                LOG_DEBUG("decoder thread stopping: error phase");
+                break;
+            }
 
             if (encoded_audio.is_eof()) {
                 LOG_DEBUG("encoded_audio is EOF");
@@ -342,7 +377,7 @@ RadioClient::decoder_thread_function(std::stop_token stopper)
 
                 // No decoder was created yet.
                 auto data = encoded_audio.peek(std::span{buffer});
-                if (data.empty()) {
+                if (data.size() < 8 * 1024) {
                     std::this_thread::sleep_for(100ms);
                     continue;
                 }
@@ -409,19 +444,21 @@ RadioClient::decoder_thread_function(std::stop_token stopper)
                     while (!stopper.stop_requested()) {
 
                         auto samples = decoder->decode();
-                        if (samples.empty())
+                        if (!samples)
                             break;
 
                         if (stopper.stop_requested())
                             break;
 
-                        audio_converter.put(samples);
+                        if (!samples->empty()) {
+                            audio_converter.put(*samples);
 
-                        while (true) {
-                            auto converted = audio_converter.get(std::span{buffer});
-                            if (converted.empty())
-                                break;
-                            App::play_audio(converted);
+                            while (true) {
+                                auto converted = audio_converter.get(std::span{buffer});
+                                if (converted.empty())
+                                    break;
+                                App::play_audio(converted);
+                            }
                         }
 
                     } // while (!stopper.stop_requested())
@@ -441,9 +478,11 @@ RadioClient::decoder_thread_function(std::stop_token stopper)
     }
     catch (std::exception& e) {
         LOG_ERROR("Exception in decoder thread: {}", e.what());
+        phase = Phase::error;
     }
     catch (...) {
         LOG_ERROR("Unknown exception in decoder thread.");
+        phase = Phase::error;
     }
 
     LOG_DEBUG("Ending decoder thread.");
@@ -454,6 +493,7 @@ RadioClient::decoder_thread_function(std::stop_token stopper)
 
     audio_converter.destroy();
 
+    safe_decoder_info.store(Decoder::Info{});
     decoder.reset();
 
     decoder_state = DecoderState::stopped;
@@ -465,12 +505,12 @@ RadioClient::task_queue_transfer(unsigned idx)
 {
     TraceFunction tf{"RadioClient"sv};
 
-    LOG_DEBUG("Network task: queue transfer.");
-
-    if (phase == Phase::error) {
+    if (is_error()) {
         LOG_ERROR("Canceled task because it's in error phase.");
         return;
     }
+
+    LOG_DEBUG("Network task: queue transfer.");
 
     phase = Phase::fetching;
 
@@ -560,6 +600,8 @@ RadioClient::task_queue_transfer(unsigned idx)
 
     playlist_type = PlaylistType::none;
     playlist_data.clear();
+
+    encoded_audio.clear();
 
     transfer_state = TransferState::started;
 }
@@ -785,7 +827,6 @@ RadioClient::on_transfer_started(std::span<const std::byte> data)
             info.content_type = content_type;
             info.type = URLType::audio;
             playlist_type = PlaylistType::none;
-            encoded_audio.clear();
 
         } else {
 
@@ -793,6 +834,9 @@ RadioClient::on_transfer_started(std::span<const std::byte> data)
 
         }
     }
+
+    playlist_data.clear();
+    encoded_audio.clear();
 
     std::size_t icy_metaint = 0;
     if (auto hdr = easy.try_get_header("icy-metaint")) {
@@ -852,6 +896,11 @@ RadioClient::start_decoder_thread()
 {
     TraceFunction tf{"RadioClient"sv};
 
+    if (is_error()) {
+        LOG_DEBUG("start_decoder_thread() gave up: error phase");
+        return;
+    }
+
     decoder_state = DecoderState::queued;
     decoder_thread = std::jthread{
         std::bind_front(&RadioClient::decoder_thread_function, this)
@@ -862,6 +911,11 @@ RadioClient::start_decoder_thread()
 void
 RadioClient::resume_transfer_if_paused()
 {
+    if (is_error()) {
+        LOG_DEBUG("resume_transfer_if_paused() gave up: error phase");
+        return;
+    }
+
     if (transfer_state == TransferState::paused) {
         transfer_state = TransferState::unpausing;
         network_tasks.add(
@@ -878,6 +932,11 @@ RadioClient::process_playlist()
 {
     TraceFunction tf{"RadioClient"sv};
 
+    if (is_error()) {
+        LOG_DEBUG("process_playlist() gave up: error phase");
+        return;
+    }
+
     // NOTE: make a copy of the URLInfo entry, so we don't keep the list locked.
     unsigned idx = url_info_idx;
     auto info = safe_url_info_vec.lock()->at(idx);
@@ -885,6 +944,7 @@ RadioClient::process_playlist()
     LOG_DEBUG("Processing playlist: {}", to_string(playlist_type));
 
     std::string playlist_str = playlist_data.read_all_as<std::string>();
+    assert(playlist_data.empty());
 
     switch (playlist_type) {
         using enum PlaylistType;
@@ -938,6 +998,11 @@ RadioClient::process_playlist()
 void
 RadioClient::try_next_url()
 {
+    if (is_error()) {
+        LOG_DEBUG("try_next_url() gave up: error phase");
+        return;
+    }
+
     network_tasks.add(
         "task_queue_transfer"sv,
         &RadioClient::task_queue_transfer,
@@ -1017,6 +1082,24 @@ to_string(RadioClient::TransferState state)
             return "error"s;
         default:
             return "<UNKNOWN>";
+    }
+}
+
+
+std::string
+to_string(RadioClient::DecoderState state)
+{
+    switch (state) {
+        using enum RadioClient::DecoderState;
+
+        case stopped:
+            return "stopped"s;
+        case queued:
+            return "queued"s;
+        case running:
+            return "running"s;
+        default:
+            return "<UNKNOWN>"s;
     }
 }
 

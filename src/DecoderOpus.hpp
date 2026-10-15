@@ -19,71 +19,68 @@
 #include "Decoder.hpp"
 
 
-namespace Decoder {
+struct DecoderOpus : Decoder {
 
-    struct Opus : Base {
-
-        struct Error : std::runtime_error {
-            Error(int code);
-            Error(const std::string& msg,
-                  int code);
-        };
+    struct Error : std::runtime_error {
+        Error(int code);
+        Error(const std::string& msg,
+              int code);
+    };
 
 
-        OggOpusFile* oof = nullptr;
-        byte_stream stream;
-        std::vector<opus_int16> samples;
-        opus_int32 bitrate = 0;
+    DecoderOpus(std::span<const std::byte> data);
+
+    ~DecoderOpus()
+        noexcept override;
 
 
-        Opus(std::span<const std::byte> data);
+    std::span<const std::byte>
+    feed(std::span<const std::byte> data)
+        override;
 
-        ~Opus()
-            noexcept override;
+    std::optional<std::span<const std::byte>>
+    decode()
+        override;
 
+    std::optional<Spec>
+    get_spec()
+        noexcept override;
 
-        std::span<const std::byte>
-        feed(std::span<const std::byte> data)
-            override;
+    Info
+    get_info()
+        override;
 
-        std::span<const std::byte>
-        decode()
-            override;
-
-        std::optional<Spec>
-        get_spec()
-            noexcept override;
-
-        Info
-        get_info()
-            override;
-
-        std::optional<stream_metadata>
-        get_metadata()
-            const override;
+    std::optional<stream_metadata>
+    get_metadata()
+        const override;
 
 
-        static
-        bool
-        match_mime(const std::string& content_type);
+    static
+    bool
+    match_mime(const std::string& content_type);
 
 
-        static
-        bool
-        match_prefix(std::span<const std::byte> data);
+    static
+    bool
+    match_prefix(std::span<const std::byte> data);
 
 
-    private:
-
-        static
-        int
-        read_callback(void* ctx,
-                      unsigned char* buf,
-                      int size);
+private:
 
 
-    }; // struct Opus
+    OggOpusFile* oof = nullptr;
+    byte_stream input_stream;
+    std::vector<opus_int16> output_buffer;
+    opus_int32 bitrate = 0;
 
-} // namespace Decoder
+
+    static
+    int
+    read_callback(void* ctx,
+                  unsigned char* buf,
+                  int size);
+
+
+}; // struct DecoderOpus
 
 #endif

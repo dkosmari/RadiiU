@@ -15,51 +15,50 @@
 #include "Decoder.hpp"
 
 
-namespace Decoder {
+struct DecoderMP3 : Decoder {
 
-    struct MP3 : Base {
+    DecoderMP3(std::span<const std::byte> data);
 
-        mpg123::handle mpg;
+    ~DecoderMP3()
+        noexcept override;
 
+    std::span<const std::byte>
+    feed(std::span<const std::byte> data)
+        override;
 
-        MP3(std::span<const std::byte> data);
+    std::optional<std::span<const std::byte>>
+    decode()
+        override;
 
-        ~MP3()
-            noexcept override;
+    std::optional<Spec>
+    get_spec()
+        noexcept override;
 
-        std::span<const std::byte>
-        feed(std::span<const std::byte> data)
-            override;
+    Info
+    get_info()
+        override;
 
-        std::span<const std::byte>
-        decode()
-            override;
-
-        std::optional<Spec>
-        get_spec()
-            noexcept override;
-
-        Info
-        get_info()
-            override;
-
-        std::optional<stream_metadata>
-        get_metadata()
-            const override;
+    std::optional<stream_metadata>
+    get_metadata()
+        const override;
 
 
-        static
-        bool
-        match_mime(const std::string& content_type);
+    static
+    bool
+    match_mime(const std::string& content_type);
 
 
-        static
-        bool
-        match_prefix(std::span<const std::byte> data);
+    static
+    bool
+    match_prefix(std::span<const std::byte> data);
 
 
-    }; // struct MP3
+private:
 
-} // namespace Decoder
+    mpg123::handle mpg;
+
+
+}; // struct DecoderMP3
+
 
 #endif

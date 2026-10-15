@@ -142,6 +142,11 @@ public:
         const noexcept;
 
 
+    bool
+    is_error()
+        const noexcept;
+
+
     void
     with_metadata(const MetadataFunc& func)
         const;
@@ -186,7 +191,7 @@ private:
 
     PlaylistType playlist_type = PlaylistType::none;
     byte_stream playlist_data{2 * 1024 * 1024};
-    async_byte_stream encoded_audio{64 * 1024};
+    async_byte_stream encoded_audio{256 * 1024};
 
     icy::stream icy_parser;
     thread_safe<stream_metadata> safe_metadata; // updated by either thread, read by the UI code
@@ -199,7 +204,7 @@ private:
 
     std::string stream_content_type;
     std::atomic<DecoderState> decoder_state = DecoderState::stopped;
-    std::unique_ptr<Decoder::Base> decoder;
+    std::unique_ptr<Decoder> decoder;
     sdl::audio::stream audio_converter{nullptr};
     thread_safe<Decoder::Info> safe_decoder_info;
 
@@ -273,6 +278,10 @@ to_string(RadioClient::PlaylistType type);
 
 std::string
 to_string(RadioClient::TransferState state);
+
+
+std::string
+to_string(RadioClient::DecoderState state);
 
 
 std::string

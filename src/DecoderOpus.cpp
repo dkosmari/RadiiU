@@ -24,234 +24,235 @@
 using namespace std::literals;
 
 
-namespace Decoder {
+namespace {
 
-    namespace {
+    // Constants
 
-        // Constants
-
-        constexpr std::array opus_mimes{
-            "audio/opus"sv,
-            "audio/ogg; codecs=opus"sv,
-            "audio/ogg"sv,
-            "application/ogg"sv,
-        };
+    constexpr std::array opus_mimes{
+        "audio/opus"sv,
+        "audio/ogg; codecs=opus"sv,
+        "audio/ogg"sv,
+        "application/ogg"sv,
+    };
 
 
-        constexpr std::array opus_prefixes{
-            "OggS"sv,
-        };
+    constexpr std::array opus_prefixes{
+        "OggS"sv,
+    };
 
 
-        // Function definitions
+    // Function definitions
 
-        std::string
-        opus_error_to_string(int code)
-        {
-            return opus_strerror(code);
-        }
-
-    } // namespace
-
-
-    Opus::Error::Error(int code) :
-        std::runtime_error{opus_error_to_string(code)}
-    {}
-
-
-    Opus::Error::Error(const std::string& msg,
-                       int code) :
-        std::runtime_error{msg + ": " + opus_error_to_string(code)}
-    {}
-
-
-    Opus::Opus(std::span<const std::byte> data) :
-        samples(8192 * 2)
+    std::string
+    opus_error_to_string(int code)
     {
-        OpusFileCallbacks callbacks {
-            .read = &read_callback,
-            .seek = nullptr,
-            .tell = nullptr,
-            .close = nullptr,
-        };
-
-        int e;
-        oof = op_open_callbacks(this,
-                                &callbacks,
-                                reinterpret_cast<const unsigned char*>(data.data()),
-                                data.size_bytes(),
-                                &e);
-        if (!oof)
-            throw Error{"op_open_callbacks() failed", e};
-
-        LOG_INFO("Created opus decoder.");
+        return opus_strerror(code);
     }
 
 
-    Opus::~Opus()
-        noexcept
+    std::vector<std::string_view>
+    to_vector(const OpusTags* tag)
     {
-        op_free(oof);
-    }
-
-
-    std::span<const std::byte>
-    Opus::feed(std::span<const std::byte> data)
-    {
-        return stream.write_some(data);
-    }
-
-
-    std::span<const std::byte>
-    Opus::decode()
-    {
-        int r = op_read_stereo(oof,
-                               samples.data(),
-                               samples.size());
-
-        if (r <= 0) {
-            switch (r) {
-                case 0:
-                    return {};
-                case OP_HOLE:
-                case OP_EREAD:
-                    LOG_DEBUG("Harmless (?) Opus error: {:?}", opus_error_to_string(r));
-                    return {};
-                default:
-                    throw Error{"op_read_stereo() failed", r};
+        std::vector<std::string_view> result;
+        if (tag && tag->comments > 0) {
+            result.resize(tag->comments);
+            for (int i = 0; i <tag->comments; ++i) {
+                result[i] = std::string_view(tag->user_comments[i],
+                                             tag->comment_lengths[i]);
             }
         }
-        auto decoded = std::span(samples.data(), r * 2);
-        return std::as_bytes(decoded);
-    }
-
-
-    std::optional<Spec>
-    Opus::get_spec()
-        noexcept
-    {
-        Spec result;
-        result.format = AUDIO_S16SYS;
-        result.rate = 48000;
-        //result.channels = op_channel_count(oof, -1);
-        result.channels = 2;
         return result;
     }
 
+} // namespace
 
-    Info
-    Opus::get_info()
-    {
-        Info result;
 
-        result.codec = "Ogg Opus";
+DecoderOpus::Error::Error(int code) :
+    std::runtime_error{opus_error_to_string(code)}
+{}
 
-        if (auto tags = op_tags(oof, -1)) {
-            if (tags->vendor)
-                result.codec += "; "s + tags->vendor;
+
+DecoderOpus::Error::Error(const std::string& msg,
+                          int code) :
+    std::runtime_error{msg + ": " + opus_error_to_string(code)}
+{}
+
+
+// NOTE: we down/up mix to stereo, to avoid worrying about remapping channels
+DecoderOpus::DecoderOpus(std::span<const std::byte> data) :
+    output_buffer(8192 * 2)
+{
+    OpusFileCallbacks callbacks {
+        .read = &read_callback,
+        .seek = nullptr,
+        .tell = nullptr,
+        .close = nullptr,
+    };
+
+    int e;
+    oof = op_open_callbacks(
+        this,
+        &callbacks,
+        reinterpret_cast<const unsigned char*>(data.data()),
+        data.size_bytes(),
+        &e
+    );
+    if (!oof)
+        throw Error{"op_open_callbacks() failed", e};
+
+    LOG_INFO("Created opus decoder.");
+}
+
+
+DecoderOpus::~DecoderOpus()
+    noexcept
+{
+    op_free(oof);
+}
+
+
+std::span<const std::byte>
+DecoderOpus::feed(std::span<const std::byte> data)
+{
+    return input_stream.write_some(data);
+}
+
+
+std::optional<std::span<const std::byte>>
+DecoderOpus::decode()
+{
+    int r = op_read_stereo(
+        oof,
+        output_buffer.data(),
+        output_buffer.size()
+    );
+
+    if (r <= 0) {
+        switch (r) {
+            case 0:
+                return {};
+            case OP_HOLE:
+            case OP_EREAD:
+                LOG_DEBUG("Harmless (?) Opus error: {:?}", opus_error_to_string(r));
+                return {};
+            default:
+                throw Error{"op_read_stereo() failed", r};
         }
-
-        opus_int32 br = op_bitrate_instant(oof);
-        if (br > 0)
-            bitrate = br;
-
-        if (bitrate)
-            result.bitrate = std::format("{:.1f} Kbps", bitrate / 1000.0f);
-
-        return result;
     }
 
-
-    namespace {
-
-        std::vector<std::string_view>
-        to_vector(const OpusTags* tag)
-        {
-            std::vector<std::string_view> result;
-            if (tag && tag->comments > 0) {
-                result.resize(tag->comments);
-                for (int i = 0; i <tag->comments; ++i) {
-                    result[i] = std::string_view(tag->user_comments[i],
-                                                 tag->comment_lengths[i]);
-                }
-            }
-            return result;
-        }
-
-    } // namespace
+    std::span decoded{
+        output_buffer.data(),
+        static_cast<std::size_t>(r * 2)
+    };
+    return as_bytes(decoded);
+}
 
 
-    std::optional<stream_metadata>
-    Opus::get_metadata()
-        const
-    {
-        auto tags = op_tags(oof, -1);
-        if (!tags)
-            return {};
+std::optional<Decoder::Spec>
+DecoderOpus::get_spec()
+    noexcept
+{
+    Spec result;
+    result.format = AUDIO_S16SYS;
+    result.rate = 48000;
+    //result.channels = op_channel_count(oof, -1);
+    result.channels = 2; // NOTE: we hardcode the output to be stereo
+    return result;
+}
 
-        stream_metadata result;
 
-        auto tags_vec = to_vector(tags);
-        for (auto entry : tags_vec) {
-            auto tokens = string_utils::split_view(entry, "="sv, false, 2);
-            if (tokens.size() != 2)
-                continue;
-            auto key = tokens[0];
-            auto val = tokens[1];
+Decoder::Info
+DecoderOpus::get_info()
+{
+    Info result;
 
-            using string_utils::equal_case;
-            if (equal_case(key, "TITLE"sv))
-                result.title = val;
-            else if (equal_case(key, "ARTIST"sv))
-                result.artist = val;
-            else if (equal_case(key, "ALBUM"sv))
-                result.album = val;
-            else if (equal_case(key, "GENRE"sv))
-                result.genre = val;
-            else
-                result.extra[std::string{key}] = std::string{val};
-        }
+    result.codec = "Ogg Opus";
 
-        return result;
+    if (auto tags = op_tags(oof, -1)) {
+        if (tags->vendor)
+            result.codec += "; "s + tags->vendor;
     }
 
+    opus_int32 br = op_bitrate_instant(oof);
+    if (br > 0)
+        bitrate = br;
 
-    bool
-    Opus::match_mime(const std::string& content_type)
-    {
-        return mime_type::match_any(content_type, opus_mimes);
+    if (bitrate)
+        result.bitrate = std::format("{:.1f} Kbps", bitrate / 1000.0f);
+
+    return result;
+}
+
+
+std::optional<stream_metadata>
+DecoderOpus::get_metadata()
+    const
+{
+    auto tags = op_tags(oof, -1);
+    if (!tags)
+        return {};
+
+    stream_metadata result;
+
+    auto tags_vec = to_vector(tags);
+    for (auto entry : tags_vec) {
+        auto tokens = string_utils::split_view(entry, "="sv, false, 2);
+        if (tokens.size() != 2)
+            continue;
+        auto key = tokens[0];
+        auto val = tokens[1];
+
+        using string_utils::equal_case;
+        if (equal_case(key, "TITLE"sv))
+            result.title = val;
+        else if (equal_case(key, "ARTIST"sv))
+            result.artist = val;
+        else if (equal_case(key, "ALBUM"sv))
+            result.album = val;
+        else if (equal_case(key, "GENRE"sv))
+            result.genre = val;
+        else
+            result.extra[std::string{key}] = std::string{val};
     }
 
+    return result;
+}
 
-    bool
-    Opus::match_prefix(std::span<const std::byte> data)
-    {
-        return utils::starts_with_any(data, opus_prefixes);
+
+bool
+DecoderOpus::match_mime(const std::string& content_type)
+{
+    return mime_type::match_any(content_type, opus_mimes);
+}
+
+
+bool
+DecoderOpus::match_prefix(std::span<const std::byte> data)
+{
+    return utils::starts_with_any(data, opus_prefixes);
+}
+
+
+int
+DecoderOpus::read_callback(void* ctx,
+                           unsigned char* buf,
+                           int size)
+{
+    auto self = reinterpret_cast<DecoderOpus*>(ctx);
+    if (!self) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (self->input_stream.empty()) {
+        errno = EAGAIN;
+        return 0;
     }
 
+    std::span src{
+        reinterpret_cast<std::byte*>(buf),
+        static_cast<std::size_t>(size)
+    };
 
-    int
-    Opus::read_callback(void* ctx,
-                        unsigned char* buf,
-                        int size)
-    {
-        auto self = reinterpret_cast<Opus*>(ctx);
-        if (!self) {
-            errno = EINVAL;
-            return -1;
-        }
-        if (self->stream.empty()) {
-            errno = EAGAIN;
-            return 0;
-        }
-
-        std::span<std::byte> src{
-            reinterpret_cast<std::byte*>(buf),
-            static_cast<std::size_t>(size)
-        };
-
-        auto result = self->stream.read(src);
-        return result.size();
-    }
-
-} // namespace Decoder
+    auto result = self->input_stream.read(src);
+    return result.size();
+}

@@ -21,7 +21,7 @@
 #include "stream_metadata.hpp"
 
 
-namespace Decoder {
+struct Decoder {
 
     struct Spec {
         SDL_AudioFormat format;
@@ -36,52 +36,49 @@ namespace Decoder {
     };
 
 
-    struct Base {
+    constexpr
+    Decoder()
+        noexcept = default;
 
-        constexpr
-        Base()
-            noexcept = default;
+    // disallow moving
+    Decoder(Decoder&& other) = delete;
 
-        // disallow moving
-        Base(Base&& other) = delete;
-
-        Base&
-        operator=(Base&& other) = delete;
+    Decoder&
+    operator=(Decoder&& other) = delete;
 
 
-        virtual
-        ~Base()
-            noexcept;
+    virtual
+    ~Decoder()
+        noexcept;
 
-        virtual
-        std::span<const std::byte>
-        feed(std::span<const std::byte> data) = 0;
+    virtual
+    std::span<const std::byte>
+    feed(std::span<const std::byte> data) = 0;
 
-        virtual
-        std::span<const std::byte>
-        decode() = 0;
+    virtual
+    std::optional<std::span<const std::byte>>
+    decode() = 0;
 
-        virtual
-        std::optional<Spec>
-        get_spec()
-            noexcept = 0;
+    virtual
+    std::optional<Spec>
+    get_spec()
+        noexcept = 0;
 
-        virtual
-        Info
-        get_info() = 0;
+    virtual
+    Info
+    get_info() = 0;
 
-        virtual
-        std::optional<stream_metadata>
-        get_metadata()
-            const = 0;
-
-    }; // struct Base
+    virtual
+    std::optional<stream_metadata>
+    get_metadata()
+        const = 0;
 
 
-    std::unique_ptr<Base>
+    static
+    std::unique_ptr<Decoder>
     create(const std::string& content_type,
            std::span<const std::byte> data);
 
-} // namespace Decoder
+}; // struct Decoder
 
 #endif
