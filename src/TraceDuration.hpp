@@ -8,18 +8,17 @@
 #ifndef TRACE_DURATION_HPP
 #define TRACE_DURATION_HPP
 
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-
-#if ENABLE_TRACING
-
 #include <optional>
 #include <source_location>
 #include <string_view>
 
 #include <glaze/json/generic.hpp>
 
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#if ENABLE_TRACING
 
 struct TraceDuration {
 

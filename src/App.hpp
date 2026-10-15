@@ -8,13 +8,14 @@
 #ifndef APP_HPP
 #define APP_HPP
 
+#include <chrono>
 #include <cstddef>
 #include <filesystem>
 #include <functional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
-#include <span>
 
 #include <sdl2xx/audio.hpp>
 
@@ -22,6 +23,8 @@
 
 
 namespace App {
+
+    using dbl_milliseconds = std::chrono::duration<double, std::milli>;
 
     using Function = std::move_only_function<void()>;
 
@@ -121,8 +124,8 @@ namespace App {
         noexcept;
 
 
-    std::size_t
-    get_audio_queued_size()
+    dbl_milliseconds
+    get_queued_audio_duration()
         noexcept;
 
 } // namespace App

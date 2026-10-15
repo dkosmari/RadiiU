@@ -223,7 +223,7 @@ namespace StationVoting {
 
         std::string value_label;
         if (station->votes) {
-            value_label = humanize::value(*station->votes);
+            value_label = humanize::value(*station->votes, false);
             vote_label += " " + value_label;
         }
 

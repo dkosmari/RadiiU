@@ -8,6 +8,7 @@
 #ifndef SETTINGS_HPP
 #define SETTINGS_HPP
 
+#include <chrono>
 #include <cstddef>
 #include <string>
 #include <filesystem>
@@ -23,7 +24,7 @@ namespace Settings {
         bool        disable_swkbd        = false;
         bool        inactive_screen_off  = false;
         TabID       initial_tab          = TabID::browser;
-        unsigned    player_buffer_size   = 8;
+        std::chrono::milliseconds player_buffer_duration = std::chrono::seconds{1};
         unsigned    player_history_limit = 20;
         bool        remember_tab         = true;
         unsigned    recent_limit         = 10;

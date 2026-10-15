@@ -310,6 +310,10 @@ namespace App {
         /* Function declarations */
         /*-----------------------*/
 
+        dbl_milliseconds
+        audio_bytes_to_duration(std::size_t bytes,
+                                const sdl::audio::spec& spec);
+
         void
         detected_activity();
 
@@ -631,6 +635,18 @@ namespace App {
 
 #endif // __WIIU__
 
+        dbl_milliseconds
+        audio_bytes_to_duration(std::size_t bytes,
+                                const sdl::audio::spec& spec)
+        {
+            double bits_in_one_second =
+                double(spec.freq) *
+                double(spec.channels) *
+                double(SDL_AUDIO_BITSIZE(spec.format));
+            // NOTE: 1000 to convert to milliseconds, 8 to convert to bytes.
+            return dbl_milliseconds{(1000.0 * 8.0) * double(bytes) / bits_in_one_second};
+        }
+
 
         void
         detected_activity()
@@ -951,6 +967,33 @@ namespace App {
             }
 
             process_screen_saver();
+
+            {
+                TraceDuration manage_audio_duration{"manage audio buffer"sv,
+                                                    "App"sv};
+                // Audio handling: if queue is empty, pause until we have enough data.
+                auto size_bytes = res->audio.device.get_queued_size();
+                auto queued_audio = get_queued_audio_duration();
+                // LOG_DEBUG("queued_audio: {}", queued_audio);
+                switch (res->audio.device.get_status()) {
+                    using enum sdl::audio::status;
+
+                    case paused:
+                        if (queued_audio >= cfg.player_buffer_duration)
+                            res->audio.device.unpause();
+                        break;
+
+                    case playing:
+                        if (size_bytes == 0)
+                            res->audio.device.pause();
+                        break;
+
+                    case stopped:
+                        LOG_DEBUG("audio device is stopped!");
+                        break;
+                }
+            }
+
         }
 
 
@@ -1365,8 +1408,6 @@ namespace App {
 
         res.emplace();
 
-        res->audio.device.unpause();
-
         SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
         SDL_SetHint(SDL_HINT_RENDER_LINE_METHOD, "2");
 
@@ -1547,13 +1588,17 @@ namespace App {
     }
 
 
-    std::size_t
-    get_audio_queued_size()
+    dbl_milliseconds
+    get_queued_audio_duration()
         noexcept
     {
-        if (!res)
-            return 0;
-        return res->audio.device.get_queued_size();
+        if (!res || !res->audio.device)
+            return dbl_milliseconds{0};
+
+        return audio_bytes_to_duration(
+            res->audio.device.get_queued_size(),
+            res->audio.spec
+        );
     }
 
 } // namespace App

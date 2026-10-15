@@ -294,7 +294,7 @@ namespace ImageLoader {
             location{location_},
             size_limit{size_limit_}
         {
-            LOG_DEBUG("CacheEntry created for {:?}", location);
+            // LOG_DEBUG("CacheEntry created for {:?}", location);
             if (size_limit.x < 0)
                 size_limit.x = 0;
             if (size_limit.y < 0)

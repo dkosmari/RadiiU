@@ -24,26 +24,29 @@ using namespace std::literals;
 namespace humanize {
 
     string
-    duration(seconds t)
+    duration(seconds t,
+             bool separate)
     {
+        const std::string separator = separate ? " "s : ""s;
+
         if (t <= 90s)
-            return std::to_string(t.count()) + " s";
+            return to_string(t.count()) + separator + "s"s;
 
         if (t < 60min) {
             auto t_min = duration_cast<minutes>(t);
             auto t_sec = duration_cast<seconds>(t - t_min);
-            string result = to_string(t_min.count()) + " min";
+            string result = to_string(t_min.count()) + separator + "min"s;
             if (t_sec >= 1s)
-                result += ", " + to_string(t_sec.count()) + " s";
+                result += ", "s + to_string(t_sec.count()) + separator + "s"s;
             return result;
         }
 
         if (t < 24h) {
             auto t_hrs = duration_cast<hours>(t);
             auto t_min = duration_cast<minutes>(t - t_hrs);
-            string result = to_string(t_hrs.count()) + " hr";
+            string result = to_string(t_hrs.count()) + separator + "hr"s;
             if (t_min >= 1min)
-                result += ", " + to_string(t_min.count()) + " min";
+                result += ", "s + to_string(t_min.count()) + separator + "min"s;
             return result;
         }
 
@@ -52,13 +55,13 @@ namespace humanize {
         auto t_min = duration_cast<minutes>(t - t_days - t_hrs);
         string result = to_string(t_days.count());
         if (t_days >= 48h)
-            result += " days";
+            result += separator + "days"s;
         else
-            result += " day";
+            result += separator + "day"s;
         if (t_hrs >= 1h)
-            result += ", " + to_string(t_hrs.count()) + " hr";
+            result += ", "s + to_string(t_hrs.count()) + separator + "hr"s;
         if (t_min >= 1min)
-            result += ", " + to_string(t_min.count()) + " min";
+            result += ", "s + to_string(t_min.count()) + separator + "min"s;
         return result;
     }
 
@@ -66,63 +69,58 @@ namespace humanize {
     std::string
     duration_brief(std::chrono::seconds t)
     {
-        // TODO: use hh_mm_ss from chrono
-        unsigned total = t.count();
-        unsigned s = total % 60u;
-        total /= 60u;
-        unsigned m = total % 60u;
-        total /= 60;
-        unsigned h = total % 24;
-        total /= 24;
-        unsigned d = total;
-        if (d)
-            return std::format("{:}d {:02}:{:02}:{:02}", d, h, m, s);
+        auto days = std::chrono::floor<std::chrono::days>(t);
+        std::chrono::hh_mm_ss time_of_day{t - days};
+        if (days > 24h)
+            return std::format("{:%Q%q} {:%T}", days, time_of_day);
         else
-            return std::format("{:02}:{:02}:{:02}", h, m, s);
+            return std::format("{:%T}", time_of_day);
     }
 
 
     string
-    value(std::uint64_t x)
+    value(std::uint64_t x,
+          bool separate)
     {
+        const std::string separator = separate ? " "s : ""s;
         if (x < 1'000u)
             return to_string(x);
 
         if (x < 10'000u) {
             float fx = x / 1e3f;
-            return std::format("{:.1f}k", fx);
+            return std::format("{:.1f}{}k", fx, separator);
         }
 
         if (x < 1'000'000u) {
             float fx = x / 1e3f;
-            return std::format("{:.0f}k", fx);
+            return std::format("{:.0f}{}k", fx, separator);
         }
 
 
         if (x < 10'000'000u) {
             float fx = x / 1e6f;
-            return std::format("{:.1f}M", fx);
+            return std::format("{:.1f}{}M", fx, separator);
         }
 
         if (x < 1'000'000'000u) {
             float fx = x / 1e6f;
-            return std::format("{:0f}M", fx);
+            return std::format("{:0f}{}M", fx, separator);
         }
 
 
         if (x < 10'000'000'000u) {
             float fx = x / 1e9f;
-            return std::format("{:.1f}G", fx);
+            return std::format("{:.1f}{}G", fx, separator);
         }
 
 
         if (x < 1'000'000'000'000u) {
             float fx = x / 1e9f;
-            return std::format("{:.0f}G", fx);
+            return std::format("{:.0f}{}G", fx, separator);
         }
 
         float fx = x / 1e12f;
-        return std::format("{:.1f}T", fx);
+        return std::format("{:.1f}{}T", fx, separator);
     }
 
 } // namespace humanize

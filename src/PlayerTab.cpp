@@ -250,16 +250,9 @@ namespace PlayerTab {
         void
         PlaybackResources::update_audio_queue_history()
         {
-            TraceFunction tf{"PlayerTab"sv};
+            audio_queue_history[audio_queue_index++] =
+                App::get_queued_audio_duration().count() / 1000.0;
 
-            auto spec = App::get_audio_spec();
-            auto sample_size = SDL_AUDIO_BITSIZE(spec.format);
-            float queued_seconds =
-                App::get_audio_queued_size()
-                /
-                float(sample_size * spec.rate * spec.channels);
-
-            audio_queue_history[audio_queue_index++] = queued_seconds;
             if (audio_queue_index >= audio_queue_history.size())
                 audio_queue_index = 0;
         }

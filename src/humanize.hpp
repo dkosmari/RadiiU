@@ -1,7 +1,7 @@
 /*
  * RadiiU - an internet radio player for the Wii U.
  *
- * Copyright (C) 2025  Daniel K. O. <dkosmari>
+ * Copyright (C) 2025-2026  Daniel K. O. <dkosmari>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -15,7 +15,8 @@ namespace humanize {
 
     [[nodiscard]]
     std::string
-    duration(std::chrono::seconds t);
+    duration(std::chrono::seconds t,
+             bool separate = true);
 
     [[nodiscard]]
     std::string
@@ -23,7 +24,8 @@ namespace humanize {
 
     [[nodiscard]]
     std::string
-    value(std::uint64_t x);
+    value(std::uint64_t x,
+          bool separate = true);
 
 } // namespace humanize
 

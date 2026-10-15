@@ -8,14 +8,20 @@
 #ifndef TRACE_FUNCTION_HPP
 #define TRACE_FUNCTION_HPP
 
+#include <optional>
+#include <source_location>
+#include <string_view>
+
+#include <glaze/json/generic.hpp>
+
+#include "TraceDuration.hpp"
+
+
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
 
 #ifdef ENABLE_TRACING
-
-#include "TraceDuration.hpp"
-
 
 struct TraceFunction : TraceDuration {
 

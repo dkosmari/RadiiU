@@ -196,25 +196,32 @@ namespace SettingsTab {
                 ImGui::Checkbox("##switch_to_player", cfg.switch_to_player);
 
 
-                /*--------------------*/
-                /* Player buffer size */
-                /*--------------------*/
+                /*------------------------*/
+                /* Player buffer duration */
+                /*------------------------*/
 
                 ImGui::TableNextRow();
 
                 ImGui::TableNextColumn();
                 ImGui::AlignTextToFramePadding();
-                UI::Label("Player buffer size (KiB)");
-                ImGui::SetItemTooltip("Playback will only start after this many bytes"
-                                      " are received.");
+                UI::Label("Player buffer duration (s)");
+                ImGui::SetItemTooltip("Ensure this many seconds of audio are queued before "
+                                      "playback starts.");
 
                 ImGui::TableNextColumn();
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::Slider("##player_buffer_size",
-                              cfg.player_buffer_size,
-                              4u, 64u,
-                              "",
-                              ImGuiSliderFlags_Logarithmic);
+                static double player_buffer_duration_ms =
+                    cfg.player_buffer_duration.count() / 1000.0;
+                if (ImGui::Drag("##player_buffer_duration"s,
+                                player_buffer_duration_ms,
+                                0.01f,
+                                {0.0},
+                                {10.0},
+                                "%.1f seconds"s)) {
+                    cfg.player_buffer_duration = std::chrono::milliseconds(
+                        static_cast<int>(1000 * player_buffer_duration_ms)
+                    );
+                }
 
 
                 /*----------------------*/

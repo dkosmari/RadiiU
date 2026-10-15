@@ -45,6 +45,10 @@ using Settings::cfg;
 
 namespace {
 
+    /*-----------*/
+    /* Constants */
+    /*-----------*/
+
     // Mime types for audio streams
     constexpr std::array audio_mimes {
         "audio/*"sv,
@@ -53,13 +57,17 @@ namespace {
     };
 
 
-    // Function declarations.
+    /*-----------------------*/
+    /* Function declarations */
+    /*-----------------------*/
 
     std::string
     format_to_string(sdl::audio::format fmt);
 
 
-    // Function definitions.
+    /*----------------------*/
+    /* Function definitions */
+    /*----------------------*/
 
     std::string
     format_to_string(sdl::audio::format fmt)
@@ -173,9 +181,9 @@ RadioClient::stop()
             this
         );
         decoder_thread.request_stop();
-        encoded_audio.close();
-        // decoder_thread = {};
     }
+    encoded_audio.close();
+    // decoder_thread = {};
     phase = Phase::stopped;
 }
 
@@ -280,17 +288,21 @@ RadioClient::network_thread_function(std::stop_token stopper)
 
         while (!stopper.stop_requested()) {
 
-            if (is_error()) {
-                LOG_DEBUG("network thread stopping: error phase");
-                break;
-            }
-
             if (!network_tasks.empty()) {
                 TraceDuration duration_tasks_dispatch{
                     "network_tasks.dispatch_all()"sv,
                     "RadioClient"sv
                 };
                 network_tasks.dispatch_all();
+            }
+
+
+            if (is_error()) {
+                auto ts = transfer_state.load();
+                if (ts != TransferState::idle && ts != TransferState::error) {
+                    std::ignore = multi.try_remove(easy);
+                    on_transfer_error(curl::error{"Phase::error"});
+                }
             }
 
             multi.poll(100ms, stopper);
