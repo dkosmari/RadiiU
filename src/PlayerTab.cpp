@@ -312,7 +312,7 @@ namespace PlayerTab {
                     }
                     catch (...) {}
 
-                    UI::FormatInfoRow("Sample rate", "{}Hz", humanize::value(spec.rate));
+                    UI::FormatInfoRow("Sample rate", "{}㎐", humanize::value(spec.rate));
                     UI::InfoRow("Sample format", format_to_string(spec.format));
                 }
 
