@@ -20,6 +20,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <vector>
 
 #include <curlxx/easy.hpp>
 #include <curlxx/error.hpp>
@@ -31,7 +32,7 @@
 #include "async_task_queue.hpp"
 #include "byte_stream.hpp"
 #include "Decoder.hpp"
-#include "icy_stream.hpp"
+#include "icy_parser.hpp"
 #include "stream_metadata.hpp"
 #include "thread_safe.hpp"
 
@@ -51,7 +52,7 @@ class RadioClient {
 
 public:
 
-    enum class Phase {
+    enum class State {
         stopped,
         fetching,
         streaming,
@@ -61,8 +62,7 @@ public:
 
     enum class TransferState {
         idle,
-        // queued,
-        started,
+        queued,
         in_progress,
         paused,
         unpausing,
@@ -119,6 +119,10 @@ public:
     using URLInfoVecFunction = std::function<URLInfoVecCallbackSignature>;
 
 
+    using ErrorMessageCallbackSignature = void (const std::string& msg);
+    using ErrorMessageFunction = std::function<ErrorMessageCallbackSignature>;
+
+
     RadioClient(const std::string& user_agent_,
                 const std::string& station_url_,
                 std::initializer_list<std::string_view> extra_urls = {});
@@ -130,7 +134,7 @@ public:
     void
     process();
 
-    // Enter the "fetching" phase, starting from the given URL index.
+    // Enter the "fetching" state, starting from the given URL index.
     void
     play(unsigned idx = 0);
 
@@ -163,16 +167,34 @@ public:
         const;
 
 
+    void
+    with_error_message(const ErrorMessageFunction& func)
+        const;
+
+
     unsigned
     get_current_url_info_index()
         const;
 
 
-    Phase
-    get_phase()
+    State
+    get_state()
         const;
 
 
+    TransferState
+    get_transfer_state()
+        const;
+
+
+    ThreadState
+    get_audio_thread_state()
+        const;
+
+
+    ThreadState
+    get_network_thread_state()
+        const;
 
 
 private:
@@ -180,42 +202,44 @@ private:
     const std::string user_agent;
     const std::string station_url;
 
-    std::atomic<Phase> phase = Phase::stopped;
-    std::atomic<TransferState> transfer_state = TransferState::idle;
+    std::atomic<State> state = State::stopped;
 
     thread_safe<URLInfoVec> safe_url_info_vec;
     std::atomic<unsigned> url_info_idx{0};
 
-
-    thread_safe<std::string> network_error_message;
-    std::vector<std::byte> network_buffer;
-
-    PlaylistType playlist_type = PlaylistType::none;
-    byte_stream playlist_data{2 * 1024 * 1024};
     async_byte_stream encoded_audio{256 * 1024};
 
-    icy::stream icy_parser;
     thread_safe<stream_metadata> safe_metadata; // updated by either thread, read by the UI code
 
-    // async_task_queue main_tasks; // dispatched from .process()
-    async_task_queue network_tasks; // dispatched from network thread
-
-    curl::multi multi{nullptr};
-    curl::easy easy{nullptr};
-
-    std::string stream_content_type;
-    std::unique_ptr<Decoder> decoder;
-    sdl::audio::stream audio_converter{nullptr};
-    thread_safe<Decoder::Info> safe_decoder_info;
-
-    std::atomic<ThreadState> network_thread_state = ThreadState::stopped;
-    std::jthread network_thread;
-
-    std::atomic<ThreadState> decoder_thread_state = ThreadState::stopped;
-    std::jthread decoder_thread;
-
+    thread_safe<std::string> safe_error_message;
 
     std::optional<APDDisabler> apd_disabler;
+
+    // async_task_queue main_tasks; // dispatched from .process()
+
+    struct network_t {
+        std::atomic<ThreadState> thread_state = ThreadState::stopped;
+        std::atomic<TransferState> transfer_state = TransferState::idle;
+        curl::multi multi{nullptr};
+        curl::easy easy{nullptr};
+        PlaylistType playlist_type = PlaylistType::none;
+        byte_stream playlist_stream{2 * 1024 * 1024};
+        icy::parser icy_parser;
+        async_task_queue tasks;
+        std::vector<std::byte> buffer{64 * 1024};
+        std::jthread thread;
+    } network;
+
+    struct audio_t {
+        std::atomic<ThreadState> thread_state = ThreadState::stopped;
+        std::unique_ptr<Decoder> decoder;
+        sdl::audio::stream converter{nullptr};
+        thread_safe<Decoder::Info> safe_info;
+        thread_safe<std::string> safe_content_type;
+        std::vector<std::byte> buffer{64 * 1024};
+        std::jthread thread;
+    } audio;
+
 
 
     void
@@ -227,7 +251,7 @@ private:
         noexcept;
 
     void
-    decoder_thread_function(std::stop_token stopper)
+    audio_thread_function(std::stop_token stopper)
         noexcept;
 
 
@@ -260,7 +284,7 @@ private:
     start_network_thread();
 
     void
-    start_decoder_thread();
+    start_audio_thread();
 
 
     void
@@ -277,7 +301,7 @@ private:
 
 
 std::string
-to_string(RadioClient::Phase phase);
+to_string(RadioClient::State state);
 
 
 std::string

@@ -162,8 +162,7 @@ RadioClient::RadioClient(const std::string& user_agent_,
                          const std::string& station_url_,
                          std::initializer_list<std::string_view> extra_urls) :
     user_agent{user_agent_},
-    station_url{station_url_},
-    network_buffer(64 * 1024)
+    station_url{station_url_}
 {
     {
         auto url_info_vec = safe_url_info_vec.lock();
@@ -179,6 +178,9 @@ RadioClient::RadioClient(const std::string& user_agent_,
 RadioClient::~RadioClient()
     noexcept
 {
+    TRACE_FUNC;
+
+    network.thread.request_stop();
     stop();
 }
 
@@ -208,20 +210,22 @@ RadioClient::play(unsigned idx)
     TRACE_FUNC;
 
     if (is_playing()) {
-        network_tasks.add(
+        network.tasks.add(
             "task_cancel_transfer"sv,
             &RadioClient::task_cancel_transfer,
             this
         );
-        decoder_thread.request_stop();
+        audio.thread.request_stop();
         encoded_audio.close();
     }
 
-    phase = Phase::stopped;
+    state = State::stopped;
+
+    safe_error_message.store("");
 
     start_network_thread();
 
-    network_tasks.add(
+    network.tasks.add(
         "task_queue_transfer"sv,
         &RadioClient::task_queue_transfer,
         this,
@@ -238,11 +242,11 @@ RadioClient::stop()
     TRACE_FUNC;
 
     if (is_playing()) {
-        decoder_thread.request_stop();
+        audio.thread.request_stop();
         encoded_audio.close();
     }
 
-    phase = Phase::stopped;
+    state = State::stopped;
 }
 
 
@@ -250,8 +254,8 @@ bool
 RadioClient::is_playing()
     const noexcept
 {
-    switch (phase.load()) {
-        using enum Phase;
+    switch (state.load()) {
+        using enum State;
 
         case fetching:
         case streaming:
@@ -267,7 +271,7 @@ bool
 RadioClient::is_error()
     const noexcept
 {
-    return phase == Phase::error;
+    return state == State::error;
 }
 
 
@@ -283,7 +287,7 @@ void
 RadioClient::with_decoder_info(const DecoderInfoFunc& func)
     const
 {
-    safe_decoder_info.with_c_lock(func);
+    audio.safe_info.with_c_lock(func);
 }
 
 
@@ -295,6 +299,14 @@ RadioClient::with_url_info_vec(const URLInfoVecFunction& func)
 }
 
 
+void
+RadioClient::with_error_message(const ErrorMessageFunction& func)
+    const
+{
+    safe_error_message.with_c_lock(func);
+}
+
+
 unsigned
 RadioClient::get_current_url_info_index()
     const
@@ -303,34 +315,59 @@ RadioClient::get_current_url_info_index()
 }
 
 
-RadioClient::Phase
-RadioClient::get_phase()
+RadioClient::State
+RadioClient::get_state()
     const
 {
-    return phase;
+    return state;
+}
+
+
+RadioClient::TransferState
+RadioClient::get_transfer_state()
+    const
+{
+    return network.transfer_state;
+}
+
+
+RadioClient::ThreadState
+RadioClient::get_audio_thread_state()
+    const
+{
+    return audio.thread_state;
+}
+
+
+RadioClient::ThreadState
+RadioClient::get_network_thread_state()
+    const
+{
+    return network.thread_state;
 }
 
 
 void
-RadioClient::add_url(const std::string& input_url)
+RadioClient::add_url(const std::string& new_url)
 {
     TraceFunction tf{"RadioClient"sv};
 
     if (is_error()) {
-        LOG_DEBUG("add_url() gave up: error phase");
+        LOG_DEBUG("add_url() gave up: error state");
         return;
     }
 
-    if (input_url.empty())
+    if (new_url.empty())
         return;
 
     auto url_info_vec = safe_url_info_vec.lock();
 
+    // Avoid duplicates.
     for (auto& [url, content_type, type] : *url_info_vec)
-        if (url == input_url)
+        if (url == new_url)
             return;
 
-    url_info_vec->emplace_back(input_url);
+    url_info_vec->emplace_back(new_url);
 }
 
 
@@ -344,11 +381,16 @@ RadioClient::network_thread_function(std::stop_token stopper)
     LOG_DEBUG("Started network thread.");
 
     ThreadStateManager tsm{
-        network_thread_state,
-        "network_thread_state"sv
+        network.thread_state,
+        "network.thread_state"sv
     };
 
+    auto& multi = network.multi;
+    auto& easy = network.easy;
+
     try {
+
+        assert(!network.buffer.empty());
 
         multi.create();
         multi.set_max_connections(2);
@@ -359,20 +401,21 @@ RadioClient::network_thread_function(std::stop_token stopper)
 
         while (!stopper.stop_requested()) {
 
-            if (!network_tasks.empty()) {
+            if (!network.tasks.empty()) {
                 TraceDuration duration_tasks_dispatch{
                     "network_tasks.dispatch_all()"sv,
                     "RadioClient"sv
                 };
-                network_tasks.dispatch_all();
+                network.tasks.dispatch_all();
             }
 
 
             if (is_error()) {
-                auto ts = transfer_state.load();
+                auto ts = network.transfer_state.load();
                 if (ts != TransferState::idle && ts != TransferState::error) {
                     std::ignore = multi.try_remove(easy);
-                    on_transfer_error(curl::error{"Phase::error"});
+                    on_transfer_error(curl::error{"invalid network.transfer_state: "s
+                                                  + to_string(ts)});
                 }
             }
 
@@ -407,48 +450,66 @@ RadioClient::network_thread_function(std::stop_token stopper)
         tsm.stopping();
 
     }
+    catch (curl::error& e) {
+        LOG_ERROR("Exception in network thread: {}", e.what());
+        on_transfer_error(e);
+        tsm.stopping();
+        state = State::error;
+    }
     catch (std::exception& e) {
         LOG_ERROR("Exception in network thread: {}", e.what());
+        on_transfer_error(curl::error{e.what()});
         tsm.stopping();
-        phase = Phase::error;
+        state = State::error;
     }
     catch (...) {
         LOG_ERROR("Unknown exception in network thread.");
+        on_transfer_error(curl::error{"unknown exception"});
         tsm.stopping();
-        phase = Phase::error;
+        state = State::error;
     }
+
+    if (multi && easy)
+        std::ignore = multi.try_remove(easy);
 
     multi.destroy();
     easy.destroy();
+
+    encoded_audio.close();
 
     LOG_DEBUG("Ending network thread.");
 }
 
 
 void
-RadioClient::decoder_thread_function(std::stop_token stopper)
+RadioClient::audio_thread_function(std::stop_token stopper)
     noexcept
 {
-    TraceManager::thread_name("RadioClient decoder thread"sv);
+    TraceManager::thread_name("RadioClient audio thread"sv);
     TraceFunction tf{"RadioClient"sv};
 
-    LOG_DEBUG("Started decoder thread.");
+    LOG_DEBUG("Started audio thread.");
 
     ThreadStateManager tsm{
-        decoder_thread_state,
-        "decoder_thread_state"sv
+        audio.thread_state,
+        "audio.thread_state"sv
     };
 
+    auto& converter = audio.converter;
+    auto& buffer = audio.buffer;
+    auto& decoder = audio.decoder;
+
     try {
+
+        assert(!buffer.empty());
+
         constexpr unsigned max_failures = 10;
         unsigned create_failures = 0;
-
-        std::vector<std::byte> buffer(64 * 1024);
 
         while (!stopper.stop_requested()) {
 
             if (is_error()) {
-                LOG_DEBUG("decoder thread stopping: error phase");
+                LOG_DEBUG("audio thread stopping: error state");
                 break;
             }
 
@@ -465,23 +526,25 @@ RadioClient::decoder_thread_function(std::stop_token stopper)
                 };
 
                 // No decoder was created yet.
-                auto data = encoded_audio.peek(std::span{buffer});
+                auto data = encoded_audio.peek(buffer);
+
+                // Avoid creating a decoder when less than 8 KiB was received.
                 if (data.size() < 8 * 1024) {
                     std::this_thread::sleep_for(100ms);
                     continue;
                 }
+
                 try {
-                    LOG_INFO("Attempting to create audio decoder for content-type: {}",
-                             stream_content_type);
-                    decoder = Decoder::create(stream_content_type, data);
+                    auto content_type = audio.safe_content_type.load();
+                    LOG_INFO("Attempting to create audio decoder for content-type: {:?}",
+                             content_type);
+                    decoder = Decoder::create(content_type, data);
                     LOG_INFO("Decoder created.");
                     encoded_audio.discard(data.size());
-
                     resume_transfer_if_paused();
                 }
                 catch (std::exception& e) {
                     ++create_failures;
-                    // TODO: count failures and give up after a while?
                     LOG_DEBUG("Cannot create decoder: {}", e.what());
                     if (create_failures >= max_failures)
                         throw std::runtime_error{"Too many failures"};
@@ -491,7 +554,8 @@ RadioClient::decoder_thread_function(std::stop_token stopper)
             } else {
 
                 // We have a decoder already
-                auto data = encoded_audio.read(std::span{buffer}, stopper);
+                auto data = encoded_audio.read(buffer, stopper);
+
                 if (stopper.stop_requested())
                     break;
 
@@ -499,20 +563,20 @@ RadioClient::decoder_thread_function(std::stop_token stopper)
 
                 decoder->feed(data);
 
-                if (!audio_converter) {
+                if (!converter) {
                     TraceDuration create_converter_duration{
                         "create audio converter"sv,
                         "RadioClient"sv
                     };
 
                     if (auto src_spec = decoder->get_spec()) {
-                        LOG_INFO("Creating audio_stream: {} Hz, {}",
+                        LOG_INFO("Creating audio converter from {} Hz, {}",
                                  src_spec->rate,
                                  format_to_string(src_spec->format));
 
                         auto dst_spec = App::get_audio_spec();
 
-                        audio_converter.create(
+                        converter.create(
                             src_spec->format,
                             src_spec->channels,
                             src_spec->rate,
@@ -521,14 +585,14 @@ RadioClient::decoder_thread_function(std::stop_token stopper)
                             dst_spec.rate
                         );
 
-                        LOG_INFO("Audio stream created.");
+                        LOG_INFO("Audio converter created.");
                     }
                 }
 
                 if (stopper.stop_requested())
                     break;
 
-                if (audio_converter) {
+                if (converter) {
 
                     while (!stopper.stop_requested()) {
 
@@ -540,10 +604,10 @@ RadioClient::decoder_thread_function(std::stop_token stopper)
                             break;
 
                         if (!samples->empty()) {
-                            audio_converter.put(*samples);
+                            converter.put(*samples);
 
                             while (true) {
-                                auto converted = audio_converter.get(std::span{buffer});
+                                auto converted = converter.get(std::span{buffer});
                                 if (converted.empty())
                                     break;
                                 App::play_audio(converted);
@@ -554,7 +618,7 @@ RadioClient::decoder_thread_function(std::stop_token stopper)
 
                 } // if (audio_converter)
 
-                safe_decoder_info.store(decoder->get_info());
+                audio.safe_info.store(decoder->get_info());
 
                 if (auto dec_meta = decoder->get_metadata()) {
                     auto metadata = safe_metadata.lock();
@@ -567,26 +631,28 @@ RadioClient::decoder_thread_function(std::stop_token stopper)
         tsm.stopping();
     }
     catch (std::exception& e) {
-        LOG_ERROR("Exception in decoder thread: {}", e.what());
+        LOG_ERROR("Exception in audio thread: {}", e.what());
+        safe_error_message.store(e.what());
         tsm.stopping();
-        phase = Phase::error;
+        try_next_url();
     }
     catch (...) {
-        LOG_ERROR("Unknown exception in decoder thread.");
+        LOG_ERROR("Unknown exception in audio thread.");
+        safe_error_message.store("unknown exception in audio thread");
         tsm.stopping();
-        phase = Phase::error;
+        try_next_url();
     }
 
     App::clear_audio();
 
     safe_metadata.store(stream_metadata{});
 
-    audio_converter.destroy();
+    converter.destroy();
 
-    safe_decoder_info.store(Decoder::Info{});
+    audio.safe_info.store(Decoder::Info{});
     decoder.reset();
 
-    LOG_DEBUG("Ending decoder thread.");
+    LOG_DEBUG("Ending audio thread.");
 }
 
 
@@ -596,15 +662,15 @@ RadioClient::task_queue_transfer(unsigned idx)
     TraceFunction tf{"RadioClient"sv};
 
     if (is_error()) {
-        LOG_ERROR("Canceled task because it's in error phase.");
+        LOG_ERROR("Canceled task because it's in error state.");
         return;
     }
 
     LOG_DEBUG("task_queue_transfer()");
 
-    phase = Phase::fetching;
+    state = State::fetching;
 
-    auto ts = transfer_state.load();
+    auto ts = network.transfer_state.load();
     switch (ts) {
         using enum TransferState;
 
@@ -612,7 +678,7 @@ RadioClient::task_queue_transfer(unsigned idx)
         case error:
             break;
 
-        case started:
+        case queued:
         case in_progress:
         case paused:
         case unpausing:
@@ -620,24 +686,27 @@ RadioClient::task_queue_transfer(unsigned idx)
             LOG_ERROR("invalid transfer state: {}", to_string(ts));
     }
 
-    std::ignore = multi.try_remove(easy);
+    assert(network.multi);
+    assert(network.easy);
+
+    auto& easy = network.easy;
+
+    std::ignore = network.multi.try_remove(easy);
     easy.reset();
 
     std::string url;
-
-    url_info_idx = idx;
 
     {
         auto url_info_vec = safe_url_info_vec.c_lock();
         if (idx >= url_info_vec->size()) {
             LOG_ERROR("Exausted all URLs, no stream found.");
-            phase = Phase::error;
+            state = State::error;
             return;
         }
         url = url_info_vec->at(idx).url;
         if (url.empty()) {
             LOG_ERROR("BUG: URL is empty!");
-            phase = Phase::error;
+            state = State::error;
             return;
         }
     }
@@ -659,6 +728,7 @@ RadioClient::task_queue_transfer(unsigned idx)
     easy.set_http_version(curl::easy::http_version::none);
     easy.set_low_speed_limit(4096);
     easy.set_low_speed_time(10s);
+    // Optimize TCP performance.
     easy.set_sockopt_function(
         [](curl_socket_t fd,
            curlsocktype) -> int
@@ -667,7 +737,7 @@ RadioClient::task_queue_transfer(unsigned idx)
             std::size_t winscale_arg = 1;
             setsockopt(fd, SOL_SOCKET, SO_WINSCALE, &winscale_arg, sizeof winscale_arg);
 #endif
-            std::size_t rcvbuf_arg = 65536;
+            std::size_t rcvbuf_arg = 64 * 1024;
             setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &rcvbuf_arg, sizeof rcvbuf_arg);
 
             return CURL_SOCKOPT_OK;
@@ -686,14 +756,16 @@ RadioClient::task_queue_transfer(unsigned idx)
 
     easy.append_http_header("Icy-Metadata: 1");
 
-    multi.add(easy);
+    network.multi.add(easy);
 
-    playlist_type = PlaylistType::none;
-    playlist_data.clear();
+    network.playlist_type = PlaylistType::none;
+    network.playlist_stream.clear();
 
     encoded_audio.clear();
 
-    transfer_state = TransferState::started;
+    url_info_idx = idx;
+
+    network.transfer_state = TransferState::queued;
 }
 
 
@@ -706,11 +778,11 @@ RadioClient::task_cancel_transfer()
 
     on_transfer_error(curl::error{"transfer canceled"});
 
-    std::ignore = multi.try_remove(easy);
-    easy.reset();
+    std::ignore = network.multi.try_remove(network.easy);
+    network.easy.reset();
 
-    transfer_state = TransferState::idle;
-    phase = Phase::stopped;
+    network.transfer_state = TransferState::idle;
+    state = State::stopped; // TODO: check if we should do this here
 }
 
 
@@ -721,8 +793,8 @@ RadioClient::task_resume_transfer()
 
     LOG_DEBUG("task_resume_transfer()");
 
-    easy.unpause();
-    transfer_state = TransferState::in_progress;
+    network.easy.unpause();
+    network.transfer_state = TransferState::in_progress;
 }
 
 
@@ -732,11 +804,11 @@ RadioClient::on_transfer_error(const curl::error& e)
     TraceFunction tf{"RadioClient"sv};
 
     LOG_ERROR("Transfer error: {}", e.what());
-    network_error_message.store(e.what());
-    transfer_state = TransferState::error;
+    safe_error_message.store(e.what());
+    network.transfer_state = TransferState::error;
 
-    switch (phase.load()) {
-        using enum Phase;
+    switch (state.load()) {
+        using enum State;
 
         case stopped:
             break;
@@ -746,7 +818,7 @@ RadioClient::on_transfer_error(const curl::error& e)
             break;
 
         case streaming:
-            phase = error;
+            state = error;
             encoded_audio.close();
             break;
 
@@ -754,7 +826,7 @@ RadioClient::on_transfer_error(const curl::error& e)
             break;
 
         default:
-            phase = error;
+            state = error;
     }
 }
 
@@ -765,7 +837,7 @@ RadioClient::on_transfer_finished()
     TraceFunction tf{"RadioClient"sv};
 
     LOG_DEBUG("Transfer finished.");
-    transfer_state = TransferState::idle;
+    network.transfer_state = TransferState::idle;
 
     URLType type = safe_url_info_vec.lock()->at(url_info_idx).type;
     switch (type) {
@@ -799,21 +871,21 @@ RadioClient::on_transfer_recv(std::span<const std::byte> input)
         return 0;
     }
 
-    if (transfer_state == TransferState::started)
+    if (network.transfer_state == TransferState::queued)
         on_transfer_started(input);
 
-    icy_parser.feed(input);
+    network.icy_parser.feed(input);
 
     {
         auto metadata = safe_metadata.lock();
-        metadata->merge(icy_parser.get_metadata());
+        metadata->merge(network.icy_parser.get_metadata());
     }
 
     URLType type = safe_url_info_vec.lock()->at(url_info_idx).type;
 
     // Loop to consume all data from the icy_parser
     while (true) {
-        auto data = icy_parser.get_data(network_buffer);
+        auto data = network.icy_parser.get_data(network.buffer);
         if (data.empty())
             break;
 
@@ -825,7 +897,7 @@ RadioClient::on_transfer_recv(std::span<const std::byte> input)
                 return CURL_WRITEFUNC_ERROR;
 
             case playlist: {
-                auto written = playlist_data.write(data);
+                auto written = network.playlist_stream.write(data);
                 // If the playlist is huge, just give up, let libcurl know we can't handle it.
                 if (written.empty())
                     return CURL_WRITEFUNC_ERROR;
@@ -834,14 +906,14 @@ RadioClient::on_transfer_recv(std::span<const std::byte> input)
 
             case audio: {
                 // Make sure the decoder thread is running.
-                start_decoder_thread();
+                start_audio_thread();
 
                 // If accumulated too much audio, tell libcurl to pause.
                 auto written = encoded_audio.write(data);
                 if (written.empty()) {
                     LOG_DEBUG("Pausing transfer: encoded_audio buffer is full.");
                     TransferState expected = TransferState::in_progress;
-                    if (!transfer_state.compare_exchange_strong(
+                    if (!network.transfer_state.compare_exchange_strong(
                             expected,
                             TransferState::paused)) {
                         LOG_ERROR("Incorrect state: should be in_progress, got {}",
@@ -869,11 +941,12 @@ RadioClient::on_transfer_started(std::span<const std::byte> data)
 {
     TraceFunction tf{"RadioClient"sv};
 
-    LOG_DEBUG("Transfer started.");
+    if (cfg.verbose_stream_logs)
+        LOG_DEBUG("Transfer started.");
 
-    transfer_state = TransferState::in_progress;
+    network.transfer_state = TransferState::in_progress;
 
-    auto effective_url = easy.get_effective_url();
+    auto effective_url = network.easy.get_effective_url();
 
     std::string path;
     try {
@@ -883,6 +956,9 @@ RadioClient::on_transfer_started(std::span<const std::byte> data)
     catch (std::exception& e) {
         LOG_ERROR("Could not parse URL: {}", e.what());
     }
+
+    auto& easy = network.easy;
+    auto& playlist_type = network.playlist_type;
 
     std::string content_type;
     if (auto hdr = easy.try_get_header("content-type"))
@@ -898,27 +974,27 @@ RadioClient::on_transfer_started(std::span<const std::byte> data)
             m3u::match_prefix(data)) {
 
             LOG_INFO("Detected M3U: {:?}", content_type);
-            info.content_type = content_type;
-            info.type = URLType::playlist;
             playlist_type = PlaylistType::m3u;
+            info.content_type = std::move(content_type);
+            info.type = URLType::playlist;
 
         } else if (pls::match_path(path) ||
                    pls::match_mime(content_type) |
                    pls::match_prefix(data)) {
 
             LOG_INFO("Detected PLS: {:?}", content_type);
-            info.content_type = content_type;
-            info.type = URLType::playlist;
             playlist_type = PlaylistType::pls;
+            info.content_type = std::move(content_type);
+            info.type = URLType::playlist;
 
         } else if (mime_type::match_any(content_type, audio_mimes)) {
 
             LOG_INFO("Detected audio mime: {:?}", content_type);
-            phase = Phase::streaming;
-            stream_content_type = content_type;
-            info.content_type = content_type;
-            info.type = URLType::audio;
+            state = State::streaming;
             playlist_type = PlaylistType::none;
+            audio.safe_content_type.store(content_type);
+            info.content_type = std::move(content_type);
+            info.type = URLType::audio;
 
         } else {
 
@@ -927,7 +1003,7 @@ RadioClient::on_transfer_started(std::span<const std::byte> data)
         }
     }
 
-    playlist_data.clear();
+    network.playlist_stream.clear();
     encoded_audio.clear();
 
     std::size_t icy_metaint = 0;
@@ -941,7 +1017,7 @@ RadioClient::on_transfer_started(std::span<const std::byte> data)
             icy_metaint = 0;
         }
     }
-    icy_parser.reset(std::move(effective_url), icy_metaint);
+    network.icy_parser.reset(std::move(effective_url), icy_metaint);
 
     // Initialize metadata from the ICY headers.
     {
@@ -986,7 +1062,8 @@ RadioClient::on_transfer_started(std::span<const std::byte> data)
 void
 RadioClient::start_network_thread()
 {
-    auto st = network_thread_state.load();
+    auto& thread_state = network.thread_state;
+    auto st = thread_state.load();
     // early out
     if (st == ThreadState::running) [[likely]]
         return;
@@ -994,7 +1071,7 @@ RadioClient::start_network_thread()
     TraceFunction tf{"RadioClient"sv};
 
     if (is_error()) {
-        LOG_ERROR("start_network_thread() gave up: error phase");
+        LOG_ERROR("start_network_thread() gave up: error state");
         return;
     }
 
@@ -1003,14 +1080,14 @@ RadioClient::start_network_thread()
 
         case stopping:
             // wait until it goes to stopped
-            while (network_thread_state != ThreadState::stopped)
+            while (thread_state != ThreadState::stopped)
                 std::this_thread::sleep_for(5ms);
 
             [[fallthrough]];
 
         case stopped:
-            network_thread_state = queued;
-            network_thread = std::jthread{
+            thread_state = queued;
+            network.thread = std::jthread{
                 std::bind_front(&RadioClient::network_thread_function, this)
             };
             break;
@@ -1023,9 +1100,10 @@ RadioClient::start_network_thread()
 
 
 void
-RadioClient::start_decoder_thread()
+RadioClient::start_audio_thread()
 {
-    auto st = decoder_thread_state.load();
+    auto& thread_state = audio.thread_state;
+    auto st = thread_state.load();
     // early out
     if (st == ThreadState::running) [[likely]]
         return;
@@ -1033,7 +1111,7 @@ RadioClient::start_decoder_thread()
     TraceFunction tf{"RadioClient"sv};
 
     if (is_error()) {
-        LOG_DEBUG("start_decoder_thread() gave up: error phase");
+        LOG_DEBUG("start_audio_thread() gave up: error state");
         return;
     }
 
@@ -1042,15 +1120,15 @@ RadioClient::start_decoder_thread()
 
         case stopping:
             // wait until it goes to stopped
-            while (decoder_thread_state != ThreadState::stopped)
+            while (thread_state != ThreadState::stopped)
                 std::this_thread::sleep_for(5ms);
 
             [[fallthrough]];
 
         case stopped:
-            decoder_thread_state = queued;
-            decoder_thread = std::jthread{
-                std::bind_front(&RadioClient::decoder_thread_function, this)
+            thread_state = queued;
+            audio.thread = std::jthread{
+                std::bind_front(&RadioClient::audio_thread_function, this)
             };
             break;
 
@@ -1065,13 +1143,13 @@ void
 RadioClient::resume_transfer_if_paused()
 {
     if (is_error()) {
-        LOG_DEBUG("resume_transfer_if_paused() gave up: error phase");
+        LOG_DEBUG("resume_transfer_if_paused() gave up: error state");
         return;
     }
 
-    if (transfer_state == TransferState::paused) {
-        transfer_state = TransferState::unpausing;
-        network_tasks.add(
+    if (network.transfer_state == TransferState::paused) {
+        network.transfer_state = TransferState::unpausing;
+        network.tasks.add(
             "task_resume_transfer"sv,
             &RadioClient::task_resume_transfer,
             this
@@ -1086,7 +1164,7 @@ RadioClient::process_playlist()
     TraceFunction tf{"RadioClient"sv};
 
     if (is_error()) {
-        LOG_DEBUG("process_playlist() gave up: error phase");
+        LOG_DEBUG("process_playlist() gave up: error state");
         return;
     }
 
@@ -1094,12 +1172,12 @@ RadioClient::process_playlist()
     unsigned idx = url_info_idx;
     auto info = safe_url_info_vec.lock()->at(idx);
 
-    LOG_DEBUG("Processing playlist: {}", to_string(playlist_type));
+    LOG_DEBUG("Processing playlist: {}", to_string(network.playlist_type));
 
-    std::string playlist_str = playlist_data.read_all_as<std::string>();
-    assert(playlist_data.empty());
+    std::string playlist_str = network.playlist_stream.read_all_as<std::string>();
+    assert(network.playlist_stream.empty());
 
-    switch (playlist_type) {
+    switch (network.playlist_type) {
         using enum PlaylistType;
 
         case none:
@@ -1152,11 +1230,11 @@ void
 RadioClient::try_next_url()
 {
     if (is_error()) {
-        LOG_DEBUG("try_next_url() gave up: error phase");
+        LOG_DEBUG("try_next_url() gave up: error state");
         return;
     }
 
-    network_tasks.add(
+    network.tasks.add(
         "task_queue_transfer"sv,
         &RadioClient::task_queue_transfer,
         this,
@@ -1166,10 +1244,10 @@ RadioClient::try_next_url()
 
 
 std::string
-to_string(RadioClient::Phase phase)
+to_string(RadioClient::State state)
 {
-    switch (phase) {
-        using enum RadioClient::Phase;
+    switch (state) {
+        using enum RadioClient::State;
 
         case stopped:
             return "stopped"s;
@@ -1221,10 +1299,8 @@ to_string(RadioClient::TransferState state)
 
         case idle:
             return "idle"s;
-        // case queued:
-        //     return "queued"s;
-        case started:
-            return "started"s;
+        case queued:
+            return "queued"s;
         case in_progress:
             return "in_progress"s;
         case paused:
@@ -1234,7 +1310,7 @@ to_string(RadioClient::TransferState state)
         case error:
             return "error"s;
         default:
-            return "<UNKNOWN>";
+            return "<UNKNOWN>"s;
     }
 }
 

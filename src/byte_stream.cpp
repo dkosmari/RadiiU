@@ -124,7 +124,7 @@ byte_stream::consume(byte_stream& src)
 
     std::size_t consumed = 0;
     while (!src.empty()) {
-        auto chunk = src.peek(std::span{consume_buffer});
+        auto chunk = src.peek(consume_buffer);
         auto written = write_some(chunk);
         src.discard(written.size());
         consumed += written.size();

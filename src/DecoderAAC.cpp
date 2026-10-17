@@ -223,7 +223,7 @@ DecoderAAC::decode()
 
     NeAACDecFrameInfo frame{}; // zero-initialize it
     input_buffer.resize(input_stream.size());
-    auto available = input_stream.peek(std::span{input_buffer});
+    auto available = input_stream.peek(input_buffer);
     auto samples_ptr = NeAACDecDecode(handle,
                                       &frame,
                                       reinterpret_cast<unsigned char*>(available.data()),

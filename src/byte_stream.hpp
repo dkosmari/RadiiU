@@ -47,15 +47,6 @@ public:
     read(std::span<std::byte> dst)
         noexcept;
 
-    template<typename T,
-             std::size_t E>
-    requires(sizeof(T) == 1)
-    [[nodiscard]]
-    std::span<T>
-    read(std::span<T, E> dst)
-        noexcept;
-
-
     template<typename C>
     [[nodiscard]]
     C
@@ -63,7 +54,7 @@ public:
     {
         C result;
         result.resize(size());
-        std::ignore = read(std::span{result});
+        std::ignore = read(as_writable_bytes(std::span{result}));
         return result;
     }
 
@@ -71,14 +62,6 @@ public:
     [[nodiscard]]
     std::span<std::byte>
     peek(std::span<std::byte> dst)
-        const noexcept;
-
-    template<typename T,
-             std::size_t E>
-    requires(sizeof(T) == 1)
-    [[nodiscard]]
-    std::span<T>
-    peek(std::span<T, E> buf)
         const noexcept;
 
 
@@ -93,24 +76,10 @@ public:
     write(std::span<const std::byte> src);
 
 
-    template<typename T,
-             std::size_t E>
-    requires (sizeof(T) == 1)
-    std::span<const T>
-    write(std::span<const T, E> src);
-
-
     // Write as much as possible.
 
     std::span<const std::byte>
     write_some(std::span<const std::byte> src);
-
-    template<typename T,
-             std::size_t E>
-    requires (sizeof(T) == 1)
-    [[nodiscard]]
-    std::span<const T>
-    write_some(std::span<const T> src);
 
 
     std::size_t
@@ -121,70 +90,5 @@ public:
             std::size_t count);
 
 }; // class byte_stream
-
-
-/*--------------------*/
-/* Inline definitions */
-/*--------------------*/
-
-template<typename T,
-         std::size_t E>
-requires(sizeof(T) == 1)
-inline
-std::span<T>
-byte_stream::read(std::span<T, E> dst)
-    noexcept
-{
-    auto result = read(std::as_writable_bytes(dst));
-    return {
-        reinterpret_cast<T*>(result.data()),
-        result.size()
-    };
-}
-
-
-template<typename T,
-         std::size_t E>
-requires(sizeof(T) == 1)
-inline
-std::span<T>
-byte_stream::peek(std::span<T, E> dst)
-    const noexcept
-{
-    auto result = peek(std::as_writable_bytes(dst));
-    return {
-        reinterpret_cast<T*>(result.data()),
-        result.size()
-    };
-}
-
-
-template<typename T,
-         std::size_t E>
-requires (sizeof(T) == 1)
-inline
-std::span<const T>
-byte_stream::write(std::span<const T, E> src)
-{
-    auto result = write(as_bytes(src));
-    return {
-        reinterpret_cast<const T*>(result.data()),
-        result.size()
-    };
-}
-
-
-template<typename T,
-         std::size_t E>
-requires (sizeof(T) == 1)
-std::span<const T>
-byte_stream::write_some(std::span<const T> src)
-{
-    auto result = write_some(as_bytes(src));
-    return {
-        reinterpret_cast<const T*>(result.data()),
-        result.size()
-    };
-}
 
 #endif

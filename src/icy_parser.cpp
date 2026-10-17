@@ -17,12 +17,11 @@
 
 #include <curlxx/url.hpp>
 
-#include "icy_stream.hpp"
+#include "icy_parser.hpp"
 
-#include "icy.hpp"
 #include "LogManager.hpp"
 #include "string_utils.hpp"
-#include "tracer.hpp"
+#include "utils.hpp"
 
 
 using namespace std::literals;
@@ -32,43 +31,27 @@ namespace icy {
 
     namespace {
 
-#if 0
+        /*-------*/
+        /* Types */
+        /*-------*/
+
+        using dict_t = std::unordered_map<std::string_view, std::string_view>;
+
+
+        /*-----------------------*/
+        /* Function declarations */
+        /*-----------------------*/
+
         bool
-        is_image_url(const std::string& url)
-        {
-            try {
-                curl::url parser{url};
-                auto path = parser.get_path();
-                auto ext_pos = path.find_last_of('.');
-                if (ext_pos == std::string::npos)
-                    return false;
-                auto ext = std::string_view(path.begin() + ext_pos, path.end());
-                using string_utils::equal_case;
-                if (equal_case(ext, ".png"sv) ||
-                    equal_case(ext, ".jpg"sv) ||
-                    equal_case(ext, ".jpeg"sv) ||
-                    equal_case(ext, ".webp"sv) ||
-                    equal_case(ext, ".gif"sv))
-                    return true;
-                return false;
-            }
-            catch (...) {
-                return false;
-            }
-        }
-#endif
+        is_just_a_number(std::string_view input);
+
+        dict_t
+        parse(std::string_view input);
 
 
-#if 0
-        std::optional<std::string>
-        if_not_empty(std::string_view input)
-        {
-            if (input.empty())
-                return {};
-            return std::string{input};
-        }
-#endif
-
+        /*----------------------*/
+        /* Function definitions */
+        /*----------------------*/
 
         bool
         is_just_a_number(std::string_view input)
@@ -81,24 +64,76 @@ namespace icy {
         }
 
 
-        void
-        remove_prefix(std::span<const std::byte>& input,
-                      std::size_t n)
+        dict_t
+        parse(std::string_view input)
         {
-            input = input.subspan(n);
+            dict_t result;
+
+            const auto npos = std::string_view::npos;
+            using size_type = std::string_view::size_type;
+
+            while (!input.empty()) {
+
+                // Look for KeyName=
+                size_type key_end_pos = input.find('=');
+                if (key_end_pos == npos)
+                    break;
+
+                std::string_view key = input.substr(0, key_end_pos);
+                if (key.empty())
+                    // Input error: empty key
+                    break;
+
+                // Discard all the way up to the '='
+                input.remove_prefix(key_end_pos + 1);
+                if (input.empty())
+                    // Input error: empty value
+                    break;
+
+                char quote_char = input.front();
+                if (quote_char != '\'' && quote_char != '"')
+                    break;
+
+                input.remove_prefix(1);
+                if (input.empty())
+                    // Input error: truncated inside quotes
+                    break;
+
+                size_type remove_size = 2;
+                size_type close_quote_pos = input.find(quote_char + ";"s);
+                if (close_quote_pos == npos) {
+                    // When on the end of input, the last quote doesn't have a following ';'
+                    close_quote_pos = input.size() - 1;
+                    remove_size = 1;
+                    if (input[close_quote_pos] != quote_char)
+                        // Input error: input does not end in the closing quote char
+                        break;
+                }
+
+                if (close_quote_pos == npos)
+                    // Input error: unterminated quote
+                    break;
+
+                std::string_view value = input.substr(0, close_quote_pos);
+
+                result.emplace(key, value);
+
+                input.remove_prefix(close_quote_pos + remove_size);
+
+            }
+
+            return result;
         }
 
     } // namespace
 
 
-    stream::stream()
-    {
-        TRACE_FUNC;
-    }
+    parser::parser()
+    {}
 
 
     void
-    stream::reset(std::string base_url_,
+    parser::reset(std::string base_url_,
                   std::size_t new_interval)
     {
         base_url = std::move(base_url_);
@@ -116,7 +151,7 @@ namespace icy {
 
 
     stream_metadata&&
-    stream::get_metadata()
+    parser::get_metadata()
         noexcept
     {
         return std::move(current_meta);
@@ -124,15 +159,17 @@ namespace icy {
 
 
     std::span<std::byte>
-    stream::get_data(std::span<std::byte> dst)
+    parser::get_data(std::span<std::byte> dst)
     {
         return data_stream.read(dst);
     }
 
 
     void
-    stream::feed(std::span<const std::byte> input)
+    parser::feed(std::span<const std::byte> input)
     {
+        using utils::remove_prefix;
+
         if (!interval) {
             data_stream.write(input);
             return;
@@ -181,7 +218,7 @@ namespace icy {
 
 
     void
-    stream::parse_metadata()
+    parser::parse_metadata()
     {
         using string_utils::trimmed;
 
@@ -189,7 +226,7 @@ namespace icy {
 
         // Note: icy metadata is padded with null bytes.
         std::string raw_meta_str(meta_stream.size(), '\0');
-        std::ignore = meta_stream.read(std::span{raw_meta_str});
+        std::ignore = meta_stream.read(as_writable_bytes(std::span{raw_meta_str}));
         std::string meta_str = trimmed(raw_meta_str, '\0');
 
         auto meta_dict = icy::parse(meta_str);
@@ -244,7 +281,7 @@ namespace icy {
 
 
     std::string
-    stream::resolve_url(std::string_view url)
+    parser::resolve_url(std::string_view url)
         noexcept
     {
         try {
@@ -264,3 +301,83 @@ namespace icy {
     }
 
 } // namespace icy
+
+
+
+#ifdef UNIT_TEST
+
+#include <iostream>
+
+using std::cout;
+using std::endl;
+
+unsigned check_counter = 0;
+
+template<typename A,
+         typename B>
+void
+check(A&& a, B&& b)
+{
+    ++check_counter;
+    if (a != b)
+        throw runtime_error{"Check failed: \"" + a + "\" != \"" + b + "\""};
+    cout << "check " << check_counter << " passed" << endl;
+}
+
+
+int main()
+{
+    {
+        // trivial case
+        auto d = icy::parse("StreamTitle='Testing something'");
+        check(d.at("StreamTitle"), "Testing something");
+    }
+
+    {
+        // again, with trailing ';'
+        auto d = icy::parse("StreamTitle='Testing something';");
+        check(d.at("StreamTitle"), "Testing something");
+    }
+
+    {
+        // trivial case with two fields
+        auto d = icy::parse("StreamTitle='Another test';StreamURL='http://example.com'");
+        check(d.at("StreamTitle"), "Another test");
+        check(d.at("StreamURL"), "http://example.com");
+    }
+
+    {
+        // again, with trailing ';'
+        auto d = icy::parse("StreamTitle='Another test';StreamURL='http://example.com';");
+        check(d.at("StreamTitle"), "Another test");
+        check(d.at("StreamURL"), "http://example.com");
+    }
+
+    {
+        // obnoxious case: title with quote character
+        auto d = icy::parse("StreamTitle='Icecast's problem'");
+        check(d.at("StreamTitle"), "Icecast's problem");
+    }
+
+    {
+        // again, with trailing ';'
+        auto d = icy::parse("StreamTitle='Icecast's problem';");
+        check(d.at("StreamTitle"), "Icecast's problem");
+    }
+
+
+    {
+        // fairly ambiguous title
+        auto d = icy::parse("StreamTitle='Why's=no quote escaping?'");
+        check(d.at("StreamTitle"), "Why's=no quote escaping?");
+    }
+
+    {
+        // again, trailing ';'
+        auto d = icy::parse("StreamTitle='Why's=no quote escaping?';");
+        check(d.at("StreamTitle"), "Why's=no quote escaping?");
+    }
+
+}
+
+#endif

@@ -70,22 +70,6 @@ public:
          std::stop_token& stopper)
         noexcept;
 
-    template<typename T,
-             std::size_t E>
-    requires (sizeof(T) == 1)
-    [[nodiscard]]
-    std::span<T>
-    read(std::span<T, E> dst)
-        noexcept;
-
-    template<typename T,
-             std::size_t E>
-    requires (sizeof(T) == 1)
-    [[nodiscard]]
-    std::span<T>
-    read(std::span<T, E> dst,
-         std::stop_token& stopper)
-        noexcept;
 
     [[nodiscard]]
     std::span<std::byte>
@@ -98,35 +82,12 @@ public:
              std::stop_token& stopper)
         noexcept;
 
-    template<typename T,
-             std::size_t E>
-    requires (sizeof(T) == 1)
-    [[nodiscard]]
-    std::span<T>
-    read_all(std::span<T, E> dst)
-        noexcept;
-
-    template<typename T,
-             std::size_t E>
-    requires (sizeof(T) == 1)
-    [[nodiscard]]
-    std::span<std::byte>
-    read_all(std::span<T, E> dst,
-             std::stop_token& stopper)
-        noexcept;
 
     [[nodiscard]]
     std::span<std::byte>
     peek(std::span<std::byte> dst)
         const noexcept;
 
-    template<typename T,
-             std::size_t E>
-    requires (sizeof(T) == 1)
-    [[nodiscard]]
-    std::span<T>
-    peek(std::span<std::byte> dst)
-        const noexcept;
 
     std::size_t
     discard(std::size_t count)
@@ -136,86 +97,5 @@ public:
     write(std::span<const std::byte> src);
 
 }; // class async_byte_stream
-
-
-// Template definitions
-
-template<typename T,
-         std::size_t E>
-requires (sizeof(T) == 1)
-inline
-std::span<T>
-async_byte_stream::read(std::span<T, E> dst)
-    noexcept
-{
-    auto result = read(std::as_writable_bytes(dst));
-    return {
-        reinterpret_cast<T*>(result.data()),
-        result.size()
-    };
-}
-
-
-template<typename T,
-         std::size_t E>
-requires (sizeof(T) == 1)
-inline
-std::span<T>
-async_byte_stream::read(std::span<T, E> dst,
-                        std::stop_token& stopper)
-    noexcept
-{
-    auto result = read(std::as_writable_bytes(dst), stopper);
-    return {
-        reinterpret_cast<T*>(result.data()),
-        result.size()
-    };
-}
-
-
-template<typename T,
-         std::size_t E>
-requires (sizeof(T) == 1)
-inline
-std::span<T>
-async_byte_stream::read_all(std::span<T, E> dst)
-    noexcept
-{
-    auto result = read_all(std::as_writable_bytes(dst));
-    return {
-        reinterpret_cast<T*>(result.data()),
-        result.size()
-    };
-}
-
-
-template<typename T,
-         std::size_t E>
-requires (sizeof(T) == 1)
-inline
-std::span<std::byte>
-async_byte_stream::read_all(std::span<T, E> dst,
-                            std::stop_token& stopper)
-    noexcept
-{
-    auto result = read_all(std::as_writable_bytes(dst), stopper);
-    return {reinterpret_cast<T*>(result.data()), result.size()};
-}
-
-
-template<typename T,
-         std::size_t E>
-requires (sizeof(T) == 1)
-inline
-std::span<T>
-async_byte_stream::peek(std::span<std::byte> dst)
-    const noexcept
-{
-    auto result = peek(std::as_writable_bytes(dst));
-    return {
-        reinterpret_cast<T*>(result.data()),
-        result.size()
-    };
-}
 
 #endif

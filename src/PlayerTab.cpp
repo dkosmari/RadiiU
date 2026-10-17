@@ -36,6 +36,7 @@
 #include "StationVoting.hpp"
 #include "TraceDuration.hpp"
 #include "TraceFunction.hpp"
+#include "tracer.hpp"
 #include "UI.hpp"
 
 
@@ -278,7 +279,7 @@ namespace PlayerTab {
             float width = audio_queue_history_size * 3
                 + 2 * style.FramePadding.x
                 + 2 * style.WindowPadding.x;
-            ImGui::SetNextWindowSize({width, 500}, ImGuiCond_Always);
+            ImGui::SetNextWindowSize({width, 600}, ImGuiCond_Always);
             auto viewport = ImGui::GetMainViewport();
             ImGui::SetNextWindowPos(viewport->GetWorkCenter(),
                                     ImGuiCond_Always,
@@ -312,13 +313,27 @@ namespace PlayerTab {
                     }
                     catch (...) {}
 
-                    UI::FormatInfoRow("Sample rate", "{}㎐", humanize::value(spec.rate));
-                    UI::InfoRow("Sample format", format_to_string(spec.format));
+                    UI::FormatInfoRow("Sound mode",
+                                      "{}㎐, {}",
+                                      humanize::value(spec.rate),
+                                      format_to_string(spec.format));
+
+                    auto transfer_state = play_res->radio.get_transfer_state();
+                    UI::InfoRow("Transfer state", to_string(transfer_state));
+
+                    auto net_state = play_res->radio.get_network_thread_state();
+                    UI::InfoRow("Network thread", to_string(net_state));
+
+                    auto audio_state = play_res->radio.get_audio_thread_state();
+                    UI::InfoRow("Audio thread", to_string(audio_state));
+
                 }
 
+                ImGui::SeparatorText("Audio buffer (seconds)");
+
                 auto available = ImGui::GetContentRegionAvail();
-                ImGui::PlotHistogram("##audio_queue_history",
-                                     std::span{play_res->audio_queue_history},
+                ImGui::PlotHistogram("##audio_queue_history"s,
+                                     play_res->audio_queue_history,
                                      play_res->audio_queue_index,
                                      {},
                                      0,
@@ -541,6 +556,8 @@ namespace PlayerTab {
         {
             using namespace ImGui::RAII;
 
+            Font smaller{nullptr, 0, 0.8f};
+
             ImGui::AlignTextToFramePadding();
 
             if (play_res) {
@@ -588,8 +605,20 @@ namespace PlayerTab {
 
                 ImGui::SameLine();
 
-                auto phase = play_res->radio.get_phase();
-                ImGui::FormatText("State: {}", to_string(phase));
+                auto state = play_res->radio.get_state();
+                ImGui::FormatText("State: {}", to_string(state));
+
+                play_res->radio.with_error_message(
+                    [](const std::string& message)
+                    {
+                        if (message.empty())
+                            return;
+
+                        ImGui::SameLine();
+
+                        ImGui::FormatTextAligned(0, -1, "Error: {}", message);
+                    }
+                );
 
             } else {
                 ImGui::Text("No station set.");
@@ -626,6 +655,8 @@ namespace PlayerTab {
     void
     initialize()
     {
+        TRACE_FUNC;
+
         load();
 
         App::add_callback("PlayerTab::process_logic()"sv,
@@ -636,6 +667,8 @@ namespace PlayerTab {
     void
     finalize()
     {
+        TRACE_FUNC;
+
         save();
         play_res.reset();
     }

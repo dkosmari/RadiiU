@@ -5,8 +5,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#ifndef ICY_STREAM_HPP
-#define ICY_STREAM_HPP
+#ifndef ICY_PARSER_HPP
+#define ICY_PARSER_HPP
 
 #include <cstddef>
 #include <span>
@@ -19,11 +19,11 @@
 
 namespace icy {
 
-    class stream {
+    class parser {
 
     public:
 
-        stream();
+        parser();
 
 
         // NOTE: pass-by-value is intentional
@@ -66,7 +66,7 @@ namespace icy {
         resolve_url(std::string_view url)
             noexcept;
 
-    }; // class stream
+    }; // class parser
 
 } // namespace icy
 

@@ -12,6 +12,14 @@
 
 namespace utils {
 
+    void
+    remove_prefix(std::span<const std::byte>& input,
+                  std::size_t n)
+    {
+        input = input.subspan(n);
+    }
+
+
     bool
     starts_with(std::span<const std::byte> data,
                 std::span<const std::byte> prefix)
