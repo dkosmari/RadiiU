@@ -214,7 +214,10 @@ RadioClient::play(unsigned idx)
             this
         );
         decoder_thread.request_stop();
+        encoded_audio.close();
     }
+
+    phase = Phase::stopped;
 
     start_network_thread();
 
@@ -234,10 +237,11 @@ RadioClient::stop()
 
     TRACE_FUNC;
 
-    if (is_playing())
+    if (is_playing()) {
         decoder_thread.request_stop();
+        encoded_audio.close();
+    }
 
-    encoded_audio.close();
     phase = Phase::stopped;
 }
 
@@ -596,7 +600,7 @@ RadioClient::task_queue_transfer(unsigned idx)
         return;
     }
 
-    LOG_DEBUG("Network task: queue transfer.");
+    LOG_DEBUG("task_queue_transfer()");
 
     phase = Phase::fetching;
 
@@ -698,12 +702,15 @@ RadioClient::task_cancel_transfer()
 {
     TraceFunction tf{"RadioClient"sv};
 
-    LOG_DEBUG("Network task: transfer.");
+    LOG_DEBUG("task_cancel_transfer()");
+
+    on_transfer_error(curl::error{"transfer canceled"});
 
     std::ignore = multi.try_remove(easy);
     easy.reset();
 
     transfer_state = TransferState::idle;
+    phase = Phase::stopped;
 }
 
 
@@ -712,7 +719,7 @@ RadioClient::task_resume_transfer()
 {
     TraceFunction tf{"RadioClient"sv};
 
-    LOG_DEBUG("Network task: resume transfer.");
+    LOG_DEBUG("task_resume_transfer()");
 
     easy.unpause();
     transfer_state = TransferState::in_progress;
@@ -739,7 +746,7 @@ RadioClient::on_transfer_error(const curl::error& e)
             break;
 
         case streaming:
-            phase = Phase::error;
+            phase = error;
             encoded_audio.close();
             break;
 
@@ -747,7 +754,7 @@ RadioClient::on_transfer_error(const curl::error& e)
             break;
 
         default:
-            phase = Phase::error;
+            phase = error;
     }
 }
 

@@ -13,10 +13,12 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <iostream>
 #include <iterator>
 #include <memory>
 #include <new>
 #include <optional>
+#include <ostream>
 #include <print>
 #include <string>
 #include <thread>
@@ -40,6 +42,7 @@
 
 
 using namespace std::literals;
+using std::cout;
 
 
 namespace TraceManager {
@@ -498,11 +501,11 @@ namespace TraceManager {
                                       started,
                                       producers);
 
-                std::println("Finishing event collection.");
+                std::println(cout,"Finishing event collection.");
                 // Assume all threads stopped generating events, so take their buffers.
                 auto all_producers = context_manager.safe_producers.lock();
                 for (auto& [tid, ctx] : *all_producers) {
-                    std::println("Dumping full buffers from {}", tid);
+                    std::println(cout,"Dumping full buffers from {}", tid);
                     dump_full_buffers(ctx,
                                       output,
                                       work_buffers,
@@ -510,7 +513,7 @@ namespace TraceManager {
                                       started);
                     // Also consume the current_buffer
                     if (ctx->current_buffer) {
-                        std::println("Dumping current buffer from {}: {} events",
+                        std::println(cout, "Dumping current buffer from {}: {} events",
                                      tid,
                                      ctx->current_buffer->size());
                         dump_buffer(ctx->current_buffer,

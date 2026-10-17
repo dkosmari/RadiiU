@@ -294,7 +294,6 @@ namespace ImageLoader {
             location{location_},
             size_limit{size_limit_}
         {
-            // LOG_DEBUG("CacheEntry created for {:?}", location);
             if (size_limit.x < 0)
                 size_limit.x = 0;
             if (size_limit.y < 0)
@@ -491,7 +490,6 @@ namespace ImageLoader {
             sdl::rwops rw{std::span(*raw_buf)};
             img = sdl::img::load(rw);
             raw_buf.reset();
-            // LOG_DEBUG("Loaded URL {:?}", location);
         }
 
 
@@ -501,7 +499,6 @@ namespace ImageLoader {
             TraceFunction tf{"ImageLoader,loader_thread"sv};
 
             img = sdl::img::load(location);
-            // LOG_DEBUG("Loaded file {:?}", location);
         }
 
 
@@ -638,12 +635,12 @@ namespace ImageLoader {
                 } else {
                     // entry not found, prepare a request
                     std::string real_location;
-                    LOG_DEBUG("Requested: {:?}", location);
+                    if (cfg.verbose_image_logs)
+                        LOG_DEBUG("Requested: {:?}", location);
                     if (auto without_prefix = string_utils::drop_prefix(location,
                                                                         content_prefix)) {
                         // Local file using content:/ prefix
                         real_location = content_dir / *without_prefix;
-                        // LOG_DEBUG("Content: {:?}", real_location);
                     } else
                         real_location = location;
 
@@ -729,7 +726,6 @@ namespace ImageLoader {
 
                 // Slow down while idle.
                 if (!work) {
-                    // LOG_DEBUG("Idling download thread");
                     std::this_thread::sleep_for(100ms);
                 }
             }
@@ -811,7 +807,8 @@ namespace ImageLoader {
             TraceFunction tf{"ImageLoader"sv};
 
             std::size_t excess = cache.size() - max_cache_size;
-            LOG_DEBUG("Prunning {} icons.", excess);
+            if (cfg.verbose_image_logs)
+                LOG_DEBUG("Prunning {} icons.", excess);
             std::vector<Cache::iterator> to_remove(excess);
             auto to_remove_end = to_remove.begin();
             for (auto it = cache.begin(); it != cache.end(); ++it) {
@@ -837,7 +834,8 @@ namespace ImageLoader {
             for (auto it : to_remove) {
                 auto& entry = it->second;
                 if (entry->easy) {
-                    LOG_DEBUG("prunning an active request");
+                    if (cfg.verbose_image_logs)
+                        LOG_DEBUG("prunning an active request");
                     // If removing an active request, make sure it's removed from the curl::multi.
                     multi.remove(entry->easy);
                 }
