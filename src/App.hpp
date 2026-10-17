@@ -128,6 +128,10 @@ namespace App {
     get_queued_audio_duration()
         noexcept;
 
+
+    void
+    detected_activity();
+
 } // namespace App
 
 #endif

@@ -208,7 +208,10 @@ endif ENABLE_DEBUG
 if ENABLE_WIIU
 
 radiiu_elf_SOURCES += \
-	external/wiiu-stdout/wiiu-stdout.c
+	external/wiiu-stdout/wiiu-stdout.c \
+	external/wiiu-stdout/wiiu-stdout.h \
+	src/WiiUIMManager.cpp \
+	src/WiiUIMManager.hpp
 
 radiiu_elf_LDFLAGS = \
 	$(AM_LDFLAGS) \

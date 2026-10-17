@@ -70,10 +70,11 @@ public:
     };
 
 
-    enum class DecoderState {
+    enum class ThreadState {
         stopped,
         queued,
         running,
+        stopping,
     };
 
 
@@ -199,16 +200,18 @@ private:
     // async_task_queue main_tasks; // dispatched from .process()
     async_task_queue network_tasks; // dispatched from network thread
 
-    curl::multi multi;
-    curl::easy easy;
+    curl::multi multi{nullptr};
+    curl::easy easy{nullptr};
 
     std::string stream_content_type;
-    std::atomic<DecoderState> decoder_state = DecoderState::stopped;
     std::unique_ptr<Decoder> decoder;
     sdl::audio::stream audio_converter{nullptr};
     thread_safe<Decoder::Info> safe_decoder_info;
 
+    std::atomic<ThreadState> network_thread_state = ThreadState::stopped;
     std::jthread network_thread;
+
+    std::atomic<ThreadState> decoder_thread_state = ThreadState::stopped;
     std::jthread decoder_thread;
 
 
@@ -254,10 +257,15 @@ private:
 
 
     void
+    start_network_thread();
+
+    void
     start_decoder_thread();
+
 
     void
     resume_transfer_if_paused();
+
 
     void
     process_playlist();
@@ -279,10 +287,8 @@ to_string(RadioClient::PlaylistType type);
 std::string
 to_string(RadioClient::TransferState state);
 
-
 std::string
-to_string(RadioClient::DecoderState state);
-
+to_string(RadioClient::ThreadState state);
 
 std::string
 to_string(RadioClient::URLType type);
