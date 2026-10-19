@@ -139,6 +139,7 @@ DecoderMP3::DecoderMP3(std::span<const std::byte> data)
     mpg.set_verbose(true);
     mpg.open_feed();
     feed(data);
+    mpg.get_format();
 
     LOG_INFO("Created MP3 decoder.");
 }

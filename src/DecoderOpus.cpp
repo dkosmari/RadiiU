@@ -100,7 +100,7 @@ DecoderOpus::DecoderOpus(std::span<const std::byte> data) :
     if (!oof)
         throw Error{"op_open_callbacks() failed", e};
 
-    LOG_INFO("Created opus decoder.");
+    LOG_INFO("Created Opus decoder.");
 }
 
 

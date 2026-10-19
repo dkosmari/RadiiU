@@ -187,15 +187,17 @@ DecoderAAC::DecoderAAC(std::span<const std::byte> input) :
     }
     assert((unsigned long)r <= input.size());
 
-    LOG_DEBUG("DecoderAAC::rate = {}\n"
-              "DecoderAAC::channels = {}",
-              rate,
-              channels);
+    // LOG_DEBUG("DecoderAAC::rate = {}\n"
+    //           "DecoderAAC::channels = {}",
+    //           rate,
+    //           channels);
 
     cfg = NeAACDecGetCurrentConfiguration(handle);
     // dump(cfg);
 
     input_stream.write(input.subspan(r));
+
+    LOG_INFO("Created AAC decoder.");
 }
 
 

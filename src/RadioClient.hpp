@@ -236,7 +236,7 @@ private:
         sdl::audio::stream converter{nullptr};
         thread_safe<Decoder::Info> safe_info;
         thread_safe<std::string> safe_content_type;
-        std::vector<std::byte> buffer{64 * 1024};
+        std::vector<std::byte> buffer{256 * 1024};
         std::jthread thread;
     } audio;
 

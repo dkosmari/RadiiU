@@ -503,7 +503,7 @@ RadioClient::audio_thread_function(std::stop_token stopper)
 
         assert(!buffer.empty());
 
-        constexpr unsigned max_failures = 10;
+        constexpr unsigned max_failures = 4;
         unsigned create_failures = 0;
 
         while (!stopper.stop_requested()) {
@@ -719,15 +719,15 @@ RadioClient::task_queue_transfer(unsigned idx)
     easy.set_accept_encoding("");
     easy.set_auto_referer(true);
     easy.set_buffer_size(64 * 1024);
-    easy.set_connect_timeout(30s);
+    easy.set_connect_timeout(15s);
     easy.set_fail_on_error(true);
     easy.set_follow_location(true);
     easy.set_forbid_reuse(false);
     easy.set_http_09_allowed(true);
     easy.set_http_200_aliases({"ICY 200 OK"});
     easy.set_http_version(curl::easy::http_version::none);
-    easy.set_low_speed_limit(4096);
-    easy.set_low_speed_time(10s);
+    easy.set_low_speed_limit(100);
+    easy.set_low_speed_time(15s);
     // Optimize TCP performance.
     easy.set_sockopt_function(
         [](curl_socket_t fd,
@@ -745,8 +745,8 @@ RadioClient::task_queue_transfer(unsigned idx)
     );
     easy.set_ssl_verify_peer(false);
     easy.set_tcp_keep_alive(true);
-    easy.set_tcp_keep_idle(120s);
-    easy.set_tcp_keep_intvl(60s);
+    easy.set_tcp_keep_idle(60s);
+    easy.set_tcp_keep_intvl(30s);
     easy.set_tcp_no_delay(false);
     easy.set_transfer_encoding(true);
     easy.set_url(url);

@@ -125,7 +125,7 @@ DecoderVorbis::DecoderVorbis(std::span<const std::byte> input) :
     if (e)
         throw Error{"ov_open_callbacks() failed", e};
 
-    LOG_INFO("Created vorbis decoder.");
+    LOG_INFO("Created Vorbis decoder.");
 }
 
 

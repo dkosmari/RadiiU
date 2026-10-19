@@ -543,7 +543,7 @@ namespace PlayerTab {
                                     UI::InfoRow("Bitrate", info.bitrate);
                             }
                         );
-                    }
+                    } // Table
 
                 }
 
