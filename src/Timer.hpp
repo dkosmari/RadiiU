@@ -1,3 +1,10 @@
+/*
+ * RadiiU - an internet radio player for the Wii U.
+ *
+ * Copyright (C) 2026  Daniel K. O. <dkosmari>
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 #ifndef TIMER_HPP
 #define TIMER_HPP
 
@@ -21,7 +28,7 @@ struct Timer {
     Timer()
         noexcept = default;
 
-    Timer(const std::string& name);
+    Timer(const std::string& name_);
 
 
     inline
@@ -59,24 +66,24 @@ struct Timer {
 }; // struct Timer
 
 
-struct TimerReporter {
+struct ScopedTimer {
 
     Timer timer;
 
-    TimerReporter(const std::string& name)
+    ScopedTimer(const std::string& name_)
         noexcept:
-        timer{name}
+        timer{name_}
     {
         timer.start();
     }
 
 
-    ~TimerReporter()
+    ~ScopedTimer()
     {
         timer.stop();
         timer.report();
     }
 
-}; // struct TimerReporter
+}; // struct ScopedTimer
 
 #endif

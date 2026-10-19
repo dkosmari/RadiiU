@@ -6,6 +6,7 @@
  */
 
 #include <algorithm>
+#include <atomic>
 #include <cstdlib>
 #include <format>
 #include <memory>
@@ -13,8 +14,6 @@
 #include <random>
 #include <ranges>
 #include <set>
-#include <stdexcept>
-#include <stop_token>
 #include <thread>
 #include <unordered_set>
 #include <utility>
@@ -22,6 +21,8 @@
 #ifdef __WIIU__
 #include <coreinit/time.h>
 #endif
+
+#include <curlxx/escape.hpp>
 
 #include <glaze/json.hpp>
 #include <glaze/json/generic.hpp>
@@ -35,6 +36,7 @@
 #include "net/address.hpp"
 #include "net/resolver.hpp"
 #include "rest.hpp"
+#include "Settings.hpp"
 #include "TraceDuration.hpp"
 #include "TraceFunction.hpp"
 #include "TraceManager.hpp"
@@ -43,26 +45,36 @@
 
 using namespace std::literals;
 
+using Settings::cfg;
+
 
 template<>
-struct glz::meta<RadioBrowserAPI::CodecParams::Order> {
-    using enum RadioBrowserAPI::CodecParams::Order;
+struct glz::meta<RadioBrowserAPI::CodecsParams::Order> {
+    using enum RadioBrowserAPI::CodecsParams::Order;
     static constexpr
     auto value = enumerate(name, stationcount);
 };
 
 
 template<>
-struct glz::meta<RadioBrowserAPI::CountryParams::Order> {
-    using enum RadioBrowserAPI::CountryParams::Order;
+struct glz::meta<RadioBrowserAPI::CountriesParams::Order> {
+    using enum RadioBrowserAPI::CountriesParams::Order;
     static constexpr
     auto value = enumerate(name, stationcount);
 };
 
 
 template<>
-struct glz::meta<RadioBrowserAPI::SearchStationParams::Order> {
-    using enum RadioBrowserAPI::SearchStationParams::Order;
+struct glz::meta<RadioBrowserAPI::LanguagesParams::Order> {
+    using enum RadioBrowserAPI::LanguagesParams::Order;
+    static constexpr
+    auto value = enumerate(name, stationcount);
+};
+
+
+template<>
+struct glz::meta<RadioBrowserAPI::SearchStationsParams::Order> {
+    using enum RadioBrowserAPI::SearchStationsParams::Order;
     static constexpr
     auto value = enumerate(
         name,
@@ -88,8 +100,8 @@ struct glz::meta<RadioBrowserAPI::SearchStationParams::Order> {
 
 
 template<>
-struct glz::meta<RadioBrowserAPI::StationParams::Order> {
-    using enum RadioBrowserAPI::StationParams::Order;
+struct glz::meta<RadioBrowserAPI::StationsParams::Order> {
+    using enum RadioBrowserAPI::StationsParams::Order;
     static constexpr
     auto value = enumerate(
         name,
@@ -115,8 +127,8 @@ struct glz::meta<RadioBrowserAPI::StationParams::Order> {
 
 
 template<>
-struct glz::meta<RadioBrowserAPI::TagParams::Order> {
-    using enum RadioBrowserAPI::TagParams::Order;
+struct glz::meta<RadioBrowserAPI::TagsParams::Order> {
+    using enum RadioBrowserAPI::TagsParams::Order;
     static constexpr
     auto value = enumerate(name, stationcount);
 };
@@ -136,6 +148,18 @@ namespace RadioBrowserAPI {
         };
 
 
+#if 0
+        struct BusyGuard {
+
+            BusyGuard(std::stop_token& stopper);
+
+            ~BusyGuard()
+                noexcept;
+
+        }; // struct BusyGuard
+#endif
+
+
         /*-----------*/
         /* Constants */
         /*-----------*/
@@ -150,13 +174,14 @@ namespace RadioBrowserAPI {
         /* Variables */
         /*-----------*/
 
-        bool busy;
+        std::atomic_bool busy;
         string current_server;
         std::minstd_rand random_engine;
         MirrorsVec mirrors;
         std::jthread fetch_mirrors_thread;
         async_task_queue pending_tasks;
         std::optional<rest::manager> rest_manager;
+        std::string user_agent;
 
 
         /*-----------------------*/
@@ -183,13 +208,19 @@ namespace RadioBrowserAPI {
         start_call();
 
         void
-        task_get_codecs(const CodecParams& params,
+        task_get_codecs(const CodecsParams& params,
                         GetCodecsResultFunction result_func,
                         ExceptionFunction except_func);
 
         void
-        task_get_countries(const CountryParams& params,
+        task_get_countries(const CountriesParams& params,
                            GetCountriesResultFunction result_func,
+                           ExceptionFunction except_func);
+
+        void
+        task_get_languages(const std::string& filter,
+                           const LanguagesParams& params,
+                           GetLanguagesResultFunction result_func,
                            ExceptionFunction except_func);
 
         void
@@ -202,12 +233,12 @@ namespace RadioBrowserAPI {
                          ExceptionFunction except_func);
 
         void
-        task_get_tags(const TagParams& params,
+        task_get_tags(const TagsParams& params,
                       GetTagsResultFunction result_func,
                       ExceptionFunction except_func);
 
         void
-        task_search_stations(const SearchStationParams& params,
+        task_search_stations(const SearchStationsParams& params,
                              SearchStationsResultFunction result_func,
                              ExceptionFunction except_func);
 
@@ -228,6 +259,27 @@ namespace RadioBrowserAPI {
         /*----------------------*/
         /* Function definitions */
         /*----------------------*/
+
+#if 0
+        BusyGuard::BusyGuard(std::stop_token& stopper)
+        {
+            bool expected_false = false;
+            while (!busy.compare_exchange_strong(expected_false, true)) {
+                if (stopper.stop_requested())
+                    throw std::runtime_error{"stop requested"};
+                std::this_thread::sleep_for(100ms);
+                expected_false = false;
+            }
+        }
+
+
+        BusyGuard::~BusyGuard()
+            noexcept
+        {
+            busy = false;
+        }
+#endif
+
 
         void
         fetch_mirrors_thread_function(std::stop_token stopper,
@@ -375,14 +427,14 @@ namespace RadioBrowserAPI {
         {
             assert(rest_manager);
 
-            if (busy)
+            bool expected = false;
+            if (!busy.compare_exchange_strong(expected, true))
                 throw async_task_queue::call_again{};
-            busy = true;
         }
 
 
         void
-        task_get_codecs(const CodecParams& params,
+        task_get_codecs(const CodecsParams& params,
                         GetCodecsResultFunction result_func,
                         ExceptionFunction except_func)
         {
@@ -392,7 +444,7 @@ namespace RadioBrowserAPI {
             glz::ex::write_json(params, params_json);
 
             rest_manager->post_json(
-                "/json/codecs",
+                "/json/codecs"s,
                 std::move(params_json),
                 make_response_func(
                     [func = std::move(result_func)]
@@ -411,7 +463,7 @@ namespace RadioBrowserAPI {
 
 
         void
-        task_get_countries(const CountryParams& params,
+        task_get_countries(const CountriesParams& params,
                            GetCountriesResultFunction result_func,
                            ExceptionFunction except_func)
         {
@@ -421,7 +473,7 @@ namespace RadioBrowserAPI {
             glz::ex::write_json(params, params_json);
 
             rest_manager->post_json(
-                "/json/countries",
+                "/json/countries"s,
                 std::move(params_json),
                 make_response_func(
                     [func = std::move(result_func)]
@@ -440,13 +492,46 @@ namespace RadioBrowserAPI {
 
 
         void
+        task_get_languages(const std::string& filter,
+                           const LanguagesParams& params,
+                           GetLanguagesResultFunction result_func,
+                           ExceptionFunction except_func)
+        {
+            start_call();
+
+            std::string params_json;
+            glz::ex::write_json(params, params_json);
+
+            std::string endpoint = "/json/languages"s;
+            if (!filter.empty())
+                endpoint += "/"s + curl::escape(filter);
+            rest_manager->post_json(
+                std::move(endpoint),
+                std::move(params_json),
+                make_response_func(
+                    [func = std::move(result_func)]
+                    (const rest::request& req)
+                        mutable
+                    {
+                        LanguageVec result;
+                        glz::ex::read<glz_options>(result, req.get_content());
+                        if (func)
+                            func(std::move(result));
+                    }
+                ),
+                make_error_func(std::move(except_func))
+            );
+        }
+
+
+        void
         task_get_server_stats(GetServerStatsResultFunction result_func,
                               ExceptionFunction except_func)
         {
             start_call();
 
             rest_manager->get_json(
-                "/json/stats",
+                "/json/stats"s,
                 make_response_func(
                     [func = std::move(result_func)]
                     (const rest::request& req)
@@ -475,7 +560,7 @@ namespace RadioBrowserAPI {
             glz::ex::write_json(params, params_json);
 
             rest_manager->post_json(
-                "/json/stations/byuuid",
+                "/json/stations/byuuid"s,
                 std::move(params_json),
                 make_response_func(
                     [func = std::move(result_func)]
@@ -501,7 +586,7 @@ namespace RadioBrowserAPI {
 
 
         void
-        task_get_tags(const TagParams& params,
+        task_get_tags(const TagsParams& params,
                       GetTagsResultFunction result_func,
                       ExceptionFunction except_func)
         {
@@ -511,7 +596,7 @@ namespace RadioBrowserAPI {
             glz::ex::write_json(params, params_json);
 
             rest_manager->post_json(
-                "/json/tags",
+                "/json/tags"s,
                 std::move(params_json),
                 make_response_func(
                     [func = std::move(result_func)]
@@ -530,7 +615,7 @@ namespace RadioBrowserAPI {
 
 
         void
-        task_search_stations(const SearchStationParams& params,
+        task_search_stations(const SearchStationsParams& params,
                              SearchStationsResultFunction result_func,
                              ExceptionFunction except_func)
         {
@@ -540,7 +625,7 @@ namespace RadioBrowserAPI {
             glz::ex::write_json(params, params_json);
 
             rest_manager->post_json(
-                "/json/stations/search",
+                "/json/stations/search"s,
                 std::move(params_json),
                 make_response_func(
                     [func = std::move(result_func)]
@@ -567,7 +652,7 @@ namespace RadioBrowserAPI {
 
             // Note: clicking does not support GET/POST parameters.
             rest_manager->get_json(
-                "/json/url/" + uuid,
+                "/json/url/"s + uuid,
                 make_response_func(
                     [func = std::move(result_func)]
                     (const rest::request& req)
@@ -593,7 +678,7 @@ namespace RadioBrowserAPI {
 
             // NOTE: voting does not support GET/POST parameters.
             rest_manager->get_json(
-                "/json/vote/" + uuid,
+                "/json/vote/"s + uuid,
                 make_response_func(
                     [func = std::move(result_func)]
                     (const rest::request& req)
@@ -630,10 +715,12 @@ namespace RadioBrowserAPI {
 
 
     void
-    initialize(const string& user_agent,
+    initialize(const string& user_agent_,
                const string& server)
     {
         TRACE_FUNC;
+
+        user_agent = user_agent_;
 
         random_engine = make_random_engine();
 
@@ -647,7 +734,8 @@ namespace RadioBrowserAPI {
             update_mirrors_and_select_random();
 
         rest::manager::config rest_config;
-        rest_config.user_agent = user_agent;
+        rest_config.user_agent = user_agent_;
+        rest_config.verbose = cfg.verbose_rest_logs;
         rest_manager.emplace(std::move(rest_config), get_server());
     }
 
@@ -756,7 +844,7 @@ namespace RadioBrowserAPI {
 
 
     void
-    get_codecs(const CodecParams& params,
+    get_codecs(const CodecsParams& params,
                GetCodecsResultFunction result_func,
                ExceptionFunction except_func)
     {
@@ -769,12 +857,27 @@ namespace RadioBrowserAPI {
 
 
     void
-    get_countries(const CountryParams& params,
+    get_countries(const CountriesParams& params,
                   GetCountriesResultFunction result_func,
                   ExceptionFunction except_func)
     {
         pending_tasks.add("task_get_countries()"sv,
                           task_get_countries,
+                          params,
+                          std::move(result_func),
+                          std::move(except_func));
+    }
+
+
+    void
+    get_languages(const std::string& filter,
+                  const LanguagesParams& params,
+                  GetLanguagesResultFunction result_func,
+                  ExceptionFunction except_func)
+    {
+        pending_tasks.add("task_get_languages()"sv,
+                          task_get_languages,
+                          filter,
                           params,
                           std::move(result_func),
                           std::move(except_func));
@@ -806,7 +909,7 @@ namespace RadioBrowserAPI {
 
 
     void
-    get_tags(const TagParams& params,
+    get_tags(const TagsParams& params,
              GetTagsResultFunction result_func,
              ExceptionFunction except_func)
     {
@@ -819,7 +922,63 @@ namespace RadioBrowserAPI {
 
 
     void
-    search_stations(const SearchStationParams& params,
+    get_tags_sync(std::stop_token& stopper,
+                  const TagsParams& params,
+                  GetTagsResultFunction result_func,
+                  ExceptionFunction except_func)
+    {
+        try {
+            // BusyGuard bg{stopper};
+            std::string params_json;
+            glz::ex::write_json(params, params_json);
+
+            rest::request::params_t req_params{
+                .accept_content  = "application/json",
+                .error_func =
+                   [&except_func](const std::exception& e)
+                       mutable
+                   {
+                       if (except_func)
+                           except_func(e);
+                   },
+                .post_fields = std::move(params_json),
+                .request_content = "application/json",
+                .response_func =
+                    [&stopper, func = std::move(result_func)](rest::request& req)
+                        mutable
+                    {
+                        if (stopper.stop_requested())
+                            throw std::runtime_error{"stop requested"};
+                        TagVec result;
+                        glz::ex::read<glz_options>(result, req.get_content());
+                        if (stopper.stop_requested())
+                            throw std::runtime_error{"stop requested"};
+                        if (func)
+                            func(result);
+                    },
+                .url = get_server() + "/json/tags",
+                .user_agent = user_agent,
+                .verbose = cfg.verbose_rest_logs,
+            };
+
+            if (stopper.stop_requested())
+                return;
+
+            rest::post_sync(std::move(req_params));
+        }
+        catch (std::exception& e) {
+            if (except_func)
+                except_func(e);
+        }
+        catch (...) {
+            if (except_func)
+                except_func(std::runtime_error{"unknown exception caught"});
+        }
+    }
+
+
+    void
+    search_stations(const SearchStationsParams& params,
                     SearchStationsResultFunction result_func,
                     ExceptionFunction except_func)
     {

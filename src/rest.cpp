@@ -111,11 +111,11 @@ namespace rest {
             //           *params.post_fields);
         }
 
-        if (params.accept_content_type)
-            easy.append_http_header("Accept: " + *params.accept_content_type);
+        if (params.accept_content)
+            easy.append_http_header("Accept: " + *params.accept_content);
 
-        if (params.request_content_type)
-            easy.append_http_header("Content-Type: " + *params.request_content_type);
+        if (params.request_content)
+            easy.append_http_header("Content-Type: " + *params.request_content);
 
         easy.set_accept_encoding("");
         easy.set_auto_referer(true);
@@ -197,6 +197,7 @@ namespace rest {
 
     void
     request::process()
+        noexcept
     {
         try {
             easy.perform();
@@ -237,11 +238,11 @@ namespace rest {
 
         try {
             // Enforce content type
-            if (params.accept_content_type) {
-                if (!mime_type::match(content_type, *params.accept_content_type)) {
+            if (params.accept_content) {
+                if (!mime_type::match(content_type, *params.accept_content)) {
                     throw error{
                         std::format("Content-Type mismatch: asked for {:?} but got {:?}",
-                                    *params.accept_content_type,
+                                    *params.accept_content,
                                     content_type),
                         content,
                         content_type
@@ -408,7 +409,7 @@ namespace rest {
     {
         return add(
             {
-                .accept_content_type = "application/json",
+                .accept_content = "application/json",
                 .error_func = std::move(error_func),
                 .response_func = std::move(response_func),
                 .url = make_url(base_url, path, get_params),
@@ -446,10 +447,10 @@ namespace rest {
     {
         return add(
             {
-                .accept_content_type = "application/json",
+                .accept_content = "application/json",
                 .error_func = std::move(error_func),
                 .post_fields = std::move(post_body),
-                .request_content_type = "application/json",
+                .request_content = "application/json",
                 .response_func = std::move(response_func),
                 .url = make_url(base_url, path),
                 .user_agent = cfg.user_agent,

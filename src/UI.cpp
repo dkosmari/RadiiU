@@ -26,7 +26,6 @@
 #include "ImageLoader.hpp"
 #include "LogManager.hpp"
 #include "PlayerTab.hpp"
-#include "RadioBrowserAPI.hpp"
 #include "Settings.hpp"
 #include "Station.hpp"
 #include "string_utils.hpp"

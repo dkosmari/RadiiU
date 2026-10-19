@@ -48,7 +48,7 @@ namespace BrowserTab {
         /*-------*/
 
         struct OrderAndDir {
-            RadioBrowserAPI::SearchStationParams::Order orer;
+            RadioBrowserAPI::SearchStationsParams::Order orer;
             bool reverse;
         };
 
@@ -135,7 +135,7 @@ namespace BrowserTab {
         OrderAndDir
         get_order_dir(BrowserSearchPopup::Order o)
         {
-            using RBOrder = RadioBrowserAPI::SearchStationParams::Order;
+            using RBOrder = RadioBrowserAPI::SearchStationsParams::Order;
 
             switch (o) {
                 using enum BrowserSearchPopup::Order;
@@ -542,7 +542,7 @@ namespace BrowserTab {
 
         scroll_to_top = true;
 
-        RadioBrowserAPI::SearchStationParams params;
+        RadioBrowserAPI::SearchStationsParams params;
         params.offset = (page - 1u) * cfg.browser_page_limit;
         params.limit = cfg.browser_page_limit;
         params.hidebroken = true;
@@ -558,6 +558,8 @@ namespace BrowserTab {
             params.tag = filter.tag;
         if (!filter.country.empty())
             params.countrycode = filter.country;
+        if (!filter.language.empty())
+            params.language = filter.language;
         if (!filter.codec.empty())
             params.codec = filter.codec;
 

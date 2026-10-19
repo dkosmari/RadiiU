@@ -72,16 +72,16 @@ namespace rest {
 
 
         struct params_t {
-            std::optional<std::string>  accept_content_type  = {};
-            unsigned                    buffer_size          = 65536;
-            mutable error_function_t    error_func           = {};
-            std::optional<std::string>  post_fields          = {};
-            std::optional<std::string>  request_content_type = {};
-            mutable response_function_t response_func        = {};
-            bool                        ssl_verify_peer      = false;
-            std::string                 url;
-            std::optional<std::string>  user_agent           = {};
-            bool                        verbose              = true;
+            std::optional<std::string>  accept_content  = {};
+            unsigned                    buffer_size     = 65536;
+            mutable error_function_t    error_func      = {};
+            std::optional<std::string>  post_fields     = {};
+            std::optional<std::string>  request_content = {};
+            mutable response_function_t response_func   = {};
+            bool                        ssl_verify_peer = false;
+            std::string                 url             = {};
+            std::optional<std::string>  user_agent      = {};
+            bool                        verbose         = true;
         }; // struct params_t
 
 
@@ -127,7 +127,8 @@ namespace rest {
 
 
         void
-        process();
+        process()
+            noexcept;
 
 
         void
@@ -172,8 +173,8 @@ namespace rest {
     public:
 
         struct config {
-            unsigned                   max_connections       = 5;
-            unsigned                   max_total_connections = 5;
+            unsigned                   max_connections       = 2;
+            unsigned                   max_total_connections = 2;
             std::optional<std::string> user_agent            = {};
             bool                       verbose               = false;
         };

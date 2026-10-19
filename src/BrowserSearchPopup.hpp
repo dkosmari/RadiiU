@@ -33,10 +33,11 @@ namespace BrowserSearchPopup {
 
 
     struct Filter {
+        std::string codec;
+        std::string country;
+        std::string language;
         std::string name;
         std::string tag;
-        std::string country;
-        std::string codec;
     };
 
 

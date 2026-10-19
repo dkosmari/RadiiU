@@ -13,6 +13,7 @@
 #include <functional>
 #include <optional>
 #include <stdexcept>
+#include <stop_token>
 #include <string>
 #include <vector>
 
@@ -47,7 +48,7 @@ namespace RadioBrowserAPI {
 
 
 
-    struct CodecParams {
+    struct CodecsParams {
         enum class Order {
             name,
             stationcount,
@@ -60,7 +61,7 @@ namespace RadioBrowserAPI {
         opt_bool  hidebroken = {};
         opt_uint  offset     = {};
         opt_uint  limit      = {};
-    }; // struct CodecParams
+    }; // struct CodecsParams
 
 
     struct Codec {
@@ -72,7 +73,7 @@ namespace RadioBrowserAPI {
     using CodecVec = std::vector<Codec>;
 
 
-    struct CountryParams {
+    struct CountriesParams {
         enum class Order {
             name,
             stationcount,
@@ -85,7 +86,7 @@ namespace RadioBrowserAPI {
         opt_bool  hidebroken = {};
         opt_uint  offset     = {};
         opt_uint  limit      = {};
-    }; // struct CountryParams
+    }; // struct CountriesParams
 
 
     struct Country {
@@ -96,6 +97,32 @@ namespace RadioBrowserAPI {
 
 
     using CountryVec = std::vector<Country>;
+
+
+    struct LanguagesParams {
+        enum class Order {
+            name,
+            stationcount,
+        };
+
+        using opt_order = std::optional<Order>;
+
+        opt_order order      = {};
+        opt_bool  reverse    = {};
+        opt_bool  hidebroken = {};
+        opt_uint  offset     = {};
+        opt_uint  limit      = {};
+    }; // struct LanguagesParams
+
+
+    struct Language {
+        std::string name;
+        opt_string iso_639;
+        unsigned stationcount;
+    }; // struct Language
+
+
+    using LanguageVec = std::vector<Language>;
 
 
     struct ServerStats {
@@ -112,7 +139,7 @@ namespace RadioBrowserAPI {
     }; // struct ServerStats
 
 
-    struct SearchStationParams {
+    struct SearchStationsParams {
         enum class Order {
             name,
             url,
@@ -162,10 +189,10 @@ namespace RadioBrowserAPI {
         opt_uint    offset            = {};
         opt_uint    limit             = {};
         opt_bool    hidebroken        = {};
-    }; // struct SearchStationParams
+    }; // struct SearchStationsParams
 
 
-    struct StationParams {
+    struct StationsParams {
         enum class Order {
             name,
             url,
@@ -194,7 +221,7 @@ namespace RadioBrowserAPI {
         opt_uint offset = {};
         opt_uint limit = {};
         opt_bool hidebroken = {};
-    }; // struct StationParams
+    }; // struct StationsParams
 
 
     struct StationUUIDParams {
@@ -244,7 +271,7 @@ namespace RadioBrowserAPI {
     using StationVec = std::vector<Station>;
 
 
-    struct TagParams {
+    struct TagsParams {
         enum class Order {
             name,
             stationcount,
@@ -257,7 +284,7 @@ namespace RadioBrowserAPI {
         opt_bool  hidebroken = {};
         opt_uint  offset     = {};
         opt_uint  limit      = {};
-    }; // struct TagParams
+    }; // struct TagsParams
 
 
     struct Tag {
@@ -339,7 +366,7 @@ namespace RadioBrowserAPI {
     using GetCodecsResultFunction = ResultFunction<CodecVec>;
 
     void
-    get_codecs(const CodecParams& params,
+    get_codecs(const CodecsParams& params,
                GetCodecsResultFunction result_func,
                ExceptionFunction except_func = {});
 
@@ -347,8 +374,17 @@ namespace RadioBrowserAPI {
     using GetCountriesResultFunction = ResultFunction<CountryVec>;
 
     void
-    get_countries(const CountryParams& params,
+    get_countries(const CountriesParams& params,
                   GetCountriesResultFunction result_func,
+                  ExceptionFunction except_func = {});
+
+
+    using GetLanguagesResultFunction = ResultFunction<LanguageVec>;
+
+    void
+    get_languages(const std::string& filter,
+                  const LanguagesParams& params,
+                  GetLanguagesResultFunction result_func,
                   ExceptionFunction except_func = {});
 
 
@@ -370,15 +406,21 @@ namespace RadioBrowserAPI {
     using GetTagsResultFunction = ResultFunction<TagVec>;
 
     void
-    get_tags(const TagParams& params,
+    get_tags(const TagsParams& params,
              GetTagsResultFunction result_func,
              ExceptionFunction except_func = {});
+
+    void
+    get_tags_sync(std::stop_token& stopper,
+                  const TagsParams& params,
+                  GetTagsResultFunction result_func,
+                  ExceptionFunction except_func = {});
 
 
     using SearchStationsResultFunction = ResultFunction<StationVec>;
 
     void
-    search_stations(const SearchStationParams& params,
+    search_stations(const SearchStationsParams& params,
                     SearchStationsResultFunction result_func,
                     ExceptionFunction except_func = {});
 

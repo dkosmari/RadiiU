@@ -1,19 +1,26 @@
+/*
+ * RadiiU - an internet radio player for the Wii U.
+ *
+ * Copyright (C) 2026  Daniel K. O. <dkosmari>
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 #include "Timer.hpp"
 
-#include "PerfWindow.hpp"
+#include "LogManager.hpp"
 
 
-using flt_seconds = std::chrono::duration<float>;
-
-
-Timer::Timer(const std::string& name) :
-    name{name}
+Timer::Timer(const std::string& name_) :
+    name{name_}
 {}
 
 
 void
 Timer::report()
 {
-    float dt = duration_cast<flt_seconds>(elapsed()).count();
-    PerfWindow::record_time(name, dt);
+    LOG_DEBUG(
+        "Timer {}: {}",
+        name,
+        duration_cast<std::chrono::microseconds>(elapsed())
+    );
 }

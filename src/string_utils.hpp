@@ -47,8 +47,8 @@ namespace string_utils {
 
     [[nodiscard]]
     std::strong_ordering
-    spaceship_case(std::string_view a,
-                   std::string_view b);
+    compare_case(std::string_view a,
+                 std::string_view b);
 
 
     [[nodiscard]]

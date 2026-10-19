@@ -92,13 +92,8 @@ namespace string_utils {
     {
         if (a.size() != b.size())
             return false;
-        auto loc = std::locale::classic();
-        for (std::size_t i = 0; i <a.size(); ++i) {
-            if (std::toupper(a[i], loc) !=
-                std::toupper(b[i], loc))
-                return false;
-        }
-        return true;
+        std::size_t size = std::min(a.size(), b.size());
+        return !SDL_strncasecmp(a.data(), b.data(), size);
     }
 
 
@@ -116,8 +111,8 @@ namespace string_utils {
 
 
     std::strong_ordering
-    spaceship_case(std::string_view a,
-                   std::string_view b)
+    compare_case(std::string_view a,
+                 std::string_view b)
     {
         std::size_t size = std::min(a.size(), b.size());
         int cmp = SDL_strncasecmp(a.data(), b.data(), size);

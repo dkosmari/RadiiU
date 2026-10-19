@@ -349,7 +349,7 @@ namespace Styles {
         if (g != std::strong_ordering::equal)
             return g;
 
-        return string_utils::spaceship_case(name, other.name);
+        return string_utils::compare_case(name, other.name);
     }
 
 

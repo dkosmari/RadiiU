@@ -157,9 +157,9 @@ namespace CountryManager {
 
             countries.emplace();
 
-            RadioBrowserAPI::CountryParams params;
+            RadioBrowserAPI::CountriesParams params;
             // NOTE: RadioBrowser does not respect order by name, it orders by code.
-            // params.order = RadioBrowserAPI::CountryParams::Order::name;
+            // params.order = RadioBrowserAPI::CountriesParams::Order::name;
             params.hidebroken = true;
             params.limit = 1000;
 
@@ -168,9 +168,12 @@ namespace CountryManager {
                 [](RadioBrowserAPI::CountryVec rb_countries)
                 {
                     for (auto& [name, code, count] : rb_countries) {
-                        code_to_name[code] = name;
-                        name_to_code[name] = code;
-                        countries->emplace_back(std::move(code),
+                        // LOG_DEBUG("handling: {:?}, {:?}",
+                        //           name, code);
+                        auto up_code = string_utils::to_upper(std::move(code));
+                        code_to_name.emplace(up_code, name);
+                        name_to_code.emplace(name, up_code);
+                        countries->emplace_back(std::move(up_code),
                                                 std::move(name));
                     }
 
