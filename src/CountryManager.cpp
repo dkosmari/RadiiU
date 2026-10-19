@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <flat_map>
 #include <ranges>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -22,8 +23,6 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
-
-
 #include "CountryManager.hpp"
 
 #include "App.hpp"
@@ -31,11 +30,27 @@
 #include "LogManager.hpp"
 #include "RadioBrowserAPI.hpp"
 #include "string_utils.hpp"
+#include "thread_safe.hpp"
+#include "Timer.hpp"
 #include "TraceFunction.hpp"
 #include "tracer.hpp"
+#include "utils.hpp"
+
+
+// Comment this to use JSON for the local cache.
+#define USE_BEVE_CACHE
+
+
+#ifndef USE_BEVE_CACHE
+#include <glaze/exceptions/json_exceptions.hpp>
+#else
+#include <glaze/exceptions/binary_exceptions.hpp>
+#endif
 
 
 using namespace std::literals;
+
+using utils::throw_if_stopped;
 
 
 namespace CountryManager {
@@ -72,6 +87,14 @@ namespace CountryManager {
         }; // struct FlagEntry
 
 
+        using CountryVec = std::vector<Country>;
+        using OptCountryVec = std::optional<CountryVec>;
+
+        using StrStrMap = std::unordered_map<std::string, std::string>;
+        using CodepointStrMap = std::unordered_map<char32_t, std::string>;
+        using StrFlagEntryMap = std::unordered_map<std::string, FlagEntry>;
+
+
         /*-----------*/
         /* Constants */
         /*-----------*/
@@ -86,14 +109,16 @@ namespace CountryManager {
         ImFontLoader font_loader;
         ImFontConfig font_config;
 
-        std::unordered_map<std::string, FlagEntry> flags;
-        std::unordered_map<char32_t, std::string> codepoint_to_code;
-        std::unordered_map<std::string, std::string> code_to_name;
-        std::unordered_map<std::string, std::string> name_to_code;
-
         char32_t last_codepoint;
 
-        std::optional<std::vector<Country>> countries;
+        // NOTE: we need a recursive mutex to allow CountryFunction to raed info about the
+        // countries.
+        thread_safe<StrFlagEntryMap, std::recursive_mutex> safe_flags;
+        thread_safe<CodepointStrMap, std::recursive_mutex> safe_codepoint_to_code;
+        thread_safe<StrStrMap, std::recursive_mutex> safe_code_to_name;
+        thread_safe<StrStrMap, std::recursive_mutex> safe_name_to_code;
+        thread_safe<OptCountryVec, std::recursive_mutex> safe_countries;
+        std::jthread countries_thread;
 
 
         /*-----------------------*/
@@ -101,7 +126,7 @@ namespace CountryManager {
         /*-----------------------*/
 
         void
-        fetch_countries();
+        fetch_countries(OptCountryVec& countries);
 
         bool
         font_loader_src_init(ImFontAtlas*,
@@ -142,12 +167,21 @@ namespace CountryManager {
                             const ImFontBaked* baked);
 
 
+        void
+        load_countries_cache(std::stop_token& stopper)
+            noexcept;
+
+        void
+        save_countries_cache(const RadioBrowserAPI::CountryVec& rb_countries)
+            noexcept;
+
+
         /*----------------------*/
         /* Function definitions */
         /*----------------------*/
 
         void
-        fetch_countries()
+        fetch_countries(OptCountryVec& countries)
         {
             TRACE_FUNC;
 
@@ -157,37 +191,62 @@ namespace CountryManager {
 
             countries.emplace();
 
-            RadioBrowserAPI::CountriesParams params;
-            // NOTE: RadioBrowser does not respect order by name, it orders by code.
-            // params.order = RadioBrowserAPI::CountriesParams::Order::name;
-            params.hidebroken = true;
-            params.limit = 1000;
-
-            RadioBrowserAPI::get_countries(
-                {},
-                [](RadioBrowserAPI::CountryVec rb_countries)
+            countries_thread = std::jthread{
+                [](std::stop_token stopper)
                 {
-                    for (auto& [name, code, count] : rb_countries) {
-                        // LOG_DEBUG("handling: {:?}, {:?}",
-                        //           name, code);
-                        auto up_code = string_utils::to_upper(std::move(code));
-                        code_to_name.emplace(up_code, name);
-                        name_to_code.emplace(name, up_code);
-                        countries->emplace_back(std::move(up_code),
-                                                std::move(name));
+                    try {
+                        load_countries_cache(stopper);
+
+                        RadioBrowserAPI::CountriesParams params;
+                        // NOTE: RadioBrowser does not respect order by name, it orders by code.
+                        // params.order = RadioBrowserAPI::CountriesParams::Order::name;
+                        params.hidebroken = true;
+                        params.limit = 1000;
+
+                        RadioBrowserAPI::get_countries_sync(
+                            stopper,
+                            {},
+                            [&stopper]
+                            (const RadioBrowserAPI::CountryVec rb_countries)
+                                mutable
+                            {
+                                throw_if_stopped(stopper);
+
+                                CountryVec new_countries;
+
+                                for (auto& [name, code, count] : rb_countries) {
+                                    throw_if_stopped(stopper);
+                                    // LOG_DEBUG("handling: {:?}, {:?}",
+                                    //           name, code);
+                                    auto up_code = string_utils::to_upper(code);
+                                    safe_code_to_name.lock()->emplace(up_code, name);
+                                    safe_name_to_code.lock()->emplace(name, up_code);
+                                    new_countries.emplace_back(std::move(up_code), name);
+                                }
+
+                                std::ranges::sort(new_countries,
+                                                  string_utils::less_case,
+                                                  &Country::name);
+
+                                LOG_INFO("Received {} countries.", new_countries.size());
+
+                                safe_countries.store(std::move(new_countries));
+
+                                throw_if_stopped(stopper);
+
+                                save_countries_cache(rb_countries);
+                            },
+                            [](const std::exception& e)
+                            {
+                                LOG_ERROR("Fetching countries: {}", e.what());
+                            }
+                        );
                     }
-
-                    std::ranges::sort(*countries,
-                                      string_utils::less_case,
-                                      &Country::name);
-
-                    LOG_INFO("Received {} countries.", countries->size());
-                },
-                [](const std::exception& e)
-                {
-                    LOG_ERROR("Fetching countries: {}", e.what());
+                    catch (std::exception& e) {
+                        LOG_ERROR("countries_thread failed: {}", e.what());
+                    }
                 }
-            );
+            };
         }
 
 
@@ -242,6 +301,9 @@ namespace CountryManager {
             TraceFunction tf{"CountryManager"sv, std::move(args)};
 
             // Load all flags for this size.
+            auto flags_guard = safe_flags.lock();
+            auto& flags = *flags_guard;
+
             for (auto& [code, flag_entry] : flags) {
                 auto image_entry = flag_entry.find_image(font_size);
                 if (!image_entry)
@@ -285,6 +347,12 @@ namespace CountryManager {
                 // LOG_DEBUG("rasterizer_density: {}", rasterizer_density);
 
                 float font_size = get_final_font_size(config, baked);
+
+                auto flags_guard = safe_flags.lock();
+                auto& flags = *flags_guard;
+
+                auto codepoint_to_code_guard = safe_codepoint_to_code.c_lock();
+                auto& codepoint_to_code = *codepoint_to_code_guard;
 
                 auto& flag_entry = flags.at(codepoint_to_code.at(codepoint));
 
@@ -378,6 +446,104 @@ namespace CountryManager {
                 image = sdl::surface{std::move(image), target_format};
         }
 
+
+        void
+        load_countries_cache(std::stop_token& stopper)
+            noexcept
+        {
+            try {
+#ifndef USE_BEVE_CACHE
+                auto cached_countries_filename = App::get_data_dir() / "countries.json";
+#else
+                auto cached_countries_filename = App::get_data_dir() / "countries.beve";
+#endif
+                if (!exists(cached_countries_filename))
+                    return;
+
+                RadioBrowserAPI::CountryVec rb_countries;
+
+                Timer t{"load countries cache"};
+                t.start();
+#ifndef USE_BEVE_CACHE
+                glz::ex::read_file_json(
+                    rb_countries,
+                    cached_countries_filename.string(),
+                    std::string{}
+                );
+#else
+                glz::ex::read_file_beve(
+                    rb_countries,
+                    cached_countries_filename.string(),
+                    std::string{}
+                );
+#endif
+                t.stop();
+                t.report();
+
+                throw_if_stopped(stopper);
+
+                CountryVec new_countries;
+
+                for (auto& [name, code, stationcount] : rb_countries) {
+                    throw_if_stopped(stopper);
+                    auto up_code = string_utils::to_upper(std::move(code));
+                    safe_code_to_name.lock()->emplace(up_code, name);
+                    safe_name_to_code.lock()->emplace(name, up_code);
+                    new_countries.emplace_back(std::move(up_code), std::move(name));
+                }
+
+                std::ranges::sort(new_countries,
+                                  string_utils::less_case,
+                                  &Country::name);
+
+                LOG_INFO("Loaded {} countries.", new_countries.size());
+
+                safe_countries.store(std::move(new_countries));
+
+                LOG_INFO("Loaded countries from local cache: {:?}",
+                         cached_countries_filename.string());
+            }
+            catch (std::exception& e) {
+                LOG_ERROR("Failed to load cached countries: {}", e.what());
+            }
+        }
+
+
+        void
+        save_countries_cache(const RadioBrowserAPI::CountryVec& rb_countries)
+            noexcept
+        {
+            TRACE_FUNC;
+
+            try {
+                Timer t{"save countries cache"};
+                t.start();
+#ifndef USE_BEVE_CACHE
+                auto cached_countries_filename = App::get_data_dir() / "countries.json";
+                glz::ex::write_file_json(
+                    rb_countries,
+                    cached_countries_filename.string(),
+                    std::string{}
+                );
+#else
+                auto cached_countries_filename = App::get_data_dir() / "countries.beve";
+                glz::ex::write_file_beve(
+                    rb_countries,
+                    cached_countries_filename.string(),
+                    std::string{}
+                );
+#endif
+                t.stop();
+                t.report();
+
+                LOG_INFO("Saved countries to local cache: {:?}",
+                         cached_countries_filename.string());
+            }
+            catch (std::exception& e) {
+                LOG_ERROR("Failed to cache countries: {}", e.what());
+            }
+        }
+
     } // namespace
 
 
@@ -394,11 +560,22 @@ namespace CountryManager {
 
         // Reserve enough size for the hash tables.
         const std::size_t reserved = 400;
-        flags.reserve(reserved);
-        codepoint_to_code.reserve(reserved);
-        code_to_name.reserve(reserved);
-        name_to_code.reserve(reserved);
 
+        auto flags_guard = safe_flags.lock();
+        auto& flags = *flags_guard;
+        flags.reserve(reserved);
+
+        auto codepoint_to_code_guard = safe_codepoint_to_code.lock();
+        auto& codepoint_to_code = *codepoint_to_code_guard;
+        codepoint_to_code.reserve(reserved);
+
+        auto code_to_name_guard = safe_code_to_name.lock();
+        auto& code_to_name = *code_to_name_guard;
+        code_to_name.reserve(reserved);
+
+        auto name_to_code_guard = safe_name_to_code.lock();
+        auto& name_to_code = *name_to_code_guard;
+        name_to_code.reserve(reserved);
 
         try {
             TraceDuration duration_flag_loading{"CountryManager::initialize()/loading"sv,
@@ -485,16 +662,23 @@ namespace CountryManager {
     {
         TRACE_FUNC;
 
-        flags.clear();
-        codepoint_to_code.clear();
-        code_to_name.clear();
-        name_to_code.clear();
+        countries_thread = {};
+
+        safe_countries.store(OptCountryVec{});
+
+        safe_flags.store(StrFlagEntryMap{});
+        safe_codepoint_to_code.store(CodepointStrMap{});
+        safe_code_to_name.store(StrStrMap{});
+        safe_name_to_code.store(StrStrMap{});
     }
 
 
     char32_t
     get_codepoint(const std::string& code)
     {
+        auto flags_guard = safe_flags.c_lock();
+        auto& flags = *flags_guard;
+
         auto it = flags.find(code);
         if (it == flags.end())
             return 0;
@@ -505,6 +689,9 @@ namespace CountryManager {
     std::string
     get_utf8(const std::string& code)
     {
+        auto flags_guard = safe_flags.c_lock();
+        auto& flags = *flags_guard;
+
         auto it = flags.find(code);
         if (it == flags.end())
             return ICON_FA_FLAG_O;
@@ -518,10 +705,17 @@ namespace CountryManager {
         if (name.empty())
             return {};
 
-        if (!countries) {
-            fetch_countries();
-            return {};
+        {
+            auto countries_guard = safe_countries.lock();
+            auto& countries = *countries_guard;
+            if (!countries) {
+                fetch_countries(countries);
+                return {};
+            }
         }
+
+        auto name_to_code_guard = safe_name_to_code.c_lock();
+        auto& name_to_code = *name_to_code_guard;
 
         auto it = name_to_code.find(name);
         if (it == name_to_code.end())
@@ -536,8 +730,15 @@ namespace CountryManager {
         if (code.empty())
             return {};
 
-        if (!countries)
-            fetch_countries();
+        {
+            auto countries_guard = safe_countries.lock();
+            auto& countries = *countries_guard;
+            if (!countries)
+                fetch_countries(countries);
+        }
+
+        auto code_to_name_guard = safe_code_to_name.c_lock();
+        auto& code_to_name = *code_to_name_guard;
 
         auto it = code_to_name.find(code);
         if (it == code_to_name.end())
@@ -549,8 +750,10 @@ namespace CountryManager {
     void
     for_each_country(const CountryFunction& func)
     {
+        auto countries_guard = safe_countries.lock();
+        auto& countries = *countries_guard;
         if (!countries)
-            fetch_countries();
+            fetch_countries(countries);
 
         for (auto [index, c] : *countries | std::views::enumerate)
             func(index, c);

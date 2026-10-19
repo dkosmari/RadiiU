@@ -6,6 +6,7 @@
  */
 
 #include <algorithm>
+#include <stdexcept>
 
 #include "utils.hpp"
 
@@ -25,6 +26,14 @@ namespace utils {
                 std::span<const std::byte> prefix)
     {
         return std::ranges::starts_with(data, prefix);
+    }
+
+
+    void
+    throw_if_stopped(std::stop_token& stopper)
+    {
+        if (stopper.stop_requested())
+            throw std::runtime_error{"stop requested"};
     }
 
 } // namespace utils

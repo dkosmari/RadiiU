@@ -378,6 +378,12 @@ namespace RadioBrowserAPI {
                   GetCountriesResultFunction result_func,
                   ExceptionFunction except_func = {});
 
+    void
+    get_countries_sync(std::stop_token& stopper,
+                       const CountriesParams& params,
+                       GetCountriesResultFunction result_func,
+                       ExceptionFunction except_func = {});
+
 
     using GetLanguagesResultFunction = ResultFunction<LanguageVec>;
 

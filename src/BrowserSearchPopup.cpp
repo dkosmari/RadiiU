@@ -32,10 +32,11 @@
 #include "Timer.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
+#include "utils.hpp"
 
 
 // Comment this to use JSON for the local cache.
-// #define USE_BEVE_CACHE
+#define USE_BEVE_CACHE
 
 
 #ifndef USE_BEVE_CACHE
@@ -46,6 +47,8 @@
 
 
 using namespace std::literals;
+
+using utils::throw_if_stopped;
 
 
 namespace BrowserSearchPopup {
@@ -160,9 +163,6 @@ namespace BrowserSearchPopup {
         void
         show_filters();
 
-        void
-        throw_if_stopped(std::stop_token& stopper);
-
         std::string
         to_label(Order order);
 
@@ -253,13 +253,17 @@ namespace BrowserSearchPopup {
                             ""s,
                             params,
                             [&stopper]
-                            (RadioBrowserAPI::LanguageVec rb_languages)
+                            (const RadioBrowserAPI::LanguageVec rb_languages)
                                 mutable
                             {
+                                throw_if_stopped(stopper);
+
                                 LanguageVec new_languages;
 
-                                for (auto& [name, code, stationcount] : rb_languages)
+                                for (auto& [name, code, stationcount] : rb_languages) {
+                                    throw_if_stopped(stopper);
                                     new_languages.emplace_back(name, code);
+                                }
 
                                 LOG_INFO("Received {} languages.", new_languages.size());
                                 safe_languages.store(std::move(new_languages));
@@ -309,11 +313,15 @@ namespace BrowserSearchPopup {
                             stopper,
                             params,
                             [&stopper]
-                            (RadioBrowserAPI::TagVec rb_tags)
+                            (const RadioBrowserAPI::TagVec rb_tags)
                                 mutable
                             {
+                                throw_if_stopped(stopper);
+
                                 if (!ignored_tags_regex)
                                     ignored_tags_regex = load_ignored_tags_regex(stopper);
+
+                                throw_if_stopped(stopper);
 
                                 TagVec new_tags;
                                 std::smatch matches;
@@ -430,11 +438,15 @@ namespace BrowserSearchPopup {
 
                 throw_if_stopped(stopper);
 
+                LanguageVec new_languages;
+
                 for (auto& [name, code, stationcount] : rb_languages) {
-                    auto languages_guard = safe_languages.lock();
-                    auto& languages = *languages_guard;
-                    languages->emplace_back(std::move(name), std::move(code));
+                    throw_if_stopped(stopper);
+                    new_languages.emplace_back(std::move(name), std::move(code));
                 }
+
+                LOG_INFO("Loaded {} languages.", new_languages.size());
+                safe_languages.store(std::move(new_languages));
                 LOG_INFO("Loaded languages from local cache: {:?}",
                          cached_languages_filename.string());
             }
@@ -483,10 +495,9 @@ namespace BrowserSearchPopup {
                     ignored_tags_regex = load_ignored_tags_regex(stopper);
 
                 std::smatch matches;
+                TagVec new_tags;
                 for (auto& [name, stationcount] : rb_tags) {
-
                     throw_if_stopped(stopper);
-
                     if (ignored_tags_regex &&
                         regex_search(name, matches, *ignored_tags_regex) &&
                         matches.length() > 0) {
@@ -496,10 +507,10 @@ namespace BrowserSearchPopup {
                         continue; // skip this tag
                     }
 
-                    auto tags_guard = safe_tags.lock();
-                    auto& tags = *tags_guard;
-                    tags->push_back(std::move(name));
+                    new_tags.push_back(std::move(name));
                 }
+                LOG_INFO("Loaded {} tags.", new_tags.size());
+                safe_tags.store(std::move(new_tags));
                 LOG_INFO("Loaded tags from local cache: {:?}", cached_tags_filename.string());
             }
             catch (std::exception& e) {
@@ -579,7 +590,8 @@ namespace BrowserSearchPopup {
                 t.stop();
                 t.report();
 
-                LOG_INFO("Saved tags to local cache: {:?}", cached_languages_filename.string());
+                LOG_INFO("Saved languages to local cache: {:?}",
+                         cached_languages_filename.string());
             }
             catch (std::exception& e) {
                 LOG_ERROR("Failed to cache languages: {}", e.what());
@@ -774,7 +786,7 @@ namespace BrowserSearchPopup {
                         language_text_filter.Build();
                     }
 
-                    ImGui::SetNextItemWidth(800);
+                    ImGui::SetNextItemWidth(900);
                     if (language_text_filter.Draw("##language_text_filter"))
                         filter.language = language_text_filter.InputBuf;
 
@@ -835,14 +847,6 @@ namespace BrowserSearchPopup {
 
             } // filters_group
 
-        }
-
-
-        void
-        throw_if_stopped(std::stop_token& stopper)
-        {
-            if (stopper.stop_requested())
-                throw std::runtime_error{"stop requested"};
         }
 
 

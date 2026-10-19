@@ -41,11 +41,13 @@
 #include "TraceFunction.hpp"
 #include "TraceManager.hpp"
 #include "tracer.hpp"
+#include "utils.hpp"
 
 
 using namespace std::literals;
 
 using Settings::cfg;
+using utils::throw_if_stopped;
 
 
 template<>
@@ -251,9 +253,6 @@ namespace RadioBrowserAPI {
         task_send_vote(const string& uuid,
                        SendVoteResultFunction result_func,
                        ExceptionFunction except_func);
-
-        void
-        throw_if_stopped(std::stop_token& stopper);
 
 
         /*----------------------*/
@@ -693,14 +692,6 @@ namespace RadioBrowserAPI {
             );
         }
 
-
-        void
-        throw_if_stopped(std::stop_token& stopper)
-        {
-            if (stopper.stop_requested())
-                throw Error{"stop requested"};
-        }
-
     } // namespace
 
 
@@ -869,6 +860,58 @@ namespace RadioBrowserAPI {
 
 
     void
+    get_countries_sync(std::stop_token& stopper,
+                       const CountriesParams& params,
+                       GetCountriesResultFunction result_func,
+                       ExceptionFunction except_func)
+    {
+        try {
+            std::string params_json;
+            glz::ex::write_json(params, params_json);
+
+            throw_if_stopped(stopper);
+
+            rest::request::params_t req_params{
+                .accept_content = "application/json"s,
+                .error_func =
+                [&except_func]
+                (const std::exception& e)
+                mutable
+                {
+                    if (except_func)
+                        except_func(e);
+                },
+                .post_fields = std::move(params_json),
+                .request_content = "application/json"s,
+                .response_func =
+                [&stopper, func = std::move(result_func)]
+                (rest::request& req)
+                mutable
+                {
+                    throw_if_stopped(stopper);
+                    CountryVec result;
+                    glz::ex::read<glz_options>(result, req.get_content());
+                    throw_if_stopped(stopper);
+                    if (func)
+                        func(result);
+                },
+                .url = get_server() + "/json/countries"s,
+                .user_agent = user_agent,
+                .verbose = cfg.verbose_rest_logs,
+            };
+
+            throw_if_stopped(stopper);
+
+            rest::post_sync(std::move(req_params));
+        }
+        catch (std::exception& e) {
+            if (except_func)
+                except_func(e);
+        }
+    }
+
+
+    void
     get_languages(const std::string& filter,
                   const LanguagesParams& params,
                   GetLanguagesResultFunction result_func,
@@ -897,6 +940,9 @@ namespace RadioBrowserAPI {
 
             std::string params_json;
             glz::ex::write_json(params, params_json);
+
+            throw_if_stopped(stopper);
+
             rest::request::params_t req_params{
                 .accept_content = "application/json"s,
                 .error_func =
@@ -932,10 +978,6 @@ namespace RadioBrowserAPI {
         catch (std::exception& e) {
             if (except_func)
                 except_func(e);
-        }
-        catch (...) {
-            if (except_func)
-                except_func(std::runtime_error{"unknown exception"});
         }
     }
 
@@ -988,6 +1030,8 @@ namespace RadioBrowserAPI {
             std::string params_json;
             glz::ex::write_json(params, params_json);
 
+            throw_if_stopped(stopper);
+
             rest::request::params_t req_params{
                 .accept_content = "application/json"s,
                 .error_func =
@@ -1012,7 +1056,7 @@ namespace RadioBrowserAPI {
                         if (func)
                             func(result);
                     },
-                .url = get_server() + "/json/tags",
+                .url = get_server() + "/json/tags"s,
                 .user_agent = user_agent,
                 .verbose = cfg.verbose_rest_logs,
             };
@@ -1024,10 +1068,6 @@ namespace RadioBrowserAPI {
         catch (std::exception& e) {
             if (except_func)
                 except_func(e);
-        }
-        catch (...) {
-            if (except_func)
-                except_func(std::runtime_error{"unknown exception"});
         }
     }
 

@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <ranges>
 #include <span>
+#include <stop_token>
 
 
 namespace utils {
@@ -39,6 +40,9 @@ namespace utils {
         }
         return false;
     }
+
+    void
+    throw_if_stopped(std::stop_token& stopper);
 
 } // namespace utils
 
