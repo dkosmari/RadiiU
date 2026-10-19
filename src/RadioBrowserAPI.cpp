@@ -265,8 +265,7 @@ namespace RadioBrowserAPI {
         {
             bool expected_false = false;
             while (!busy.compare_exchange_strong(expected_false, true)) {
-                if (stopper.stop_requested())
-                    throw std::runtime_error{"stop requested"};
+                throw_if_stopped(stopper);
                 std::this_thread::sleep_for(100ms);
                 expected_false = false;
             }
@@ -885,6 +884,63 @@ namespace RadioBrowserAPI {
 
 
     void
+    get_languages_sync(std::stop_token& stopper,
+                       const std::string& filter,
+                       const LanguagesParams& params,
+                       GetLanguagesResultFunction result_func,
+                       ExceptionFunction except_func)
+    {
+        try {
+            std::string url = get_server() + "/json/languages"s;
+            if (!filter.empty())
+                url += "/"s + curl::escape(filter);
+
+            std::string params_json;
+            glz::ex::write_json(params, params_json);
+            rest::request::params_t req_params{
+                .accept_content = "application/json"s,
+                .error_func =
+                    [&except_func]
+                    (const std::exception& e)
+                        mutable
+                    {
+                        if (except_func)
+                            except_func(e);
+                    },
+                .post_fields = std::move(params_json),
+                .request_content = "application/json"s,
+                .response_func =
+                [&stopper, func = std::move(result_func)]
+                    (rest::request& req)
+                        mutable
+                    {
+                        throw_if_stopped(stopper);
+                        LanguageVec result;
+                        glz::ex::read<glz_options>(result, req.get_content());
+                        if (func)
+                            func(result);
+                    },
+                .url = url,
+                .user_agent = user_agent,
+                .verbose = cfg.verbose_rest_logs,
+            };
+
+            throw_if_stopped(stopper);
+
+            rest::post_sync(std::move(req_params));
+        }
+        catch (std::exception& e) {
+            if (except_func)
+                except_func(e);
+        }
+        catch (...) {
+            if (except_func)
+                except_func(std::runtime_error{"unknown exception"});
+        }
+    }
+
+
+    void
     get_server_stats(GetServerStatsResultFunction result_func,
                      ExceptionFunction except_func)
     {
@@ -933,26 +989,26 @@ namespace RadioBrowserAPI {
             glz::ex::write_json(params, params_json);
 
             rest::request::params_t req_params{
-                .accept_content  = "application/json",
+                .accept_content = "application/json"s,
                 .error_func =
-                   [&except_func](const std::exception& e)
+                   [&except_func]
+                   (const std::exception& e)
                        mutable
                    {
                        if (except_func)
                            except_func(e);
                    },
                 .post_fields = std::move(params_json),
-                .request_content = "application/json",
+                .request_content = "application/json"s,
                 .response_func =
-                    [&stopper, func = std::move(result_func)](rest::request& req)
+                    [&stopper, func = std::move(result_func)]
+                    (rest::request& req)
                         mutable
                     {
-                        if (stopper.stop_requested())
-                            throw std::runtime_error{"stop requested"};
+                        throw_if_stopped(stopper);
                         TagVec result;
                         glz::ex::read<glz_options>(result, req.get_content());
-                        if (stopper.stop_requested())
-                            throw std::runtime_error{"stop requested"};
+                        throw_if_stopped(stopper);
                         if (func)
                             func(result);
                     },
@@ -961,8 +1017,7 @@ namespace RadioBrowserAPI {
                 .verbose = cfg.verbose_rest_logs,
             };
 
-            if (stopper.stop_requested())
-                return;
+            throw_if_stopped(stopper);
 
             rest::post_sync(std::move(req_params));
         }
@@ -972,7 +1027,7 @@ namespace RadioBrowserAPI {
         }
         catch (...) {
             if (except_func)
-                except_func(std::runtime_error{"unknown exception caught"});
+                except_func(std::runtime_error{"unknown exception"});
         }
     }
 

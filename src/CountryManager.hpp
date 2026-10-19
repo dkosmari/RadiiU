@@ -19,7 +19,8 @@ namespace CountryManager {
     };
 
 
-    using CountryCallbackSignature = void(const Country&);
+    using CountryCallbackSignature = void (std::size_t,
+                                           const Country&);
     using CountryFunction = std::function<CountryCallbackSignature>;
 
 

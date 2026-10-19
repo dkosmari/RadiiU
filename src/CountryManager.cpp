@@ -552,8 +552,8 @@ namespace CountryManager {
         if (!countries)
             fetch_countries();
 
-        for (const auto& c : *countries)
-            func(c);
+        for (auto [index, c] : *countries | std::views::enumerate)
+            func(index, c);
     }
 
 } // namespace CountryManager

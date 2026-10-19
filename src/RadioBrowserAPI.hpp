@@ -387,6 +387,13 @@ namespace RadioBrowserAPI {
                   GetLanguagesResultFunction result_func,
                   ExceptionFunction except_func = {});
 
+    void
+    get_languages_sync(std::stop_token& stopper,
+                       const std::string& filter,
+                       const LanguagesParams& params,
+                       GetLanguagesResultFunction result_func,
+                       ExceptionFunction except_func = {});
+
 
     using GetServerStatsResultFunction = ResultFunction<ServerStats>;
 
