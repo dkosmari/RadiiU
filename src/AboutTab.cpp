@@ -311,7 +311,7 @@ namespace AboutTab {
 
         TraceFunction tf{"AboutTab"sv};
 
-        // Note: flat navigation doesn't work well on child windows that scroll.
+        // NOTE: flat navigation doesn't work well on child windows that scroll.
         if (Child about{"about"}) {
 
             auto radiiu_icon_tex = ImageLoader::get("content:/ui/radiiu-icon.png");

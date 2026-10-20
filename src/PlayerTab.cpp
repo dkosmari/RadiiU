@@ -179,6 +179,8 @@ namespace PlayerTab {
         void
         load()
         try {
+            TRACE_FUNC;
+
             auto filename = App::get_config_dir() / "player.json";
             Serializer::load(state, filename);
             changed = false;
@@ -265,6 +267,8 @@ namespace PlayerTab {
         void
         save()
         try {
+            TRACE_FUNC;
+
             auto filename = App::get_config_dir() / "player.json";
             Serializer::save(state, filename);
             changed = false;
@@ -566,73 +570,83 @@ namespace PlayerTab {
         {
             using namespace ImGui::RAII;
 
-            Font smaller{nullptr, 0, 0.8f};
+            if (Child toolbar{
+                    "toolbar",
+                    {0, 0},
+                    ImGuiChildFlags_AutoResizeY |
+                    ImGuiChildFlags_NavFlattened,
+                    ImGuiWindowFlags_NoSavedSettings
+                }) {
 
-            ImGui::AlignTextToFramePadding();
+                Font smaller{nullptr, 0, 0.8f};
 
-            if (play_res) {
+                ImGui::AlignTextToFramePadding();
 
-                if (ImGui::Button(ICON_FA_INFO_CIRCLE))
-                    ImGui::OpenPopup(details_popup_id);
-                ImGui::SetItemTooltip("Show output audio device properties.");
-                show_details_popup();
+                if (play_res) {
 
-                ImGui::SameLine();
+                    if (ImGui::Button(ICON_FA_INFO_CIRCLE))
+                        ImGui::OpenPopup(details_popup_id);
+                    ImGui::SetItemTooltip("Show output audio device properties.");
+                    show_details_popup();
 
-                // Show URL info vec
-                play_res->radio.with_url_info_vec(
-                    [](const RadioClient::URLInfoVec& info_vec)
-                    {
-                        auto cur_idx = play_res->radio.get_current_url_info_index();
-                        auto size = info_vec.size();
-                        std::string combo_label = std::format(ICON_FA_SERVER " {}/{}",
-                                                              cur_idx + 1,
-                                                              size);
-                        auto combo_label_size = ImGui::CalcTextSize(combo_label);
-                        const auto& style = ImGui::GetStyle();
-                        float combo_width =
-                            2 * style.FramePadding.x // padding
-                            + combo_label_size.x // text
-                            + style.ItemInnerSpacing.x // separation between text and arrow
-                            + ImGui::GetFrameHeight(); // arrow
-                        ImGui::SetNextItemWidth(combo_width);
-                        if (Combo url_vec_combo{"##url_vec_combo"s, combo_label}) {
-                            for (auto [idx, entry] : info_vec | std::views::enumerate) {
-                                auto& [url, content_type, type] = entry;
-                                auto label = std::format(
-                                    "{} {} ({})",
-                                    to_label(type),
-                                    url,
-                                    content_type.empty() ? "?"s : content_type
-                                );
-                                if (ImGui::RadioButton(label, std::cmp_equal(idx, cur_idx)))
-                                    play_res->radio.play(idx);
+                    ImGui::SameLine();
+
+                    // Show URL info vec
+                    play_res->radio.with_url_info_vec(
+                        [](const RadioClient::URLInfoVec& info_vec)
+                        {
+                            auto cur_idx = play_res->radio.get_current_url_info_index();
+                            auto size = info_vec.size();
+                            std::string combo_label = std::format(ICON_FA_SERVER " {}/{}",
+                                                                  cur_idx + 1,
+                                                                  size);
+                            auto combo_label_size = ImGui::CalcTextSize(combo_label);
+                            const auto& style = ImGui::GetStyle();
+                            float combo_width =
+                                2 * style.FramePadding.x // padding
+                                + combo_label_size.x // text
+                                + style.ItemInnerSpacing.x // separation between text and arrow
+                                + ImGui::GetFrameHeight(); // arrow
+                            ImGui::SetNextItemWidth(combo_width);
+                            if (Combo url_vec_combo{"##url_vec_combo"s, combo_label}) {
+                                for (auto [idx, entry] : info_vec | std::views::enumerate) {
+                                    auto& [url, content_type, type] = entry;
+                                    auto label = std::format(
+                                        "{} {} ({})",
+                                        to_label(type),
+                                        url,
+                                        content_type.empty() ? "?"s : content_type
+                                    );
+                                    if (ImGui::RadioButton(label, std::cmp_equal(idx, cur_idx)))
+                                        play_res->radio.play(idx);
+                                }
                             }
+                            ImGui::SetItemTooltip("Show all URLs for this stream.");
                         }
-                        ImGui::SetItemTooltip("Show all URLs for this stream.");
-                    }
-                );
+                    );
 
-                ImGui::SameLine();
+                    ImGui::SameLine();
 
-                auto state = play_res->radio.get_state();
-                ImGui::FormatText("State: {}", to_string(state));
+                    auto state = play_res->radio.get_state();
+                    ImGui::FormatText("State: {}", to_string(state));
 
-                play_res->radio.with_error_message(
-                    [](const std::string& message)
-                    {
-                        if (message.empty())
-                            return;
+                    play_res->radio.with_error_message(
+                        [](const std::string& message)
+                        {
+                            if (message.empty())
+                                return;
 
-                        ImGui::SameLine();
+                            ImGui::SameLine();
 
-                        ImGui::FormatTextAligned(0, -1, "Error: {}", message);
-                    }
-                );
+                            ImGui::FormatTextAligned(0, -1, "Error: {}", message);
+                        }
+                    );
 
-            } else {
-                ImGui::Text("No station set.");
-            }
+                } else {
+                    ImGui::Text("No station set.");
+                }
+
+            } // toolbar
         }
 
 
@@ -694,11 +708,8 @@ namespace PlayerTab {
 
         show_toolbar();
 
-        if (Child player_child{
-                "player",
-                {0, 0},
-                ImGuiChildFlags_NavFlattened
-            }) {
+        // NOTE: flat navigation doesn't work well on child windows that scroll.
+        if (Child player_child{"player"}) {
 
             show_station();
             show_stream();

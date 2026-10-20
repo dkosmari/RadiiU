@@ -377,13 +377,8 @@ namespace BrowserTab {
         {
             using namespace ImGui::RAII;
 
-            // Note: flat navigation doesn't work well on child windows that scroll.
-            if (Child stations_list{
-                    "stations_list",
-                    {0, 0},
-                    ImGuiChildFlags_None,
-                    ImGuiWindowFlags_NoSavedSettings
-                }) {
+            // NOTE: flat navigation doesn't work well on child windows that scroll.
+            if (Child stations_child{"stations"}) {
 
 #if 0
                 // Disabled until ImGui fixes navigation.
@@ -415,7 +410,7 @@ namespace BrowserTab {
                 }
                 UI::DoSmoothScroll();
 
-            } // stations_list
+            } // stations
         }
 
 
@@ -431,6 +426,8 @@ namespace BrowserTab {
                     ImGuiChildFlags_NavFlattened,
                     ImGuiWindowFlags_NoSavedSettings
                 }) {
+
+                Font smaller{nullptr, 0, 0.8f};
 
                 Disabled if_busy{RadioBrowserAPI::is_busy()};
 

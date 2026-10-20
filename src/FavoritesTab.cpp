@@ -75,6 +75,12 @@ namespace FavoritesTab {
                      StationPtr& station);
 
         void
+        show_stations();
+
+        void
+        show_toolbar();
+
+        void
         task_move_down(std::size_t index);
 
         void
@@ -239,6 +245,88 @@ namespace FavoritesTab {
 
 
         void
+        show_stations()
+        {
+            using namespace ImGui::RAII;
+
+            // NOTE: flat navigation doesn't work well on child windows that scroll.
+            if (Child stations_child{"stations"}) {
+
+                for (std::size_t index = 0; index < stations.size(); ++index) {
+                    auto& station = stations[index];
+
+                    using string_utils::to_upper;
+
+                    if (!name_filter.empty())
+                        if (!to_upper(station->name).contains(to_upper(name_filter)))
+                            continue;
+
+                    if (!tag_filter.empty()) {
+                        bool match = false;
+                        for (const auto& tag : station->tags)
+                            if (to_upper(tag).contains(to_upper(tag_filter))) {
+                                match = true;
+                                break;
+                            }
+                        if (!match)
+                            continue;
+                    }
+
+                    show_station(index, station);
+
+                    if (scroll_to_station == index) {
+                        scroll_to_station.reset();
+                        UI::SmoothScrollItem();
+                    }
+                }
+
+                UI::DoSmoothScroll();
+
+            } // stations
+
+        }
+
+
+        void
+        show_toolbar()
+        {
+            using namespace ImGui::RAII;
+
+            if (Child toolbar{
+                    "toolbar",
+                    {0, 0},
+                    ImGuiChildFlags_AutoResizeY |
+                    ImGuiChildFlags_NavFlattened,
+                    ImGuiWindowFlags_NoSavedSettings
+                }) {
+
+                Font smaller{nullptr, 0, 0.8f};
+
+                if (ImGui::Button(ICON_FA_PLUS " Add"))
+                    EditStationPopup::open(handle_station_add);
+                ImGui::SetItemTooltip("Add a new station to favorites.");
+
+                ImGui::SameLine();
+
+                ImGui::SetNextItemWidth(400);
+                ImGui::InputTextWithHint("##name_filter"s, "Filter by name..."s, name_filter);
+
+                ImGui::SameLine();
+
+                ImGui::SetNextItemWidth(400);
+                ImGui::InputTextWithHint("##tag_filter"s, "Filter by tag..."s, tag_filter);
+
+                ImGui::SameLine();
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::FormatTextAligned(1, -1, "{} stations", stations.size());
+
+            } // toolbar
+
+        }
+
+
+        void
         task_move_down(std::size_t index)
         {
             if (index >= stations.size() || index + 1 >= stations.size())
@@ -345,69 +433,9 @@ namespace FavoritesTab {
 
         TraceFunction tf{"FavoritesTab"sv};
 
-        if (Child toolbar{
-                "toolbar",
-                {0, 0},
-                ImGuiChildFlags_AutoResizeY |
-                ImGuiChildFlags_NavFlattened
-            }) {
+        show_toolbar();
 
-            // ➕
-            if (ImGui::Button(ICON_FA_PLUS " Add"))
-                EditStationPopup::open(handle_station_add);
-            ImGui::SetItemTooltip("Add a new station to favorites.");
-
-            ImGui::SameLine();
-
-            ImGui::SetNextItemWidth(400);
-            ImGui::InputTextWithHint("##name_filter"s, "Filter by name..."s, name_filter);
-
-            ImGui::SameLine();
-
-            ImGui::SetNextItemWidth(400);
-            ImGui::InputTextWithHint("##tag_filter"s, "Filter by tag..."s, tag_filter);
-
-            ImGui::SameLine();
-
-            ImGui::AlignTextToFramePadding();
-            ImGui::FormatTextAligned(1, -1, "{} stations", stations.size());
-
-        } // toolbar
-
-        // Note: flat navigation doesn't work well on child windows that scroll.
-        if (Child favorites{"favorites"}) {
-
-            for (std::size_t index = 0; index < stations.size(); ++index) {
-                auto& station = stations[index];
-
-                using string_utils::to_upper;
-
-                if (!name_filter.empty())
-                    if (!to_upper(station->name).contains(to_upper(name_filter)))
-                        continue;
-
-                if (!tag_filter.empty()) {
-                    bool match = false;
-                    for (const auto& tag : station->tags)
-                        if (to_upper(tag).contains(to_upper(tag_filter))) {
-                            match = true;
-                            break;
-                        }
-                    if (!match)
-                        continue;
-                }
-
-                show_station(index, station);
-
-                if (scroll_to_station == index) {
-                    scroll_to_station.reset();
-                    UI::SmoothScrollItem();
-                }
-            }
-
-            UI::DoSmoothScroll();
-
-        } // favorites
+        show_stations();
 
         EditStationPopup::process_ui();
         ConfirmDeleteStationPopup::process_ui();

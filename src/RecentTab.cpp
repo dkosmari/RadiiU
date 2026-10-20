@@ -63,6 +63,12 @@ namespace RecentTab {
                      ConstStationPtr& station);
 
         void
+        show_stations();
+
+        void
+        show_toolbar();
+
+        void
         task_add(ConstStationPtr& station);
 
         void
@@ -158,6 +164,75 @@ namespace RecentTab {
             } // station_frame
         }
 
+        void
+        show_stations()
+        {
+            using namespace ImGui::RAII;
+
+            // NOTE: flat navigation doesn't work well on child windows that scroll.
+            if (Child stations_child{"stations"}) {
+
+                for (auto [index, station] : stations | std::views::enumerate) {
+                    using string_utils::to_upper;
+                    if (!name_filter.empty())
+                        if (!to_upper(station->name).contains(to_upper(name_filter)))
+                            continue;
+
+                    if (!tag_filter.empty()) {
+                        bool match = false;
+                        for (const auto& tag : station->tags)
+                            if (to_upper(tag).contains(to_upper(tag_filter))) {
+                                match = true;
+                                break;
+                            }
+                        if (!match)
+                            continue;
+                    }
+
+                    show_station(index, station);
+                }
+
+            } // stations
+        }
+
+
+        void
+        show_toolbar()
+        {
+            using namespace ImGui::RAII;
+
+            if (Child toolbar{
+                    "toolbar",
+                    {0, 0},
+                    ImGuiChildFlags_AutoResizeY |
+                    ImGuiChildFlags_NavFlattened,
+                    ImGuiWindowFlags_NoSavedSettings
+                }) {
+
+                Font smaller{nullptr, 0, 0.8f};
+
+                if (ImGui::Button(ICON_FA_ERASER " Clear"))
+                    stations.clear();
+                ImGui::SetItemTooltip("Clear entire recent history.");
+
+                ImGui::SameLine();
+
+                ImGui::SetNextItemWidth(400);
+                ImGui::InputTextWithHint("##name_filter"s, "Filter by name..."s, name_filter);
+
+                ImGui::SameLine();
+
+                ImGui::SetNextItemWidth(400);
+                ImGui::InputTextWithHint("##tag_filter"s, "Filter by tag..."s, tag_filter);
+
+                ImGui::SameLine();
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::FormatTextAligned(1, -1, "{} stations", stations.size());
+            }
+
+        }
+
 
         void
         task_add(ConstStationPtr& station)
@@ -228,54 +303,9 @@ namespace RecentTab {
 
         TraceFunction tf{"RecentTab"sv};
 
-        if (Child toolbar_child{
-                "toolbar",
-                {0, 0},
-                ImGuiChildFlags_AutoResizeY |
-                ImGuiChildFlags_NavFlattened
-            }) {
+        show_toolbar();
 
-            if (ImGui::Button(ICON_FA_ERASER " Clear"))
-                stations.clear();
-            ImGui::SetItemTooltip("Clear entire recent history.");
-
-            ImGui::SameLine();
-
-            ImGui::SetNextItemWidth(400);
-            ImGui::InputTextWithHint("##name_filter"s, "Filter by name..."s, name_filter);
-
-            ImGui::SameLine();
-
-            ImGui::SetNextItemWidth(400);
-            ImGui::InputTextWithHint("##tag_filter"s, "Filter by tag..."s, tag_filter);
-
-            ImGui::SameLine();
-
-            ImGui::AlignTextToFramePadding();
-            ImGui::FormatTextAligned(1, -1, "{} stations", stations.size());
-        }
-
-        // Note: flat navigation doesn't work well on child windows that scroll.
-        if (Child list{"recent"})
-            for (auto [index, station] : stations | std::views::enumerate) {
-                using string_utils::to_upper;
-                if (!name_filter.empty())
-                    if (!to_upper(station->name).contains(to_upper(name_filter)))
-                        continue;
-
-                if (!tag_filter.empty()) {
-                    bool match = false;
-                    for (const auto& tag : station->tags)
-                        if (to_upper(tag).contains(to_upper(tag_filter))) {
-                            match = true;
-                            break;
-                        }
-                    if (!match)
-                        continue;
-                }
-
-                show_station(index, station);
-            }
+        show_stations();
 
         StationDetailsPopup::process_ui();
     }

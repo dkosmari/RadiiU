@@ -196,56 +196,67 @@ namespace LogsTab {
         {
             using namespace ImGui::RAII;
 
-            if (ImGui::Button("Clear"))
-                LogManager::clear();
+            if (Child toolbar{
+                    "toolbar",
+                    {0, 0},
+                    ImGuiChildFlags_AutoResizeY |
+                    ImGuiChildFlags_NavFlattened,
+                    ImGuiWindowFlags_NoSavedSettings
+                }) {
 
-            ImGui::SameLine();
+                Font smaller{nullptr, 0, 0.8f};
 
-            if (ImGui::Button(ICON_FA_DOWNLOAD " Save"))
-                LogManager::save();
+                if (ImGui::Button("Clear"))
+                    LogManager::clear();
 
-            ImGui::SameLine();
+                ImGui::SameLine();
 
-            auto& style = ImGui::GetStyle();
-            float combo_width =
+                if (ImGui::Button(ICON_FA_DOWNLOAD " Save"))
+                    LogManager::save();
+
+                ImGui::SameLine();
+
+                auto& style = ImGui::GetStyle();
+                float combo_width =
                 ImGui::CalcTextSize("DEBUG").x +
                 ImGui::GetFrameHeight() +
                 2 * style.FramePadding.x;
-            ImGui::SetNextItemWidth(combo_width);
-            if (Combo min_level_combo{"##min_level_combo", to_string(min_level)}) {
-                for (auto level : enumerator::enumerate<LogLevel>())
-                    if (ImGui::Selectable(to_string(level), min_level == level)) {
-                        min_level = level;
-                        timestamp = 0;
-                    }
-            }
+                ImGui::SetNextItemWidth(combo_width);
+                if (Combo min_level_combo{"##min_level_combo", to_string(min_level)}) {
+                    for (auto level : enumerator::enumerate<LogLevel>())
+                        if (ImGui::Selectable(to_string(level), min_level == level)) {
+                            min_level = level;
+                            timestamp = 0;
+                        }
+                }
 
-            ImGui::SameLine();
+                ImGui::SameLine();
 
-            ImGui::Checkbox("auto scroll"s, auto_scroll);
+                ImGui::Checkbox("auto scroll"s, auto_scroll);
 
 #ifdef DEBUG_MESSAGE_COLORS
-            ImGui::SameLine();
+                ImGui::SameLine();
 
-            if (ImGui::Button(ICON_FA_PLUS " DBG"))
-                LOG_DEBUG("This is an injected debug message.");
+                if (ImGui::Button(ICON_FA_PLUS " DBG"))
+                    LOG_DEBUG("This is an injected debug message.");
 
-            ImGui::SameLine();
+                ImGui::SameLine();
 
-            if (ImGui::Button(ICON_FA_PLUS " INF"))
-                LOG_INFO("This is an injected info message.");
+                if (ImGui::Button(ICON_FA_PLUS " INF"))
+                    LOG_INFO("This is an injected info message.");
 
-            ImGui::SameLine();
+                ImGui::SameLine();
 
-            if (ImGui::Button(ICON_FA_PLUS " WARN"))
-                LOG_WARN("This is an injected warning message.");
+                if (ImGui::Button(ICON_FA_PLUS " WARN"))
+                    LOG_WARN("This is an injected warning message.");
 
-            ImGui::SameLine();
+                ImGui::SameLine();
 
-            if (ImGui::Button(ICON_FA_PLUS " ERR"))
-                LOG_ERROR("This is an injected error message.");
+                if (ImGui::Button(ICON_FA_PLUS " ERR"))
+                    LOG_ERROR("This is an injected error message.");
 #endif
 
+            } // toolbar
         }
 
     } // namespace
