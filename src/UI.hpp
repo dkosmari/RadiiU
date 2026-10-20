@@ -175,6 +175,11 @@ namespace UI {
     Label(std::string_view label);
 
 
+    void
+    Label(std::string_view label,
+          std::string_view tooltip);
+
+
     template<typename... Args>
     void
     FormatLabel(std::format_string<Args...> fmt,

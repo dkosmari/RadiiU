@@ -112,7 +112,7 @@ namespace ImageLoader {
                                                            // rwops
             const std::string location;
             vec2 size_limit;
-            bool checked_content_type = false;
+            bool started_recv  = false;
 
             CacheEntry(std::uint64_t now,
                        const std::string& location,
@@ -372,11 +372,14 @@ namespace ImageLoader {
         {
             easy.create();
             LogManagerCurl::capture_curl_debug(easy);
+            easy.set_verbose(cfg.verbose_image_logs);
+
             if (!user_agent.empty())
                 easy.set_user_agent(user_agent);
             easy.set_accept_encoding("");
             easy.set_auto_referer(true);
-            easy.set_buffer_size(1024 * 1024);
+            easy.set_buffer_size(64 * 1024);
+            easy.set_fail_on_error(true);
             easy.set_follow_location(true);
             easy.set_http_headers({ "Accept: image/*" });
             easy.set_http_version(curl::easy::http_version::none);
@@ -385,9 +388,10 @@ namespace ImageLoader {
             easy.set_tcp_no_delay(false);
             easy.set_transfer_encoding(true);
             easy.set_url(location);
-            easy.set_verbose(cfg.verbose_image_logs);
-            easy.set_write_function(std::bind_front(&CacheEntry::easy_write_callback, this));
-            checked_content_type = false;
+            easy.set_write_function(
+                std::bind_front(&CacheEntry::easy_write_callback, this)
+            );
+            started_recv = false;
             return easy;
         }
 
@@ -397,22 +401,30 @@ namespace ImageLoader {
         {
             TraceFunction tf{"ImageLoader"sv};
 
-            if (!checked_content_type) {
-                checked_content_type = true;
-                if (auto content_type = easy.try_get_header("Content-Type")) {
-                    std::string desired = "image/*"s;
+            if (!started_recv) {
+                started_recv = true;
+                if (auto content_type = easy.try_get_header("content-type")) {
                     std::string received = content_type->value;
+                    std::string desired = "image/*"s;
                     if (!mime_type::match(received, desired)) {
-                        LOG_ERROR("Content-Type should be {:?} but received {:?}",
+                        LOG_ERROR("content-type should be {:?} but received {:?}",
                                   desired,
                                   received);
                         return CURL_READFUNC_ABORT;
                     }
                 }
+                raw_buf.emplace();
+                if (auto content_length = easy.try_get_header("content-length")) {
+                    try {
+                        unsigned long length = std::stoul(content_length->value);
+                        raw_buf->reserve(length);
+                    }
+                    catch (std::exception& e) {
+                        LOG_ERROR("Failed to reserve buffer: {}", e.what());
+                    }
+                }
             }
 
-            if (!raw_buf)
-                raw_buf.emplace();
             raw_buf->append_range(buf);
             return buf.size();
         }
@@ -668,7 +680,7 @@ namespace ImageLoader {
                 // Check if there are new download requests
                 while (auto maybe_entry = download_queue.try_pop()) {
                     TraceDuration duration_check_new_requests{
-                        "ImageLoader::Resources::downloader_thread_function()"
+                        "downloader_thread_function()"
                         "/adding new requests"sv,
                         "ImageLoader,downloader_thread"sv
                     };
@@ -692,7 +704,7 @@ namespace ImageLoader {
 
                 for (auto [easy, error_code] : multi.get_done()) {
                     TraceDuration duration_handling_finished{
-                        "ImageLoader::Resources::downloader_thread_function()"
+                        "downloader_thread_function()"
                         "/handling finished"sv,
                         "ImageLoader,downloader_thread"sv
                     };
@@ -714,6 +726,9 @@ namespace ImageLoader {
                         if (error_code)
                             throw curl::error{error_code};
 
+                        if (!entry->raw_buf)
+                            throw std::runtime_error{"No data received."};
+
                         load_queue.push(entry);
                     }
                     catch (std::exception& e) {
@@ -731,7 +746,7 @@ namespace ImageLoader {
             }
         }
         catch (std::exception& e) {
-            LOG_ERROR("Resources::downloader_thread_function(): {}", e.what());
+            LOG_ERROR("downloader_thread_function(): {}", e.what());
         }
 
 

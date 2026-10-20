@@ -210,7 +210,7 @@ namespace App {
         TabID current_tab;
 
 #ifdef __WIIU__
-        bool old_disable_swkbd;
+        bool old_use_swkbd;
 #endif
 
         Uint64 last_activity;
@@ -483,10 +483,10 @@ namespace App {
 
 #ifdef __WIIU__
             // If user wishes no swkbd, we tell SDL.
-            if (old_disable_swkbd != cfg.disable_swkbd) {
+            if (old_use_swkbd != cfg.use_swkbd) {
                 SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD,
-                            cfg.disable_swkbd ? "0" : "1");
-                old_disable_swkbd = cfg.disable_swkbd;
+                            cfg.use_swkbd ? "1" : "0");
+                old_use_swkbd = cfg.use_swkbd;
             }
 
 #ifdef ENABLE_DIM_TIMER_WATCHER
@@ -1044,11 +1044,8 @@ namespace App {
             cfg.initial_tab = TabID::last_active;
 
 #ifdef __WIIU__
-        old_disable_swkbd = cfg.disable_swkbd;
-        if (cfg.disable_swkbd) {
-            SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "0");
-            // SDL_StartTextInput();
-        }
+        old_use_swkbd = cfg.use_swkbd;
+        SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, cfg.use_swkbd ? "1" : "0");
 #endif
 
         res.emplace();

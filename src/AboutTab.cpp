@@ -292,6 +292,8 @@ namespace AboutTab {
                 == RPX_LOADER_RESULT_SUCCESS)
                 real_save_dir = std::filesystem::path{"SD:/"} / real_save_buf;
             RPXLoader_DeInitLibrary();
+
+            real_save_dir /= App::get_config_dir().filename();
         }
 #endif
     }

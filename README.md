@@ -21,6 +21,52 @@ for free. You can donate to them to ensure the project continues running.
 ![RadiiU Player tab](assets/hbas/radiiu-player.png)
 
 
+## Features and customization
+
+### Save folder
+
+When loading homebrew from the SD card, Aroma will redirect the save file to the SD card, inside
+`SD:/wiiu/apps/save/`. Check the **About** tab in RadiiU, to see what the SD save path is. User
+preferences, station history, track history, etc, are all stored in that folder.
+
+
+### Additional fonts
+
+When some text fails to render, because of missing glyphs, you can load custom fonts to fill in
+the missing glyphs.
+
+- Create a `fonts` folder inside the save folder.
+
+- The fonts have to be `.ttf`, `.otf` or `.woff2`.
+
+> Note: right-to-left text does not render correctly. This is a limitation of the ImGui library.
+
+
+### Styles
+
+Some color styles are defined in [`assets/content/styles`](assets/content/styles). You can
+create a `styles` folder inside the save folder, and put your own custom styles there.
+
+The [`GenerateTheme.py`](tools/GenerateTheme.py) is a Python script to help generate a color
+style from a set of basic colors. Use that if you prefer to create a color style from scratch.
+
+
+### USB Keyboard
+
+If you have a USB keyboard connected to your Wii U, and you don't want to use the software
+keyboard (SWKBD), you can turn off the "Use SWKBD" option in the **Settings** tab.
+
+
+### Sending statistics and votes
+
+Sending station playback and votes is an opt-in feature. Turn on the "Send clicks and votes"
+option in the **Settings** tab, if you want the Radio Browser service to know what stations you
+play and vote.
+
+> Note: Radio Browser limits voting to once per day. RadiiU does no send unique information to
+> Radio Browser, only your IP address is used to determine if you already voted.
+
+
 ## Build instructions
 
 ### Dependencies

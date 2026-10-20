@@ -745,6 +745,33 @@ namespace UI {
     }
 
 
+    void
+    Label(std::string_view label,
+          std::string_view tooltip)
+    {
+        auto available = ImGui::GetContentRegionAvail();
+        auto label_size = ImGui::CalcTextSize(label);
+        const std::string question_label = ICON_FA_QUESTION_CIRCLE_O;
+        auto question_size = ImGui::CalcTextSize(question_label);
+
+        auto& style = ImGui::GetStyle();
+        auto text_width = label_size.x + style.ItemSpacing.x + question_size.x;
+
+        float offset = available.x - text_width;
+        if (offset > 0)
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
+
+        ImGui::TextColored(get_label_color(), label);
+        ImGui::SameLine();
+        ImGui::TextColored(style.Colors[ImGuiCol_TextLink], question_label);
+        // BoundingBox();
+        {
+            ImGui::RAII::Font smaller{nullptr, 0, 0.8f};
+            ImGui::SetItemTooltip(tooltip);
+        }
+    }
+
+
     bool
     TextLinkOpenURL(const std::string& url)
     {

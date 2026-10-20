@@ -22,7 +22,7 @@ namespace Settings {
 
         unsigned    browser_page_limit   = 20;
         bool        disable_apd          = true;
-        bool        disable_swkbd        = false;
+        bool        use_swkbd            = true;
         bool        inactive_screen_off  = false;
         TabID       initial_tab          = TabID::browser;
         std::chrono::milliseconds player_buffer_duration = std::chrono::seconds{1};
