@@ -45,6 +45,7 @@ namespace RecentTab {
         std::deque<ConstStationPtr> stations;
         std::string name_filter;
         std::string tag_filter;
+        bool changed;
 
 
         /*-----------------------*/
@@ -81,6 +82,7 @@ namespace RecentTab {
             stations.clear();
             auto filename = App::get_config_dir() / "recent.json";
             Serializer::load(stations, filename);
+            changed = false;
         }
         catch (std::exception& e) {
             LOG_ERROR("{}", e.what());
@@ -92,6 +94,7 @@ namespace RecentTab {
         try {
             auto filename = App::get_config_dir() / "recent.json";
             Serializer::save(stations, filename);
+            changed = false;
         }
         catch (std::exception& e) {
             LOG_ERROR("{}", e.what());
@@ -167,14 +170,17 @@ namespace RecentTab {
             }
             stations.push_front(std::move(station));
             trim_excess();
+            changed = true;
         }
 
 
         void
         task_remove(std::size_t idx)
         {
-            if (idx < stations.size())
+            if (idx < stations.size()) {
                 stations.erase(stations.begin() + idx);
+                changed = true;
+            }
         }
 
 
@@ -185,6 +191,7 @@ namespace RecentTab {
                 std::size_t excess = stations.size() - cfg.recent_limit;
                 stations.erase(stations.end() - excess,
                                stations.end());
+                changed = true;
             }
         }
 
@@ -209,7 +216,8 @@ namespace RecentTab {
     {
         TRACE_FUNC;
 
-        save();
+        if (changed)
+            save();
     }
 
 

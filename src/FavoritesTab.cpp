@@ -50,6 +50,7 @@ namespace FavoritesTab {
         std::optional<std::size_t> scroll_to_station;
         std::string name_filter;
         std::string tag_filter;
+        bool changed;
 
 
         /*-----------------------*/
@@ -103,6 +104,7 @@ namespace FavoritesTab {
                 uuids.insert(station.stationuuid);
             }
             stations.push_back(std::make_shared<Station>(std::move(station)));
+            changed = true;
         }
 
 
@@ -131,6 +133,7 @@ namespace FavoritesTab {
             *station = std::move(new_station);
             if (!station->stationuuid.empty())
                 uuids.insert(station->stationuuid);
+            changed = true;
         }
 
 
@@ -242,6 +245,7 @@ namespace FavoritesTab {
                 return;
             std::swap(stations[index], stations[index + 1]);
             scroll_to_station = index + 1;
+            changed = true;
         }
 
 
@@ -252,6 +256,7 @@ namespace FavoritesTab {
                 return;
             std::swap(stations[index], stations[index - 1]);
             scroll_to_station = index - 1;
+            changed = true;
         }
 
     } // namespace
@@ -264,6 +269,7 @@ namespace FavoritesTab {
         stations.push_back(std::make_shared<Station>(st));
         if (!st.stationuuid.empty())
             uuids.insert(st.stationuuid);
+        changed = true;
     }
 
 
@@ -294,7 +300,8 @@ namespace FavoritesTab {
     {
         TRACE_FUNC;
 
-        save();
+        if (changed)
+            save();
     }
 
 
@@ -322,6 +329,7 @@ namespace FavoritesTab {
             if (!st->stationuuid.empty())
                 uuids.insert(st->stationuuid);
         }
+        changed = false;
 
         LOG_INFO("Loaded {} favorites.", stations.size());
     }
@@ -419,6 +427,8 @@ namespace FavoritesTab {
             uuids.erase(it);
 
         stations.erase(stations.begin() + index);
+
+        changed = true;
     }
 
 
@@ -435,8 +445,10 @@ namespace FavoritesTab {
             uuids.erase(u);
 
         auto s = std::ranges::find(stations, uuid, get_id);
-        if (s != stations.end())
+        if (s != stations.end()) {
             stations.erase(s);
+            changed = true;
+        }
     }
 
 
@@ -451,6 +463,7 @@ namespace FavoritesTab {
                       {
                           return station.stationuuid == st->stationuuid;
                       });
+        changed = true;
     }
 
 
@@ -461,6 +474,7 @@ namespace FavoritesTab {
 
         auto filename = App::get_config_dir() / "favorites.json";
         Serializer::save(stations, filename);
+        changed = false;
     }
     catch (std::exception& e) {
         LOG_ERROR("{}", e.what());

@@ -26,11 +26,14 @@ using std::string;
 namespace Settings {
 
     Cfg cfg;
+    Cfg last_cfg;
+
 
     void
     load_defaults()
     {
         cfg = {};
+        last_cfg = cfg;
     }
 
 
@@ -47,7 +50,8 @@ namespace Settings {
     finalize()
     {
         TRACE_FUNC;
-        save();
+        if (cfg != last_cfg)
+            save();
     }
 
 
@@ -55,9 +59,11 @@ namespace Settings {
     load()
     {
         TRACE_FUNC;
+
         try {
             auto filename = App::get_config_dir() / "settings.json";
             Serializer::load(cfg, filename);
+            last_cfg = cfg;
         }
         catch (std::exception& e) {
             LOG_ERROR("load(): {}", e.what());
@@ -69,9 +75,11 @@ namespace Settings {
     save()
     {
         TRACE_FUNC;
+
         try {
             auto filename = App::get_config_dir() / "settings.json";
             Serializer::save(cfg, filename);
+            last_cfg = cfg;
         }
         catch (std::exception& e) {
             LOG_ERROR("save(): {}", e.what());

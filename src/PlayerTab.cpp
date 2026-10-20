@@ -116,6 +116,8 @@ namespace PlayerTab {
         State state;
         ConstStationPtr station;
         std::optional<PlaybackResources> play_res;
+        bool changed;
+
 
         /*-----------------------*/
         /* Function declarations */
@@ -179,6 +181,7 @@ namespace PlayerTab {
         try {
             auto filename = App::get_config_dir() / "player.json";
             Serializer::load(state, filename);
+            changed = false;
         }
         catch (std::exception& e) {
             LOG_ERROR("{}", e.what());
@@ -264,6 +267,7 @@ namespace PlayerTab {
         try {
             auto filename = App::get_config_dir() / "player.json";
             Serializer::save(state, filename);
+            changed = false;
         }
         catch (std::exception& e) {
             LOG_ERROR("{}", e.what());
@@ -358,6 +362,7 @@ namespace PlayerTab {
                 }) {
 
                 ImGui::SetNextItemOpen(state.track_history_expanded);
+                bool old_track_history_expanded = state.track_history_expanded;
                 if ((state.track_history_expanded = ImGui::CollapsingHeader("Track history"))) {
 
                     Font smaller{nullptr, 0, 0.8f};
@@ -385,6 +390,8 @@ namespace PlayerTab {
                     } // table
 
                 }
+                if (old_track_history_expanded != state.track_history_expanded)
+                    changed = true;
 
             } // history_child
         }
@@ -471,6 +478,7 @@ namespace PlayerTab {
                 }) {
 
                 ImGui::SetNextItemOpen(state.details_expanded);
+                bool old_details_expanded = state.details_expanded;
                 if ((state.details_expanded = ImGui::CollapsingHeader("Stream details"))) {
 
                     if (!play_res)
@@ -546,6 +554,8 @@ namespace PlayerTab {
                     } // Table
 
                 }
+                if (old_details_expanded != state.details_expanded)
+                    changed = true;
 
             } // stream_child
         }
@@ -636,6 +646,7 @@ namespace PlayerTab {
 
             state.history.emplace_front(system_clock::now(), title);
             track_history_trim();
+            changed = true;
         }
 
 
@@ -646,6 +657,7 @@ namespace PlayerTab {
                 std::size_t excess = state.history.size() - cfg.player_history_limit;
                 state.history.erase(state.history.end() - excess,
                                     state.history.end());
+                changed  =true;
             }
         }
 
@@ -669,7 +681,8 @@ namespace PlayerTab {
     {
         TRACE_FUNC;
 
-        save();
+        if (changed)
+            save();
         play_res.reset();
     }
 

@@ -111,6 +111,34 @@ namespace App {
             Function func;
         };
 
+
+        // RAII for ImGui context initialization.
+        struct ImGuiInitContext {
+            ImGuiInitContext();
+
+            ~ImGuiInitContext()
+                noexcept;
+        };
+
+
+        // RAII for ImGui backend initialization.
+        struct ImGuiInitSDL2Backend {
+            ImGuiInitSDL2Backend();
+
+            ~ImGuiInitSDL2Backend()
+                noexcept;
+        };
+
+
+        // RAII for ImGui SDL2 renderer initialization.
+        struct ImGuiInitSDL2Renderer {
+            ImGuiInitSDL2Renderer();
+
+            ~ImGuiInitSDL2Renderer()
+                noexcept;
+        };
+
+
         // RAII-managed resources are stored here.
         struct Resources {
 
@@ -124,10 +152,9 @@ namespace App {
             sdl::window window{nullptr};
             sdl::renderer renderer{nullptr};
 
-            struct {
+            struct audio_t {
                 sdl::audio::spec spec{};
                 sdl::audio::device device{
-                    nullptr,
                     false,
                     [] -> sdl::audio::spec
                     {
@@ -138,7 +165,10 @@ namespace App {
                         result.samples = 2048;
                         return result;
                     }(),
-                    spec
+                    spec,
+                    sdl::audio::allow_change::frequency,
+                    sdl::audio::allow_change::format,
+                    sdl::audio::allow_change::samples
                 };
             } audio;
 
@@ -151,6 +181,11 @@ namespace App {
 #endif // ENABLE_DIM_TIMER_WATCHER
             WiiUIMManager::UNDIMEventWatcher undim_event_watcher{im_device};
 #endif // __WIIU__
+
+
+            std::optional<ImGuiInitContext> imgui_context;
+            std::optional<ImGuiInitSDL2Backend> imgui_backend;
+            std::optional<ImGuiInitSDL2Renderer> imgui_renderer;
 
         }; // struct Resources
 
@@ -238,6 +273,50 @@ namespace App {
         /* Function definitions */
         /*----------------------*/
 
+        ImGuiInitContext::ImGuiInitContext()
+        {
+            IMGUI_CHECKVERSION();
+            auto ctx = ImGui::CreateContext();
+            if (!ctx)
+                throw std::runtime_error{"ImGui::CreateContext() failed!"};
+        }
+
+
+        ImGuiInitContext::~ImGuiInitContext()
+            noexcept
+        {
+            ImGui::DestroyContext();
+        }
+
+
+        ImGuiInitSDL2Backend::ImGuiInitSDL2Backend()
+        {
+            if (!ImGui_ImplSDL2_InitForSDLRenderer(res->window.data(),
+                                                   res->renderer.data()))
+                throw std::runtime_error{"ImGui_ImplSDL2_InitForSDLRenderer() failed!"};
+        }
+
+
+        ImGuiInitSDL2Backend::~ImGuiInitSDL2Backend()
+            noexcept
+        {
+            ImGui_ImplSDL2_Shutdown();
+        }
+
+
+        ImGuiInitSDL2Renderer::ImGuiInitSDL2Renderer()
+        {
+            ImGui_ImplSDLRenderer2_Init(res->renderer.data());
+        }
+
+
+        ImGuiInitSDL2Renderer::~ImGuiInitSDL2Renderer()
+            noexcept
+        {
+            ImGui_ImplSDLRenderer2_Shutdown();
+        }
+
+
         dbl_milliseconds
         audio_bytes_to_duration(std::size_t bytes,
                                 const sdl::audio::spec& spec)
@@ -296,13 +375,13 @@ namespace App {
         {
             TRACE_FUNC;
 
-            ImGui_ImplSDLRenderer2_Shutdown();
-            ImGui_ImplSDL2_Shutdown();
+            res->imgui_renderer.reset();
+            res->imgui_backend.reset();
 
             CountryManager::finalize();
             FontLoader::finalize();
 
-            ImGui::DestroyContext();
+            res->imgui_context.reset();
         }
 
 
@@ -372,8 +451,7 @@ namespace App {
         {
             TRACE_FUNC;
 
-            IMGUI_CHECKVERSION();
-            ImGui::CreateContext();
+            res->imgui_context.emplace();
 
             ImGuiIO& io = ImGui::GetIO();
             io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
@@ -393,9 +471,8 @@ namespace App {
             FontLoader::load_dir(get_data_dir() / "fonts");
             CountryManager::initialize();
 
-            ImGui_ImplSDL2_InitForSDLRenderer(res->window.data(),
-                                              res->renderer.data());
-            ImGui_ImplSDLRenderer2_Init(res->renderer.data());
+            res->imgui_backend.emplace();
+            res->imgui_renderer.emplace();
         }
 
 
@@ -975,6 +1052,13 @@ namespace App {
 #endif
 
         res.emplace();
+
+        LOG_DEBUG(
+            "Audio initialized: freq={}, samples={}, format={}",
+            res->audio.spec.freq,
+            res->audio.spec.samples,
+            res->audio.spec.format
+        );
 
         SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
         SDL_SetHint(SDL_HINT_RENDER_LINE_METHOD, "2");

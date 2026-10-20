@@ -10,8 +10,8 @@
 
 #include <chrono>
 #include <cstddef>
-#include <string>
 #include <filesystem>
+#include <string>
 
 #include "TabID.hpp"
 
@@ -19,6 +19,7 @@
 namespace Settings {
 
     struct Cfg {
+
         unsigned    browser_page_limit   = 20;
         bool        disable_apd          = true;
         bool        disable_swkbd        = false;
@@ -36,7 +37,13 @@ namespace Settings {
         bool        verbose_image_logs   = false;
         bool        verbose_rest_logs    = false;
         bool        verbose_stream_logs  = false;
-    };
+
+        constexpr
+        bool
+        operator ==(const Cfg& other)
+            const noexcept = default;
+
+    }; // struct Cfg
 
 
     extern Cfg cfg;
