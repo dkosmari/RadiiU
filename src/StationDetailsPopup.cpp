@@ -226,11 +226,11 @@ namespace StationDetailsPopup {
             ImGui::OpenPopup(popup_id);
         }
 
-        ImGui::SetNextWindowSize({1100, 600}, ImGuiCond_Always);
         auto viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowPos(viewport->GetWorkCenter(),
-                                ImGuiCond_Always,
-                                {0.5f, 0.5f});
+        auto center = viewport->GetWorkCenter();
+        auto size = UI::max(0.75f * viewport->WorkSize, {1100, 600});
+        ImGui::SetNextWindowSize(size, ImGuiCond_Always);
+        ImGui::SetNextWindowPos(center, ImGuiCond_Always, {0.5f, 0.5f});
         Popup popup{popup_id,
                     ImGuiWindowFlags_NoMove |
                     ImGuiWindowFlags_NoSavedSettings};

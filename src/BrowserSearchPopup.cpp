@@ -954,7 +954,6 @@ namespace BrowserSearchPopup {
         ImGui::SetNextWindowPos(center, ImGuiCond_Always, {0.5f, 0.5f});
         Popup popup{popup_id,
                     ImGuiWindowFlags_AlwaysAutoResize |
-                    ImGuiWindowFlags_NoResize |
                     ImGuiWindowFlags_NoMove};
         if (!popup) {
             state = State::hidden;

@@ -269,10 +269,10 @@ namespace EditStationPopup {
 
         auto viewport = ImGui::GetMainViewport();
         auto center = viewport->GetWorkCenter();
-        ImGui::SetNextWindowSize({1100, 600}, ImGuiCond_Always);
+        auto size = UI::max(0.75f * viewport->WorkSize, {1100, 600});
+        ImGui::SetNextWindowSize(size, ImGuiCond_Always);
         ImGui::SetNextWindowPos(center, ImGuiCond_Always, {0.5f, 0.5f});
         Popup popup{get_popup_id(),
-                    ImGuiWindowFlags_NoResize |
                     ImGuiWindowFlags_NoMove |
                     ImGuiWindowFlags_NoSavedSettings};
         if (!popup) {
@@ -307,8 +307,6 @@ namespace EditStationPopup {
             true,
             action_confirm
         );
-
-        // TODO: add button for updating from Browser, if uuid is present
 
         if (Child content{"content",
                           {0, -buttons.get_height_with_spacing()},

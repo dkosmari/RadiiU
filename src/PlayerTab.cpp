@@ -271,16 +271,14 @@ namespace PlayerTab {
         {
             using namespace ImGui::RAII;
 
-            const auto& style = ImGui::GetStyle();
-            float width = audio_queue_history_size * 3
-                + 2 * style.FramePadding.x
-                + 2 * style.WindowPadding.x;
-            ImGui::SetNextWindowSize({width, 600}, ImGuiCond_Always);
             auto viewport = ImGui::GetMainViewport();
-            ImGui::SetNextWindowPos(viewport->GetWorkCenter(),
-                                    ImGuiCond_Always,
-                                    {0.5f, 0.5f});
-            Popup popup{details_popup_id};
+            auto center = viewport->GetWorkCenter();
+            auto size = UI::max(0.75f * viewport->WorkSize, {1100, 600});
+            ImGui::SetNextWindowSize(size, ImGuiCond_Always);
+            ImGui::SetNextWindowPos(center, ImGuiCond_Always, {0.5f, 0.5f});
+            Popup popup{details_popup_id,
+                        ImGuiWindowFlags_NoMove |
+                        ImGuiWindowFlags_NoSavedSettings};
             if (!popup)
                 return;
 

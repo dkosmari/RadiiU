@@ -214,105 +214,146 @@ namespace BrowserTab {
         void
         show_navigation()
         {
+            /*
+             * [ 100 << ] [ 10 << ] [ < ] [  num  ] [ > ] [ >> 10 ] [ >> 100 ]
+             */
+
             using namespace ImGui::RAII;
 
-            const float parent_width = ImGui::GetContentRegionAvail().x;
-            const ImVec2 global_pos = ImGui::GetCursorScreenPos();
-            ImGui::SetNextWindowPos({global_pos.x + parent_width / 2.0f, global_pos.y + 0.0f},
-                                    ImGuiCond_Always,
-                                    {0.5f, 0.0f});
-            if (Child navigation{
-                    "navigation",
-                    {0, 0},
-                    ImGuiChildFlags_AutoResizeX |
-                    ImGuiChildFlags_AutoResizeY |
-                    ImGuiChildFlags_NavFlattened,
-                    ImGuiWindowFlags_NoSavedSettings
-                }) {
+            const auto available = ImGui::GetContentRegionAvail();
 
-                const bool is_first_page = page == 1;
-                const bool is_last_page = stations.size() < cfg.browser_page_limit;
-                const bool is_busy = RadioBrowserAPI::is_busy();
+            // To center the nav bar we need to measure everything that's on it.
+            const auto& style = ImGui::GetStyle();
+            float total_width = 0;
 
-                {
-                    Disabled disable_first_page{is_first_page};
+            const auto prev100_label = "100 " ICON_FA_ANGLE_DOUBLE_LEFT " "s;
+            const auto prev100_size = 2 * style.FramePadding + ImGui::CalcTextSize(prev100_label);
+            total_width += prev100_size.x;
 
-                    // 100⏪
-                    if (ImGui::Button("100" ICON_FA_ANGLE_DOUBLE_LEFT) && !is_busy) {
-                        if (page > 100)
-                            page -= 100;
-                        else
-                            page = 1;
-                        perform_search();
-                    }
-                    ImGui::SetItemTooltip("Go back 100 pages.");
+            total_width += style.ItemSpacing.x;
 
-                    ImGui::SameLine();
+            const auto prev10_label = "10 " ICON_FA_ANGLE_DOUBLE_LEFT " "s;
+            const auto prev10_size = 2 * style.FramePadding + ImGui::CalcTextSize(prev10_label);
+            total_width += prev10_size.x;
 
-                    // 10⏪
-                    if (ImGui::Button("10" ICON_FA_ANGLE_DOUBLE_LEFT) && !is_busy) {
-                        if (page > 10)
-                            page -= 10;
-                        else
-                            page = 1;
-                        perform_search();
-                    }
-                    ImGui::SetItemTooltip("Go back 10 pages.");
+            total_width += style.ItemSpacing.x;
 
-                    ImGui::SameLine();
+            const auto prev_label = " " ICON_FA_ANGLE_LEFT " "s;
+            const auto prev_size = 2 * style.FramePadding + ImGui::CalcTextSize(prev_label);
+            total_width += prev_size.x;
 
-                    // ⏴
-                    if (ImGui::Button(" " ICON_FA_ANGLE_LEFT " ") && !is_busy) {
-                        if (page > 1)
-                            --page;
-                        perform_search();
-                    }
-                    ImGui::SetItemTooltip("Go back one page.");
-                }
+            total_width += style.ItemSpacing.x;
 
-                ImGui::SameLine();
+            const float drag_width = ImGui::CalcTextSize("9999999").x;
+            total_width += drag_width;
 
-                const float page_width = 200;
-                ImGui::SetNextItemWidth(page_width);
-                unsigned max_page_num = std::numeric_limits<unsigned>::max();
-                if (is_last_page)
-                    max_page_num = page;
-                ImGui::Drag<unsigned>("##page"s, page, 0.05f, 1u, max_page_num);
-                if (ImGui::IsItemDeactivatedAfterEdit())
+            total_width += style.ItemSpacing.x;
+
+            const auto next_label = " " ICON_FA_ANGLE_RIGHT " "s;
+            const auto next_size = 2 * style.FramePadding + ImGui::CalcTextSize(next_label);
+            total_width += next_size.x;
+
+            total_width += style.ItemSpacing.x;
+
+            const auto next10_label = " " ICON_FA_ANGLE_DOUBLE_RIGHT " 10"s;
+            const auto next10_size = 2 * style.FramePadding + ImGui::CalcTextSize(next10_label);
+            total_width += next10_size.x;
+
+            total_width += style.ItemSpacing.x;
+
+            const auto next100_label = " " ICON_FA_ANGLE_DOUBLE_RIGHT " 100"s;
+            const auto next100_size = 2 * style.FramePadding + ImGui::CalcTextSize(next100_label);
+            total_width += next10_size.x;
+
+            // Calculate offset to center the nav bar.
+            const float offset = (available.x - total_width) / 2;
+            if (offset > 0)
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
+
+            const bool is_first_page = page == 1;
+            const bool is_last_page = stations.size() < cfg.browser_page_limit;
+            const bool is_busy = RadioBrowserAPI::is_busy();
+
+            // Scope to conditionally disable all prev buttons
+            {
+                Disabled disable_first_page{is_first_page};
+
+                // 100 <<
+                if (ImGui::Button(prev100_label, prev100_size) && !is_busy) {
+                    if (page > 100)
+                        page -= 100;
+                    else
+                        page = 1;
                     perform_search();
+                }
+                ImGui::SetItemTooltip("Go back 100 pages.");
 
                 ImGui::SameLine();
 
-                {
-                    Disabled disable_last_page{is_last_page};
-
-                    // ⏵
-                    if (ImGui::Button(" " ICON_FA_ANGLE_RIGHT " ") && !is_busy) {
-                        ++page;
-                        perform_search();
-                    }
-                    ImGui::SetItemTooltip("Advance one page.");
-
-                    ImGui::SameLine();
-
-                    // ⏩10
-                    if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "10") && !is_busy) {
-                        page += 10;
-                        perform_search();
-                    }
-                    ImGui::SetItemTooltip("Advance 10 pages.");
-
-                    ImGui::SameLine();
-
-                    // ⏩100
-                    if (ImGui::Button(ICON_FA_ANGLE_DOUBLE_RIGHT "100") && !is_busy) {
-                        page += 100;
-                        perform_search();
-                    }
-                    ImGui::SetItemTooltip("Advance 100 pages.");
+                // 10 <<
+                if (ImGui::Button(prev10_label, prev10_size) && !is_busy) {
+                    if (page > 10)
+                        page -= 10;
+                    else
+                        page = 1;
+                    perform_search();
                 }
+                ImGui::SetItemTooltip("Go back 10 pages.");
 
-            } // navigation
+                ImGui::SameLine();
+
+                // <
+                if (ImGui::Button(prev_label, prev_size) && !is_busy) {
+                    if (page > 1)
+                        --page;
+                    perform_search();
+                }
+                ImGui::SetItemTooltip("Go back one page.");
+            }
+
+            ImGui::SameLine();
+
+            unsigned max_page_num = std::numeric_limits<unsigned>::max();
+            if (is_last_page)
+                max_page_num = page;
+            ImGui::SetNextItemWidth(drag_width);
+            const auto& io = ImGui::GetIO();
+            float drag_speed = 1.0f / (2 * io.MouseDragThreshold);
+            ImGui::Drag("##page"s, page, drag_speed, {1u}, {max_page_num});
+            if (ImGui::IsItemDeactivatedAfterEdit())
+                perform_search();
+
+            ImGui::SameLine();
+
+            // Scope to conditionally disable all the next buttons.
+            {
+                Disabled disable_last_page{is_last_page};
+
+                // >
+                if (ImGui::Button(next_label, next_size) && !is_busy) {
+                    ++page;
+                    perform_search();
+                }
+                ImGui::SetItemTooltip("Advance one page.");
+
+                ImGui::SameLine();
+
+                // >> 10
+                if (ImGui::Button(next10_label, next10_size) && !is_busy) {
+                    page += 10;
+                    perform_search();
+                }
+                ImGui::SetItemTooltip("Advance 10 pages.");
+
+                ImGui::SameLine();
+
+                // >> 100
+                if (ImGui::Button(next100_label, next100_size) && !is_busy) {
+                    page += 100;
+                    perform_search();
+                }
+                ImGui::SetItemTooltip("Advance 100 pages.");
+            }
         }
 
 

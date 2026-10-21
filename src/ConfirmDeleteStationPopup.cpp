@@ -122,9 +122,10 @@ namespace ConfirmDeleteStationPopup {
             state = State::visible;
         }
 
+        auto viewport = ImGui::GetMainViewport();
         ImGui::SetNextWindowSize({800, 0}, ImGuiCond_Always);
+        ImGui::SetNextWindowPos(viewport->GetWorkCenter(), ImGuiCond_Always, {0.5f, 0.5f});
         Popup popup{popup_id,
-                    ImGuiWindowFlags_NoResize |
                     ImGuiWindowFlags_NoMove |
                     ImGuiWindowFlags_NoSavedSettings};
         if (!popup) {
