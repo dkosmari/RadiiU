@@ -17,15 +17,17 @@ template<>
 struct glz::meta<TabID> {
     using enum TabID;
     static constexpr
-    auto value = enumerate(browser,
-                           favorites,
-                           recent,
-                           player,
-                           settings,
-                           logs,
-                           about,
-                           last_active,
-                           count);
+    auto value = enumerate(
+        browser,
+        favorites,
+        recent,
+        player,
+        settings,
+        logs,
+        about,
+        last_active,
+        count
+    );
 }; // struct glz::meta<TabID>
 
 #endif

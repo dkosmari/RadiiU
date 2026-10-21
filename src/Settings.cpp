@@ -11,10 +11,13 @@
 #include <filesystem>
 #include <optional>
 
+#include <glaze/core/meta.hpp>
+
 #include "Settings.hpp"
 
 #include "App.hpp"
 #include "LogManager.hpp"
+#include "Resolution.hpp"
 #include "Serializer.hpp"
 #include "TabIDGlaze.hpp"
 #include "tracer.hpp"

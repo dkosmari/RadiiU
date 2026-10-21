@@ -74,6 +74,28 @@ namespace SettingsTab {
                 } // styles_combo
 
 
+                /*------------*/
+                /* Resolution */
+                /*------------*/
+
+                ImGui::TableNextRow();
+
+                ImGui::TableNextColumn();
+                ImGui::AlignTextToFramePadding();
+                UI::Label("Screen resolution"sv,
+                          "Restart the app for the new resolution to apply."sv);
+
+                ImGui::TableNextColumn();
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                if (Combo resolution_combo{"##resolution", to_label(cfg.resolution)}) {
+                    for (auto res : enumerator::enumerate<Resolution>()) {
+                        if (ImGui::Selectable(to_label(res),
+                                              cfg.resolution == res))
+                            cfg.resolution = res;
+                    }
+                } // resolution
+
+
                 /*-------------*/
                 /* Initial tab */
                 /*-------------*/

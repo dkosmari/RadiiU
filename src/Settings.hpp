@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <string>
 
+#include "Resolution.hpp"
 #include "TabID.hpp"
 
 
@@ -29,6 +30,7 @@ namespace Settings {
         unsigned    player_history_limit = 20;
         bool        remember_tab         = true;
         unsigned    recent_limit         = 10;
+        Resolution  resolution           = Resolution::hd;
         unsigned    screen_saver_timeout = 120;
         bool        send_clicks          = false;
         std::string server               = {};

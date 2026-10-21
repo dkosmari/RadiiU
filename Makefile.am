@@ -109,6 +109,9 @@ radiiu_elf_SOURCES = \
 	src/RadioClient.hpp \
 	src/RecentTab.cpp \
 	src/RecentTab.hpp \
+	src/Resolution.cpp \
+	src/Resolution.hpp \
+	src/ResolutionGlaze.hpp \
 	src/rest.cpp \
 	src/rest.hpp \
 	src/Serializer.hpp \

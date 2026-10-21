@@ -793,7 +793,7 @@ namespace App {
                                                      ImVec2{6, 6}};
                 if (Window main_window{PACKAGE_STRING,
                                        nullptr,
-                                       ImGuiWindowFlags_NoBringToFrontOnFocus |
+                                       //ImGuiWindowFlags_NoBringToFrontOnFocus |
                                        ImGuiWindowFlags_NoDecoration |
                                        ImGuiWindowFlags_NoMove |
                                        ImGuiWindowFlags_NoSavedSettings}) {
@@ -1062,8 +1062,14 @@ namespace App {
 
         res->window.create(PACKAGE_STRING,
                            sdl::window::pos_centered,
-                           {1280, 720},
+                           to_size(cfg.resolution),
                            sdl::window::flag::resizable);
+        auto win_size = res->window.get_size();
+        LOG_DEBUG(
+            "Window created: {} x {}",
+            win_size.x,
+            win_size.y
+        );
 
         res->renderer.create(res->window,
                              -1,
