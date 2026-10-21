@@ -17,24 +17,28 @@
 
 struct stream_metadata {
 
-    std::optional<std::string> title;
-    std::optional<std::string> artist;
     std::optional<std::string> album;
-    std::optional<std::string> genre;
-    std::optional<std::string> date;
+    std::optional<std::string> album_art;
+    std::optional<std::string> artist;
+    std::optional<std::string> composer;
     std::optional<std::string> cover_art;
+    std::optional<std::string> date;
+    std::optional<std::string> genre;
+    std::optional<std::string> label;
+    std::optional<std::string> next;
+    std::optional<std::string> publisher;
+    std::optional<std::string> title;
+    std::optional<std::string> track;
 
     struct station_metadata {
-        std::optional<std::string> name;
-        std::optional<std::string> genre;
-        std::optional<std::string> description;
-        std::optional<std::string> url;
-        std::optional<std::string> bitrate;
         std::optional<std::string> audio_info;
-        std::vector<std::string> notice;
-    };
+        std::optional<std::string> description;
+        std::optional<std::string> genre;
+        std::optional<std::string> name;
+        std::optional<std::string> url;
 
-    station_metadata station;
+        std::vector<std::string> notice;
+    } station;
 
     std::flat_map<std::string, std::string> extra;
 

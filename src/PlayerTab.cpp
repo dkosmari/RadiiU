@@ -43,7 +43,6 @@
 using std::chrono::system_clock;
 
 using namespace std::literals;
-using namespace std::placeholders;
 
 using Settings::cfg;
 
@@ -59,7 +58,7 @@ namespace PlayerTab {
         /* Types */
         /*-------*/
 
-        struct TrackInfo {
+        struct HistoryEntry {
             system_clock::time_point when{};
             std::string title{};
         };
@@ -68,7 +67,7 @@ namespace PlayerTab {
         struct State {
             bool details_expanded{};
             bool track_history_expanded{};
-            std::deque<TrackInfo> history{};
+            std::deque<HistoryEntry> history{};
         };
 
 
@@ -151,7 +150,7 @@ namespace PlayerTab {
         show_toolbar();
 
         void
-        track_history_add(const std::string& title);
+        track_history_add(const stream_metadata& meta);
 
         void
         track_history_trim();
@@ -234,18 +233,7 @@ namespace PlayerTab {
 
                 update_audio_queue_history();
 
-                radio.with_metadata(
-                    [this](const stream_metadata& meta)
-                    {
-                        if (meta.title) {
-                            if (meta.artist)
-                                track_history_add(*meta.artist + " - " + *meta.title);
-                            else
-                                track_history_add(*meta.title);
-                        } else
-                            track_history_add({});
-                    }
-                );
+                radio.with_metadata(track_history_add);
             }
             catch (std::exception& e) {
                 LOG_ERROR("{}", e.what());
@@ -500,44 +488,38 @@ namespace PlayerTab {
                             [](const stream_metadata& meta)
                             {
                                 UI::InfoRowOpt("Title", meta.title);
+                                UI::InfoRowOpt("Track", meta.track);
                                 UI::InfoRowOpt("Artist", meta.artist);
-
-                                if (meta.cover_art && !meta.cover_art->empty()) {
-                                    auto available = ImGui::GetContentRegionAvail();
-                                    const sdl::vec2 max_size = {
-                                        static_cast<int>(available.x),
-                                        0
-                                    };
-                                    auto art = ImageLoader::get(*meta.cover_art, max_size);
-                                    ImGui::TableNextRow();
-                                    ImGui::TableNextColumn();
-                                    UI::Label("Cover art");
-                                    ImGui::TableNextColumn();
-                                    UI::Image(*art);
-                                    ImGui::SetItemTooltip(*meta.cover_art);
-                                }
+                                UI::InfoRowOpt("Composer", meta.composer);
+                                UI::ImageRowOpt("Cover Art", meta.album_art);
+                                UI::InfoRowOpt("Next", meta.next);
 
                                 UI::InfoRowOpt("Album", meta.album);
+                                UI::ImageRowOpt("Album Art", meta.album_art);
+
                                 UI::InfoRowOpt("Genre", meta.genre);
                                 UI::InfoRowOpt("Date", meta.date);
+                                UI::InfoRowOpt("Publisher", meta.publisher);
+                                UI::InfoRowOpt("Label", meta.label);
 
                                 // station metadata
                                 UI::InfoRowOpt("Station Name", meta.station.name);
                                 UI::InfoRowOpt("Station Genre", meta.station.genre);
                                 UI::InfoRowOpt("Station Description", meta.station.description);
                                 UI::InfoRowOpt("Station URL", meta.station.url);
-                                UI::InfoRowOpt("Station Bitrate", meta.station.bitrate);
                                 UI::InfoRowOpt("Station Audio Info", meta.station.audio_info);
 
-#if 0
-                                for (auto [index, line] :
-                                         meta.station.notice | std::views::enumerate) {
-                                    UI::InfoRow(
-                                        "Station Notice "s + std::to_string(index+1),
-                                        line
-                                    );
+                                if (!meta.station.notice.empty()) {
+                                    if (ImGui::CollapsingHeader("Station Notice")) {
+                                        for (auto [index, line] :
+                                                 meta.station.notice | std::views::enumerate) {
+                                            UI::InfoRow(
+                                                "Notice "s + std::to_string(index+1),
+                                                line
+                                            );
+                                        }
+                                    }
                                 }
-#endif
 
                                 // extra metadata
                                 for (const auto& [key, val] : meta.extra)
@@ -651,14 +633,24 @@ namespace PlayerTab {
 
 
         void
-        track_history_add(const std::string& title)
+        track_history_add(const stream_metadata& meta)
         {
             TraceFunction tf{"PlayerTab"sv};
+
+            std::string title;
+            if (meta.title) {
+                title = *meta.title;
+            } else {
+                if (meta.artist && meta.track)
+                    title = *meta.artist + " - "s + *meta.track;
+                else if (meta.track)
+                    title = *meta.track;
+            }
 
             if (!state.history.empty() && state.history.front().title == title)
                 return;
 
-            state.history.emplace_front(system_clock::now(), title);
+            state.history.emplace_front(system_clock::now(), std::move(title));
             track_history_trim();
             changed = true;
         }

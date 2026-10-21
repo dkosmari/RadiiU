@@ -211,51 +211,56 @@ DecoderMP3::get_info()
 }
 
 
-std::optional<stream_metadata>
-DecoderMP3::get_metadata()
+bool
+DecoderMP3::get_metadata(stream_metadata& meta)
     const
 {
     // These don't show up on streams, but do if playing a regular mp3 file.
     auto meta_flags = mpg.meta_check();
     if ((meta_flags & MPG123_NEW_ID3) == 0)
-        return {};
+        return false;
 
     LOG_DEBUG("Got ID3 metadata.");
     auto id3 = mpg.get_id3();
+
     if (id3.v2) {
-        stream_metadata result;
+
         auto& tag = *id3.v2;
         if (!tag.title.empty()) {
             LOG_DEBUG("Title: {:?}", tag.title);
-            result.title = std::move(tag.title);
+            meta.title = std::move(tag.title);
         }
         if (!tag.artist.empty()) {
             LOG_DEBUG("Artist: {:?}", tag.artist);
-            result.artist = std::move(tag.artist);
+            meta.artist = std::move(tag.artist);
         }
         if (!tag.album.empty()) {
             LOG_DEBUG("Album: {:?}", tag.album);
-            result.album = std::move(tag.album);
+            meta.album = std::move(tag.album);
         }
-        return result;
+        return true;
+
     } else if (id3.v1) {
+
         stream_metadata result;
         auto& tag = *id3.v1;
         if (!tag.title.empty()) {
             LOG_DEBUG("Title: {:?}", tag.title);
-            result.title = std::move(tag.title);
+            meta.title = std::move(tag.title);
         }
         if (!tag.artist.empty()) {
             LOG_DEBUG("Artist: {:?}", tag.artist);
-            result.artist = std::move(tag.artist);
+            meta.artist = std::move(tag.artist);
         }
         if (!tag.album.empty()) {
             LOG_DEBUG("Album: {:?}", tag.album);
-            result.album = std::move(tag.album);
+            meta.album = std::move(tag.album);
         }
-        return result;
+        return true;
+
     }
-    return {};
+
+    return false;
 }
 
 

@@ -54,8 +54,8 @@ struct DecoderAAC : Decoder {
     get_info()
         override;
 
-    std::optional<stream_metadata>
-    get_metadata()
+    bool
+    get_metadata(stream_metadata& meta)
         const override;
 
 

@@ -184,38 +184,39 @@ DecoderOpus::get_info()
 }
 
 
-std::optional<stream_metadata>
-DecoderOpus::get_metadata()
+bool
+DecoderOpus::get_metadata(stream_metadata& meta)
     const
 {
     auto tags = op_tags(oof, -1);
     if (!tags)
-        return {};
-
-    stream_metadata result;
+        return false;
 
     auto tags_vec = to_vector(tags);
     for (auto entry : tags_vec) {
+
         auto tokens = string_utils::split_view(entry, "="sv, false, 2);
         if (tokens.size() != 2)
             continue;
+
         auto key = tokens[0];
         auto val = tokens[1];
 
         using string_utils::equal_case;
         if (equal_case(key, "TITLE"sv))
-            result.title = val;
+            meta.title = val;
         else if (equal_case(key, "ARTIST"sv))
-            result.artist = val;
+            meta.artist = val;
         else if (equal_case(key, "ALBUM"sv))
-            result.album = val;
+            meta.album = val;
         else if (equal_case(key, "GENRE"sv))
-            result.genre = val;
+            meta.genre = val;
         else
-            result.extra[std::string{key}] = std::string{val};
+            meta.extra[std::string{key}] = std::string{val};
+
     }
 
-    return result;
+    return true;
 }
 
 

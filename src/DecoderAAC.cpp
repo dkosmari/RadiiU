@@ -291,11 +291,11 @@ DecoderAAC::get_info()
 }
 
 
-std::optional<stream_metadata>
-DecoderAAC::get_metadata()
+bool
+DecoderAAC::get_metadata(stream_metadata&)
     const
 {
-    return {};
+    return false;
 }
 
 

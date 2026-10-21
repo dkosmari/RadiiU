@@ -316,6 +316,30 @@ namespace UI {
 
 
     void
+    ImageRowOpt(const std::string& label,
+                const std::optional<std::string>& value)
+    {
+        if (value && !value->empty()) {
+            auto available = ImGui::GetContentRegionAvail();
+            const sdl::vec2 max_size = {
+                static_cast<int>(available.x),
+                0
+            };
+            auto art = ImageLoader::get(*value, max_size);
+
+            ImGui::TableNextRow();
+
+            ImGui::TableNextColumn();
+            UI::Label(label);
+
+            ImGui::TableNextColumn();
+            UI::Image(*art);
+            ImGui::SetItemTooltip(*value);
+        }
+    }
+
+
+    void
     InfoRow(const std::string& label,
             const std::string& value)
     {

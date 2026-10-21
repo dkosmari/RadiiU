@@ -7,10 +7,9 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <iostream>
 #include <locale>
-#include <sstream>
 #include <stdexcept>
-#include <string_view>
 #include <utility>
 
 #include <SDL_stdinc.h>
@@ -31,13 +30,6 @@ namespace icy {
 
     namespace {
 
-        /*-------*/
-        /* Types */
-        /*-------*/
-
-        using dict_t = std::unordered_map<std::string_view, std::string_view>;
-
-
         /*-----------------------*/
         /* Function declarations */
         /*-----------------------*/
@@ -45,13 +37,14 @@ namespace icy {
         bool
         is_just_a_number(std::string_view input);
 
-        dict_t
+        parser::dict_t
         parse(std::string_view input);
 
 
         /*----------------------*/
         /* Function definitions */
         /*----------------------*/
+
 
         bool
         is_just_a_number(std::string_view input)
@@ -64,10 +57,10 @@ namespace icy {
         }
 
 
-        dict_t
+        parser::dict_t
         parse(std::string_view input)
         {
-            dict_t result;
+            parser::dict_t result;
 
             const auto npos = std::string_view::npos;
             using size_type = std::string_view::size_type;
@@ -146,15 +139,22 @@ namespace icy {
         data_left = interval;
         meta_left = 0;
 
-        current_meta = {};
+        meta = {};
     }
 
 
-    stream_metadata&&
-    parser::get_metadata()
+    bool
+    parser::get_metadata(stream_metadata& dst)
         noexcept
     {
-        return std::move(current_meta);
+        if (!meta)
+            return false;
+
+        // std::cout << "icy_parser::get_metadata():\n" << *meta << std::endl;
+
+        dst = std::move(*meta);
+        meta.reset();
+        return true;
     }
 
 
@@ -218,65 +218,145 @@ namespace icy {
 
 
     void
+    parser::handle(const dict_t& dict,
+                   std::string_view key,
+                   std::string_view val)
+    {
+        LOG_DEBUG("icy meta key: {} = {:?}", key, val);
+
+        if (key == "AlbumArt"sv) {
+            meta->album_art = resolve_url(val);
+            return;
+        }
+
+        if (key == "CoverArt"sv) {
+            meta->cover_art = resolve_url(val);
+            return;
+        }
+
+        if (key == "CoverArtUrl"sv) {
+            meta->cover_art = resolve_url(val);
+            return;
+        }
+
+        if (key == "Image"sv) {
+            // TODO: might be base64 of the image
+            meta->cover_art = resolve_url(val);
+            return;
+        }
+
+        if (key == "ImageUrl"sv) {
+            meta->cover_art = resolve_url(val);
+            return;
+        }
+
+        if (key == "StreamAlbum"sv) {
+            meta->album = val;
+            return;
+        }
+
+        if (key == "StreamArtist"sv) {
+            meta->artist = val;
+            return;
+        }
+
+        if (key == "StreamArtwork"sv) {
+            meta->cover_art = resolve_url(val);
+            return;
+        }
+
+        if (key == "StreamComposer"sv) {
+            meta->composer = val;
+            return;
+        }
+
+        if (key == "StreamCover"sv) {
+            meta->cover_art = resolve_url(val);
+            return;
+        }
+
+        if (key == "StreamCoverArt"sv) {
+            meta->cover_art = resolve_url(val);
+            return;
+        }
+
+        if (key == "StreamDate"sv) {
+            meta->date = val;
+            return;
+        }
+
+        if (key == "StreamGenre"sv) {
+            meta->genre = val;
+            return;
+        }
+
+        if (key == "StreamLabel"sv) {
+            meta->label = val;
+            return;
+        }
+
+        if (key == "StreamNext"sv) {
+            meta->next = val;
+            return;
+        }
+
+        if (key == "StreamPublisher"sv) {
+            meta->publisher = val;
+            return;
+        }
+
+        if (key == "StreamTitle"sv) {
+            meta->title = val;
+            return;
+        }
+
+        if (key == "StreamTrack"sv) {
+            meta->track = val;
+            return;
+        }
+
+        if (key == "StreamUrl"sv) {
+            // NOTE: Some servers report a numeric song ID as the URL, let's ignore them.
+            if (is_just_a_number(val))
+                return;
+
+            auto url = resolve_url(val);
+            if (!dict.contains("StreamArtwork"sv))
+                meta->cover_art = std::move(url);
+            else
+                meta->station.url = std::move(url);
+
+            return;
+        }
+
+        if (key == "StreamYear"sv) {
+            meta->date = val;
+            return;
+        }
+
+        // Fallback: just add it to the "extra" dictionary.
+        meta->extra[std::string{key}] = std::string{val};
+    }
+
+
+    void
     parser::parse_metadata()
     {
         using string_utils::trimmed;
 
-        //current_meta = {};
+        meta.emplace();
 
         // Note: icy metadata is padded with null bytes.
         std::string raw_meta_str(meta_stream.size(), '\0');
         std::ignore = meta_stream.read(as_writable_bytes(std::span{raw_meta_str}));
         std::string meta_str = trimmed(raw_meta_str, '\0');
 
-        auto meta_dict = icy::parse(meta_str);
+        auto dict = icy::parse(meta_str);
 
-        auto& meta = current_meta;
-
-        for (const auto& [key, raw_val] : meta_dict) {
+        for (const auto& [key, raw_val] : dict) {
             auto val = trimmed(raw_val);
-            LOG_DEBUG("icy meta key: {} = {:?}", key, val);
-            if (key == "StreamTitle"sv) {
-                meta.title = std::move(val);
-            } else if (key == "StreamUrl"sv) {
-                // NOTE: Some servers report a numeric song ID as the URL, let's ignore them.
-                if (!is_just_a_number(val)) {
-                    auto url = resolve_url(val);
-                    if (!meta_dict.contains("StreamArtwork"sv))
-                        meta.cover_art = std::move(url);
-                    else
-                        meta.station.url = std::move(url);
-                }
-            } else if (key == "StreamArtwork"sv) {
-                meta.cover_art = resolve_url(val);
-            } else if (key == "StreamArtist"sv) {
-                meta.artist = val;
-            } else if (key == "StreamAlbum"sv) {
-                meta.album = val;
-            } else if (key == "StreamGenre"sv) {
-                meta.genre = val;
-            } else if (key == "StreamYear"sv) {
-                meta.date = val;
-            } else if (key == "StreamDate"sv) {
-                meta.date = val;
-            } else {
-                /*
-                  Not handled:
-                  StreamComposer
-                  StreamPublisher
-                  StreamLabel
-                  StreamCover
-                  StreamCoverArt
-                  CoverArt
-                  CoverArtUrl
-                  Image
-                  ImageUrl
-                  AlbumArt
-                */
-                current_meta.extra[std::string{key}] = std::string{val};
-            }
+            handle(dict, key, val);
         }
-
     }
 
 
@@ -287,6 +367,14 @@ namespace icy {
         try {
             if (url.empty())
                 return {};
+
+            bool looks_like_url = url.starts_with("http://") || url.starts_with("https://");
+            if (looks_like_url)
+                return std::string{url};
+
+            if (url.size() > 256) // avoid long strings, probably base64 encoded images
+                return {};
+
             curl::url resolver{base_url};
             resolver.set_url(std::string{url});
             std::string result = resolver.get_url();

@@ -105,6 +105,11 @@ namespace UI {
 
 
     void
+    ImageRowOpt(const std::string& label,
+                const std::optional<std::string>& value);
+
+
+    void
     InfoRow(const std::string& label,
             const std::vector<std::string>& values);
 

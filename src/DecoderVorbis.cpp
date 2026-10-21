@@ -211,15 +211,13 @@ DecoderVorbis::get_info()
 }
 
 
-std::optional<stream_metadata>
-DecoderVorbis::get_metadata()
+bool
+DecoderVorbis::get_metadata(stream_metadata& meta)
     const
 {
     auto comment = ov_comment(const_cast<OggVorbis_File*>(&ovf), -1);
     if (!comment)
-        return {};
-
-    stream_metadata result;
+        return false;
 
     auto comment_vec = to_vector(comment);
     for (auto entry : comment_vec) {
@@ -231,18 +229,18 @@ DecoderVorbis::get_metadata()
 
         using string_utils::equal_case;
         if (equal_case(key, "TITLE"sv))
-            result.title = val;
+            meta.title = val;
         else if (equal_case(key, "ARTIST"sv))
-            result.artist = val;
+            meta.artist = val;
         else if (equal_case(key, "ALBUM"sv))
-            result.album = val;
+            meta.album = val;
         else if (equal_case(key, "GENRE"sv))
-            result.genre = val;
+            meta.genre = val;
         else
-            result.extra[std::string{key}] = std::string{val};
+            meta.extra[std::string{key}] = std::string{val};
     }
 
-    return result;
+    return true;
 }
 
 

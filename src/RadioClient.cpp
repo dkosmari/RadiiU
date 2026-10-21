@@ -620,9 +620,10 @@ RadioClient::audio_thread_function(std::stop_token stopper)
 
                 audio.safe_info.store(decoder->get_info());
 
-                if (auto dec_meta = decoder->get_metadata()) {
-                    auto metadata = safe_metadata.lock();
-                    metadata->merge(std::move(*dec_meta));
+                {
+                    stream_metadata dec_meta;
+                    if (decoder->get_metadata(dec_meta))
+                        safe_metadata.lock()->merge(std::move(dec_meta));
                 }
 
             }
@@ -669,6 +670,7 @@ RadioClient::task_queue_transfer(unsigned idx)
     LOG_DEBUG("task_queue_transfer()");
 
     state = State::fetching;
+    safe_error_message.store("");
 
     auto ts = network.transfer_state.load();
     switch (ts) {
@@ -877,8 +879,9 @@ RadioClient::on_transfer_recv(std::span<const std::byte> input)
     network.icy_parser.feed(input);
 
     {
-        auto metadata = safe_metadata.lock();
-        metadata->merge(network.icy_parser.get_metadata());
+        stream_metadata icy_meta;
+        if (network.icy_parser.get_metadata(icy_meta))
+            safe_metadata.lock()->merge(std::move(icy_meta));
     }
 
     URLType type = safe_url_info_vec.lock()->at(url_info_idx).type;
@@ -991,6 +994,7 @@ RadioClient::on_transfer_started(std::span<const std::byte> data)
 
             LOG_INFO("Detected audio mime: {:?}", content_type);
             state = State::streaming;
+            safe_error_message.store("");
             playlist_type = PlaylistType::none;
             audio.safe_content_type.store(content_type);
             info.content_type = std::move(content_type);
@@ -1040,14 +1044,8 @@ RadioClient::on_transfer_started(std::span<const std::byte> data)
         if (auto hdr = easy.try_get_header("icy-url"))
             metadata->station.url = trimmed(hdr->value);
 
-        if (auto hdr = easy.try_get_header("icy-br"))
-            metadata->station.bitrate = trimmed(hdr->value);
-
         if (auto hdr = easy.try_get_header("icy-audio-info"))
             metadata->station.audio_info = trimmed(hdr->value);
-
-        if (auto hdr = easy.try_get_header("icy-pub"))
-            LOG_DEBUG("icy-pub: {:?}", hdr->value);
 
         for (auto hdr : easy.get_header_iterator()) {
             if (hdr.name.starts_with("icy-notice"sv))
