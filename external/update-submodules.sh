@@ -12,7 +12,7 @@ update_submodule()
 }
 
 
-updatesubmodule cafe_glyphs
+update_submodule cafe_glyphs
 update_submodule curlxx
 update_submodule glaze
 update_submodule imgui

@@ -11,8 +11,12 @@ AM_CXXFLAGS = \
 	-Wall -Wextra -Werror
 
 
+noinst_HEADERS =
+
 noinst_LTLIBRARIES =
 
+
+include $(srcdir)/cafe_glyphs.am
 
 include $(srcdir)/glaze.am
 

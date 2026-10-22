@@ -95,7 +95,7 @@ using Settings::cfg;
 #endif
 
 
-// #define ENABLE_DIM_TIMER_WATCHER
+#define ENABLE_DIM_TIMER_WATCHER
 
 
 namespace App {
@@ -491,10 +491,11 @@ namespace App {
 
 #ifdef ENABLE_DIM_TIMER_WATCHER
             static std::uint32_t old_dim_timer = 0;
-            if (res->dim_timer_reader.state != IMDevice::AsyncCall::State::waiting) {
+            if (res->dim_timer_reader.state
+                != WiiUIMManager::IMDevice::AsyncCall::State::waiting) {
                 std::uint32_t cur_dim_timer = res->dim_timer_reader.value;
                 if (cur_dim_timer != old_dim_timer) {
-                    // LOG_DEBUG("DIM timer: {}", cur_dim_timer);
+                    LOG_DEBUG("DIM timer: {}", cur_dim_timer);
                     old_dim_timer = cur_dim_timer;
                 }
             }

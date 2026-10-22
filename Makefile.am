@@ -3,7 +3,6 @@ EXTRA_DIST = \
 	bootstrap \
 	COPYING.GPLv3 \
 	CREDITS \
-	radio-browser-info-api.md \
 	README.md \
 	TODO.org \
 	tools

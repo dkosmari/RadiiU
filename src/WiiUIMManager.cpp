@@ -248,6 +248,7 @@ namespace WiiUIMManager {
             if (finish_shutdown())
                 return;
         }
+        LOG_WARN("idle -> started");
 
         event = desired;
         if (auto e = IM_GetEventNotify(device.handle,
