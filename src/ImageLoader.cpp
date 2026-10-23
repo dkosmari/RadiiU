@@ -170,14 +170,14 @@ namespace ImageLoader {
             sdl::texture loading_icon;
             Cache cache;
 
+            curl::multi multi;
+
             async_queue<CacheEntryPtr> download_queue;
-            std::jthread downloader_thread;
-
             async_queue<CacheEntryPtr> load_queue;
-
             async_queue<CacheEntryPtr> convert_queue;
 
-            curl::multi multi;
+
+            std::jthread downloader_thread;
             std::jthread loader_thread;
 
 
@@ -674,7 +674,9 @@ namespace ImageLoader {
             noexcept
         try {
             TraceManager::thread_name("ImageLoader downloader thread");
+
             while (!stopper.stop_requested()) {
+
                 unsigned work = 0; // keep track of any work, to detect we're idle
 
                 // Check if there are new download requests
@@ -743,7 +745,9 @@ namespace ImageLoader {
                 if (!work) {
                     std::this_thread::sleep_for(100ms);
                 }
-            }
+
+            } // while
+
         }
         catch (std::exception& e) {
             LOG_ERROR("downloader_thread_function(): {}", e.what());

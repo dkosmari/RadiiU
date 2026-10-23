@@ -16,8 +16,8 @@
 
 #include "WiiUIMManager.hpp"
 
-#include "App.hpp"
 #include "LogManager.hpp"
+#include "string_utils.hpp"
 
 
 using namespace std::literals;
@@ -122,29 +122,77 @@ namespace WiiUIMManager {
             }
         }
 
+
+        std::string
+        im_event_to_string(unsigned mask)
+        {
+            using string_utils::concat;
+
+            std::string result;
+            const std::string separator = ",";
+
+            if (mask & IM_EVENT_ACTIVE)
+                result = concat(result, "active", separator);
+            if (mask & IM_EVENT_INACTIVE)
+                result = concat(result, "inactive", separator);
+            if (mask & IM_EVENT_DIM)
+                result = concat(result, "dim", separator);
+            if (mask & IM_EVENT_UNDIM)
+                result = concat(result, "undim", separator);
+            if (mask & IM_EVENT_APD)
+                result = concat(result, "apd", separator);
+            if (mask & IM_EVENT_POWER)
+                result = concat(result, "power", separator);
+            if (mask & IM_EVENT_HOME)
+                result = concat(result, "home", separator);
+            if (mask & IM_EVENT_SYNC)
+                result = concat(result, "sync", separator);
+            if (mask & IM_EVENT_RESET)
+                result = concat(result, "reset", separator);
+            if (mask & IM_EVENT_CANCELLED)
+                result = concat(result, "cancelled", separator);
+
+            return result;
+        }
+
     } // namespace
 
 
-    IMDevice::AsyncCall::AsyncCall(IMDevice& dev) :
+    IMDevice::IMDevice() :
+        handle{IM_Open()}
+    {
+        if (handle < 0)
+            throw std::runtime_error{"IM_Open() failed: "s
+                                     + std::to_string(handle)};
+    }
+
+
+    IMDevice::~IMDevice()
+    {
+        IM_Close(handle);
+    }
+
+
+    AsyncCall::AsyncCall(IMDevice& dev) :
         device(dev)
     {}
 
 
-    IMDevice::AsyncCall::~AsyncCall()
+    AsyncCall::~AsyncCall()
         noexcept
     {
         State old_state = State::idle;
-        if (!state.compare_exchange_strong(old_state, State::shutdown_finish)) {
+        if (!state.compare_exchange_strong(old_state, State::shutdown_finishing)) {
             LOG_WARN("shutting down while async call active: state = {}",
                      to_string(old_state));
-            // !idle -> shutdown_start
-            state = State::shutdown_start;
+            // !idle -> shutdown_starting
+            state = State::shutdown_starting;
             auto start = std::chrono::steady_clock::now();
-            while ((old_state = state) != State::shutdown_finish) {
+            while ((old_state = state) != State::shutdown_finishing) {
                 std::this_thread::sleep_for(5ms);
                 auto now = std::chrono::steady_clock::now();
                 if (now - start > 100ms) {
-                    LOG_ERROR("timed out waiting for shutdown_finish state: state is {}",
+                    LOG_ERROR("timed out waiting for shutdown_finishing state: state is {}",
                               to_string(old_state));
                     break;
                 }
@@ -154,13 +202,13 @@ namespace WiiUIMManager {
 
 
     void
-    IMDevice::AsyncCall::callback(IOSError)
+    AsyncCall::callback(IOSError)
     {}
 
 
     void
-    IMDevice::AsyncCall::callback_helper(IOSError e,
-                                         void* ctx)
+    AsyncCall::callback_helper(IOSError e,
+                               void* ctx)
         noexcept
     {
         auto self = reinterpret_cast<AsyncCall*>(ctx);
@@ -170,8 +218,8 @@ namespace WiiUIMManager {
         if (self->finish_shutdown())
             return;
 
-        // waiting -> handling
-        old_state = State::waiting;
+        // requesting -> handling
+        old_state = State::requesting;
         if (!self->state.compare_exchange_strong(old_state, State::handling)) {
             LOG_WARN("could not enter handling state: old_state was {}",
                      to_string(old_state));
@@ -198,14 +246,14 @@ namespace WiiUIMManager {
 
 
     bool
-    IMDevice::AsyncCall::finish_shutdown()
+    AsyncCall::finish_shutdown()
         noexcept
     {
-        State old_state = State::shutdown_start;
-        if (state.compare_exchange_strong(old_state, State::shutdown_finish))
+        State old_state = State::shutdown_starting;
+        if (state.compare_exchange_strong(old_state, State::shutdown_finishing))
             return true;
         // Shouldn't happen, but just to be safe...
-        if (old_state == State::shutdown_finish) {
+        if (old_state == State::shutdown_finishing) {
             LOG_ERROR("finish_shutdown() called multiple times!");
             return true;
         }
@@ -213,16 +261,45 @@ namespace WiiUIMManager {
     }
 
 
-    IMDevice::EventWatcher::EventWatcher(IMDevice& dev,
-                                         IMEventMask ev) :
-        AsyncCall{dev},
-        desired{ev}
+    std::string
+    to_string(AsyncCall::State st)
     {
-        watch();
+        switch (st) {
+            using enum AsyncCall::State;
+
+            case idle:
+                return "idle"s;
+
+            case requesting:
+                return "requesting"s;
+
+            case handling:
+                return "handling"s;
+
+            case shutdown_starting:
+                return "shutdown_starting"s;
+
+            case shutdown_finishing:
+                return "shutdown_finishing"s;
+
+            default:
+                return "?";
+        }
     }
 
 
-    IMDevice::EventWatcher::~EventWatcher()
+    EventWatcher::EventWatcher(IMDevice& dev,
+                               IMEventMask ev,
+                               Function f) :
+        AsyncCall{dev},
+        desired{ev},
+        func{std::move(f)}
+    {
+        request_watch();
+    }
+
+
+    EventWatcher::~EventWatcher()
         noexcept
     {
         alignas(0x40) IMRequest cancel_req{};
@@ -236,19 +313,18 @@ namespace WiiUIMManager {
 
 
     void
-    IMDevice::EventWatcher::watch()
+    EventWatcher::request_watch()
     {
         State old_state;
 
-        // idle -> started
+        // idle -> requesting
         old_state = State::idle;
-        if (!state.compare_exchange_strong(old_state, State::started)) {
-            LOG_WARN("could not enter started state: old_state is {}",
+        if (!state.compare_exchange_strong(old_state, State::requesting)) {
+            LOG_WARN("EventWatcher::request_watch(): could not enter requesting state: old_state is {}",
                      to_string(old_state));
             if (finish_shutdown())
                 return;
         }
-        LOG_WARN("idle -> started");
 
         event = desired;
         if (auto e = IM_GetEventNotify(device.handle,
@@ -256,8 +332,8 @@ namespace WiiUIMManager {
                                        &event,
                                        &EventWatcher::callback_helper,
                                        this)) {
-            // started -> idle
-            old_state = State::started;
+            // requesting -> idle
+            old_state = State::requesting;
             if (!state.compare_exchange_strong(old_state, State::idle)) {
                 LOG_WARN("could not enter idle state: old_state is {}",
                          to_string(old_state));
@@ -267,22 +343,25 @@ namespace WiiUIMManager {
             throw std::runtime_error{"IM_GetEventNotify() failed: "s
                                      + to_string(e)};
         }
-
-        // started -> waiting
-        old_state = State::started;
-        // NOTE: this can fail if we entered shutdown, don't override the shutdown state.
-        if (!state.compare_exchange_strong(old_state, State::waiting)) {
-            LOG_WARN("could not enter waiting state: old_state is {}",
-                     to_string(old_state));
-            if (finish_shutdown())
-                return;
-        }
     }
 
 
     void
-    IMDevice::EventWatcher::callback_helper(IOSError e,
-                                            void* ctx)
+    EventWatcher::callback(IOSError e)
+    {
+        AsyncCall::callback(e);
+
+        LOG_DEBUG("im event watcher: {}", im_event_to_string(event));
+
+        if (!e)
+            if (func)
+                func(event);
+    }
+
+
+    void
+    EventWatcher::callback_helper(IOSError e,
+                                  void* ctx)
         noexcept
     {
         auto self = reinterpret_cast<EventWatcher*>(ctx);
@@ -290,11 +369,11 @@ namespace WiiUIMManager {
         if (self->finish_shutdown())
             return;
 
-        IMDevice::AsyncCall::callback_helper(e, static_cast<AsyncCall*>(self));
+        AsyncCall::callback_helper(e, static_cast<AsyncCall*>(self));
 
         try {
             if (!e)
-                self->watch();
+                self->request_watch(); // watch again
         }
         catch (std::exception& e) {
             LOG_ERROR("re-watch failed: {}", e.what());
@@ -305,118 +384,45 @@ namespace WiiUIMManager {
     }
 
 
-    IMDevice::IMDevice() :
-        handle{IM_Open()}
-    {
-        if (handle < 0)
-            throw std::runtime_error{"IM_Open() failed: "s
-                                     + std::to_string(handle)};
-    }
-
-
-    IMDevice::~IMDevice()
-    {
-        IM_Close(handle);
-    }
-
-
     DIMTimerReader::DIMTimerReader(IMDevice& dev) :
-        IMDevice::AsyncCall{dev}
+        AsyncCall{dev}
     {}
 
 
     void
-    DIMTimerReader::read()
+    DIMTimerReader::request_read()
     {
         State old_state;
-        // idle -> started
+        // idle -> requesting
         old_state = State::idle;
-        if (!state.compare_exchange_strong(old_state, State::started)) {
-            LOG_WARN("could not enter started state: old_state is {}",
-                     to_string(old_state));
+        if (!state.compare_exchange_strong(old_state, State::requesting))
             return;
-        }
 
         auto e = IM_GetTimerRemaining(device.handle,
                                       &request,
                                       IM_TIMER_DIM,
                                       &value,
-                                      &IMDevice::AsyncCall::callback_helper,
-                                      static_cast<IMDevice::AsyncCall*>(this));
+                                      &AsyncCall::callback_helper,
+                                      static_cast<AsyncCall*>(this));
         if (e)
             throw std::runtime_error{"IM_GetTimerRemaining() failed: "s + to_string(e)};
-
-        // started -> waiting
-        old_state = State::started;
-        if (!state.compare_exchange_strong(old_state, State::waiting)) {
-            LOG_WARN("could not enter waiting state: old_state is {}",
-                     to_string(old_state));
-            if (finish_shutdown())
-                return;
-        }
     }
 
 
     void
     DIMTimerReader::callback(IOSError e)
     {
-        IMDevice::AsyncCall::callback(e);
+        AsyncCall::callback(e);
         if (e)
             LOG_ERROR("DIMTimerReader: got error: {}", to_string(e));
     }
 
 
-    UNDIMEventWatcher::UNDIMEventWatcher(IMDevice& dev) :
-        IMDevice::EventWatcher{dev, IM_EVENT_UNDIM}
-    {}
-
-
-    void
-    UNDIMEventWatcher::callback(IOSError e)
+    std::uint32_t
+    DIMTimerReader::get_value()
+        const noexcept
     {
-        IMDevice::EventWatcher::callback(e);
-        if (!e) {
-            if (event & IM_EVENT_UNDIM) {
-                LOG_DEBUG("undim event");
-                App::add_task(
-                    "undim event"sv,
-                    []
-                    {
-                        App::detected_activity();
-                    }
-                );
-            }
-        }
-    }
-
-
-    std::string
-    to_string(IMDevice::AsyncCall::State st)
-    {
-        switch (st) {
-            using enum IMDevice::AsyncCall::State;
-
-            case idle:
-                return "idle"s;
-
-            case started:
-                return "started"s;
-
-            case waiting:
-                return "waiting"s;
-
-            case handling:
-                return "handling"s;
-
-            case shutdown_start:
-                return "shutdown_start"s;
-
-            case shutdown_finish:
-                return "shutdown_finish"s;
-
-            default:
-                return "?";
-        }
+        return value;
     }
 
 } // namespace WiiUIMManager

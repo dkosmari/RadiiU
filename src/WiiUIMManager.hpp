@@ -11,6 +11,7 @@
 #ifdef __WIIU__
 
 #include <atomic>
+#include <functional>
 
 #include <coreinit/im.h>
 
@@ -19,74 +20,6 @@ namespace WiiUIMManager {
 
     // RAII type for IM handles
     struct IMDevice {
-
-        struct AsyncCall {
-
-            enum class State {
-                idle,
-                started,
-                waiting,
-                handling,
-                shutdown_start,
-                shutdown_finish,
-            };
-
-            alignas(0x40) IMRequest request{};
-            IMDevice& device;
-            std::atomic<State> state{State::idle};
-
-            AsyncCall(IMDevice& dev);
-
-            // Prevent moving.
-            AsyncCall(AsyncCall&&) = delete;
-
-            virtual
-            ~AsyncCall()
-                noexcept;
-
-            virtual
-            void
-            callback(IOSError e);
-
-        protected:
-
-            static
-            void
-            callback_helper(IOSError e,
-                            void* ctx)
-                noexcept;
-
-            bool
-            finish_shutdown()
-                noexcept;
-
-        }; // struct AsyncCall
-
-
-        struct EventWatcher : AsyncCall {
-
-            IMEventMask desired;
-            IMEventMask event{};
-
-            EventWatcher(IMDevice& dev,
-                         IMEventMask ev);
-
-            ~EventWatcher()
-                noexcept;
-
-            void
-            watch();
-
-        protected:
-
-            static
-            void
-            callback_helper(IOSError e,
-                            void* ctx)
-                noexcept;
-
-        }; // struct EventWatcher
-
 
         const IOSHandle handle;
 
@@ -98,35 +31,111 @@ namespace WiiUIMManager {
     }; // struct IMDevice
 
 
-    struct DIMTimerReader : IMDevice::AsyncCall {
+    struct AsyncCall {
 
-        std::uint32_t value = 0;
+        enum class State : unsigned {
+            idle,
+            requesting,
+            handling,
+            shutdown_starting,
+            shutdown_finishing,
+        };
+
+        alignas(0x40) IMRequest request{};
+        IMDevice& device;
+        std::atomic<State> state{State::idle};
+
+
+        AsyncCall(IMDevice& dev);
+
+        // Prevent moving.
+        AsyncCall(AsyncCall&&) = delete;
+
+        virtual
+        ~AsyncCall()
+            noexcept;
+
+
+        virtual
+        void
+        callback(IOSError e);
+
+
+    protected:
+
+        static
+        void
+        callback_helper(IOSError e,
+                        void* ctx)
+            noexcept;
+
+        bool
+        finish_shutdown()
+            noexcept;
+
+    }; // struct AsyncCall
+
+
+    std::string
+    to_string(AsyncCall::State st);
+
+
+    struct EventWatcher : AsyncCall {
+
+        using Function = std::move_only_function<void (IMEventMask)>;
+
+        EventWatcher(IMDevice& dev,
+                     IMEventMask ev,
+                     Function f);
+
+        ~EventWatcher()
+            noexcept;
+
+        void
+        request_watch();
+
+        void
+        callback(IOSError e)
+            override;
+
+
+    protected:
+
+        IMEventMask desired;
+        IMEventMask event{};
+        Function func;
+
+
+        static
+        void
+        callback_helper(IOSError e,
+                        void* ctx)
+            noexcept;
+
+    }; // struct EventWatcher
+
+
+    struct DIMTimerReader : AsyncCall {
 
         DIMTimerReader(IMDevice& dev);
 
         void
-        read();
+        request_read();
 
         void
         callback(IOSError e)
             override;
+
+        std::uint32_t
+        get_value()
+            const noexcept;
+
+
+    private:
+
+        std::uint32_t value = 0;
 
     }; // struct DIMTimerReader
-
-
-    struct UNDIMEventWatcher : IMDevice::EventWatcher {
-
-        UNDIMEventWatcher(IMDevice& dev);
-
-        void
-        callback(IOSError e)
-            override;
-
-    }; // struct UNDIMEventWatcher
-
-
-    std::string
-    to_string(IMDevice::AsyncCall::State st);
 
 } // namespace WiiUIMManager
 

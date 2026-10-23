@@ -63,7 +63,7 @@ namespace LogManager {
         const MessageVec::size_type max_messages = 1024;
 
         const std::array log_level_ansi_prefixes = {
-            "\e[1;7;93m"sv,         // DEBUG
+            "\e[1;7m"sv,          // DEBUG
             "\e[1;7;34m"sv,       // INFO
             "\e[1;7;33m"sv,       // WARN
             "\e[1;7;31m"sv        // ERROR
@@ -241,9 +241,6 @@ namespace LogManager {
         TRACE_FUNC;
 
         cout.sync_with_stdio(false);
-
-        main_thread_id = std::this_thread::get_id();
-        std::println("main thread is {}", main_thread_id);
     }
 
 

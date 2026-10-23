@@ -82,6 +82,7 @@
 
 
 using std::cout;
+using std::cerr;
 using std::endl;
 
 using namespace std::literals;
@@ -95,7 +96,7 @@ using Settings::cfg;
 #endif
 
 
-#define ENABLE_DIM_TIMER_WATCHER
+// #define ENABLE_DIM_TIMER_WATCHER
 
 
 namespace App {
@@ -179,7 +180,14 @@ namespace App {
 #ifdef ENABLE_DIM_TIMER_WATCHER
             WiiUIMManager::DIMTimerReader dim_timer_reader{im_device};
 #endif // ENABLE_DIM_TIMER_WATCHER
-            WiiUIMManager::UNDIMEventWatcher undim_event_watcher{im_device};
+            WiiUIMManager::EventWatcher active_event_watcher{
+                im_device,
+                IM_EVENT_ACTIVE,
+                [](IMEventMask)
+                {
+                    detected_activity();
+                }
+            };
 #endif // __WIIU__
 
 
@@ -489,23 +497,26 @@ namespace App {
                 old_use_swkbd = cfg.use_swkbd;
             }
 
+            const auto& io = ImGui::GetIO();
+            if (io.WantTextInput)
+                SDL_WiiUSetSWKBDShowCopyPasteButtons(SDL_TRUE);
+
 #ifdef ENABLE_DIM_TIMER_WATCHER
             static std::uint32_t old_dim_timer = 0;
-            if (res->dim_timer_reader.state
-                != WiiUIMManager::IMDevice::AsyncCall::State::waiting) {
-                std::uint32_t cur_dim_timer = res->dim_timer_reader.value;
-                if (cur_dim_timer != old_dim_timer) {
-                    LOG_DEBUG("DIM timer: {}", cur_dim_timer);
-                    old_dim_timer = cur_dim_timer;
-                }
+            std::uint32_t cur_dim_timer = res->dim_timer_reader.get_value();
+            if (cur_dim_timer != old_dim_timer) {
+                // LOG_INFO("dim timer: {}", cur_dim_timer);
+                if (cur_dim_timer > old_dim_timer)
+                    detected_activity();
             }
+            old_dim_timer = cur_dim_timer;
 
             try {
                 TraceDuration duration_dim_timer_reader{
                     "dim_timer_reader.read()"sv,
                     "App"sv
                 };
-                res->dim_timer_reader.read();
+                res->dim_timer_reader.request_read();
             }
             catch (std::exception& e) {
                 LOG_ERROR("dim_timer_reader.read(): {}", e.what());
@@ -628,9 +639,9 @@ namespace App {
                         style.Alpha = 1.0f;
                     }
 
-                    process_ui();
-
                 }
+
+                process_ui();
 
                 {
                     TraceDuration duration_end_frame{"ImGui::EndFrame()"sv,
@@ -1110,6 +1121,14 @@ namespace App {
     {
         TRACE_FUNC;
 
+        // Dispatch all pending tasks
+        try {
+            tasks.dispatch_all();
+        }
+        catch (std::exception& e) {
+            cerr << "Error: " << e.what() << endl;
+        }
+
         // Finalize tabs.
         StationVoting::finalize();
         RecentTab::finalize();
@@ -1137,6 +1156,14 @@ namespace App {
         // Finalize Settings module last.
         Settings::finalize();
         finalize_config_dir();
+
+        // Last task dispatch
+        try {
+            tasks.dispatch_all();
+        }
+        catch (std::exception& e) {
+            cerr << "Error: " << e.what() << endl;
+        }
 
         TraceManager::finalize();
         LogManager::finalize();
