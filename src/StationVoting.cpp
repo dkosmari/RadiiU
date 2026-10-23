@@ -55,7 +55,11 @@ namespace StationVoting {
         /* Constants */
         /*-----------*/
 
-        const system_clock::duration vote_duration = 10min;
+        // NOTE: Radio Browser docs say you can vote every 10 min, but it's more like a 24 hours
+        // limit.
+
+        // const system_clock::duration vote_cooldown = 10min;
+        const system_clock::duration vote_cooldown = 24h;
 
 
         /*-----------*/
@@ -172,7 +176,7 @@ namespace StationVoting {
 
             auto now = system_clock::now();
             for (const auto& [uuid, record] : votes_cast)
-                if (now - record.when > vote_duration)
+                if (now - record.when > vote_cooldown)
                     expired.push_back(uuid);
 
             for (const auto& uuid : expired)

@@ -65,33 +65,54 @@ namespace AboutTab {
         {
             using string_utils::concat;
 
-            char* faad_id = nullptr;
-            NeAACDecGetVersion(&faad_id, nullptr);
+            char* faad_version = nullptr;
+            NeAACDecGetVersion(&faad_version, nullptr);
+            return faad_version;
+        }
 
-            std::string cap_str;
-            const std::string sep = ", "s;
-            auto cap = NeAACDecGetCapabilities();
-            if (cap & LC_DEC_CAP)
-                cap_str = concat(cap_str, "LC"s, sep);
 
-            if (cap & MAIN_DEC_CAP)
-                cap_str = concat(cap_str, "MAIN"s, sep);
+        void
+        show_faad2_info()
+        {
+            using namespace ImGui::RAII;
 
-            if (cap & LTP_DEC_CAP)
-                cap_str = concat(cap_str, "LTP"s, sep);
+            ID faad2_id{"faad2"};
 
-            if (cap & LD_DEC_CAP)
-                cap_str = concat(cap_str, "LD"s, sep);
+            ImGui::TableNextRow();
 
-            if (cap & ERROR_RESILIENCE_CAP)
-                cap_str = concat(cap_str, "ER"s, sep);
+            ImGui::TableNextColumn();
 
-            if (cap & FIXED_POINT_CAP)
-                cap_str = concat(cap_str, "FP"s, sep);
+            UI::Label("FAAD2");
 
-            return std::format("{}: {}",
-                               faad_id,
-                               cap_str);
+            ImGui::TableNextColumn();
+
+            static const std::string faad2_version_str = get_faad2_version();
+
+            ImGui::Text(faad2_version_str);
+
+            if (auto version_node = TreeNode{"features"s}) {
+
+                auto cap = NeAACDecGetCapabilities();
+
+                if (cap & LC_DEC_CAP)
+                    ImGui::BulletText("Low Complexity (LC) decoding"s);
+
+                if (cap & MAIN_DEC_CAP)
+                    ImGui::BulletText("Main Profile decoding"s);
+
+                if (cap & LTP_DEC_CAP)
+                    ImGui::BulletText("Long Term Prediction (LTP) decoding"s);
+
+                if (cap & LD_DEC_CAP)
+                    ImGui::BulletText("Low Delay (LD) decoding"s);
+
+                if (cap & ERROR_RESILIENCE_CAP)
+                    ImGui::BulletText("Error Resilience (ER) decoding"s);
+
+                if (cap & FIXED_POINT_CAP)
+                    ImGui::BulletText("Fixed Point (FP) decoding"s);
+
+            }
         }
 
 
@@ -215,6 +236,8 @@ namespace AboutTab {
         {
             using namespace ImGui::RAII;
 
+            ID curl_id{"curl"};
+
             auto info = curl_version_info(CURLVERSION_NOW);
 
             ImGui::TableNextRow();
@@ -223,9 +246,9 @@ namespace AboutTab {
 
             ImGui::TableNextColumn();
 
-            if (auto version_node = TreeNode::format("version",
-                                                     "{} ({})",
-                                                     info->version, info->host)) {
+            ImGui::FormatText("{} ({})", info->version, info->host);
+
+            if (auto version_node = TreeNode{"components"}) {
 
                 if (info->ssl_version)
                     ImGui::FormatBulletText("SSL: {}", info->ssl_version);
@@ -340,66 +363,70 @@ namespace AboutTab {
 
             }
 
-            ImGui::SeparatorText("Credits");
-            static const auto credits = get_credits();
-            if (Table credits_table{"credits", 2}) {
+            {
+                static const auto credits = get_credits();
+                ImGui::SeparatorText("Credits");
+                Font smaller{nullptr, 0, 0.75f};
+                if (Table credits_table{"credits", 2}) {
 
-                ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
-                ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
+                    ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
+                    ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
 
-                for (const auto& [role, name] : credits)
-                    UI::InfoRow(role, name);
+                    for (const auto& [role, name] : credits)
+                        UI::InfoRow(role, name);
 
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                UI::Label("Stations list");
-                ImGui::TableNextColumn();
-                UI::TextLinkOpenURL("https://www.radio-browser.info");
-                // ImGui::SameLine();
-                // auto rb_icon_tex = ImageLoader::get("https://www.radio-browser.info/favicon.ico");
-                // ImGui::Image(*rb_icon_tex, sdl::vec2{64, 64});
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    UI::Label("Stations list");
+                    ImGui::TableNextColumn();
+                    UI::TextLinkOpenURL("https://www.radio-browser.info");
+                        // ImGui::SameLine();
+                    // auto rb_icon_tex = ImageLoader::get("https://www.radio-browser.info/favicon.ico");
+                    // ImGui::Image(*rb_icon_tex, sdl::vec2{64, 64});
 
-                UI::InfoRow("Country flags", "GoSquared (http://www.gosquared.com/)");
+                    UI::InfoRow("Country flags", "GoSquared (http://www.gosquared.com/)");
+                }
             }
 
-            ImGui::SeparatorText("Components");
-            if (Table componets_table{"components", 2}) {
+            {
+                ImGui::SeparatorText("Components");
+                Font smaller{nullptr, 0, 0.75f};
+                if (Table componets_table{"components", 2}) {
 
-                ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
-                ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
+                    ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
+                    ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
 
-                static const std::string sdl_version_str = get_sdl_version();
-                UI::InfoRow("SDL", sdl_version_str);
+                    static const std::string sdl_version_str = get_sdl_version();
+                    UI::InfoRow("SDL", sdl_version_str);
 
-                static const std::string sdl_img_version_str = get_sdl_img_version();
-                UI::InfoRow("SDL_image", sdl_img_version_str);
-                // TODO: show versions for all image libraries
+                    static const std::string sdl_img_version_str = get_sdl_img_version();
+                    UI::InfoRow("SDL_image", sdl_img_version_str);
+                    // TODO: show versions for all image libraries
 
-                UI::InfoRow("ImGui", IMGUI_VERSION);
+                    UI::InfoRow("ImGui", IMGUI_VERSION);
 
 #ifdef IMGUI_ENABLE_FREETYPE
-                static const std::string ft_version_str = get_ft_version();
-                if (!ft_version_str.empty())
-                    UI::InfoRow("FreeType", ft_version_str);
+                    static const std::string ft_version_str = get_ft_version();
+                    if (!ft_version_str.empty())
+                        UI::InfoRow("FreeType", ft_version_str);
 #endif
 
-                show_curl_info();
+                    show_curl_info();
 
-                static const std::string glaze_version_str = get_glaze_version();
-                UI::InfoRow("glaze", glaze_version_str);
+                    static const std::string glaze_version_str = get_glaze_version();
+                    UI::InfoRow("glaze", glaze_version_str);
 
-                static const std::string mpg123_version_str = MPG123_VERSION;
-                UI::InfoRow("mpg123", mpg123_version_str);
+                    static const std::string mpg123_version_str = MPG123_VERSION;
+                    UI::InfoRow("mpg123", mpg123_version_str);
 
-                static const std::string opus_version_str = opus_get_version_string();
-                UI::InfoRow("Opus", opus_version_str);
+                    static const std::string opus_version_str = opus_get_version_string();
+                    UI::InfoRow("Opus", opus_version_str);
 
-                static const std::string vorbis_version_str = vorbis_version_string();
-                UI::InfoRow("Vorbis", vorbis_version_str);
+                    static const std::string vorbis_version_str = vorbis_version_string();
+                    UI::InfoRow("Vorbis", vorbis_version_str);
 
-                static const std::string faad2_version_str = get_faad2_version();
-                UI::InfoRow("FAAD2", faad2_version_str);
-
+                    show_faad2_info();
+                }
             }
         }
     }
