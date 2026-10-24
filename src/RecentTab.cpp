@@ -6,6 +6,7 @@
  */
 
 #include <deque>
+#include <iostream>
 #include <optional>
 #include <queue>
 #include <ranges>
@@ -31,6 +32,10 @@
 
 
 using namespace std::literals;
+
+using std::cerr;
+using std::endl;
+
 using Settings::cfg;
 
 
@@ -53,10 +58,12 @@ namespace RecentTab {
         /*-----------------------*/
 
         void
-        load();
+        load()
+            noexcept;
 
         void
-        save();
+        save()
+            noexcept;
 
         void
         show_station(std::size_t index,
@@ -84,26 +91,35 @@ namespace RecentTab {
 
         void
         load()
-        try {
-            stations.clear();
-            auto filename = App::get_config_dir() / "recent.json";
-            Serializer::load(stations, filename);
-            changed = false;
-        }
-        catch (std::exception& e) {
-            LOG_ERROR("{}", e.what());
+            noexcept
+        {
+            try {
+                stations.clear();
+                auto filename = App::get_config_dir() / "recent.json";
+                Serializer::load(stations, filename);
+                changed = false;
+            }
+            catch (std::exception& e) {
+                LOG_ERROR("Loading recent.json: {}", e.what());
+            }
         }
 
 
         void
         save()
-        try {
-            auto filename = App::get_config_dir() / "recent.json";
-            Serializer::save(stations, filename);
-            changed = false;
-        }
-        catch (std::exception& e) {
-            LOG_ERROR("{}", e.what());
+            noexcept
+        {
+            try {
+                auto filename = App::get_config_dir() / "recent.json";
+                Serializer::save(stations, filename);
+                changed = false;
+            }
+            catch (std::exception& e) {
+                if (App::is_running())
+                    LOG_ERROR("Saving recent.json: {}", e.what());
+                else
+                    cerr << "Error saving recent.json: " << e.what() << endl;
+            }
         }
 
 

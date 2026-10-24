@@ -51,12 +51,9 @@ namespace Serializer {
 
 #ifdef __WIIU__
         // WORKAROUND: wut+newlib cannot rename when destination file already exists.
-        std::filesystem::path filename_old = filename.string() + ".old";
-        if (exists(filename_old))
-            remove(filename_old);
-        rename(filename, filename_old);
+        if (exists(filename))
+            remove(filename);
         rename(filename_new, filename);
-        remove(filename_old);
 #else
         rename(filename_new, filename);
 #endif

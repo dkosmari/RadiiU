@@ -10,6 +10,7 @@
 #include <exception>
 #include <filesystem>
 #include <optional>
+#include <iostream>
 
 #include <glaze/core/meta.hpp>
 
@@ -23,17 +24,87 @@
 #include "tracer.hpp"
 
 
+using namespace std::literals;
+
+using std::cerr;
+using std::endl;
 using std::string;
 
 
 namespace Settings {
 
+    namespace {
+
+        /*-----------*/
+        /* Variables */
+        /*-----------*/
+
+        Cfg last_cfg;
+
+
+        /*-----------------------*/
+        /* Function declarations */
+        /*-----------------------*/
+
+        void
+        load()
+            noexcept;
+
+        void
+        save()
+            noexcept;
+
+
+        /*----------------------*/
+        /* Function definitions */
+        /*----------------------*/
+
+        void
+        load()
+            noexcept
+        {
+            TRACE_FUNC;
+
+            try {
+                auto filename = App::get_config_dir() / "settings.json";
+                Serializer::load(cfg, filename);
+                last_cfg = cfg;
+            }
+            catch (std::exception& e) {
+                LOG_ERROR("Loading settings.json: {}", e.what());
+            }
+        }
+
+
+        void
+        save()
+            noexcept
+        {
+            TRACE_FUNC;
+
+            try {
+                auto filename = App::get_config_dir() / "settings.json";
+                Serializer::save(cfg, filename);
+                last_cfg = cfg;
+            }
+            catch (std::exception& e) {
+                if (App::is_running())
+                    LOG_ERROR("Saving settings.json: {}", e.what());
+                else
+                    cerr << "Error saving settings.json: " << e.what() << endl;
+            }
+        }
+
+
+    } // namespace
+
+
     Cfg cfg;
-    Cfg last_cfg;
 
 
     void
     load_defaults()
+        noexcept
     {
         cfg = {};
         last_cfg = cfg;
@@ -44,7 +115,8 @@ namespace Settings {
     initialize()
     {
         TRACE_FUNC;
-        load_defaults();
+
+        last_cfg = cfg = {};
         load();
     }
 
@@ -53,40 +125,18 @@ namespace Settings {
     finalize()
     {
         TRACE_FUNC;
+
         if (cfg != last_cfg)
             save();
     }
 
 
     void
-    load()
+    reset()
+        noexcept
     {
-        TRACE_FUNC;
-
-        try {
-            auto filename = App::get_config_dir() / "settings.json";
-            Serializer::load(cfg, filename);
-            last_cfg = cfg;
-        }
-        catch (std::exception& e) {
-            LOG_ERROR("load(): {}", e.what());
-        }
-    }
-
-
-    void
-    save()
-    {
-        TRACE_FUNC;
-
-        try {
-            auto filename = App::get_config_dir() / "settings.json";
-            Serializer::save(cfg, filename);
-            last_cfg = cfg;
-        }
-        catch (std::exception& e) {
-            LOG_ERROR("save(): {}", e.what());
-        }
+        last_cfg = cfg = {};
+        save();
     }
 
 } // namespace Settings

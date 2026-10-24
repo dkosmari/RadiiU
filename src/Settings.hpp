@@ -52,10 +52,6 @@ namespace Settings {
 
 
     void
-    load_defaults();
-
-
-    void
     initialize();
 
 
@@ -64,11 +60,8 @@ namespace Settings {
 
 
     void
-    load();
-
-
-    void
-    save();
+    reset()
+        noexcept;
 
 } // namespace Settings
 

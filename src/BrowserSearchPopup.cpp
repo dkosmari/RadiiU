@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <cassert>
 #include <filesystem>
 #include <fstream>
 #include <optional>
@@ -30,6 +31,8 @@
 #include "RadioBrowserAPI.hpp"
 #include "thread_safe.hpp"
 #include "Timer.hpp"
+#include "TraceFunction.hpp"
+#include "TraceManager.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
 #include "utils.hpp"
@@ -72,12 +75,37 @@ namespace BrowserSearchPopup {
         };
 
 
+        using CodecVec = std::vector<std::string>;
+
+
         using TagVec = std::vector<std::string>;
         using OptTagVec = std::optional<TagVec>;
 
 
         using LanguageVec = std::vector<Language>;
         using OptLanguageVec = std::optional<LanguageVec>;
+
+
+        // RAII type for resources
+        struct Resources {
+
+            ImGuiTextFilter tag_text_filter;
+            ImGuiTextFilter country_text_filter;
+            ImGuiTextFilter language_text_filter;
+
+            std::optional<CodecVec> codecs;
+
+            SearchParams search_params;
+            ConfirmFunction confirm_func;
+
+            thread_safe<OptLanguageVec> safe_languages;
+            std::jthread languages_loader_thread;
+
+            std::optional<std::regex> ignored_tags_regex;
+            thread_safe<OptTagVec> safe_tags;
+            std::jthread tags_loader_thread;
+
+        }; // struct Resources
 
 
         /*-----------*/
@@ -91,23 +119,9 @@ namespace BrowserSearchPopup {
         /* Variables */
         /*-----------*/
 
+        std::optional<Resources> res;
+
         State state = State::hidden;
-        SearchParams search_params;
-        ConfirmFunction confirm_func;
-
-        ImGuiTextFilter tag_text_filter;
-        ImGuiTextFilter country_text_filter;
-        ImGuiTextFilter language_text_filter;
-
-        std::optional<std::vector<std::string>> codecs;
-
-        thread_safe<OptLanguageVec> safe_languages;
-        std::jthread languages_thread;
-
-        thread_safe<OptTagVec> safe_tags;
-        std::optional<std::regex> ignored_tags_regex;
-        std::jthread tags_thread;
-
 
         /*-----------------------*/
         /* Function declarations */
@@ -127,6 +141,10 @@ namespace BrowserSearchPopup {
 
         void
         fetch_tags(OptTagVec& tags);
+
+        void
+        languages_loader_thread_function(std::stop_token stopper)
+            noexcept;
 
         std::regex
         load_ignored_tags_regex(std::stop_token& stopper);
@@ -163,6 +181,10 @@ namespace BrowserSearchPopup {
         void
         show_filters();
 
+        void
+        tags_loader_thread_function(std::stop_token stopper)
+            noexcept;
+
         std::string
         to_label(Order order);
 
@@ -180,9 +202,11 @@ namespace BrowserSearchPopup {
         {
             TRACE_FUNC;
 
+            assert(res);
+
             ImGui::CloseCurrentPopup();
-            if (confirm_func)
-                confirm_func(search_params);
+            if (res->confirm_func)
+                res->confirm_func(res->search_params);
         }
 
 
@@ -191,7 +215,7 @@ namespace BrowserSearchPopup {
         {
             TRACE_FUNC;
 
-            search_params = {};
+            res->search_params = {};
         }
 
 
@@ -200,11 +224,13 @@ namespace BrowserSearchPopup {
         {
             TRACE_FUNC;
 
+            assert(res);
+
             // TODO: when RB errors out, it should be possible to try again
-            if (codecs)
+            if (res->codecs)
                 return;
 
-            codecs.emplace();
+            res->codecs.emplace();
 
             RadioBrowserAPI::CodecsParams params;
             params.order = RadioBrowserAPI::CodecsParams::Order::name;
@@ -215,9 +241,11 @@ namespace BrowserSearchPopup {
                 params,
                 [](RadioBrowserAPI::CodecVec rb_codecs)
                 {
+                    assert(res);
+
                     for (auto& [name, stationcount] : rb_codecs)
-                        codecs->push_back(std::move(name));
-                    LOG_INFO("Received {} codecs.", codecs->size());
+                        res->codecs->push_back(std::move(name));
+                    LOG_INFO("Received {} codecs.", res->codecs->size());
                 },
                 [](const std::exception& e)
                 {
@@ -237,53 +265,8 @@ namespace BrowserSearchPopup {
 
             languages.emplace();
 
-            languages_thread = std::jthread{
-                [](std::stop_token stopper)
-                {
-                    try {
-                        load_languages_cache(stopper);
-
-                        RadioBrowserAPI::LanguagesParams params;
-                        params.order = RadioBrowserAPI::LanguagesParams::Order::name;
-                        params.hidebroken = true;
-                        params.limit = 10000;
-
-                        RadioBrowserAPI::get_languages_sync(
-                            stopper,
-                            ""s,
-                            params,
-                            [&stopper]
-                            (const RadioBrowserAPI::LanguageVec rb_languages)
-                                mutable
-                            {
-                                throw_if_stopped(stopper);
-
-                                LanguageVec new_languages;
-
-                                for (auto& [name, code, stationcount] : rb_languages) {
-                                    throw_if_stopped(stopper);
-                                    new_languages.emplace_back(name, code);
-                                }
-
-                                LOG_INFO("Received {} languages.", new_languages.size());
-                                safe_languages.store(std::move(new_languages));
-
-                                throw_if_stopped(stopper);
-
-                                save_languages_cache(rb_languages);
-                            },
-                            [](const std::exception& e)
-                            {
-                                LOG_ERROR("Fetching languages: {}", e.what());
-                            }
-                        );
-
-                    }
-                    catch (std::exception& e) {
-                        LOG_ERROR("languages_thread failed: {}", e.what());
-                    }
-                }
-            };
+            assert(res);
+            res->languages_loader_thread = std::jthread{languages_loader_thread_function};
         }
 
 
@@ -298,65 +281,63 @@ namespace BrowserSearchPopup {
 
             tags.emplace();
 
-            tags_thread = std::jthread{
-                [](std::stop_token stopper)
-                {
-                    try {
-                        load_tags_cache(stopper);
+            assert(res);
+            res->tags_loader_thread = std::jthread{tags_loader_thread_function};
+        }
 
-                        RadioBrowserAPI::TagsParams params;
-                        params.order = RadioBrowserAPI::TagsParams::Order::name;
-                        params.limit = 50000;
-                        params.hidebroken = true;
 
-                        RadioBrowserAPI::get_tags_sync(
-                            stopper,
-                            params,
-                            [&stopper]
-                            (const RadioBrowserAPI::TagVec rb_tags)
-                                mutable
-                            {
-                                throw_if_stopped(stopper);
+        void
+        languages_loader_thread_function(std::stop_token stopper)
+            noexcept
+        {
+            TraceManager::thread_name("languages loader thread"sv);
 
-                                if (!ignored_tags_regex)
-                                    ignored_tags_regex = load_ignored_tags_regex(stopper);
+            TraceFunction tf{"BrowserSearchPopup"sv};
 
-                                throw_if_stopped(stopper);
+            try {
+                load_languages_cache(stopper);
 
-                                TagVec new_tags;
-                                std::smatch matches;
+                RadioBrowserAPI::LanguagesParams params;
+                params.order = RadioBrowserAPI::LanguagesParams::Order::name;
+                params.hidebroken = true;
+                params.limit = 10000;
 
-                                for (auto& [name, stationcount] : rb_tags) {
-                                    throw_if_stopped(stopper);
-                                    if (ignored_tags_regex &&
-                                        regex_search(name, matches, *ignored_tags_regex) &&
-                                        matches.length() > 0) {
-                                        // LOG_DEBUG("Ignored tag: {} (from {})",
-                                        //           name,
-                                        //           matches.str());
-                                        continue; // skip this tag
-                                    }
-                                    new_tags.push_back(name);
-                                }
+                RadioBrowserAPI::get_languages_sync(
+                    stopper,
+                    ""s,
+                    params,
+                    [&stopper]
+                    (const RadioBrowserAPI::LanguageVec rb_languages)
+                    mutable
+                    {
+                        assert(res);
 
-                                LOG_INFO("Received {} tags.", new_tags.size());
-                                safe_tags.store(std::move(new_tags));
+                        throw_if_stopped(stopper);
 
-                                throw_if_stopped(stopper);
+                        LanguageVec new_languages;
 
-                                save_tags_cache(rb_tags);
-                            },
-                            [](const std::exception& e)
-                            {
-                                LOG_ERROR("Fetching tags: {}", e.what());
-                            }
-                        );
+                        for (auto& [name, code, stationcount] : rb_languages) {
+                            throw_if_stopped(stopper);
+                            new_languages.emplace_back(name, code);
+                        }
+
+                        LOG_INFO("Received {} languages.", new_languages.size());
+                        res->safe_languages.store(std::move(new_languages));
+
+                        throw_if_stopped(stopper);
+
+                        save_languages_cache(rb_languages);
+                    },
+                    [](const std::exception& e)
+                    {
+                        LOG_ERROR("Fetching languages: {}", e.what());
                     }
-                    catch (std::exception& e) {
-                        LOG_ERROR("tags_thread failed: {}", e.what());
-                    }
-                }
-            };
+                );
+
+            }
+            catch (std::exception& e) {
+                LOG_ERROR("languages_thread failed: {}", e.what());
+            }
         }
 
 
@@ -407,6 +388,8 @@ namespace BrowserSearchPopup {
         load_languages_cache(std::stop_token& stopper)
             noexcept
         {
+            assert(res);
+
             try {
 #ifndef USE_BEVE_CACHE
                 auto cached_languages_filename = App::get_data_dir() / "languages.json";
@@ -446,7 +429,7 @@ namespace BrowserSearchPopup {
                 }
 
                 LOG_INFO("Loaded {} languages.", new_languages.size());
-                safe_languages.store(std::move(new_languages));
+                res->safe_languages.store(std::move(new_languages));
                 LOG_INFO("Loaded languages from local cache: {:?}",
                          cached_languages_filename.string());
             }
@@ -460,6 +443,9 @@ namespace BrowserSearchPopup {
         load_tags_cache(std::stop_token& stopper)
             noexcept
         {
+            assert(res);
+            auto& ignored_tags_regex = res->ignored_tags_regex;
+
             try {
 #ifndef USE_BEVE_CACHE
                 auto cached_tags_filename = App::get_data_dir() / "tags.json";
@@ -498,7 +484,7 @@ namespace BrowserSearchPopup {
                 TagVec new_tags;
                 for (auto& [name, stationcount] : rb_tags) {
                     throw_if_stopped(stopper);
-                    if (ignored_tags_regex &&
+                    if (res->ignored_tags_regex &&
                         regex_search(name, matches, *ignored_tags_regex) &&
                         matches.length() > 0) {
                         // LOG_DEBUG("Ignored tag: {} (from {})",
@@ -510,7 +496,7 @@ namespace BrowserSearchPopup {
                     new_tags.push_back(std::move(name));
                 }
                 LOG_INFO("Loaded {} tags.", new_tags.size());
-                safe_tags.store(std::move(new_tags));
+                res->safe_tags.store(std::move(new_tags));
                 LOG_INFO("Loaded tags from local cache: {:?}", cached_tags_filename.string());
             }
             catch (std::exception& e) {
@@ -637,6 +623,8 @@ namespace BrowserSearchPopup {
         {
             using namespace ImGui::RAII;
 
+            assert(res);
+
             if (Child filters_group{"filters_group",
                                     {0, 0},
                                     ImGuiChildFlags_AutoResizeX |
@@ -646,7 +634,7 @@ namespace BrowserSearchPopup {
 
                 ImGui::TextUnformatted(ICON_FA_FILTER " Filters");
 
-                auto& filter = search_params.filter;
+                auto& filter = res->search_params.filter;
 
                 const std::string name_entry_label     = "Name"s;
                 const std::string tag_combo_label      = "Tag"s;
@@ -680,22 +668,24 @@ namespace BrowserSearchPopup {
                 if (Combo tag_combo{"##tag",
                                     make_tag_label(filter.tag),
                                     ImGuiComboFlags_HeightLargest}) {
+                    auto& text_filter = res->tag_text_filter;
+
                     if (ImGui::IsWindowAppearing()) {
                         ImGui::SetKeyboardFocusHere();
-                        SDL_strlcpy(tag_text_filter.InputBuf,
+                        SDL_strlcpy(text_filter.InputBuf,
                                     filter.tag.data(),
-                                    sizeof tag_text_filter.InputBuf);
-                        tag_text_filter.Build();
+                                    sizeof text_filter.InputBuf);
+                        text_filter.Build();
                     }
 
                     ImGui::SetNextItemWidth(800);
-                    if (tag_text_filter.Draw("##tag_text_filter"))
-                        filter.tag = tag_text_filter.InputBuf;
+                    if (text_filter.Draw("##tag_text_filter"))
+                        filter.tag = text_filter.InputBuf;
 
                     if (ImGui::Selectable("(any tag)", filter.tag.empty()))
                         filter.tag.clear();
 
-                    auto tags_guard = safe_tags.lock();
+                    auto tags_guard = res->safe_tags.lock();
                     auto& tags = *tags_guard;
                     if (!tags)
                         fetch_tags(tags);
@@ -706,7 +696,7 @@ namespace BrowserSearchPopup {
                                    ImGuiChildFlags_NavFlattened}) {
 
                         for (auto [index, tag] : *tags | std::views::enumerate) {
-                            if (!tag_text_filter.PassFilter(tag.data()))
+                            if (!text_filter.PassFilter(tag.data()))
                                 continue;
                             ID id{index};
                             if (ImGui::Selectable(make_tag_label(tag), filter.tag == tag)) {
@@ -727,17 +717,19 @@ namespace BrowserSearchPopup {
                 if (Combo country_combo{"##country",
                                         filter.country,
                                         ImGuiComboFlags_HeightLargest}) {
+                    auto& text_filter = res->country_text_filter;
+
                     if (ImGui::IsWindowAppearing()) {
                         ImGui::SetKeyboardFocusHere();
-                        SDL_strlcpy(country_text_filter.InputBuf,
+                        SDL_strlcpy(text_filter.InputBuf,
                                     filter.country.data(),
-                                    sizeof country_text_filter.InputBuf);
-                        country_text_filter.Build();
+                                    sizeof text_filter.InputBuf);
+                        text_filter.Build();
                     }
 
                     // NOTE: only exact matches are allowed
                     ImGui::SetNextItemWidth(1100);
-                    country_text_filter.Draw("##country");
+                    text_filter.Draw("##country");
 
                     if (ImGui::Selectable("(any country)", filter.country.empty()))
                         filter.country.clear();
@@ -747,13 +739,14 @@ namespace BrowserSearchPopup {
                                    {0.0f, 12 * ImGui::GetTextLineHeight()},
                                    ImGuiChildFlags_NavFlattened}) {
                         CountryManager::for_each_country(
-                            [&filter](std::size_t index,
-                                      const CountryManager::Country& c)
+                            [&filter, &text_filter]
+                            (std::size_t index,
+                             const CountryManager::Country& c)
                             {
                                 const auto& [code, name] = c;
 
-                                if (!country_text_filter.PassFilter(code.data()) &&
-                                    !country_text_filter.PassFilter(name.data()))
+                                if (!text_filter.PassFilter(code.data()) &&
+                                    !text_filter.PassFilter(name.data()))
                                     return;
 
                                 ID id{index};
@@ -778,22 +771,24 @@ namespace BrowserSearchPopup {
                 if (Combo language_combo{"##language",
                                          filter.language,
                                          ImGuiComboFlags_HeightLargest}) {
+                    auto& text_filter = res->language_text_filter;
+
                     if (ImGui::IsWindowAppearing()) {
                         ImGui::SetKeyboardFocusHere();
-                        SDL_strlcpy(language_text_filter.InputBuf,
+                        SDL_strlcpy(text_filter.InputBuf,
                                     filter.language.data(),
-                                    sizeof language_text_filter.InputBuf);
-                        language_text_filter.Build();
+                                    sizeof text_filter.InputBuf);
+                        text_filter.Build();
                     }
 
                     ImGui::SetNextItemWidth(900);
-                    if (language_text_filter.Draw("##language_text_filter"))
-                        filter.language = language_text_filter.InputBuf;
+                    if (text_filter.Draw("##language_text_filter"))
+                        filter.language = text_filter.InputBuf;
 
                     if (ImGui::Selectable("(any language)", filter.language.empty()))
                         filter.language.clear();
 
-                    auto languages_guard = safe_languages.lock();
+                    auto languages_guard = res->safe_languages.lock();
                     auto& languages = *languages_guard;
                     if (!languages)
                         fetch_languages(languages);
@@ -803,9 +798,9 @@ namespace BrowserSearchPopup {
                             ImGuiChildFlags_NavFlattened}) {
                         for (auto [index, lang] : *languages | std::views::enumerate) {
 
-                            bool passed_name = language_text_filter.PassFilter(lang.name.data());
+                            bool passed_name = text_filter.PassFilter(lang.name.data());
                             bool passed_code = lang.code
-                                && language_text_filter.PassFilter(lang.code->data());
+                                && text_filter.PassFilter(lang.code->data());
                             if (!passed_name && !passed_code)
                                 continue;
 
@@ -834,10 +829,10 @@ namespace BrowserSearchPopup {
                         filter.codec = "";
 
                     // The rest of codecs.
-                    if (!codecs)
+                    if (!res->codecs)
                         fetch_codecs();
 
-                    for (auto [index, codec] : *codecs | std::views::enumerate) {
+                    for (auto [index, codec] : *res->codecs | std::views::enumerate) {
                         ID id{index};
                         if (ImGui::Selectable(make_codec_label(codec),
                                               filter.codec == codec))
@@ -846,6 +841,82 @@ namespace BrowserSearchPopup {
                 }
 
             } // filters_group
+
+        }
+
+
+        void
+        tags_loader_thread_function(std::stop_token stopper)
+            noexcept
+        {
+            TraceManager::thread_name("tags loader thread"sv);
+
+            TraceFunction tf{"BrowserSearchPopup"sv};
+
+            try {
+                load_tags_cache(stopper);
+
+                RadioBrowserAPI::TagsParams params;
+                params.order = RadioBrowserAPI::TagsParams::Order::name;
+                params.limit = 50000;
+                params.hidebroken = true;
+
+                RadioBrowserAPI::get_tags_sync(
+                    stopper,
+                    params,
+                    [&stopper]
+                    (const RadioBrowserAPI::TagVec rb_tags)
+                    mutable
+                    {
+                        throw_if_stopped(stopper);
+
+                        assert(res);
+
+                        auto& ignored_tags_regex = res->ignored_tags_regex;
+
+                        if (!ignored_tags_regex)
+                            ignored_tags_regex = load_ignored_tags_regex(stopper);
+
+                        throw_if_stopped(stopper);
+
+                        TagVec new_tags;
+                        std::smatch matches;
+
+                        for (auto& [name, stationcount] : rb_tags) {
+                            throw_if_stopped(stopper);
+
+                            if (ignored_tags_regex &&
+                                regex_search(name, matches, *ignored_tags_regex) &&
+                                matches.length() > 0) {
+#if 0
+                                // NOTE: don't log this for releases, since the whole point is
+                                // to suppress spam/vulgar language.
+                                LOG_DEBUG("Ignored tag: {} (from {})",
+                                          name,
+                                          matches.str());
+#endif
+                                continue; // skip this tag
+                            }
+
+                            new_tags.push_back(name);
+                        }
+
+                        LOG_INFO("Received {} tags.", new_tags.size());
+                        res->safe_tags.store(std::move(new_tags));
+
+                        throw_if_stopped(stopper);
+
+                        save_tags_cache(rb_tags);
+                    },
+                    [](const std::exception& e)
+                    {
+                        LOG_ERROR("Fetching tags: {}", e.what());
+                    }
+                );
+            }
+            catch (std::exception& e) {
+                LOG_ERROR("tags_thread failed: {}", e.what());
+            }
 
         }
 
@@ -904,6 +975,8 @@ namespace BrowserSearchPopup {
     initialize()
     {
         TRACE_FUNC;
+
+        res.emplace();
     }
 
 
@@ -912,16 +985,7 @@ namespace BrowserSearchPopup {
     {
         TRACE_FUNC;
 
-        languages_thread = {};
-        tags_thread = {};
-
-        safe_languages.store(OptLanguageVec{});
-        safe_tags.store(OptTagVec{});
-
-        ignored_tags_regex = {};
-
-        action_reset_fields();
-        confirm_func = {};
+        res.reset();
     }
 
 
@@ -931,7 +995,9 @@ namespace BrowserSearchPopup {
         TRACE_FUNC;
 
         state = State::queued;
-        confirm_func = std::move(func);
+
+        assert(res);
+        res->confirm_func = std::move(func);
     }
 
 
@@ -948,6 +1014,7 @@ namespace BrowserSearchPopup {
             state = State::visible;
         }
 
+        assert(res);
 
         auto viewport = ImGui::GetMainViewport();
         auto center = viewport->GetWorkCenter();
@@ -957,7 +1024,7 @@ namespace BrowserSearchPopup {
                     ImGuiWindowFlags_NoMove};
         if (!popup) {
             state = State::hidden;
-            confirm_func = {};
+            res->confirm_func = {};
             return;
         }
 
@@ -986,12 +1053,12 @@ namespace BrowserSearchPopup {
 
                 ImGui::SetNextItemWidth(280);
                 if (Combo order_combo{"##order",
-                                      to_label(search_params.order),
+                                      to_label(res->search_params.order),
                                       ImGuiComboFlags_HeightLargest}) {
 
                     for (auto o : enumerator::enumerate<Order>())
-                        if (ImGui::Selectable(to_label(o), search_params.order == o))
-                            search_params.order = o;
+                        if (ImGui::Selectable(to_label(o), res->search_params.order == o))
+                            res->search_params.order = o;
 
                 }
 

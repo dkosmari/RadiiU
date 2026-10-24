@@ -60,6 +60,11 @@ namespace App {
     run();
 
 
+    bool
+    is_running()
+        noexcept;
+
+
     void
     quit();
 

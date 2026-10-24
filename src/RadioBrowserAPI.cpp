@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cassert>
 #include <cstdlib>
 #include <format>
 #include <memory>
@@ -161,6 +162,21 @@ namespace RadioBrowserAPI {
         }; // struct BusyGuard
 #endif
 
+        // RAII type for resources.
+        struct Resources {
+            std::string user_agent;
+            std::minstd_rand random_engine;
+
+            string current_server;
+            MirrorsVec mirrors;
+
+            async_task_queue pending_tasks;
+
+            std::optional<rest::manager> rest_manager;
+
+            std::jthread fetch_mirrors_thread;
+        };
+
 
         /*-----------*/
         /* Constants */
@@ -169,21 +185,16 @@ namespace RadioBrowserAPI {
         constexpr
         const glz::opts glz_options{ .error_on_unknown_keys = false, };
 
-        const string start_server = "all.api.radio-browser.info";
+        const string start_server = "all.api.radio-browser.info"s;
 
 
         /*-----------*/
         /* Variables */
         /*-----------*/
 
+        std::optional<Resources> res;
+
         std::atomic_bool busy;
-        string current_server;
-        std::minstd_rand random_engine;
-        MirrorsVec mirrors;
-        std::jthread fetch_mirrors_thread;
-        async_task_queue pending_tasks;
-        std::optional<rest::manager> rest_manager;
-        std::string user_agent;
 
 
         /*-----------------------*/
@@ -352,18 +363,18 @@ namespace RadioBrowserAPI {
 
                 // Step 3: Invoke the result callback.
                 if (result_func) {
-                    pending_tasks.add("fetch_mirrors_thread()::result_func"sv,
-                                      std::move(result_func),
-                                      MirrorsVec{names.begin(), names.end()});
+                    res->pending_tasks.add("fetch_mirrors_thread()::result_func"sv,
+                                           std::move(result_func),
+                                           MirrorsVec{names.begin(), names.end()});
                 }
             }
             catch (std::exception& e) {
                 string msg = e.what();
                 LOG_ERROR("{}", msg);
                 if (error_func)
-                    pending_tasks.add("fetch_mirrors_thread()::error_func"sv,
-                                      std::move(error_func),
-                                      std::move(msg));
+                    res->pending_tasks.add("fetch_mirrors_thread()::error_func"sv,
+                                           std::move(error_func),
+                                           std::move(msg));
             }
         }
 
@@ -423,7 +434,8 @@ namespace RadioBrowserAPI {
         void
         start_call()
         {
-            assert(rest_manager);
+            assert(res);
+            assert(res->rest_manager);
 
             bool expected = false;
             if (!busy.compare_exchange_strong(expected, true))
@@ -441,7 +453,7 @@ namespace RadioBrowserAPI {
             std::string params_json;
             glz::ex::write_json(params, params_json);
 
-            rest_manager->post_json(
+            res->rest_manager->post_json(
                 "/json/codecs"s,
                 std::move(params_json),
                 make_response_func(
@@ -470,7 +482,7 @@ namespace RadioBrowserAPI {
             std::string params_json;
             glz::ex::write_json(params, params_json);
 
-            rest_manager->post_json(
+            res->rest_manager->post_json(
                 "/json/countries"s,
                 std::move(params_json),
                 make_response_func(
@@ -503,7 +515,8 @@ namespace RadioBrowserAPI {
             std::string endpoint = "/json/languages"s;
             if (!filter.empty())
                 endpoint += "/"s + curl::escape(filter);
-            rest_manager->post_json(
+
+            res->rest_manager->post_json(
                 std::move(endpoint),
                 std::move(params_json),
                 make_response_func(
@@ -528,7 +541,7 @@ namespace RadioBrowserAPI {
         {
             start_call();
 
-            rest_manager->get_json(
+            res->rest_manager->get_json(
                 "/json/stats"s,
                 make_response_func(
                     [func = std::move(result_func)]
@@ -557,7 +570,7 @@ namespace RadioBrowserAPI {
             std::string params_json;
             glz::ex::write_json(params, params_json);
 
-            rest_manager->post_json(
+            res->rest_manager->post_json(
                 "/json/stations/byuuid"s,
                 std::move(params_json),
                 make_response_func(
@@ -593,7 +606,7 @@ namespace RadioBrowserAPI {
             std::string params_json;
             glz::ex::write_json(params, params_json);
 
-            rest_manager->post_json(
+            res->rest_manager->post_json(
                 "/json/tags"s,
                 std::move(params_json),
                 make_response_func(
@@ -622,7 +635,7 @@ namespace RadioBrowserAPI {
             std::string params_json;
             glz::ex::write_json(params, params_json);
 
-            rest_manager->post_json(
+            res->rest_manager->post_json(
                 "/json/stations/search"s,
                 std::move(params_json),
                 make_response_func(
@@ -649,7 +662,7 @@ namespace RadioBrowserAPI {
             start_call();
 
             // Note: clicking does not support GET/POST parameters.
-            rest_manager->get_json(
+            res->rest_manager->get_json(
                 "/json/url/"s + uuid,
                 make_response_func(
                     [func = std::move(result_func)]
@@ -675,7 +688,7 @@ namespace RadioBrowserAPI {
             start_call();
 
             // NOTE: voting does not support GET/POST parameters.
-            rest_manager->get_json(
+            res->rest_manager->get_json(
                 "/json/vote/"s + uuid,
                 make_response_func(
                     [func = std::move(result_func)]
@@ -705,28 +718,28 @@ namespace RadioBrowserAPI {
 
 
     void
-    initialize(const string& user_agent_,
+    initialize(const string& user_agent,
                const string& server)
     {
         TRACE_FUNC;
 
-        user_agent = user_agent_;
+        res.emplace();
 
-        random_engine = make_random_engine();
+        res->user_agent = user_agent;
+
+        res->random_engine = make_random_engine();
 
         busy = false;
 
-        fetch_mirrors_thread = {};
-        current_server.clear();
         if (!server.empty())
-            current_server = server;
+            res->current_server = server;
         else
             update_mirrors_and_select_random();
 
         rest::manager::config rest_config;
-        rest_config.user_agent = user_agent_;
+        rest_config.user_agent = user_agent;
         rest_config.verbose = cfg.verbose_rest_logs;
-        rest_manager.emplace(std::move(rest_config), get_server());
+        res->rest_manager.emplace(std::move(rest_config), get_server());
     }
 
 
@@ -735,24 +748,24 @@ namespace RadioBrowserAPI {
     {
         TRACE_FUNC;
 
-        fetch_mirrors_thread = {};
-
-        rest_manager.reset();
+        res.reset();
     }
 
 
     void
     process()
     {
+        assert(res);
+
         try {
-            pending_tasks.try_dispatch_one();
+            res->pending_tasks.try_dispatch_one();
         }
         catch (async_task_queue::error& e) {
             LOG_ERROR("Dispatching RadioBrowerAPI task {}: {}", e.name, e.what());
         }
 
-        assert(rest_manager);
-        rest_manager->process();
+        assert(res->rest_manager);
+        res->rest_manager->process();
     }
 
 
@@ -766,15 +779,19 @@ namespace RadioBrowserAPI {
     void
     set_server(const string& server)
     {
-        current_server = server;
-        rest_manager->set_base_url("http://"s + get_server());
+        assert(res);
+
+        res->current_server = server;
+        res->rest_manager->set_base_url("http://"s + get_server());
     }
 
 
     string
     get_server()
     {
-        return current_server.empty() ? start_server : current_server;
+        assert(res);
+
+        return res->current_server.empty() ? start_server : res->current_server;
     }
 
 
@@ -784,9 +801,13 @@ namespace RadioBrowserAPI {
     {
         TRACE_FUNC;
 
-        fetch_mirrors_thread = std::jthread{fetch_mirrors_thread_function,
-                                            std::move(result_func),
-                                            std::move(error_func)};
+        assert(res);
+
+        res->fetch_mirrors_thread = std::jthread{
+            fetch_mirrors_thread_function,
+            std::move(result_func),
+            std::move(error_func)
+        };
     }
 
 
@@ -796,7 +817,9 @@ namespace RadioBrowserAPI {
         fetch_mirrors(
             [](MirrorsVec result)
             {
-                mirrors = std::move(result);
+                assert(res);
+
+                res->mirrors = std::move(result);
             }
         );
     }
@@ -808,15 +831,17 @@ namespace RadioBrowserAPI {
         fetch_mirrors(
             [](MirrorsVec result)
             {
-                mirrors = std::move(result);
-                if (mirrors.empty())
+                assert(res);
+
+                res->mirrors = std::move(result);
+                if (res->mirrors.empty())
                     set_server("");
                 else {
                     std::vector<string> samples(1);
-                    std::ranges::sample(mirrors,
+                    std::ranges::sample(res->mirrors,
                                         samples.begin(),
                                         1,
-                                        random_engine);
+                                        res->random_engine);
                     set_server(samples[0]);
                 }
             }
@@ -827,8 +852,10 @@ namespace RadioBrowserAPI {
     void
     for_each_mirror(ForEachMirrorFunction func)
     {
+        assert(res);
+
         if (func)
-            for (const auto& server : mirrors)
+            for (const auto& server : res->mirrors)
                 func(server);
     }
 
@@ -838,11 +865,15 @@ namespace RadioBrowserAPI {
                GetCodecsResultFunction result_func,
                ExceptionFunction except_func)
     {
-        pending_tasks.add("task_get_codecs()"sv,
-                          task_get_codecs,
-                          params,
-                          std::move(result_func),
-                          std::move(except_func));
+        assert(res);
+
+        res->pending_tasks.add(
+            "task_get_codecs()"sv,
+            task_get_codecs,
+            params,
+            std::move(result_func),
+            std::move(except_func)
+        );
     }
 
 
@@ -851,11 +882,13 @@ namespace RadioBrowserAPI {
                   GetCountriesResultFunction result_func,
                   ExceptionFunction except_func)
     {
-        pending_tasks.add("task_get_countries()"sv,
-                          task_get_countries,
-                          params,
-                          std::move(result_func),
-                          std::move(except_func));
+        res->pending_tasks.add(
+            "task_get_countries()"sv,
+            task_get_countries,
+            params,
+            std::move(result_func),
+            std::move(except_func)
+        );
     }
 
 
@@ -865,6 +898,8 @@ namespace RadioBrowserAPI {
                        GetCountriesResultFunction result_func,
                        ExceptionFunction except_func)
     {
+        assert(res);
+
         try {
             std::string params_json;
             glz::ex::write_json(params, params_json);
@@ -896,7 +931,7 @@ namespace RadioBrowserAPI {
                         func(result);
                 },
                 .url = get_server() + "/json/countries"s,
-                .user_agent = user_agent,
+                .user_agent = res->user_agent,
                 .verbose = cfg.verbose_rest_logs,
             };
 
@@ -917,12 +952,14 @@ namespace RadioBrowserAPI {
                   GetLanguagesResultFunction result_func,
                   ExceptionFunction except_func)
     {
-        pending_tasks.add("task_get_languages()"sv,
-                          task_get_languages,
-                          filter,
-                          params,
-                          std::move(result_func),
-                          std::move(except_func));
+        res->pending_tasks.add(
+            "task_get_languages()"sv,
+            task_get_languages,
+            filter,
+            params,
+            std::move(result_func),
+            std::move(except_func)
+        );
     }
 
 
@@ -933,6 +970,8 @@ namespace RadioBrowserAPI {
                        GetLanguagesResultFunction result_func,
                        ExceptionFunction except_func)
     {
+        assert(res);
+
         try {
             std::string url = get_server() + "/json/languages"s;
             if (!filter.empty())
@@ -967,7 +1006,7 @@ namespace RadioBrowserAPI {
                             func(result);
                     },
                 .url = url,
-                .user_agent = user_agent,
+                .user_agent = res->user_agent,
                 .verbose = cfg.verbose_rest_logs,
             };
 
@@ -986,10 +1025,14 @@ namespace RadioBrowserAPI {
     get_server_stats(GetServerStatsResultFunction result_func,
                      ExceptionFunction except_func)
     {
-        pending_tasks.add("task_get_server_stats()"sv,
-                          task_get_server_stats,
-                          std::move(result_func),
-                          std::move(except_func));
+        assert(res);
+
+        res->pending_tasks.add(
+            "task_get_server_stats()"sv,
+            task_get_server_stats,
+            std::move(result_func),
+            std::move(except_func)
+        );
     }
 
 
@@ -998,11 +1041,15 @@ namespace RadioBrowserAPI {
                 GetStationResultFunction result_func,
                 ExceptionFunction except_func)
     {
-        pending_tasks.add("task_get_station()"sv,
-                          task_get_station,
-                          uuid,
-                          std::move(result_func),
-                          std::move(except_func));
+        assert(res);
+
+        res->pending_tasks.add(
+            "task_get_station()"sv,
+            task_get_station,
+            uuid,
+            std::move(result_func),
+            std::move(except_func)
+        );
     }
 
 
@@ -1011,11 +1058,14 @@ namespace RadioBrowserAPI {
              GetTagsResultFunction result_func,
              ExceptionFunction except_func)
     {
-        pending_tasks.add("task_get_tags()"sv,
-                          task_get_tags,
-                          params,
-                          std::move(result_func),
-                          std::move(except_func));
+        assert(res);
+        res->pending_tasks.add(
+            "task_get_tags()"sv,
+            task_get_tags,
+            params,
+            std::move(result_func),
+            std::move(except_func)
+        );
     }
 
 
@@ -1025,6 +1075,8 @@ namespace RadioBrowserAPI {
                   GetTagsResultFunction result_func,
                   ExceptionFunction except_func)
     {
+        assert(res);
+
         try {
             // BusyGuard bg{stopper};
             std::string params_json;
@@ -1057,7 +1109,7 @@ namespace RadioBrowserAPI {
                             func(result);
                     },
                 .url = get_server() + "/json/tags"s,
-                .user_agent = user_agent,
+                .user_agent = res->user_agent,
                 .verbose = cfg.verbose_rest_logs,
             };
 
@@ -1077,11 +1129,15 @@ namespace RadioBrowserAPI {
                     SearchStationsResultFunction result_func,
                     ExceptionFunction except_func)
     {
-        pending_tasks.add("task_search_stations()"sv,
-                          task_search_stations,
-                          params,
-                          std::move(result_func),
-                          std::move(except_func));
+        assert(res);
+
+        res->pending_tasks.add(
+            "task_search_stations()"sv,
+            task_search_stations,
+            params,
+            std::move(result_func),
+            std::move(except_func)
+        );
     }
 
 
@@ -1090,11 +1146,15 @@ namespace RadioBrowserAPI {
                SendClickResultFunction result_func,
                ExceptionFunction except_func)
     {
-        pending_tasks.add("task_send_click()"sv,
-                          task_send_click,
-                          uuid,
-                          std::move(result_func),
-                          std::move(except_func));
+        assert(res);
+
+        res->pending_tasks.add(
+            "task_send_click()"sv,
+            task_send_click,
+            uuid,
+            std::move(result_func),
+            std::move(except_func)
+        );
     }
 
 
@@ -1103,11 +1163,15 @@ namespace RadioBrowserAPI {
               SendVoteResultFunction result_func,
               ExceptionFunction except_func)
     {
-        pending_tasks.add("task_send_vote()"sv,
-                          task_send_vote,
-                          uuid,
-                          std::move(result_func),
-                          std::move(except_func));
+        assert(res);
+
+        res->pending_tasks.add(
+            "task_send_vote()"sv,
+            task_send_vote,
+            uuid,
+            std::move(result_func),
+            std::move(except_func)
+        );
     }
 
 } // namespace RadioBrowserAPI

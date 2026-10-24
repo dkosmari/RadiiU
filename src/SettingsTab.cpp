@@ -414,8 +414,7 @@ namespace SettingsTab {
                 ImGui::TableNextColumn();
 
                 if (ImGui::Button("Reset")) {
-                    Settings::load_defaults();
-                    Settings::save();
+                    Settings::reset();
                 }
 
                 /////////////////

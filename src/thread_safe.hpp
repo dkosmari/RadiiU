@@ -184,4 +184,8 @@ public:
 
 }; // class thread_safe<T, M>
 
+
+template<typename T>
+using thread_safe_rec = thread_safe<T, std::recursive_mutex>;
+
 #endif

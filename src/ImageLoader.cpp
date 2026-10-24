@@ -601,10 +601,7 @@ namespace ImageLoader {
             convert_queue.stop();
 
             // Stop the threads
-            cout << "ImageLoader: downloader thread" << endl;
             downloader_thread = {};
-
-            cout << "ImageLoader: loader thread" << endl;
             loader_thread = {};
         }
 

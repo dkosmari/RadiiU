@@ -1150,7 +1150,7 @@ namespace App {
 
         cfg.remember_tab = cfg.initial_tab == TabID::last_active;
         if (cfg.remember_tab) {
-            LOG_DEBUG("remembering last used tab: {}", to_string(current_tab));
+            cout  << "remembering last used tab: {}" << to_string(current_tab) << endl;
             cfg.initial_tab = current_tab;
         }
         // Finalize Settings module last.
@@ -1192,6 +1192,14 @@ namespace App {
             draw();
 
         }
+    }
+
+
+    bool
+    is_running()
+        noexcept
+    {
+        return running;
     }
 
 

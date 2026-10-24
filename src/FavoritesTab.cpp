@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -35,6 +36,9 @@
 
 
 using namespace std::literals;
+
+using std::cerr;
+using std::endl;
 
 
 namespace FavoritesTab {
@@ -69,6 +73,14 @@ namespace FavoritesTab {
         void
         handle_station_edit(StationPtr old_station,
                             Station new_station);
+
+        void
+        load()
+            noexcept;
+
+        void
+        save()
+            noexcept;
 
         void
         show_station(std::size_t index,
@@ -140,6 +152,54 @@ namespace FavoritesTab {
             if (!station->stationuuid.empty())
                 uuids.insert(station->stationuuid);
             changed = true;
+        }
+
+
+        void
+        load()
+            noexcept
+        {
+            try {
+                TRACE_FUNC;
+
+                stations.clear();
+
+                auto filename = App::get_config_dir() / "favorites.json";
+                Serializer::load(stations, filename);
+
+                uuids.clear();
+                for (auto& st : stations) {
+                    if (!st->stationuuid.empty())
+                        uuids.insert(st->stationuuid);
+                }
+                changed = false;
+
+                LOG_INFO("Loaded {} favorites.", stations.size());
+            }
+            catch (std::exception& e) {
+                LOG_ERROR("Loading favorites.json: {}", e.what());
+            }
+        }
+
+
+        void
+        save()
+            noexcept
+        {
+            TraceFunction tf{"FavoritesTab"sv};
+
+            try {
+
+                auto filename = App::get_config_dir() / "favorites.json";
+                Serializer::save(stations, filename);
+                changed = false;
+            }
+            catch (std::exception& e) {
+                if (App::is_running())
+                    LOG_ERROR("Saving favorites: {}", e.what());
+                else
+                    cerr << "Error saving favorites.json: " << e.what() << endl;
+            }
         }
 
 
@@ -403,30 +463,6 @@ namespace FavoritesTab {
 
 
     void
-    load()
-    try {
-        TRACE_FUNC;
-
-        stations.clear();
-
-        auto filename = App::get_config_dir() / "favorites.json";
-        Serializer::load(stations, filename);
-
-        uuids.clear();
-        for (auto& st : stations) {
-            if (!st->stationuuid.empty())
-                uuids.insert(st->stationuuid);
-        }
-        changed = false;
-
-        LOG_INFO("Loaded {} favorites.", stations.size());
-    }
-    catch (std::exception& e) {
-        LOG_ERROR("{}", e.what());
-    }
-
-
-    void
     process_ui()
     {
         using namespace ImGui::RAII;
@@ -492,20 +528,6 @@ namespace FavoritesTab {
                           return station.stationuuid == st->stationuuid;
                       });
         changed = true;
-    }
-
-
-    void
-    save()
-    try {
-        TraceFunction tf{"FavoritesTab"sv};
-
-        auto filename = App::get_config_dir() / "favorites.json";
-        Serializer::save(stations, filename);
-        changed = false;
-    }
-    catch (std::exception& e) {
-        LOG_ERROR("{}", e.what());
     }
 
 } // namespace FavoritesTab

@@ -9,6 +9,7 @@
 #include <chrono>
 #include <deque>
 #include <format>
+#include <iostream>
 #include <memory>
 #include <optional>
 #include <ranges>
@@ -39,10 +40,11 @@
 #include "tracer.hpp"
 #include "UI.hpp"
 
-
-using std::chrono::system_clock;
-
 using namespace std::literals;
+
+using std::cerr;
+using std::chrono::system_clock;
+using std::endl;
 
 using Settings::cfg;
 
@@ -126,13 +128,15 @@ namespace PlayerTab {
         format_to_string(sdl::audio::format fmt);
 
         void
-        load();
+        load()
+            noexcept;
 
         void
         process_logic();
 
         void
-        save();
+        save()
+            noexcept;
 
         // void
         // show_details_popup();
@@ -177,15 +181,18 @@ namespace PlayerTab {
 
         void
         load()
-        try {
+            noexcept
+        {
             TRACE_FUNC;
+            try {
 
-            auto filename = App::get_config_dir() / "player.json";
-            Serializer::load(state, filename);
-            changed = false;
-        }
-        catch (std::exception& e) {
-            LOG_ERROR("{}", e.what());
+                auto filename = App::get_config_dir() / "player.json";
+                Serializer::load(state, filename);
+                changed = false;
+            }
+            catch (std::exception& e) {
+                LOG_ERROR("Loading player.json: {}", e.what());
+            }
         }
 
 
@@ -254,15 +261,20 @@ namespace PlayerTab {
 
         void
         save()
-        try {
+            noexcept
+        {
             TRACE_FUNC;
-
-            auto filename = App::get_config_dir() / "player.json";
-            Serializer::save(state, filename);
-            changed = false;
-        }
-        catch (std::exception& e) {
-            LOG_ERROR("{}", e.what());
+            try {
+                auto filename = App::get_config_dir() / "player.json";
+                Serializer::save(state, filename);
+                changed = false;
+            }
+            catch (std::exception& e) {
+                if (App::is_running())
+                    LOG_ERROR("Saving player.json: {}", e.what());
+                else
+                    cerr << "Error saving player.json: " << e.what() << endl;
+            }
         }
 
 
@@ -685,8 +697,11 @@ namespace PlayerTab {
     {
         TRACE_FUNC;
 
+        stop();
+
         if (changed)
             save();
+
         play_res.reset();
     }
 

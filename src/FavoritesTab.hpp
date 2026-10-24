@@ -32,9 +32,6 @@ namespace FavoritesTab {
     initialize();
 
     void
-    load();
-
-    void
     process_ui();
 
     void
@@ -45,9 +42,6 @@ namespace FavoritesTab {
 
     void
     remove(const Station& station);
-
-    void
-    save();
 
 } // namespace FavoritesTab
 
