@@ -379,7 +379,7 @@ namespace RadioBrowserAPI {
                   ExceptionFunction except_func = {});
 
     void
-    get_countries_sync(std::stop_token& stopper,
+    get_countries_sync(std::stop_token& stoken,
                        const CountriesParams& params,
                        GetCountriesResultFunction result_func,
                        ExceptionFunction except_func = {});
@@ -394,7 +394,7 @@ namespace RadioBrowserAPI {
                   ExceptionFunction except_func = {});
 
     void
-    get_languages_sync(std::stop_token& stopper,
+    get_languages_sync(std::stop_token& stoken,
                        const std::string& filter,
                        const LanguagesParams& params,
                        GetLanguagesResultFunction result_func,
@@ -424,7 +424,7 @@ namespace RadioBrowserAPI {
              ExceptionFunction except_func = {});
 
     void
-    get_tags_sync(std::stop_token& stopper,
+    get_tags_sync(std::stop_token& stoken,
                   const TagsParams& params,
                   GetTagsResultFunction result_func,
                   ExceptionFunction except_func = {});

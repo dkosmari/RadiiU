@@ -26,6 +26,7 @@
 #include "ButtonHBox.hpp"
 #include "CountryManager.hpp"
 #include "enumerator.hpp"
+#include "humanize.hpp"
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
 #include "RadioBrowserAPI.hpp"
@@ -85,6 +86,8 @@ namespace BrowserSearchPopup {
         using LanguageVec = std::vector<Language>;
         using OptLanguageVec = std::optional<LanguageVec>;
 
+        using FileTimestamp = std::filesystem::file_time_type;
+
 
         // RAII type for resources
         struct Resources {
@@ -112,7 +115,9 @@ namespace BrowserSearchPopup {
         /* Constants */
         /*-----------*/
 
-        const std::string popup_id = "Search on RadioBrowser.info"s;
+        const auto popup_id = "Search on RadioBrowser.info"s;
+
+        constexpr auto cache_expiration = 24h;
 
 
         /*-----------*/
@@ -143,18 +148,21 @@ namespace BrowserSearchPopup {
         fetch_tags(OptTagVec& tags);
 
         void
-        languages_loader_thread_function(std::stop_token stopper)
+        languages_loader_thread_function(std::stop_token stoken)
             noexcept;
 
+        [[nodiscard]]
         std::regex
-        load_ignored_tags_regex(std::stop_token& stopper);
+        load_ignored_tags_regex(std::stop_token& stoken);
 
-        void
-        load_languages_cache(std::stop_token& stopper)
+        [[nodiscard]]
+        std::optional<FileTimestamp>
+        load_languages_cache(std::stop_token& stoken)
             noexcept;
 
-        void
-        load_tags_cache(std::stop_token& stopper)
+        [[nodiscard]]
+        std::optional<FileTimestamp>
+        load_tags_cache(std::stop_token& stoken)
             noexcept;
 
         std::string
@@ -182,7 +190,7 @@ namespace BrowserSearchPopup {
         show_filters();
 
         void
-        tags_loader_thread_function(std::stop_token stopper)
+        tags_loader_thread_function(std::stop_token stoken)
             noexcept;
 
         std::string
@@ -287,7 +295,7 @@ namespace BrowserSearchPopup {
 
 
         void
-        languages_loader_thread_function(std::stop_token stopper)
+        languages_loader_thread_function(std::stop_token stoken)
             noexcept
         {
             TraceManager::thread_name("languages loader thread"sv);
@@ -295,7 +303,20 @@ namespace BrowserSearchPopup {
             TraceFunction tf{"BrowserSearchPopup"sv};
 
             try {
-                load_languages_cache(stopper);
+                auto now = std::chrono::file_clock::now();
+                auto timestamp = load_languages_cache(stoken);
+
+                throw_if_stopped(stoken);
+
+                // Skip downloading a new languages list if the cache is recent.
+                if (timestamp) {
+                    auto cache_age = now - *timestamp;
+                    if (cache_age < cache_expiration) {
+                        LOG_DEBUG("languages cache is recent: {}",
+                                  humanize::duration(cache_age));
+                        return;
+                    }
+                }
 
                 RadioBrowserAPI::LanguagesParams params;
                 params.order = RadioBrowserAPI::LanguagesParams::Order::name;
@@ -303,28 +324,28 @@ namespace BrowserSearchPopup {
                 params.limit = 10000;
 
                 RadioBrowserAPI::get_languages_sync(
-                    stopper,
+                    stoken,
                     ""s,
                     params,
-                    [&stopper]
+                    [&stoken]
                     (const RadioBrowserAPI::LanguageVec rb_languages)
-                    mutable
+                        mutable
                     {
                         assert(res);
 
-                        throw_if_stopped(stopper);
+                        throw_if_stopped(stoken);
 
                         LanguageVec new_languages;
 
                         for (auto& [name, code, stationcount] : rb_languages) {
-                            throw_if_stopped(stopper);
+                            throw_if_stopped(stoken);
                             new_languages.emplace_back(name, code);
                         }
 
                         LOG_INFO("Received {} languages.", new_languages.size());
                         res->safe_languages.store(std::move(new_languages));
 
-                        throw_if_stopped(stopper);
+                        throw_if_stopped(stoken);
 
                         save_languages_cache(rb_languages);
                     },
@@ -342,7 +363,7 @@ namespace BrowserSearchPopup {
 
 
         std::regex
-        load_ignored_tags_regex(std::stop_token& stopper)
+        load_ignored_tags_regex(std::stop_token& stoken)
         try {
             std::ifstream input;
             std::filesystem::path filename = "ignored_tags.txt";
@@ -352,13 +373,13 @@ namespace BrowserSearchPopup {
                 if (!try_open_file(input, App::get_content_dir() / filename))
                     throw std::runtime_error{"could not find \""s + filename.string() + "\""s};
 
-            throw_if_stopped(stopper);
+            throw_if_stopped(stoken);
 
             std::string line;
             std::string full_regex;
             unsigned counter = 0;
             while (getline(input, line)) {
-                if (stopper.stop_requested())
+                if (stoken.stop_requested())
                     throw std::runtime_error{"stop requested"};
                 if (line.empty())
                     continue;
@@ -368,7 +389,7 @@ namespace BrowserSearchPopup {
                 ++counter;
             }
 
-            throw_if_stopped(stopper);
+            throw_if_stopped(stoken);
 
             std::regex result;
             result.assign(full_regex,
@@ -384,8 +405,8 @@ namespace BrowserSearchPopup {
         }
 
 
-        void
-        load_languages_cache(std::stop_token& stopper)
+        std::optional<FileTimestamp>
+        load_languages_cache(std::stop_token& stoken)
             noexcept
         {
             assert(res);
@@ -397,7 +418,9 @@ namespace BrowserSearchPopup {
                 auto cached_languages_filename = App::get_data_dir() / "languages.beve";
 #endif
                 if (!exists(cached_languages_filename))
-                    return;
+                    return {};
+
+                FileTimestamp result = last_write_time(cached_languages_filename);
 
                 RadioBrowserAPI::LanguageVec rb_languages;
 
@@ -419,12 +442,12 @@ namespace BrowserSearchPopup {
                 t.stop();
                 t.report();
 
-                throw_if_stopped(stopper);
+                throw_if_stopped(stoken);
 
                 LanguageVec new_languages;
 
                 for (auto& [name, code, stationcount] : rb_languages) {
-                    throw_if_stopped(stopper);
+                    throw_if_stopped(stoken);
                     new_languages.emplace_back(std::move(name), std::move(code));
                 }
 
@@ -432,15 +455,18 @@ namespace BrowserSearchPopup {
                 res->safe_languages.store(std::move(new_languages));
                 LOG_INFO("Loaded languages from local cache: {:?}",
                          cached_languages_filename.string());
+
+                return result;
             }
             catch (std::exception& e) {
                 LOG_ERROR("Failed to load cached languages: {}", e.what());
+                return {};
             }
         }
 
 
-        void
-        load_tags_cache(std::stop_token& stopper)
+        std::optional<FileTimestamp>
+        load_tags_cache(std::stop_token& stoken)
             noexcept
         {
             assert(res);
@@ -453,7 +479,9 @@ namespace BrowserSearchPopup {
                 auto cached_tags_filename = App::get_data_dir() / "tags.beve";
 #endif
                 if (!exists(cached_tags_filename))
-                    return;
+                    return {};
+
+                FileTimestamp result = last_write_time(cached_tags_filename);
 
                 RadioBrowserAPI::TagVec rb_tags;
 
@@ -475,15 +503,17 @@ namespace BrowserSearchPopup {
                 t.stop();
                 t.report();
 
-                throw_if_stopped(stopper);
+                throw_if_stopped(stoken);
 
                 if (!ignored_tags_regex)
-                    ignored_tags_regex = load_ignored_tags_regex(stopper);
+                    ignored_tags_regex = load_ignored_tags_regex(stoken);
+
+                throw_if_stopped(stoken);
 
                 std::smatch matches;
                 TagVec new_tags;
                 for (auto& [name, stationcount] : rb_tags) {
-                    throw_if_stopped(stopper);
+                    throw_if_stopped(stoken);
                     if (res->ignored_tags_regex &&
                         regex_search(name, matches, *ignored_tags_regex) &&
                         matches.length() > 0) {
@@ -498,9 +528,12 @@ namespace BrowserSearchPopup {
                 LOG_INFO("Loaded {} tags.", new_tags.size());
                 res->safe_tags.store(std::move(new_tags));
                 LOG_INFO("Loaded tags from local cache: {:?}", cached_tags_filename.string());
+
+                return result;
             }
             catch (std::exception& e) {
                 LOG_ERROR("Failed to load cached tags: {}", e.what());
+                return {};
             }
         }
 
@@ -846,7 +879,7 @@ namespace BrowserSearchPopup {
 
 
         void
-        tags_loader_thread_function(std::stop_token stopper)
+        tags_loader_thread_function(std::stop_token stoken)
             noexcept
         {
             TraceManager::thread_name("tags loader thread"sv);
@@ -854,7 +887,20 @@ namespace BrowserSearchPopup {
             TraceFunction tf{"BrowserSearchPopup"sv};
 
             try {
-                load_tags_cache(stopper);
+                auto now = std::chrono::file_clock::now();
+                auto timestamp = load_tags_cache(stoken);
+
+                throw_if_stopped(stoken);
+
+                // Skip downloading a new tags list if the cache is recent.
+                if (timestamp) {
+                    auto cache_age = now - *timestamp;
+                    if (cache_age < cache_expiration) {
+                        LOG_DEBUG("tags cache is recent: {}",
+                                  humanize::duration(cache_age));
+                        return;
+                    }
+                }
 
                 RadioBrowserAPI::TagsParams params;
                 params.order = RadioBrowserAPI::TagsParams::Order::name;
@@ -862,28 +908,28 @@ namespace BrowserSearchPopup {
                 params.hidebroken = true;
 
                 RadioBrowserAPI::get_tags_sync(
-                    stopper,
+                    stoken,
                     params,
-                    [&stopper]
+                    [&stoken]
                     (const RadioBrowserAPI::TagVec rb_tags)
-                    mutable
+                        mutable
                     {
-                        throw_if_stopped(stopper);
+                        throw_if_stopped(stoken);
 
                         assert(res);
 
                         auto& ignored_tags_regex = res->ignored_tags_regex;
 
                         if (!ignored_tags_regex)
-                            ignored_tags_regex = load_ignored_tags_regex(stopper);
+                            ignored_tags_regex = load_ignored_tags_regex(stoken);
 
-                        throw_if_stopped(stopper);
+                        throw_if_stopped(stoken);
 
                         TagVec new_tags;
                         std::smatch matches;
 
                         for (auto& [name, stationcount] : rb_tags) {
-                            throw_if_stopped(stopper);
+                            throw_if_stopped(stoken);
 
                             if (ignored_tags_regex &&
                                 regex_search(name, matches, *ignored_tags_regex) &&
@@ -904,7 +950,7 @@ namespace BrowserSearchPopup {
                         LOG_INFO("Received {} tags.", new_tags.size());
                         res->safe_tags.store(std::move(new_tags));
 
-                        throw_if_stopped(stopper);
+                        throw_if_stopped(stoken);
 
                         save_tags_cache(rb_tags);
                     },

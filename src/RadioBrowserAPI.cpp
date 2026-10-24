@@ -154,7 +154,7 @@ namespace RadioBrowserAPI {
 #if 0
         struct BusyGuard {
 
-            BusyGuard(std::stop_token& stopper);
+            BusyGuard(std::stop_token& stoken);
 
             ~BusyGuard()
                 noexcept;
@@ -202,7 +202,7 @@ namespace RadioBrowserAPI {
         /*-----------------------*/
 
         void
-        fetch_mirrors_thread_function(std::stop_token stopper,
+        fetch_mirrors_thread_function(std::stop_token stoken,
                                       FetchMirrorsResultFunction result_func,
                                       ErrorMsgFunction error_func)
             noexcept;
@@ -271,11 +271,11 @@ namespace RadioBrowserAPI {
         /*----------------------*/
 
 #if 0
-        BusyGuard::BusyGuard(std::stop_token& stopper)
+        BusyGuard::BusyGuard(std::stop_token& stoken)
         {
             bool expected_false = false;
             while (!busy.compare_exchange_strong(expected_false, true)) {
-                throw_if_stopped(stopper);
+                throw_if_stopped(stoken);
                 std::this_thread::sleep_for(100ms);
                 expected_false = false;
             }
@@ -291,7 +291,7 @@ namespace RadioBrowserAPI {
 
 
         void
-        fetch_mirrors_thread_function(std::stop_token stopper,
+        fetch_mirrors_thread_function(std::stop_token stoken,
                                       FetchMirrorsResultFunction result_func,
                                       ErrorMsgFunction error_func)
             noexcept
@@ -314,7 +314,7 @@ namespace RadioBrowserAPI {
                     string server = start_server;
                     ar.process(server);
 
-                    throw_if_stopped(stopper);
+                    throw_if_stopped(stoken);
 
                     if (ar.error.message)
                         throw Error{"failed resolving \""
@@ -327,7 +327,7 @@ namespace RadioBrowserAPI {
 
                 LOG_DEBUG("Found {} mirrors.", addresses.size());
 
-                throw_if_stopped(stopper);
+                throw_if_stopped(stoken);
 
                 // Step 2: find the canonical names for each IP
                 std::set<string> names;
@@ -338,7 +338,7 @@ namespace RadioBrowserAPI {
                     };
                     net::resolver::name_resolver nr;
                     for (const auto& addr : addresses) {
-                        throw_if_stopped(stopper);
+                        throw_if_stopped(stoken);
                         LOG_DEBUG("Querying canonical name for {}", addr);
                         try {
                             nr.process(addr);
@@ -359,7 +359,7 @@ namespace RadioBrowserAPI {
 
                 LOG_DEBUG("Found {} servers.", names.size());
 
-                throw_if_stopped(stopper);
+                throw_if_stopped(stoken);
 
                 // Step 3: Invoke the result callback.
                 if (result_func) {
@@ -893,7 +893,7 @@ namespace RadioBrowserAPI {
 
 
     void
-    get_countries_sync(std::stop_token& stopper,
+    get_countries_sync(std::stop_token& stoken,
                        const CountriesParams& params,
                        GetCountriesResultFunction result_func,
                        ExceptionFunction except_func)
@@ -904,7 +904,7 @@ namespace RadioBrowserAPI {
             std::string params_json;
             glz::ex::write_json(params, params_json);
 
-            throw_if_stopped(stopper);
+            throw_if_stopped(stoken);
 
             rest::request::params_t req_params{
                 .accept_content = "application/json"s,
@@ -919,14 +919,14 @@ namespace RadioBrowserAPI {
                 .post_fields = std::move(params_json),
                 .request_content = "application/json"s,
                 .response_func =
-                [&stopper, func = std::move(result_func)]
+                [&stoken, func = std::move(result_func)]
                 (rest::request& req)
                 mutable
                 {
-                    throw_if_stopped(stopper);
+                    throw_if_stopped(stoken);
                     CountryVec result;
                     glz::ex::read<glz_options>(result, req.get_content());
-                    throw_if_stopped(stopper);
+                    throw_if_stopped(stoken);
                     if (func)
                         func(result);
                 },
@@ -935,7 +935,7 @@ namespace RadioBrowserAPI {
                 .verbose = cfg.verbose_rest_logs,
             };
 
-            throw_if_stopped(stopper);
+            throw_if_stopped(stoken);
 
             rest::post_sync(std::move(req_params));
         }
@@ -964,7 +964,7 @@ namespace RadioBrowserAPI {
 
 
     void
-    get_languages_sync(std::stop_token& stopper,
+    get_languages_sync(std::stop_token& stoken,
                        const std::string& filter,
                        const LanguagesParams& params,
                        GetLanguagesResultFunction result_func,
@@ -980,7 +980,7 @@ namespace RadioBrowserAPI {
             std::string params_json;
             glz::ex::write_json(params, params_json);
 
-            throw_if_stopped(stopper);
+            throw_if_stopped(stoken);
 
             rest::request::params_t req_params{
                 .accept_content = "application/json"s,
@@ -995,11 +995,11 @@ namespace RadioBrowserAPI {
                 .post_fields = std::move(params_json),
                 .request_content = "application/json"s,
                 .response_func =
-                [&stopper, func = std::move(result_func)]
+                [&stoken, func = std::move(result_func)]
                     (rest::request& req)
                         mutable
                     {
-                        throw_if_stopped(stopper);
+                        throw_if_stopped(stoken);
                         LanguageVec result;
                         glz::ex::read<glz_options>(result, req.get_content());
                         if (func)
@@ -1010,7 +1010,7 @@ namespace RadioBrowserAPI {
                 .verbose = cfg.verbose_rest_logs,
             };
 
-            throw_if_stopped(stopper);
+            throw_if_stopped(stoken);
 
             rest::post_sync(std::move(req_params));
         }
@@ -1070,7 +1070,7 @@ namespace RadioBrowserAPI {
 
 
     void
-    get_tags_sync(std::stop_token& stopper,
+    get_tags_sync(std::stop_token& stoken,
                   const TagsParams& params,
                   GetTagsResultFunction result_func,
                   ExceptionFunction except_func)
@@ -1078,11 +1078,11 @@ namespace RadioBrowserAPI {
         assert(res);
 
         try {
-            // BusyGuard bg{stopper};
+            // BusyGuard bg{stoken};
             std::string params_json;
             glz::ex::write_json(params, params_json);
 
-            throw_if_stopped(stopper);
+            throw_if_stopped(stoken);
 
             rest::request::params_t req_params{
                 .accept_content = "application/json"s,
@@ -1097,14 +1097,14 @@ namespace RadioBrowserAPI {
                 .post_fields = std::move(params_json),
                 .request_content = "application/json"s,
                 .response_func =
-                    [&stopper, func = std::move(result_func)]
+                    [&stoken, func = std::move(result_func)]
                     (rest::request& req)
                         mutable
                     {
-                        throw_if_stopped(stopper);
+                        throw_if_stopped(stoken);
                         TagVec result;
                         glz::ex::read<glz_options>(result, req.get_content());
-                        throw_if_stopped(stopper);
+                        throw_if_stopped(stoken);
                         if (func)
                             func(result);
                     },
@@ -1113,7 +1113,7 @@ namespace RadioBrowserAPI {
                 .verbose = cfg.verbose_rest_logs,
             };
 
-            throw_if_stopped(stopper);
+            throw_if_stopped(stoken);
 
             rest::post_sync(std::move(req_params));
         }

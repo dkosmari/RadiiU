@@ -11,7 +11,6 @@
 #include <cassert>
 #include <chrono>
 #include <cmath>
-#include <concepts>
 #include <cstddef>
 #include <filesystem>
 #include <format>
@@ -196,11 +195,11 @@ namespace ImageLoader {
                 const sdl::vec2& size_limit);
 
             void
-            downloader_thread_function(std::stop_token stopper)
+            downloader_thread_function(std::stop_token stoken)
                 noexcept;
 
             void
-            loader_thread_function(std::stop_token stopper)
+            loader_thread_function(std::stop_token stoken)
                 noexcept;
 
             void
@@ -667,12 +666,12 @@ namespace ImageLoader {
 
 
         void
-        Resources::downloader_thread_function(std::stop_token stopper)
+        Resources::downloader_thread_function(std::stop_token stoken)
             noexcept
         try {
             TraceManager::thread_name("ImageLoader downloader thread");
 
-            while (!stopper.stop_requested()) {
+            while (!stoken.stop_requested()) {
 
                 unsigned work = 0; // keep track of any work, to detect we're idle
 
@@ -687,16 +686,16 @@ namespace ImageLoader {
                     auto& entry = *maybe_entry;
                     multi.add(entry->start_download(user_agent));
 
-                    if (stopper.stop_requested())
+                    if (stoken.stop_requested())
                         break;
                 }
 
-                if (stopper.stop_requested())
+                if (stoken.stop_requested())
                     break;
 
-                multi.poll(100ms, stopper);
+                multi.poll(100ms, stoken);
 
-                if (stopper.stop_requested())
+                if (stoken.stop_requested())
                     break;
 
                 work += multi.perform();
@@ -752,12 +751,12 @@ namespace ImageLoader {
 
 
         void
-        Resources::loader_thread_function(std::stop_token stopper)
+        Resources::loader_thread_function(std::stop_token stoken)
             noexcept
         try {
             TraceManager::thread_name("loader_thread");
-            while (!stopper.stop_requested()) {
-                auto entry = load_queue.try_pop_block(stopper);
+            while (!stoken.stop_requested()) {
+                auto entry = load_queue.try_pop_block(stoken);
                 if (entry) {
                     try {
                         (*entry)->load();
@@ -766,7 +765,7 @@ namespace ImageLoader {
                     catch (std::exception& e) {
                         LOG_ERROR("Requested: {}", e.what());
                     }
-                } else if (stopper.stop_requested() ||
+                } else if (stoken.stop_requested() ||
                            entry.error() == async_queue_error::stop) {
                     break;
                 } else if (entry.error() == async_queue_error::locked) [[unlikely]] {

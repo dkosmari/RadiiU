@@ -226,13 +226,13 @@ namespace BrowserTab {
             const auto& style = ImGui::GetStyle();
             float total_width = 0;
 
-            const auto prev100_label = "100 " ICON_FA_ANGLE_DOUBLE_LEFT " "s;
+            const auto prev100_label = "100 " ICON_FA_ANGLE_DOUBLE_LEFT ""s;
             const auto prev100_size = 2 * style.FramePadding + ImGui::CalcTextSize(prev100_label);
             total_width += prev100_size.x;
 
             total_width += style.ItemSpacing.x;
 
-            const auto prev10_label = "10 " ICON_FA_ANGLE_DOUBLE_LEFT " "s;
+            const auto prev10_label = "10 " ICON_FA_ANGLE_DOUBLE_LEFT ""s;
             const auto prev10_size = 2 * style.FramePadding + ImGui::CalcTextSize(prev10_label);
             total_width += prev10_size.x;
 
@@ -255,7 +255,7 @@ namespace BrowserTab {
 
             total_width += style.ItemSpacing.x;
 
-            const auto next10_label = " " ICON_FA_ANGLE_DOUBLE_RIGHT " 10"s;
+            const auto next10_label = ICON_FA_ANGLE_DOUBLE_RIGHT " 10"s;
             const auto next10_size = 2 * style.FramePadding + ImGui::CalcTextSize(next10_label);
             total_width += next10_size.x;
 

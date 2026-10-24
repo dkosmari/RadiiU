@@ -184,20 +184,20 @@ public:
 
     // Overload taking a stop_token to unblock.
     T
-    pop(std::stop_token& stopper)
+    pop(std::stop_token& stoken)
     {
         std::unique_lock guard{mutex};
         // Wait until a stop is requested, or the queue has data.
         empty_cond.wait(
             guard,
-            stopper,
+            stoken,
             [this]
             {
                 return should_stop || !queue.empty();
             }
         );
 
-        if (stopper.stop_requested() || should_stop)
+        if (stoken.stop_requested() || should_stop)
             throw async_queue_error::stop;
 
         T result = std::move(queue.front());
@@ -208,21 +208,21 @@ public:
 
     // Block until there's data to pop, or a stop is requested.
     std::expected<T, async_queue_error>
-    try_pop_block(std::stop_token stopper)
+    try_pop_block(std::stop_token stoken)
         noexcept
     {
         std::unique_lock guard{mutex};
         // Wait until a stop is requested, or the queue has data.
         empty_cond.wait(
             guard,
-            stopper,
+            stoken,
             [this]
             {
                 return should_stop || !queue.empty();
             }
         );
 
-        if (stopper.stop_requested() || should_stop)
+        if (stoken.stop_requested() || should_stop)
             return std::unexpected{async_queue_error::stop};
 
         T result = std::move(queue.front());
@@ -291,7 +291,7 @@ public:
     template<typename Rep,
              typename Period>
     std::expected<T, async_queue_error>
-    pop_for(std::stop_token& stopper,
+    pop_for(std::stop_token& stoken,
             const std::chrono::duration<Rep, Period>& timeout)
         noexcept
     {
@@ -304,7 +304,7 @@ public:
         // Wait until a stop is requested, or the queue has data.
         empty_cond.wait_until(
             guard,
-            stopper,
+            stoken,
             deadline,
             [this]
             {
@@ -312,7 +312,7 @@ public:
             }
         );
 
-        if (stopper.stop_requested() || should_stop)
+        if (stoken.stop_requested() || should_stop)
             return std::unexpected{async_queue_error::stop};
 
         if (queue.empty())

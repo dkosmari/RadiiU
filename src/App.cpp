@@ -1121,7 +1121,7 @@ namespace App {
     {
         TRACE_FUNC;
 
-        // Dispatch all pending tasks
+        // Dispatch all pending tasks before we start cleaning up.
         try {
             tasks.dispatch_all();
         }
@@ -1149,15 +1149,14 @@ namespace App {
         finalize_imgui();
 
         cfg.remember_tab = cfg.initial_tab == TabID::last_active;
-        if (cfg.remember_tab) {
-            cout  << "remembering last used tab: {}" << to_string(current_tab) << endl;
+        if (cfg.remember_tab)
             cfg.initial_tab = current_tab;
-        }
+
         // Finalize Settings module last.
         Settings::finalize();
         finalize_config_dir();
 
-        // Last task dispatch
+        // Last task dispatch before we shut down the log manager.
         try {
             tasks.dispatch_all();
         }

@@ -461,12 +461,12 @@ namespace rest {
 
 
     void
-    manager::worker_thread_function(std::stop_token stopper)
+    manager::worker_thread_function(std::stop_token stoken)
     {
         try {
             TraceManager::thread_name("rest worker thread"sv);
 
-            while (!stopper.stop_requested()) {
+            while (!stoken.stop_requested()) {
 
                 if (!new_requests.empty()) {
                     TraceDuration add_req_duration{
@@ -483,7 +483,7 @@ namespace rest {
                     }
                 }
 
-                if (stopper.stop_requested())
+                if (stoken.stop_requested())
                     break;
 
                 {
@@ -506,9 +506,9 @@ namespace rest {
                     );
                 }
 
-                worker.multi.poll(100ms, stopper);
+                worker.multi.poll(100ms, stoken);
 
-                if (stopper.stop_requested())
+                if (stoken.stop_requested())
                     break;
 
                 {
@@ -519,7 +519,7 @@ namespace rest {
                     worker.multi.perform();
                 }
 
-                if (stopper.stop_requested())
+                if (stoken.stop_requested())
                     break;
 
                 for (auto& [easy, err] : worker.multi.get_done()) {
@@ -548,7 +548,7 @@ namespace rest {
                     }
                 }
 
-                if (stopper.stop_requested())
+                if (stoken.stop_requested())
                     break;
             }
         }

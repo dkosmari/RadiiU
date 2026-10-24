@@ -107,7 +107,7 @@ async_byte_stream::read(std::span<std::byte> dst)
 
 std::span<std::byte>
 async_byte_stream::read(std::span<std::byte> dst,
-                        std::stop_token& stopper)
+                        std::stop_token& stoken)
     noexcept
 {
     if (dst.empty())
@@ -117,14 +117,14 @@ async_byte_stream::read(std::span<std::byte> dst,
 
     empty_cond.wait(
         lock,
-        stopper,
+        stoken,
         [this]
         {
             return !data.empty() || closed;
         }
     );
 
-    if (stopper.stop_requested())
+    if (stoken.stop_requested())
         return {};
 
     std::size_t count = std::min(data.size(), dst.size());
@@ -178,7 +178,7 @@ async_byte_stream::read_all(std::span<std::byte> dst)
 
 std::span<std::byte>
 async_byte_stream::read_all(std::span<std::byte> dst,
-                            std::stop_token& stopper)
+                            std::stop_token& stoken)
     noexcept
 {
     const std::size_t requested = dst.size();
@@ -191,14 +191,14 @@ async_byte_stream::read_all(std::span<std::byte> dst,
 
         empty_cond.wait(
             lock,
-            stopper,
+            stoken,
             [this]
             {
                 return !data.empty() || closed;
             }
         );
 
-        if (stopper.stop_requested())
+        if (stoken.stop_requested())
             break;
         if (data.empty() && closed)
             break;

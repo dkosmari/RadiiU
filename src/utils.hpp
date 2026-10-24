@@ -42,7 +42,7 @@ namespace utils {
     }
 
     void
-    throw_if_stopped(std::stop_token& stopper);
+    throw_if_stopped(std::stop_token& stoken);
 
 } // namespace utils
 

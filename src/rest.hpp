@@ -258,7 +258,7 @@ namespace rest {
 
 
         void
-        worker_thread_function(std::stop_token stopper);
+        worker_thread_function(std::stop_token stoken);
 
     }; // class manager
 

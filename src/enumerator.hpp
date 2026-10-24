@@ -7,6 +7,8 @@
 
 namespace enumerator {
 
+    // A custom enumerator::limits<T> can be specialized, with begin/end values.
+
     template<typename T>
     struct limits;
 
@@ -14,22 +16,33 @@ namespace enumerator {
     namespace concepts {
 
         template<typename T>
-        concept enumeration = std::is_enum_v<T>;
+        concept enumeration = std::is_enum_v<std::decay_t<T>>;
 
 
         template<typename T>
-        concept limited_below = enumeration<T> && requires { limits<T>::begin; };
+        concept limited_below =
+            enumeration<T> &&
+            requires { limits<std::decay_t<T>>::begin; };
 
 
         template<typename T>
-        concept limited_above = enumeration<T> && requires { limits<T>::end; };
+        concept limited_above =
+            enumeration<T> &&
+            requires { limits<std::decay_t<T>>::end; };
 
 
         template<typename T>
-        concept limited = limited_below<T> && limited_above<T>;
+        concept limited =
+            enumeration<T> &&
+            limited_below<T> &&
+            limited_above<T>;
 
+        // When a `count` enumeration value exists, assume it's the limit, and the enumeration
+        // starts from 0.
         template<typename T>
-        concept implicit_limit_above = enumeration<T> && requires { T::count; };
+        concept implicit_limit_above =
+            enumeration<T> &&
+            requires { T::count; };
 
     } // namespace concepts
 

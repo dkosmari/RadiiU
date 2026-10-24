@@ -30,9 +30,9 @@ namespace utils {
 
 
     void
-    throw_if_stopped(std::stop_token& stopper)
+    throw_if_stopped(std::stop_token& stoken)
     {
-        if (stopper.stop_requested())
+        if (stoken.stop_requested())
             throw std::runtime_error{"stop requested"};
     }
 

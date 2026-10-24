@@ -211,14 +211,14 @@ namespace TraceManager {
 
         void
         collect_active_events(std::ostream& output,
-                              std::stop_token& stopper,
+                              std::stop_token& stoken,
                               EventBufferPtrList& work_buffers,
                               std::string& json_buffer,
                               bool& started,
                               std::vector<ThreadContextPtr>& producers);
 
         void
-        collector_thread_function(std::stop_token stopper);
+        collector_thread_function(std::stop_token stoken);
 
         void
         dump_buffer(EventBufferPtr& buffer,
@@ -432,7 +432,7 @@ namespace TraceManager {
 
         void
         collect_active_events(std::ostream& output,
-                              std::stop_token& stopper,
+                              std::stop_token& stoken,
                               EventBufferPtrList& work_buffers,
                               std::string& json_buffer,
                               bool& started,
@@ -440,7 +440,7 @@ namespace TraceManager {
         {
             TraceActivator activator{context_manager};
 
-            while (!stopper.stop_requested()) {
+            while (!stoken.stop_requested()) {
 
                 bool worked = false;
 
@@ -452,7 +452,7 @@ namespace TraceManager {
                         producers.push_back(ctx);
                 }
 
-                if (stopper.stop_requested())
+                if (stoken.stop_requested())
                     break;
 
                 for (auto& ctx : producers)
@@ -470,13 +470,13 @@ namespace TraceManager {
 
 
         void
-        collector_thread_function(std::stop_token stopper)
+        collector_thread_function(std::stop_token stoken)
         {
             try {
                 LOG_DEBUG("Starting trace collector thread");
 
                 auto filename = make_log_filename();
-                if (stopper.stop_requested())
+                if (stoken.stop_requested())
                     return;
 
                 LOG_DEBUG("Collector thread: writing to {}", filename.string());
@@ -494,32 +494,38 @@ namespace TraceManager {
                 std::string json_buffer;
                 std::vector<ThreadContextPtr> producers;
 
-                collect_active_events(output,
-                                      stopper,
-                                      work_buffers,
-                                      json_buffer,
-                                      started,
-                                      producers);
+                collect_active_events(
+                    output,
+                    stoken,
+                    work_buffers,
+                    json_buffer,
+                    started,
+                    producers
+                );
 
                 std::println(cout,"Finishing event collection.");
                 // Assume all threads stopped generating events, so take their buffers.
                 auto all_producers = context_manager.safe_producers.lock();
                 for (auto& [tid, ctx] : *all_producers) {
                     std::println(cout,"Dumping full buffers from {}", tid);
-                    dump_full_buffers(ctx,
-                                      output,
-                                      work_buffers,
-                                      json_buffer,
-                                      started);
+                    dump_full_buffers(
+                        ctx,
+                        output,
+                        work_buffers,
+                        json_buffer,
+                        started
+                    );
                     // Also consume the current_buffer
                     if (ctx->current_buffer) {
                         std::println(cout, "Dumping current buffer from {}: {} events",
                                      tid,
                                      ctx->current_buffer->size());
-                        dump_buffer(ctx->current_buffer,
-                                    output,
-                                    json_buffer,
-                                    started);
+                        dump_buffer(
+                            ctx->current_buffer,
+                            output,
+                            json_buffer,
+                            started
+                        );
                     }
                     // Add a name event, for good measure
                     glz::generic_u64 args;

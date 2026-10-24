@@ -10,6 +10,8 @@
 
 #include <chrono>
 #include <string>
+#include <type_traits>
+
 
 namespace humanize {
 
@@ -18,9 +20,29 @@ namespace humanize {
     duration(std::chrono::seconds t,
              bool separate = true);
 
+
+    template<typename Rep,
+             typename Period>
+    requires (
+        !std::is_same_v<std::chrono::duration<Rep, Period>,
+                        std::chrono::seconds>
+    )
+    [[nodiscard]]
+    std::string
+    duration(std::chrono::duration<Rep, Period> t,
+             bool separate = true)
+    {
+        return duration(
+            duration_cast<std::chrono::seconds>(t),
+            separate
+        );
+    }
+
+
     [[nodiscard]]
     std::string
     duration_brief(std::chrono::seconds t);
+
 
     [[nodiscard]]
     std::string

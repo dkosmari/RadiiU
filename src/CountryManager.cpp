@@ -28,6 +28,7 @@
 #include "CountryManager.hpp"
 
 #include "App.hpp"
+#include "humanize.hpp"
 #include "IconsFontAwesome4.h"
 #include "LogManager.hpp"
 #include "RadioBrowserAPI.hpp"
@@ -97,6 +98,8 @@ namespace CountryManager {
         using CodepointStrMap = std::unordered_map<char32_t, std::string>;
         using StrFlagEntryMap = std::unordered_map<std::string, FlagEntry>;
 
+        using FileTimestamp = std::filesystem::file_time_type;
+
 
         // RAII type for resources
         struct Resources {
@@ -116,7 +119,9 @@ namespace CountryManager {
         /* Constants */
         /*-----------*/
 
-        const char32_t first_codepoint = 0xe200;
+        constexpr char32_t first_codepoint = 0xe200;
+
+        constexpr auto cache_expiration = 24h;
 
 
         /*-----------*/
@@ -139,7 +144,7 @@ namespace CountryManager {
         /*-----------------------*/
 
         void
-        countries_loader_thread_function(std::stop_token stopper)
+        countries_loader_thread_function(std::stop_token stoken)
             noexcept;
 
         void
@@ -183,9 +188,9 @@ namespace CountryManager {
         get_final_font_size(const ImFontConfig* config,
                             const ImFontBaked* baked);
 
-
-        void
-        load_countries_cache(std::stop_token& stopper)
+        [[nodiscard]]
+        std::optional<FileTimestamp>
+        load_countries_cache(std::stop_token& stoken)
             noexcept;
 
         void
@@ -210,7 +215,7 @@ namespace CountryManager {
 
 
         void
-        countries_loader_thread_function(std::stop_token stopper)
+        countries_loader_thread_function(std::stop_token stoken)
             noexcept
         {
             TraceManager::thread_name("countries loader thread"sv);
@@ -220,7 +225,20 @@ namespace CountryManager {
             assert(res);
 
             try {
-                load_countries_cache(stopper);
+                auto now = std::chrono::file_clock::now();
+                auto timestamp = load_countries_cache(stoken);
+
+                throw_if_stopped(stoken);
+
+                // Skip downloading a new countries list if the cache is recent.
+                if (timestamp) {
+                    auto cache_age = now - *timestamp;
+                    if (cache_age < cache_expiration) {
+                        LOG_DEBUG("countries cache is recent: {}",
+                                  humanize::duration(cache_age));
+                        return;
+                    }
+                }
 
                 RadioBrowserAPI::CountriesParams params;
                 // NOTE: RadioBrowser does not respect order by name, it orders by code. So we
@@ -229,18 +247,18 @@ namespace CountryManager {
                 params.limit = 1000;
 
                 RadioBrowserAPI::get_countries_sync(
-                    stopper,
+                    stoken,
                     {},
-                    [&stopper]
+                    [&stoken]
                     (const RadioBrowserAPI::CountryVec rb_countries)
-                    mutable
+                        mutable
                     {
-                        throw_if_stopped(stopper);
+                        throw_if_stopped(stoken);
 
                         CountryVec new_countries;
 
                         for (auto& [name, code, count] : rb_countries) {
-                            throw_if_stopped(stopper);
+                            throw_if_stopped(stoken);
                             // LOG_DEBUG("handling: {:?}, {:?}",
                             //           name, code);
                             auto up_code = string_utils::to_upper(code);
@@ -257,7 +275,7 @@ namespace CountryManager {
 
                         res->safe_countries.store(std::move(new_countries));
 
-                        throw_if_stopped(stopper);
+                        throw_if_stopped(stoken);
 
                         save_countries_cache(rb_countries);
                     },
@@ -477,8 +495,8 @@ namespace CountryManager {
         }
 
 
-        void
-        load_countries_cache(std::stop_token& stopper)
+        std::optional<FileTimestamp>
+        load_countries_cache(std::stop_token& stoken)
             noexcept
         {
             assert(res);
@@ -490,7 +508,9 @@ namespace CountryManager {
                 auto cached_countries_filename = App::get_data_dir() / "countries.beve";
 #endif
                 if (!exists(cached_countries_filename))
-                    return;
+                    return {};
+
+                FileTimestamp result = last_write_time(cached_countries_filename);
 
                 RadioBrowserAPI::CountryVec rb_countries;
 
@@ -512,12 +532,12 @@ namespace CountryManager {
                 t.stop();
                 t.report();
 
-                throw_if_stopped(stopper);
+                throw_if_stopped(stoken);
 
                 CountryVec new_countries;
 
                 for (auto& [name, code, stationcount] : rb_countries) {
-                    throw_if_stopped(stopper);
+                    throw_if_stopped(stoken);
                     auto up_code = string_utils::to_upper(std::move(code));
                     res->safe_code_to_name.lock()->emplace(up_code, name);
                     res->safe_name_to_code.lock()->emplace(name, up_code);
@@ -534,9 +554,12 @@ namespace CountryManager {
 
                 LOG_INFO("Loaded countries from local cache: {:?}",
                          cached_countries_filename.string());
+
+                return result;
             }
             catch (std::exception& e) {
                 LOG_ERROR("Failed to load cached countries: {}", e.what());
+                return {};
             }
         }
 

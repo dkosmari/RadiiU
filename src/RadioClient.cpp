@@ -372,7 +372,7 @@ RadioClient::add_url(const std::string& new_url)
 
 
 void
-RadioClient::network_thread_function(std::stop_token stopper)
+RadioClient::network_thread_function(std::stop_token stoken)
     noexcept
 {
     TraceManager::thread_name("RadioClient network thread"sv);
@@ -399,7 +399,7 @@ RadioClient::network_thread_function(std::stop_token stopper)
 
         easy.create();
 
-        while (!stopper.stop_requested()) {
+        while (!stoken.stop_requested()) {
 
             if (!network.tasks.empty()) {
                 TraceDuration duration_tasks_dispatch{
@@ -419,9 +419,9 @@ RadioClient::network_thread_function(std::stop_token stopper)
                 }
             }
 
-            multi.poll(100ms, stopper);
+            multi.poll(100ms, stoken);
 
-            if (stopper.stop_requested())
+            if (stoken.stop_requested())
                 break;
 
             {
@@ -433,7 +433,7 @@ RadioClient::network_thread_function(std::stop_token stopper)
             }
 
 
-            if (stopper.stop_requested())
+            if (stoken.stop_requested())
                 break;
 
             for (auto [ez, code] : multi.get_done()) {
@@ -482,7 +482,7 @@ RadioClient::network_thread_function(std::stop_token stopper)
 
 
 void
-RadioClient::audio_thread_function(std::stop_token stopper)
+RadioClient::audio_thread_function(std::stop_token stoken)
     noexcept
 {
     TraceManager::thread_name("RadioClient audio thread"sv);
@@ -506,7 +506,7 @@ RadioClient::audio_thread_function(std::stop_token stopper)
         constexpr unsigned max_failures = 4;
         unsigned create_failures = 0;
 
-        while (!stopper.stop_requested()) {
+        while (!stoken.stop_requested()) {
 
             if (is_error()) {
                 LOG_DEBUG("audio thread stopping: error state");
@@ -554,9 +554,9 @@ RadioClient::audio_thread_function(std::stop_token stopper)
             } else {
 
                 // We have a decoder already
-                auto data = encoded_audio.read(buffer, stopper);
+                auto data = encoded_audio.read(buffer, stoken);
 
-                if (stopper.stop_requested())
+                if (stoken.stop_requested())
                     break;
 
                 resume_transfer_if_paused();
@@ -589,18 +589,18 @@ RadioClient::audio_thread_function(std::stop_token stopper)
                     }
                 }
 
-                if (stopper.stop_requested())
+                if (stoken.stop_requested())
                     break;
 
                 if (converter) {
 
-                    while (!stopper.stop_requested()) {
+                    while (!stoken.stop_requested()) {
 
                         auto samples = decoder->decode();
                         if (!samples)
                             break;
 
-                        if (stopper.stop_requested())
+                        if (stoken.stop_requested())
                             break;
 
                         if (!samples->empty()) {
@@ -614,7 +614,7 @@ RadioClient::audio_thread_function(std::stop_token stopper)
                             }
                         }
 
-                    } // while (!stopper.stop_requested())
+                    } // while (!stoken.stop_requested())
 
                 } // if (audio_converter)
 
@@ -628,7 +628,7 @@ RadioClient::audio_thread_function(std::stop_token stopper)
 
             }
 
-        } // while (!stopper.stop_requested())
+        } // while (!stoken.stop_requested())
         tsm.stopping();
     }
     catch (std::exception& e) {

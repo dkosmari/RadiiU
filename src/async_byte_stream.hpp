@@ -67,7 +67,7 @@ public:
     [[nodiscard]]
     std::span<std::byte>
     read(std::span<std::byte> dst,
-         std::stop_token& stopper)
+         std::stop_token& stoken)
         noexcept;
 
 
@@ -79,7 +79,7 @@ public:
     [[nodiscard]]
     std::span<std::byte>
     read_all(std::span<std::byte> dst,
-             std::stop_token& stopper)
+             std::stop_token& stoken)
         noexcept;
 
 

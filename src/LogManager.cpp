@@ -38,7 +38,7 @@ namespace LogManager {
         /*-------*/
 
         using MessageVec = std::deque<Message>;
-        using SafeMessageVec = thread_safe<MessageVec, std::recursive_mutex>;
+        using SafeMessageVec = thread_safe_rec<MessageVec>;
 
 
         struct MessageAttributes {

@@ -8,7 +8,6 @@
 #ifndef UI_HPP
 #define UI_HPP
 
-#include <concepts>
 #include <format>
 #include <optional>
 #include <string>

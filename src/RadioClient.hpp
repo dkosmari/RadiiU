@@ -247,11 +247,11 @@ private:
 
 
     void
-    network_thread_function(std::stop_token stopper)
+    network_thread_function(std::stop_token stoken)
         noexcept;
 
     void
-    audio_thread_function(std::stop_token stopper)
+    audio_thread_function(std::stop_token stoken)
         noexcept;
 
 
