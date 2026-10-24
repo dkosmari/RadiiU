@@ -177,6 +177,8 @@ radiiu_elf_CPPFLAGS = \
 	-I$(srcdir)/external/imgui/misc/cpp \
 	-I$(srcdir)/external/imgui/misc/freetype \
 	-I$(srcdir)/external/mpg123xx/include \
+	-I$(srcdir)/external/plutosvg/plutovg/include \
+	-I$(srcdir)/external/plutosvg/source \
 	-I$(srcdir)/external/sdl2xx/include
 
 

@@ -20,12 +20,16 @@
 #include <imgui_stdlib.h>
 #include <neaacdec.h>
 #include <opus/opus_defines.h>
+#include <plutosvg.h>
 #include <SDL_image.h>
 #include <SDL_version.h>
 #include <vorbis/codec.h>
 
 #ifdef __WIIU__
+#include <jconfig.h>
+#include <png.h>
 #include <rpxloader/rpxloader.h>
+#include <webp/decode.h>
 #endif
 
 #ifdef IMGUI_ENABLE_FREETYPE
@@ -48,6 +52,10 @@
 #endif
 
 
+#define STRINGIFY(x) #x
+#define DOUBLE_STRINGIFY(x) STRINGIFY(x)
+
+
 using namespace std::literals;
 
 
@@ -55,143 +63,85 @@ namespace AboutTab {
 
     namespace {
 
+        /*-------*/
+        /* Types */
+        /*-------*/
+
+        struct RoleName {
+            std::string role;
+            std::string name;
+        }; // struct RoleName
+
+
+        /*-----------*/
+        /* Variables */
+        /*-----------*/
+
 #ifdef __WIIU__
         std::filesystem::path real_save_dir;
 #endif
 
 
+        /*-----------------------*/
+        /* Function declarations */
+        /*-----------------------*/
+
+        std::vector<RoleName>
+        get_credits();
+
         std::string
-        get_faad2_version()
-        {
-            using string_utils::concat;
-
-            char* faad_version = nullptr;
-            NeAACDecGetVersion(&faad_version, nullptr);
-            return faad_version;
-        }
-
-
-        void
-        show_faad2_info()
-        {
-            using namespace ImGui::RAII;
-
-            ID faad2_id{"faad2"};
-
-            ImGui::TableNextRow();
-
-            ImGui::TableNextColumn();
-
-            UI::Label("FAAD2");
-
-            ImGui::TableNextColumn();
-
-            static const std::string faad2_version_str = get_faad2_version();
-
-            ImGui::Text(faad2_version_str);
-
-            if (auto version_node = TreeNode{"features"s}) {
-
-                auto cap = NeAACDecGetCapabilities();
-
-                if (cap & LC_DEC_CAP)
-                    ImGui::BulletText("Low Complexity (LC) decoding"s);
-
-                if (cap & MAIN_DEC_CAP)
-                    ImGui::BulletText("Main Profile decoding"s);
-
-                if (cap & LTP_DEC_CAP)
-                    ImGui::BulletText("Long Term Prediction (LTP) decoding"s);
-
-                if (cap & LD_DEC_CAP)
-                    ImGui::BulletText("Low Delay (LD) decoding"s);
-
-                if (cap & ERROR_RESILIENCE_CAP)
-                    ImGui::BulletText("Error Resilience (ER) decoding"s);
-
-                if (cap & FIXED_POINT_CAP)
-                    ImGui::BulletText("Fixed Point (FP) decoding"s);
-
-            }
-        }
+        get_faad2_version();
 
 
 #ifdef IMGUI_ENABLE_FREETYPE
         std::string
-        get_ft_version()
-        {
-            FT_Library lib;
-            if (!FT_Init_FreeType(&lib)) {
-                FT_Int major, minor, patch;
-                FT_Library_Version(lib, &major, &minor, &patch);
-                FT_Done_FreeType(lib);
-                return std::format("{}.{}.{}",
-                                   major,
-                                   minor,
-                                   patch);
-            }
-            return "";
-        }
+        get_ft_version();
 #endif
 
+        std::string
+        get_glaze_version();
+
+#ifdef __WIIU__
+        std::string
+        get_png_version();
+#endif
 
         std::string
-        get_glaze_version()
-        {
-            return std::format("{}.{}.{}",
-                               glz::version.major,
-                               glz::version.minor,
-                               glz::version.patch);
-        }
-
+        get_sdl_img_version();
 
         std::string
-        get_sdl_version()
-        {
-            SDL_version v;
-            SDL_GetVersion(&v);
-            return std::format("{}.{}.{}",
-                               v.major,
-                               v.minor,
-                               v.patch);
-        }
+        get_sdl_version();
 
+#ifdef __WIIU__
+        std::string
+        get_webp_version();
+#endif
 
         std::string
-        get_sdl_img_version()
-        {
-            const SDL_version* v = IMG_Linked_Version();
-            return std::format("{}.{}.{}",
-                               v->major,
-                               v->minor,
-                               v->patch);
-        }
+        replace_brand_glyphs(const std::string& input);
+
+        void
+        show_components();
+
+        void
+        show_credits();
+
+        void
+        show_curl_info();
+
+        void
+        show_faad2_info();
+
+        void
+        show_imgui_info();
+
+        void
+        show_sdl_image_info();
 
 
-        std::string
-        replace_brand_glyphs(const std::string& input)
-        {
-            static const std::vector<std::tuple<std::string, std::string>> replacements = {
-                { "github:", ICON_FA_GITHUB },
-                // { "discord:", ICON_FA_DISCORD }
-            };
-
-            std::string result = input;
-
-            for (const auto& [src, dst] : replacements) {
-                auto pos = result.find(src);
-                if (pos == std::string::npos)
-                    continue;
-                result.replace(pos, src.size(), dst);
-            }
-            return result;
-        }
-
-
-        struct RoleName {
-            std::string role;
-            std::string name;
-        };
+        /*----------------------*/
+        /* Function definitions */
+        /*----------------------*/
 
         std::vector<RoleName>
         get_credits()
@@ -230,6 +180,206 @@ namespace AboutTab {
 
             return result;
         }
+
+
+        std::string
+        get_faad2_version()
+        {
+            using string_utils::concat;
+
+            char* faad_version = nullptr;
+            NeAACDecGetVersion(&faad_version, nullptr);
+            return faad_version;
+        }
+
+
+#ifdef IMGUI_ENABLE_FREETYPE
+        std::string
+        get_ft_version()
+        {
+            FT_Library lib;
+            if (!FT_Init_FreeType(&lib)) {
+                FT_Int major, minor, patch;
+                FT_Library_Version(lib, &major, &minor, &patch);
+                FT_Done_FreeType(lib);
+                return std::format("{}.{}.{}",
+                                   major,
+                                   minor,
+                                   patch);
+            }
+            return "";
+        }
+#endif
+
+
+        std::string
+        get_glaze_version()
+        {
+            return std::format("{}.{}.{}",
+                               glz::version.major,
+                               glz::version.minor,
+                               glz::version.patch);
+        }
+
+
+#ifdef __WIIU__
+        std::string
+        get_png_version()
+        {
+            unsigned v = png_access_version_number();
+            unsigned major = (v >> 16) & 0xff;
+            unsigned minor = (v >>  8) & 0xff;
+            unsigned micro = (v >>  0) & 0xff;
+            return std::format("{}.{}.{}", major, minor, micro);
+        }
+#endif
+
+
+        std::string
+        get_sdl_img_version()
+        {
+            const SDL_version* v = IMG_Linked_Version();
+            return std::format("{}.{}.{}",
+                               v->major,
+                               v->minor,
+                               v->patch);
+        }
+
+
+        std::string
+        get_sdl_version()
+        {
+            SDL_version v;
+            SDL_GetVersion(&v);
+            return std::format("{}.{}.{}",
+                               v.major,
+                               v.minor,
+                               v.patch);
+        }
+
+
+#ifdef __WIIU__
+        std::string
+        get_webp_version()
+        {
+            int v = WebPGetDecoderVersion();
+            int major = (v >> 16) & 0xff;
+            int minor = (v >>  8) & 0xff;
+            int micro = (v >>  0) & 0xff;
+            return std::format("{}.{}.{}", major, minor, micro);
+        }
+#endif
+
+
+        std::string
+        replace_brand_glyphs(const std::string& input)
+        {
+            static const std::vector<std::tuple<std::string, std::string>> replacements = {
+                { "github:", ICON_FA_GITHUB },
+                // { "discord:", ICON_FA_DISCORD }
+            };
+
+            std::string result = input;
+
+            for (const auto& [src, dst] : replacements) {
+                auto pos = result.find(src);
+                if (pos == std::string::npos)
+                    continue;
+                result.replace(pos, src.size(), dst);
+            }
+            return result;
+        }
+
+
+        void
+        show_components()
+        {
+            using namespace ImGui::RAII;
+
+            ID id{"components"};
+
+            ImGui::SeparatorText("Components");
+
+            Font smaller{nullptr, 0, 0.75f};
+
+            if (Table componets_table{"components", 2}) {
+
+                ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
+                ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
+
+                static const std::string sdl_version_str = get_sdl_version();
+                UI::InfoRow("SDL", sdl_version_str);
+
+                show_sdl_image_info();
+
+                show_imgui_info();
+
+#ifdef IMGUI_ENABLE_FREETYPE
+                static const std::string ft_version_str = get_ft_version();
+                if (!ft_version_str.empty())
+                    UI::InfoRow("FreeType", ft_version_str);
+
+                static const std::string plutosvg_version_str = plutosvg_version_string();
+                ImGui::FormatBulletText("plutosvg {}", plutosvg_version_str);
+#endif
+
+                show_curl_info();
+
+                static const std::string glaze_version_str = get_glaze_version();
+                UI::InfoRow("glaze", glaze_version_str);
+
+                static const std::string mpg123_version_str = MPG123_VERSION;
+                UI::InfoRow("mpg123", mpg123_version_str);
+
+                static const std::string opus_version_str = opus_get_version_string();
+                UI::InfoRow("Opus", opus_version_str);
+
+                static const std::string vorbis_version_str = vorbis_version_string();
+                UI::InfoRow("Vorbis", vorbis_version_str);
+
+                show_faad2_info();
+            }
+        }
+
+
+        void
+        show_credits()
+        {
+            using namespace ImGui::RAII;
+
+            static const auto credits = get_credits();
+
+            ImGui::SeparatorText("Credits");
+
+            Font smaller{nullptr, 0, 0.75f};
+
+            if (Table credits_table{"credits", 2}) {
+
+                ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
+                ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
+
+                for (const auto& [role, name] : credits)
+                    UI::InfoRow(role, name);
+
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                UI::Label("Stations list");
+                ImGui::TableNextColumn();
+                UI::TextLinkOpenURL("https://www.radio-browser.info");
+#if 0
+                ImGui::SameLine();
+                sdl::vec2 icon_size = {64, 64}
+                auto rb_icon_tex = ImageLoader::get(
+                    "https://www.radio-browser.info/favicon.ico",
+                    icon_size
+                );
+                ImGui::Image(*rb_icon_tex, icon_size);
+#endif
+
+                UI::InfoRow("Country flags", "GoSquared (http://www.gosquared.com/)");
+            }
+        }
+
 
         void
         show_curl_info()
@@ -299,6 +449,111 @@ namespace AboutTab {
 
         }
 
+
+        void
+        show_faad2_info()
+        {
+            using namespace ImGui::RAII;
+
+            ID faad2_id{"faad2"};
+
+            ImGui::TableNextRow();
+
+            ImGui::TableNextColumn();
+
+            UI::Label("FAAD2");
+
+            ImGui::TableNextColumn();
+
+            static const std::string faad2_version_str = get_faad2_version();
+
+            ImGui::Text(faad2_version_str);
+
+            if (auto version_node = TreeNode{"features"s}) {
+
+                auto cap = NeAACDecGetCapabilities();
+
+                if (cap & LC_DEC_CAP)
+                    ImGui::BulletText("Low Complexity (LC) decoding"s);
+
+                if (cap & MAIN_DEC_CAP)
+                    ImGui::BulletText("Main Profile decoding"s);
+
+                if (cap & LTP_DEC_CAP)
+                    ImGui::BulletText("Long Term Prediction (LTP) decoding"s);
+
+                if (cap & LD_DEC_CAP)
+                    ImGui::BulletText("Low Delay (LD) decoding"s);
+
+                if (cap & ERROR_RESILIENCE_CAP)
+                    ImGui::BulletText("Error Resilience (ER) decoding"s);
+
+                if (cap & FIXED_POINT_CAP)
+                    ImGui::BulletText("Fixed Point (FP) decoding"s);
+
+            }
+        }
+
+
+        void
+        show_imgui_info()
+        {
+            using namespace ImGui::RAII;
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            UI::Label("ImGui"s);
+
+            ImGui::TableNextColumn();
+            ImGui::Text(IMGUI_VERSION);
+
+            const auto& io = ImGui::GetIO();
+            auto font_atlas = io.Fonts;
+            if (TreeNode fonts_node{"fonts"}) {
+                for (auto font : font_atlas->Fonts) {
+                    ID font_id{font};
+                    for (auto src : font->Sources) {
+                        ID src_id{src};
+                        TextWrapPos wrapper;
+                        ImGui::BulletText(src->Name);
+                    }
+                }
+            }
+        }
+
+
+        void
+        show_sdl_image_info()
+        {
+            using namespace ImGui::RAII;
+
+            ID id{"sdl_image_info"};
+
+            ImGui::TableNextRow();
+
+            ImGui::TableNextColumn();
+
+            UI::Label("SDL_image");
+
+            ImGui::TableNextColumn();
+
+            static const std::string sdl_img_version_str = get_sdl_img_version();
+            ImGui::Text(sdl_img_version_str);
+
+#ifdef __WIIU__
+            if (TreeNode components_node{"image libraries"}) {
+                static const std::string png_version_str = get_png_version();
+                ImGui::FormatBulletText("png {}", png_version_str);
+
+                ImGui::FormatBulletText("turbo-jpeg {}",
+                                        DOUBLE_STRINGIFY(LIBJPEG_TURBO_VERSION));
+
+                static const std::string webp_version_str = get_webp_version();
+                ImGui::FormatBulletText("webp {}", webp_version_str);
+            }
+#endif
+        }
+
     } // namespace
 
 
@@ -360,74 +615,11 @@ namespace AboutTab {
                 UI::InfoRow("Config folder", App::get_config_dir());
                 UI::InfoRow("Data folder", App::get_data_dir());
 #endif
-
             }
 
-            {
-                static const auto credits = get_credits();
-                ImGui::SeparatorText("Credits");
-                Font smaller{nullptr, 0, 0.75f};
-                if (Table credits_table{"credits", 2}) {
+            show_credits();
 
-                    ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
-                    ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
-
-                    for (const auto& [role, name] : credits)
-                        UI::InfoRow(role, name);
-
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    UI::Label("Stations list");
-                    ImGui::TableNextColumn();
-                    UI::TextLinkOpenURL("https://www.radio-browser.info");
-                        // ImGui::SameLine();
-                    // auto rb_icon_tex = ImageLoader::get("https://www.radio-browser.info/favicon.ico");
-                    // ImGui::Image(*rb_icon_tex, sdl::vec2{64, 64});
-
-                    UI::InfoRow("Country flags", "GoSquared (http://www.gosquared.com/)");
-                }
-            }
-
-            {
-                ImGui::SeparatorText("Components");
-                Font smaller{nullptr, 0, 0.75f};
-                if (Table componets_table{"components", 2}) {
-
-                    ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed);
-                    ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
-
-                    static const std::string sdl_version_str = get_sdl_version();
-                    UI::InfoRow("SDL", sdl_version_str);
-
-                    static const std::string sdl_img_version_str = get_sdl_img_version();
-                    UI::InfoRow("SDL_image", sdl_img_version_str);
-                    // TODO: show versions for all image libraries
-
-                    UI::InfoRow("ImGui", IMGUI_VERSION);
-
-#ifdef IMGUI_ENABLE_FREETYPE
-                    static const std::string ft_version_str = get_ft_version();
-                    if (!ft_version_str.empty())
-                        UI::InfoRow("FreeType", ft_version_str);
-#endif
-
-                    show_curl_info();
-
-                    static const std::string glaze_version_str = get_glaze_version();
-                    UI::InfoRow("glaze", glaze_version_str);
-
-                    static const std::string mpg123_version_str = MPG123_VERSION;
-                    UI::InfoRow("mpg123", mpg123_version_str);
-
-                    static const std::string opus_version_str = opus_get_version_string();
-                    UI::InfoRow("Opus", opus_version_str);
-
-                    static const std::string vorbis_version_str = vorbis_version_string();
-                    UI::InfoRow("Vorbis", vorbis_version_str);
-
-                    show_faad2_info();
-                }
-            }
+            show_components();
         }
     }
 

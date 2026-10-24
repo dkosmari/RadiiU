@@ -6,7 +6,7 @@
     </a>
 </p>
 
-This is an internet radio player app for the Wii U.
+RadiiU is an internet radio player app for the Wii U.
 
 The stations list is provided by [www.radio-browser.info](https://www.radio-browser.info)
 for free. You can donate to them to ensure the project continues running.

@@ -57,7 +57,7 @@ namespace FontLoader {
         };
 
 
-        std::span<std::byte>
+        std::pair<std::span<std::byte>, std::string>
         get_cafe_font(OSSharedDataType type)
         {
             std::byte* data= nullptr;
@@ -67,7 +67,10 @@ namespace FontLoader {
                                  reinterpret_cast<void**>(&data),
                                  &size))
                 throw std::runtime_error{"Could not find \"" + font_names.at(type) + "\""};
-            return std::span(data, size);
+            return {
+                std::span(data, size),
+                font_names.at(type)
+            };
         }
 
 
@@ -95,12 +98,14 @@ namespace FontLoader {
             config.ExtraSizeScale = global_extra_scale;
             config.GlyphOffset.y = global_y_offset;
 
+            auto [font_data, font_name] = get_cafe_font(type);
+            std::snprintf(config.Name, sizeof config.Name, "%s", font_name.data());
 
             auto& io = ImGui::GetIO();
-            if (!io.Fonts->AddFontFromMemoryTTF(get_cafe_font(type),
+            if (!io.Fonts->AddFontFromMemoryTTF(font_data,
                                                 style.FontSizeBase,
                                                 &config))
-                throw std::runtime_error{"Could not parse \"" + font_names.at(type) + "\""};
+                throw std::runtime_error{"Could not load \"" + font_name + "\""};
         }
 
 
