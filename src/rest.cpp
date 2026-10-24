@@ -6,6 +6,7 @@
  */
 
 #include <chrono>
+#include <filesystem>
 #include <format>
 #include <utility>
 
@@ -18,18 +19,19 @@
 #include "mime_type.hpp"
 #include "TraceDuration.hpp"
 #include "TraceManager.hpp"
+#include "utils.hpp"
 
 
 using namespace std::literals;
 
 
-// New API
-
 namespace rest {
 
     namespace {
 
-        // Function declarations
+        /*-----------------------*/
+        /* Function declarations */
+        /*-----------------------*/
 
         std::string
         make_url(const std::string& base_url,
@@ -44,7 +46,9 @@ namespace rest {
         task_process_response(request_ptr req);
 
 
-        // Function definitions
+        /*----------------------*/
+        /* Function definitions */
+        /*----------------------*/
 
         std::string
         make_url(const std::string& base_url,
@@ -78,7 +82,9 @@ namespace rest {
     } // namespace
 
 
-    // Public functions
+    /*------------------*/
+    /* Public functions */
+    /*------------------*/
 
     error::error(const std::string& msg,
                  std::string content_,
@@ -95,6 +101,9 @@ namespace rest {
     {
         LogManagerCurl::capture_curl_debug(easy);
         easy.set_verbose(params.verbose);
+
+        if (auto custom_ca_info = utils::find_custom_ca_info())
+            easy.set_ca_info(*custom_ca_info);
 
         easy.set_ssl_verify_peer(params.ssl_verify_peer);
         easy.set_buffer_size(params.buffer_size);

@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <array>
 #include <cctype>
 #include <exception>
 #include <format>
@@ -46,6 +47,7 @@
 #include "TraceFunction.hpp"
 #include "tracer.hpp"
 #include "UI.hpp"
+#include "utils.hpp"
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -116,6 +118,9 @@ namespace AboutTab {
         std::string
         get_webp_version();
 #endif
+
+        std::string
+        path_to_human(const std::filesystem::path& path);
 
         std::string
         replace_brand_glyphs(const std::string& input);
@@ -272,12 +277,41 @@ namespace AboutTab {
 
 
         std::string
+        path_to_human(const std::filesystem::path& path)
+        {
+            std::string result = path.string();
+#ifdef __WIIU__
+
+            static const std::array<std::tuple<std::string, std::string>, 2> replacements{{
+
+                {
+                    "/vol/external01"s,
+                    "SD:"s
+                },
+                {
+                    "/vol/storage_mlc01"s,
+                    "mlc:"s
+                },
+            }};
+
+            for (auto [prefix, drive] : replacements) {
+                if (result.starts_with(prefix))
+                    result = drive + result.substr(prefix.size());
+            }
+#endif
+            return result;
+        }
+
+
+        std::string
         replace_brand_glyphs(const std::string& input)
         {
-            static const std::vector<std::tuple<std::string, std::string>> replacements = {
-                { "github:", ICON_FA_GITHUB },
-                // { "discord:", ICON_FA_DISCORD }
-            };
+            static const std::array<std::tuple<std::string, std::string>, 1> replacements{{
+                {
+                    "github:"s,
+                    ICON_FA_GITHUB ""s
+                },
+            }};
 
             std::string result = input;
 
@@ -439,14 +473,22 @@ namespace AboutTab {
 
             if (info->cainfo) {
                 ImGui::Bullet();
-                ImGui::FormatTextWrapped("cainfo: {}", info->cainfo);
+                ImGui::FormatTextWrapped("default cainfo: {}",
+                                         path_to_human(info->cainfo));
             }
 
             if (info->capath) {
                 ImGui::Bullet();
-                ImGui::FormatTextWrapped("capath: {}", info->capath);
+                ImGui::FormatTextWrapped("default capath: {}",
+                                         path_to_human(info->capath));
             }
 
+            static const auto custom_ca_info = utils::find_custom_ca_info();
+            if (custom_ca_info) {
+                ImGui::Bullet();
+                ImGui::FormatTextWrapped("custom cainfo: {}",
+                                         path_to_human(*custom_ca_info));
+            }
         }
 
 

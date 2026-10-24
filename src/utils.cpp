@@ -6,12 +6,35 @@
  */
 
 #include <algorithm>
+#include <array>
 #include <stdexcept>
 
 #include "utils.hpp"
 
 
+using namespace std::literals;
+
+
 namespace utils {
+
+    std::optional<std::filesystem::path>
+    find_custom_ca_info()
+    {
+#ifdef __WIIU__
+        static const std::array candidates{
+            "/vol/external01/wiiu/certs/cacert.pem"s,
+            "/vol/external01/certs/cacert.pem"s,
+            "/vol/content/cacert.pem"s,
+        };
+
+        for (auto p : candidates)
+            if (std::filesystem::exists(p))
+                return p;
+#endif
+
+        return {};
+    }
+
 
     void
     remove_prefix(std::span<const std::byte>& input,

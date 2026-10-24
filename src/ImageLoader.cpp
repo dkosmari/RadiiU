@@ -46,6 +46,7 @@
 #include "TraceFunction.hpp"
 #include "TraceManager.hpp"
 #include "tracer.hpp"
+#include "utils.hpp"
 
 
 using namespace std::literals;
@@ -372,6 +373,9 @@ namespace ImageLoader {
             easy.create();
             LogManagerCurl::capture_curl_debug(easy);
             easy.set_verbose(cfg.verbose_image_logs);
+
+            if (auto custom_ca_info = utils::find_custom_ca_info())
+                easy.set_ca_info(*custom_ca_info);
 
             if (!user_agent.empty())
                 easy.set_user_agent(user_agent);

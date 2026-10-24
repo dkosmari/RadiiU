@@ -9,12 +9,18 @@
 #define UTILS_HPP
 
 #include <cstddef>
+#include <filesystem>
+#include <optional>
 #include <ranges>
 #include <span>
 #include <stop_token>
 
 
 namespace utils {
+
+    std::optional<std::filesystem::path>
+    find_custom_ca_info();
+
 
     void
     remove_prefix(std::span<const std::byte>& input,
