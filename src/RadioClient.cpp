@@ -12,10 +12,6 @@
 
 #include <sys/socket.h>
 
-#ifdef __WIIU__
-#include <coreinit/energysaver.h>
-#endif
-
 #include <curlxx/url.hpp>
 #include <curlxx/easy.hpp>
 #include <curlxx/multi.hpp>
@@ -36,6 +32,10 @@
 #include "TraceManager.hpp"
 #include "tracer.hpp"
 #include "utils.hpp"
+
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 
 using namespace std::literals;
@@ -158,24 +158,6 @@ namespace {
 } // namespace
 
 
-RadioClient::APDDisabler::APDDisabler()
-    noexcept
-{
-#ifdef __WIIU__
-    IMDisableAPD();
-#endif
-}
-
-
-RadioClient::APDDisabler::~APDDisabler()
-    noexcept
-{
-#ifdef __WIIU__
-    IMEnableAPD();
-#endif
-}
-
-
 RadioClient::RadioClient(const std::string& user_agent_,
                          const std::string& station_url_,
                          std::initializer_list<std::string_view> extra_urls) :
@@ -209,11 +191,11 @@ RadioClient::process()
     TraceFunction tf{"RadioClient"sv};
 
     if (is_playing()) {
-        if (!apd_disabler && cfg.disable_apd)
-            apd_disabler.emplace();
+        if (!wake_lock && cfg.disable_apd)
+            wake_lock.emplace(PACKAGE_STRING, "Inhibit sleep while playing.");
     } else {
-        if (apd_disabler)
-            apd_disabler.reset();
+        if (wake_lock)
+            wake_lock.reset();
     }
 
     // main_tasks.dispatch_all()

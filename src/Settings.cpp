@@ -99,15 +99,6 @@ namespace Settings {
 
 
     void
-    load_defaults()
-        noexcept
-    {
-        cfg = {};
-        last_cfg = cfg;
-    }
-
-
-    void
     initialize()
     {
         TRACE_FUNC;

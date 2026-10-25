@@ -155,7 +155,9 @@ radiiu_elf_SOURCES = \
 	src/UI.hpp \
 	src/unit_test.hpp \
 	src/utils.cpp \
-	src/utils.hpp
+	src/utils.hpp \
+	src/WakeLock.cpp \
+	src/WakeLock.hpp
 
 
 radiiu_elf_CPPFLAGS = \
@@ -262,9 +264,13 @@ CLEANFILES = $(WUHB_FILE) radiiu.map
 
 else !ENABLE_WIIU
 
-radiiu_elf_CPPFLAGS += $(FONTCONFIG_CFLAGS)
+radiiu_elf_CPPFLAGS += \
+	$(FONTCONFIG_CFLAGS) \
+	$(SYSTEMD_CFLAGS)
 
-radiiu_elf_LDADD += $(FONTCONFIG_LIBS)
+radiiu_elf_LDADD += \
+	$(FONTCONFIG_LIBS) \
+	$(SYSTEMD_LIBS)
 
 
 .PHONY: run

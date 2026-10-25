@@ -35,20 +35,12 @@
 #include "icy_parser.hpp"
 #include "stream_metadata.hpp"
 #include "thread_safe.hpp"
+#include "WakeLock.hpp"
 
 
 // This class is the high-level handler for internet radio streams.
 
 class RadioClient {
-
-    struct APDDisabler {
-        APDDisabler()
-            noexcept;
-
-        ~APDDisabler()
-            noexcept;
-    };
-
 
 public:
 
@@ -213,7 +205,7 @@ private:
 
     thread_safe<std::string> safe_error_message;
 
-    std::optional<APDDisabler> apd_disabler;
+    std::optional<WakeLock> wake_lock;
 
     // async_task_queue main_tasks; // dispatched from .process()
 
