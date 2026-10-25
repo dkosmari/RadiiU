@@ -737,8 +737,9 @@ namespace RadioBrowserAPI {
             update_mirrors_and_select_random();
 
         rest::manager::config rest_config;
+        rest_config.ssl_verify = !cfg.ignore_ssl_errors;
         rest_config.user_agent = user_agent;
-        rest_config.verbose = cfg.verbose_rest_logs;
+        rest_config.verbose    = cfg.verbose_rest_logs;
         res->rest_manager.emplace(std::move(rest_config), get_server());
     }
 
@@ -909,27 +910,28 @@ namespace RadioBrowserAPI {
             rest::request::params_t req_params{
                 .accept_content = "application/json"s,
                 .error_func =
-                [&except_func]
-                (const std::exception& e)
-                mutable
-                {
-                    if (except_func)
-                        except_func(e);
-                },
+                    [&except_func]
+                    (const std::exception& e)
+                        mutable
+                    {
+                        if (except_func)
+                            except_func(e);
+                    },
                 .post_fields = std::move(params_json),
                 .request_content = "application/json"s,
                 .response_func =
-                [&stoken, func = std::move(result_func)]
-                (rest::request& req)
-                mutable
-                {
-                    throw_if_stopped(stoken);
-                    CountryVec result;
-                    glz::ex::read<glz_options>(result, req.get_content());
-                    throw_if_stopped(stoken);
-                    if (func)
-                        func(result);
-                },
+                    [&stoken, func = std::move(result_func)]
+                    (rest::request& req)
+                        mutable
+                    {
+                        throw_if_stopped(stoken);
+                        CountryVec result;
+                        glz::ex::read<glz_options>(result, req.get_content());
+                        throw_if_stopped(stoken);
+                        if (func)
+                            func(result);
+                    },
+                .ssl_verify = !cfg.ignore_ssl_errors,
                 .url = get_server() + "/json/countries"s,
                 .user_agent = res->user_agent,
                 .verbose = cfg.verbose_rest_logs,
@@ -995,7 +997,7 @@ namespace RadioBrowserAPI {
                 .post_fields = std::move(params_json),
                 .request_content = "application/json"s,
                 .response_func =
-                [&stoken, func = std::move(result_func)]
+                    [&stoken, func = std::move(result_func)]
                     (rest::request& req)
                         mutable
                     {
@@ -1005,6 +1007,7 @@ namespace RadioBrowserAPI {
                         if (func)
                             func(result);
                     },
+                .ssl_verify = !cfg.ignore_ssl_errors,
                 .url = url,
                 .user_agent = res->user_agent,
                 .verbose = cfg.verbose_rest_logs,
@@ -1108,6 +1111,7 @@ namespace RadioBrowserAPI {
                         if (func)
                             func(result);
                     },
+                .ssl_verify = !cfg.ignore_ssl_errors,
                 .url = get_server() + "/json/tags"s,
                 .user_agent = res->user_agent,
                 .verbose = cfg.verbose_rest_logs,

@@ -13,6 +13,7 @@
 #include <optional>
 #include <ranges>
 #include <span>
+#include <stdexcept>
 #include <stop_token>
 
 
@@ -46,6 +47,14 @@ namespace utils {
         }
         return false;
     }
+
+
+    struct stop_requested : std::runtime_error{
+
+        stop_requested();
+
+    }; // struct stop_requested;
+
 
     void
     throw_if_stopped(std::stop_token& stoken);

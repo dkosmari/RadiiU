@@ -12,7 +12,6 @@
 #include <format>
 #include <iostream>
 #include <memory>
-#include <optional>
 #include <set>
 #include <stdexcept>
 #include <thread>
@@ -662,13 +661,13 @@ namespace App {
                                                     "App"sv};
                 // Audio handling: if queue is empty, pause until we have enough data.
                 auto size_bytes = res->audio.device.get_queued_size();
-                auto queued_audio = get_queued_audio_duration();
-                // LOG_DEBUG("queued_audio: {}", queued_audio);
+                auto queued_duration = get_queued_music_duration();
+                // LOG_DEBUG("queued_duration: {}", queued_duration);
                 switch (res->audio.device.get_status()) {
                     using enum sdl::audio::status;
 
                     case paused:
-                        if (queued_audio >= cfg.player_buffer_duration)
+                        if (queued_duration >= cfg.player_buffer_duration)
                             res->audio.device.unpause();
                         break;
 
@@ -1239,7 +1238,7 @@ namespace App {
     }
 
 
-    audio_spec
+    std::optional<AudioSpec>
     get_audio_spec()
         noexcept
     {
@@ -1248,7 +1247,7 @@ namespace App {
             return {};
         }
 
-        return {
+        return AudioSpec{
             .format = res->audio.spec.format,
             .channels = res->audio.spec.channels,
             .rate = static_cast<unsigned>(res->audio.spec.freq),
@@ -1257,19 +1256,26 @@ namespace App {
 
 
     void
-    play_audio(std::span<const std::byte> samples)
+    play_music(std::span<const std::byte> samples,
+               std::stop_token& stoken)
     {
         if (!res) {
-            LOG_ERROR("Playing audio with no audio device available.");
+            LOG_ERROR("Playing music with no audio device available.");
             return;
         }
 
         res->audio.device.play(samples);
+
+        // Block while there's too much data queued.
+        if (cfg.player_buffer_duration > 0s)
+            while (!stoken.stop_requested() &&
+                   get_queued_music_duration() > 2 * cfg.player_buffer_duration)
+                std::this_thread::sleep_for(100ms);
     }
 
 
     void
-    clear_audio()
+    clear_music()
         noexcept
     {
         if (!res)
@@ -1279,7 +1285,7 @@ namespace App {
 
 
     dbl_milliseconds
-    get_queued_audio_duration()
+    get_queued_music_duration()
         noexcept
     {
         if (!res || !res->audio.device)

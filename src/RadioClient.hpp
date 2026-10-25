@@ -63,7 +63,7 @@ public:
     enum class TransferState {
         idle,
         queued,
-        in_progress,
+        active,
         paused,
         unpausing,
         error,
@@ -207,7 +207,7 @@ private:
     thread_safe<URLInfoVec> safe_url_info_vec;
     std::atomic<unsigned> url_info_idx{0};
 
-    async_byte_stream encoded_audio{256 * 1024};
+    async_byte_stream encoded_audio{1024 * 1024};
 
     thread_safe<stream_metadata> safe_metadata; // updated by either thread, read by the UI code
 
@@ -233,10 +233,11 @@ private:
     struct audio_t {
         std::atomic<ThreadState> thread_state = ThreadState::stopped;
         std::unique_ptr<Decoder> decoder;
+        bool skip_converter = false;
         sdl::audio::stream converter{nullptr};
         thread_safe<Decoder::Info> safe_info;
         thread_safe<std::string> safe_content_type;
-        std::vector<std::byte> buffer{256 * 1024};
+        std::vector<std::byte> buffer{256 * 1024}; // used for both decoding and conversion
         std::jthread thread;
     } audio;
 
@@ -296,6 +297,17 @@ private:
 
     void
     try_next_url();
+
+
+    void
+    set_error(const std::string& message);
+
+    void
+    set_error_and_halt(const std::string& message);
+
+    void
+    clear_error()
+        noexcept;
 
 }; // struct RadioClient
 

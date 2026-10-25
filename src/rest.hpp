@@ -78,7 +78,7 @@ namespace rest {
             std::optional<std::string>  post_fields     = {};
             std::optional<std::string>  request_content = {};
             mutable response_function_t response_func   = {};
-            bool                        ssl_verify_peer = false;
+            bool                        ssl_verify      = true;
             std::string                 url             = {};
             std::optional<std::string>  user_agent      = {};
             bool                        verbose         = true;
@@ -175,6 +175,7 @@ namespace rest {
         struct config {
             unsigned                   max_connections       = 2;
             unsigned                   max_total_connections = 2;
+            bool                       ssl_verify            = true;
             std::optional<std::string> user_agent            = {};
             bool                       verbose               = false;
         };

@@ -105,7 +105,8 @@ namespace rest {
         if (auto custom_ca_info = utils::find_custom_ca_info())
             easy.set_ca_info(*custom_ca_info);
 
-        easy.set_ssl_verify_peer(params.ssl_verify_peer);
+        easy.set_ssl_verify_host(params.ssl_verify);
+        easy.set_ssl_verify_peer(params.ssl_verify);
         easy.set_buffer_size(params.buffer_size);
         easy.set_url(params.url);
         // LOG_DEBUG("request url: {:?}", params.url);
@@ -388,6 +389,7 @@ namespace rest {
             {
                 .error_func = std::move(error_func),
                 .response_func = std::move(response_func),
+                .ssl_verify = cfg.ssl_verify,
                 .url = make_url(base_url, path, get_params),
                 .user_agent = cfg.user_agent,
                 .verbose = cfg.verbose,
@@ -421,6 +423,7 @@ namespace rest {
                 .accept_content = "application/json",
                 .error_func = std::move(error_func),
                 .response_func = std::move(response_func),
+                .ssl_verify = cfg.ssl_verify,
                 .url = make_url(base_url, path, get_params),
                 .user_agent = cfg.user_agent,
                 .verbose = cfg.verbose,
@@ -440,6 +443,7 @@ namespace rest {
                 .error_func = std::move(error_func),
                 .post_fields = std::move(post_body),
                 .response_func = std::move(response_func),
+                .ssl_verify = cfg.ssl_verify,
                 .url = make_url(base_url, path),
                 .user_agent = cfg.user_agent,
                 .verbose = cfg.verbose,
@@ -461,6 +465,7 @@ namespace rest {
                 .post_fields = std::move(post_body),
                 .request_content = "application/json",
                 .response_func = std::move(response_func),
+                .ssl_verify = cfg.ssl_verify,
                 .url = make_url(base_url, path),
                 .user_agent = cfg.user_agent,
                 .verbose = cfg.verbose,

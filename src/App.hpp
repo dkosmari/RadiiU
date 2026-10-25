@@ -12,7 +12,9 @@
 #include <cstddef>
 #include <filesystem>
 #include <functional>
+#include <optional>
 #include <span>
+#include <stop_token>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -108,29 +110,30 @@ namespace App {
     }
 
 
-    struct audio_spec {
+    struct AudioSpec {
         sdl::audio::format format{};
         unsigned channels{};
         unsigned rate{};
     };
 
 
-    audio_spec
+    std::optional<AudioSpec>
     get_audio_spec()
         noexcept;
 
 
     void
-    play_audio(std::span<const std::byte> samples);
+    play_music(std::span<const std::byte> samples,
+               std::stop_token& stoken);
 
 
     void
-    clear_audio()
+    clear_music()
         noexcept;
 
 
     dbl_milliseconds
-    get_queued_audio_duration()
+    get_queued_music_duration()
         noexcept;
 
 

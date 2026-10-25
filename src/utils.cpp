@@ -52,11 +52,17 @@ namespace utils {
     }
 
 
+
+    stop_requested::stop_requested() :
+        std::runtime_error{"stop requested"}
+    {}
+
+
     void
     throw_if_stopped(std::stop_token& stoken)
     {
         if (stoken.stop_requested())
-            throw std::runtime_error{"stop requested"};
+            throw stop_requested{};
     }
 
 } // namespace utils

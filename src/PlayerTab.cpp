@@ -89,10 +89,6 @@ namespace PlayerTab {
             PlaybackResources(PlaybackResources&&) = delete;
 
 
-            // bool
-            // is_buffer_too_empty();
-
-
             void
             process();
 
@@ -217,19 +213,6 @@ namespace PlayerTab {
         }
 
 
-#if 0
-        bool
-        PlaybackResources::is_buffer_too_empty()
-        {
-            // if (cfg.player_buffer_size == 0)
-            //     return false;
-
-            // return total_bytes_fed < cfg.player_buffer_size * 1024u;
-            return false;
-        }
-#endif
-
-
         void
         PlaybackResources::process()
         {
@@ -252,7 +235,7 @@ namespace PlayerTab {
         PlaybackResources::update_audio_queue_history()
         {
             audio_queue_history[audio_queue_index++] =
-                App::get_queued_audio_duration().count() / 1000.0;
+                App::get_queued_music_duration().count() / 1000.0;
 
             if (audio_queue_index >= audio_queue_history.size())
                 audio_queue_index = 0;
@@ -307,7 +290,6 @@ namespace PlayerTab {
 
                 Font smaller{nullptr, 0, 0.8f};
 
-                auto spec = App::get_audio_spec();
                 if (Table table{"table", 2}) {
                     ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed);
                     ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
@@ -319,10 +301,15 @@ namespace PlayerTab {
                     }
                     catch (...) {}
 
-                    UI::FormatInfoRow("Sound mode",
-                                      "{}㎐, {}",
-                                      humanize::value(spec.rate),
-                                      format_to_string(spec.format));
+                    if (auto spec = App::get_audio_spec()) {
+                        UI::FormatInfoRow("Sound mode",
+                                          "{} ch, {}㎐, {}",
+                                          spec->channels,
+                                          humanize::value(spec->rate),
+                                          format_to_string(spec->format));
+                    } else {
+                        UI::InfoRow("Sound mode", "audio device not initialized");
+                    }
 
                     auto transfer_state = play_res->radio.get_transfer_state();
                     UI::InfoRow("Transfer state", to_string(transfer_state));

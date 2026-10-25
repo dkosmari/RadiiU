@@ -333,7 +333,7 @@ namespace SettingsTab {
 
                 ImGui::TableNextColumn();
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::Checkbox("##use_swkbd", cfg.use_swkbd);
+                ImGui::Checkbox("##use_swkbd"s, cfg.use_swkbd);
 
 
                 /*-----------------------*/
@@ -349,7 +349,23 @@ namespace SettingsTab {
 
                 ImGui::TableNextColumn();
                 ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                ImGui::Checkbox("##send_clicks", cfg.send_clicks);
+                ImGui::Checkbox("##send_clicks"s, cfg.send_clicks);
+
+
+                /*-------------------*/
+                /* Ignore SSL errors */
+                /*-------------------*/
+
+                ImGui::TableNextRow();
+
+                ImGui::TableNextColumn();
+                ImGui::AlignTextToFramePadding();
+                UI::Label("Ignore SSL errors"sv,
+                          "Disable verification of SSL certificates."sv);
+
+                ImGui::TableNextColumn();
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                ImGui::Checkbox("##ignore_ssl_errors"s, cfg.ignore_ssl_errors);
 
 
                 /*--------------------*/

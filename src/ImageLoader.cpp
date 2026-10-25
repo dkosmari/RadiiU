@@ -387,7 +387,8 @@ namespace ImageLoader {
             easy.set_http_headers({ "Accept: image/*" });
             easy.set_http_version(curl::easy::http_version::none);
             easy.set_private(shared_from_this()); // NOTE: increase ref count
-            easy.set_ssl_verify_peer(false);
+            easy.set_ssl_verify_host(!cfg.ignore_ssl_errors);
+            easy.set_ssl_verify_peer(!cfg.ignore_ssl_errors);
             easy.set_tcp_no_delay(false);
             easy.set_transfer_encoding(true);
             easy.set_url(location);
