@@ -26,7 +26,7 @@ namespace Settings {
         bool        ignore_ssl_errors    = false;
         bool        inactive_screen_off  = false;
         TabID       initial_tab          = TabID::browser;
-        std::chrono::milliseconds player_buffer_duration = std::chrono::seconds{1};
+        std::chrono::milliseconds player_buffer_duration = std::chrono::seconds{5};
         unsigned    player_history_limit = 20;
         bool        remember_tab         = true;
         unsigned    recent_limit         = 10;
