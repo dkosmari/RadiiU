@@ -582,8 +582,8 @@ namespace ImageLoader {
             error_icon.set_blend_mode(SDL_BLENDMODE_BLEND);
             loading_icon.set_blend_mode(SDL_BLENDMODE_BLEND);
 
-            multi.set_max_total_connections(4);
-            multi.set_max_connections(2);
+            multi.set_max_total_connections(5);
+            multi.set_max_connections(5);
 
             downloader_thread = std::jthread{
                 std::bind_front(&Resources::downloader_thread_function, this)

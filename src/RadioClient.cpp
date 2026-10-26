@@ -209,17 +209,21 @@ RadioClient::play(unsigned idx)
 
     TRACE_FUNC;
 
-    if (is_playing()) {
+    bool was_playing = is_playing();
+
+    // NOTE: taking it out of is_playing() state will encourage the audio thread to stop, and
+    // the network thread to cancel its current transfer.
+    state = State::stopped;
+
+    if (was_playing) {
         network.tasks.add(
             "task_cancel_transfer"sv,
             &RadioClient::task_cancel_transfer,
             this
         );
-        audio.thread.request_stop();
         encoded_audio.close();
+        audio.thread.request_stop();
     }
-
-    state = State::stopped;
 
     clear_error();
 
@@ -241,15 +245,18 @@ RadioClient::stop()
 
     TRACE_FUNC;
 
-    if (is_playing()) {
-        audio.thread.request_stop();
+    bool was_playing = is_playing();
+
+    // NOTE: taking it out of is_playing() state will encourage the audio thread to stop, and
+    // the network thread to cancel its current transfer.
+    state = State::stopped;
+
+    if (was_playing) {
         encoded_audio.close();
         audio.thread = {};
     }
 
     App::clear_music();
-
-    state = State::stopped;
 }
 
 
@@ -356,7 +363,7 @@ RadioClient::add_url(const std::string& new_url)
     TraceFunction tf{"RadioClient"sv};
 
     if (is_error()) {
-        LOG_DEBUG("add_url() gave up: error state");
+        LOG_DEBUG("Not adding URL: error state.");
         return;
     }
 
@@ -414,13 +421,15 @@ RadioClient::network_thread_function(std::stop_token stoken)
                 network.tasks.dispatch_all();
             }
 
+            throw_if_stopped(stoken);
 
             if (is_error()) {
                 auto ts = network.transfer_state.load();
                 if (ts != TransferState::idle && ts != TransferState::error) {
                     std::ignore = multi.try_remove(easy);
-                    on_transfer_error(curl::error{"invalid network.transfer_state: "s
-                                                  + to_string(ts)});
+                    on_transfer_error(
+                        curl::error{"Stopped transfer due to error state: "s + to_string(ts)}
+                    );
                 }
             }
 
@@ -519,8 +528,8 @@ RadioClient::audio_thread_function(std::stop_token stoken)
 
             throw_if_stopped(stoken);
 
-            if (is_error()) {
-                LOG_DEBUG("audio thread stopping: error state");
+            if (!is_playing()) {
+                LOG_DEBUG("audio thread stopping: not playing.");
                 break;
             }
 
@@ -715,7 +724,7 @@ RadioClient::task_queue_transfer(unsigned idx)
     TraceFunction tf{"RadioClient"sv};
 
     if (is_error()) {
-        LOG_ERROR("Canceled task because it's in error state.");
+        LOG_DEBUG("Not queueing transfer: error state.");
         return;
     }
 
@@ -917,6 +926,9 @@ RadioClient::on_transfer_recv(std::span<const std::byte> input)
 {
     TraceFunction tf{"RadioClient"sv};
 
+    if (is_error())
+        return CURL_WRITEFUNC_ERROR;
+
     if (input.empty()) {
         LOG_DEBUG("Connection ended.");
         return 0;
@@ -1109,6 +1121,9 @@ RadioClient::on_transfer_started(std::span<const std::byte> data)
 void
 RadioClient::start_network_thread()
 {
+    if (is_error())
+        return;
+
     auto& thread_state = network.thread_state;
     auto st = thread_state.load();
     // early out
@@ -1116,11 +1131,6 @@ RadioClient::start_network_thread()
         return;
 
     TraceFunction tf{"RadioClient"sv};
-
-    if (is_error()) {
-        LOG_ERROR("start_network_thread() gave up: error state");
-        return;
-    }
 
     switch (st) {
         using enum ThreadState;
@@ -1149,6 +1159,9 @@ RadioClient::start_network_thread()
 void
 RadioClient::start_audio_thread()
 {
+    if (!is_playing())
+        return;
+
     auto& thread_state = audio.thread_state;
     auto st = thread_state.load();
     // early out
@@ -1156,11 +1169,6 @@ RadioClient::start_audio_thread()
         return;
 
     TraceFunction tf{"RadioClient"sv};
-
-    if (is_error()) {
-        LOG_DEBUG("start_audio_thread() gave up: error state");
-        return;
-    }
 
     switch (st) {
         using enum ThreadState;
@@ -1190,7 +1198,7 @@ void
 RadioClient::resume_transfer_if_paused()
 {
     if (is_error()) {
-        LOG_DEBUG("resume_transfer_if_paused() gave up: error state");
+        LOG_DEBUG("Not resuming transfer: error state.");
         return;
     }
 
@@ -1211,7 +1219,7 @@ RadioClient::process_playlist()
     TraceFunction tf{"RadioClient"sv};
 
     if (is_error()) {
-        LOG_DEBUG("process_playlist() gave up: error state");
+        LOG_DEBUG("Not processing playlist: error state.");
         return;
     }
 
@@ -1277,7 +1285,7 @@ void
 RadioClient::try_next_url()
 {
     if (is_error()) {
-        LOG_DEBUG("try_next_url() gave up: error state");
+        LOG_DEBUG("Not trying next URL: error state.");
         return;
     }
 

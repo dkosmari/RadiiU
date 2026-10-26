@@ -27,7 +27,7 @@ for free. You can donate to them to ensure the project continues running.
 
 When loading homebrew from the SD card, Aroma will redirect the save file to the SD card, inside
 `SD:/wiiu/apps/save/`. Check the **About** tab in RadiiU, to see what the SD save path is. User
-preferences, station history, track history, etc, are all stored in that folder.
+preferences, station history, player track history, etc, are all stored in that folder.
 
 
 ### Additional fonts

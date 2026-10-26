@@ -242,7 +242,7 @@ namespace SettingsTab {
                                 player_buffer_duration_ms,
                                 0.01f,
                                 {0.0},
-                                {10.0},
+                                {30.0},
                                 "%.1f seconds"s)) {
                     cfg.player_buffer_duration = std::chrono::milliseconds(
                         static_cast<int>(1000 * player_buffer_duration_ms)
