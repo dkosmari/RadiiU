@@ -4,7 +4,6 @@ EXTRA_DIST = \
 	COPYING.GPLv3 \
 	CREDITS \
 	README.md \
-	TODO.org \
 	tools
 
 

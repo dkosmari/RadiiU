@@ -19,11 +19,15 @@
 
 namespace Serializer {
 
+    struct custom_options : glz::opts {
+        bool error_on_unknown_keys = false;
+        bool prettify = true;
+        bool validate_utf8 = false;
+    }; // struct custom_options
+
+
     inline constexpr
-    const glz::opts glz_options{
-        .error_on_unknown_keys = false,
-        .prettify = true,
-    };
+    const custom_options options;
 
 
     template<typename T>
@@ -33,9 +37,9 @@ namespace Serializer {
     {
         std::filesystem::path filename_old = filename.string() + ".old";
         if (exists(filename))
-            glz::ex::read_file_json<glz_options>(obj, filename.c_str(), std::string{});
+            glz::ex::read_file_json<options>(obj, filename.c_str(), std::string{});
         else if (exists(filename_old))
-            glz::ex::read_file_json<glz_options>(obj, filename_old.c_str(), std::string{});
+            glz::ex::read_file_json<options>(obj, filename_old.c_str(), std::string{});
         else
             throw std::runtime_error{"\"" + filename.string() + "\" not found"};
     }
@@ -47,7 +51,7 @@ namespace Serializer {
          const std::filesystem::path& filename)
     {
         std::filesystem::path filename_new = filename.string() + ".new";
-        glz::ex::write_file_json<glz_options>(obj, filename_new.string(), std::string{});
+        glz::ex::write_file_json<options>(obj, filename_new.string(), std::string{});
 
 #ifdef __WIIU__
         // WORKAROUND: wut+newlib cannot rename when destination file already exists.
