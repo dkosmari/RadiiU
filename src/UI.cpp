@@ -801,48 +801,70 @@ namespace UI {
     {
         using namespace ImGui::RAII;
 #if 1
+        bool result = false;
+
         const auto& style = ImGui::GetStyle();
         const auto link_color = style.Colors[ImGuiCol_TextLink];
-        float url_width = ImGui::CalcTextSize(url).x;
+
+        ImVec2 available = ImGui::GetContentRegionAvail();
+
+        const std::string prefix = ICON_FA_LINK " "s;
+        const std::string label = prefix + url;
+
+        ImVec2 prefix_size = ImGui::CalcTextSize(prefix);
+        ImVec2 label_size = ImGui::CalcTextSize(label);
+        if (label_size.x > available.x)
+            label_size.x = available.x;
+
+        ImVec2 min = ImGui::GetCursorScreenPos();
+        ImVec2 max = min + label_size;
+
+        // Place an invisible button to track clicks and hover.
+        {
+            auto old_pos = ImGui::GetCursorPos();
+            bool clicked = ImGui::InvisibleButton(url,
+                                                  label_size,
+                                                  ImGuiButtonFlags_MouseButtonLeft |
+                                                  ImGuiButtonFlags_EnableNav);
+            if (ImGui::IsItemHovered())
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            // Right-click
+            if (PopupContextItem context_menu{"context-" + url}) {
+                if (ImGui::MenuItem("Copy link to clipboard"))
+                    ImGui::SetClipboardText(url);
+            }
+
+            if (clicked) {
+                // TODO: show QR popup
+                LOG_DEBUG("clicked on link: {}", url);
+                result = true;
+            }
+            ImGui::SetCursorPos(old_pos);
+        }
+
         {
             StyleColor text_color{ImGuiCol_Text, link_color};
-            ImGui::TextUnformatted(ICON_FA_LINK);
-            ImGui::SameLine();
-            if (ImGui::TextAligned(0, -1, url))
-                url_width = -1; // got truncated
+            ImGui::TextAligned(0, -1, label);
         }
 
         // Draw underline
-        auto draw_list = ImGui::GetWindowDrawList();
-        auto min = ImGui::GetItemRectMin();
-        auto max = ImGui::GetItemRectMax();
         auto baked = ImGui::GetFontBaked();
-        float underline_y = max.y
-            + std::floor(baked->Descent * style.FontSizeBase / baked->Size * 0.2f);
-        float underline_max = url_width < 0 ? max.x : min.x + url_width;
-        draw_list->AddLineH(min.x,
-                            underline_max,
+        constexpr float underline_pos = 0.2f; // how far below the baseline the underline is
+        float underline_y =
+            max.y +
+            std::floor(
+                underline_pos * baked->Descent * style.FontSizeBase / baked->Size
+            );
+
+        auto draw_list = ImGui::GetWindowDrawList();
+        // NOTE: underline starts where the URL text starts, not under the prefix
+        draw_list->AddLineH(min.x + prefix_size.x,
+                            max.x,
                             underline_y,
                             ImGui::GetColorU32(link_color),
                             2.0f);
 
-        // Mouse hover
-        if (ImGui::IsItemHovered())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-
-        // Left-click
-        if (ImGui::IsItemClicked()) {
-            // TODO: show QR popup
-            LOG_DEBUG("clicked on link: {}", url);
-            return true;
-        }
-
-        // Right-click
-        if (PopupContextItem context_menu{"context-" + url}) {
-            if (ImGui::MenuItem("Copy link to clipboard"))
-                ImGui::SetClipboardText(url);
-        }
-        return false;
+        return result;
 #else
         TextWrapPos wrapper{0};
         return ImGui::TextLinkOpenURL(url);
