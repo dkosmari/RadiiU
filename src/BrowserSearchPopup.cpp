@@ -658,6 +658,8 @@ namespace BrowserSearchPopup {
 
             assert(res);
 
+            const auto& style = ImGui::GetStyle();
+
             if (Child filters_group{"filters_group",
                                     {0, 0},
                                     ImGuiChildFlags_AutoResizeX |
@@ -723,10 +725,15 @@ namespace BrowserSearchPopup {
                     if (!tags)
                         fetch_tags(tags);
 
-                    // The rest of tags.
+                    // NOTE: Selectable items extrude outwards by half ItemSpacing
+                    StyleVar extra_padding{
+                        ImGuiStyleVar_WindowPadding,
+                        style.ItemSpacing / 2
+                    };
                     if (Child list{"list",
                                    {0.0f, 12 * ImGui::GetTextLineHeight()},
-                                   ImGuiChildFlags_NavFlattened}) {
+                                   ImGuiChildFlags_NavFlattened |
+                                   ImGuiChildFlags_AlwaysUseWindowPadding}) {
 
                         for (auto [index, tag] : *tags | std::views::enumerate) {
                             if (!text_filter.PassFilter(tag.data()))
@@ -760,17 +767,23 @@ namespace BrowserSearchPopup {
                         text_filter.Build();
                     }
 
+                    // NOTE: really wide so we don't scroll
+                    ImGui::SetNextItemWidth(1150);
                     // NOTE: only exact matches are allowed
-                    ImGui::SetNextItemWidth(1100);
                     text_filter.Draw("##country");
 
                     if (ImGui::Selectable("(any country)", filter.country.empty()))
                         filter.country.clear();
 
-                    // The rest of countries
+                    // NOTE: Selectable items extrude outwards by half ItemSpacing
+                    StyleVar extra_padding{
+                        ImGuiStyleVar_WindowPadding,
+                        style.ItemSpacing / 2
+                    };
                     if (Child list{"list",
                                    {0.0f, 12 * ImGui::GetTextLineHeight()},
-                                   ImGuiChildFlags_NavFlattened}) {
+                                   ImGuiChildFlags_NavFlattened |
+                                   ImGuiChildFlags_AlwaysUseWindowPadding}) {
                         CountryManager::for_each_country(
                             [&filter, &text_filter]
                             (std::size_t index,
@@ -826,9 +839,15 @@ namespace BrowserSearchPopup {
                     if (!languages)
                         fetch_languages(languages);
 
+                    // NOTE: Selectable items extrude outwards by half ItemSpacing
+                    StyleVar extra_padding{
+                        ImGuiStyleVar_WindowPadding,
+                        style.ItemSpacing / 2
+                    };
                     if (Child list{"list",
                             {0.0f, 12 * ImGui::GetTextLineHeight()},
-                            ImGuiChildFlags_NavFlattened}) {
+                            ImGuiChildFlags_NavFlattened |
+                            ImGuiChildFlags_AlwaysUseWindowPadding}) {
                         for (auto [index, lang] : *languages | std::views::enumerate) {
 
                             bool passed_name = text_filter.PassFilter(lang.name.data());
